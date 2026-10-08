@@ -157,46 +157,13 @@ function openDocForm(c,d={}){
 
 
 /* ---------- Cofre: senha e 2FA (TOTP) — o segredo nunca chega ao navegador ---------- */
-function celSenha(x){
-  if(!x.tem_senha)return el("span",{class:"note"},"—");
-  const sp=el("span",{class:"num"},"••••••••");let on=false,cache=null;
-  const pegar=async(motivo)=>{if(cache)return cache;const {data,error}=await SB.rpc("acesso_senha",{acesso_id:x.id,motivo});if(error)throw error;cache=data;return data};
-  const bt=el("button",{class:"btn sm",onclick:async()=>{try{if(!on){sp.textContent=await pegar("ver_senha")||"—"}else sp.textContent="••••••••";on=!on;bt.textContent=on?"Ocultar":"Mostrar"}catch(e){toast("Não foi possível obter a senha")}}},"Mostrar");
-  const cp=el("button",{class:"btn sm",onclick:async()=>{try{await navigator.clipboard.writeText(await pegar("copiar_senha")||"");toast("Senha copiada")}catch{toast("Não foi possível copiar")}}},"Copiar");
-  return el("div",{style:"display:flex;gap:6px;align-items:center"},sp,bt,cp);
-}
+const celSenha=(x)=>window.PP_TOTP.celSenha(x);
 function cel2fa(c,x){
   if(!x.tem_2fa)return el("button",{class:"btn sm edit-only",onclick:()=>open2faForm(c,x)},"Configurar 2FA");
   const w=window.PP_TOTP?window.PP_TOTP.widget(x.id,{compacto:true}):el("span",{class:"note"},"carregando…");
   return el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},w,el("button",{class:"btn sm edit-only",title:"Substituir ou remover o 2FA",onclick:()=>open2faForm(c,x)},"⚙"));
 }
-function open2faForm(c,x){
-  const seg=el("textarea",{rows:"3",placeholder:"Cole a chave manual (ex.: gezd gnbv gy3t qojq …) ou a URI otpauth://totp/…",autocomplete:"off",spellcheck:"false"});
-  const st=el("div",{class:"note"});
-  const arq=inp("file","",{accept:"image/*"});arq.onchange=async()=>{const f=arq.files?.[0];if(!f)return;st.textContent="Lendo QR…";try{const r=await lerQrImagem(f);if(r){seg.value=r;st.textContent="QR lido. Confira e salve."}else st.textContent="Não encontrei um QR nessa imagem."}catch(e){st.textContent="Não foi possível ler a imagem."}};
-  let stream=null,raf=null;const video=el("video",{style:"width:100%;max-height:260px;border-radius:8px;background:#000;display:none",playsinline:"",muted:""});
-  const parar=()=>{if(raf)cancelAnimationFrame(raf);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.style.display="none"};
-  const cam=el("button",{class:"btn sm",onclick:async()=>{if(stream){parar();cam.textContent="Ler com a câmera";return}try{await carregarJsQR();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});video.srcObject=stream;video.style.display="block";await video.play();cam.textContent="Parar câmera";
-      const cv=document.createElement("canvas");const ctx=cv.getContext("2d",{willReadFrequently:true});
-      const tick=()=>{if(!stream)return;if(video.readyState===4){cv.width=video.videoWidth;cv.height=video.videoHeight;ctx.drawImage(video,0,0);const img=ctx.getImageData(0,0,cv.width,cv.height);const q=window.jsQR(img.data,img.width,img.height);if(q?.data){seg.value=q.data;st.textContent="QR lido. Confira e salve.";parar();cam.textContent="Ler com a câmera";return}}raf=requestAnimationFrame(tick)};tick();
-    }catch(e){st.textContent="Câmera indisponível neste dispositivo/navegador. Use a chave manual ou uma imagem do QR."}}},"Ler com a câmera");
-  const body=el("div",{class:"form"},el("div",{class:"f full note"},`${x.sistema}${x.login?" · "+x.login:""}. No sistema do cliente, ative a verificação em duas etapas por aplicativo autenticador e use a chave/QR aqui — o painel passa a gerar os códigos para a equipe.`),
-    el("div",{class:"f full"},el("label",{},"Chave ou QR"),seg),el("div",{class:"f full",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},el("label",{class:"btn sm",style:"cursor:pointer"},"Ler QR de uma imagem",Object.assign(arq,{style:"display:none"})),cam),el("div",{class:"f full"},video),el("div",{class:"f full"},st));
-  const extra=x.tem_2fa&&PP.perfil?.papel==="admin"?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Remover o 2FA deste acesso?"))return;const {error}=await SB.rpc("totp_remover",{acesso_id:x.id});if(error){toast("Não foi possível remover");return}parar();$("#modalHost").replaceChildren();toast("2FA removido");recarregar()}},"Remover 2FA"):null;
-  modal(x.tem_2fa?"Substituir 2FA":"Configurar 2FA",body,async()=>{
-    const v=seg.value.trim();if(!v)throw new Error("Cole a chave ou leia o QR");
-    const {error}=await SB.rpc("totp_cadastrar",{acesso_id:x.id,segredo:v});if(error)throw new Error(error.message||"Segredo inválido");
-    parar();toast("2FA cadastrado — o código já pode ser gerado");recarregar();
-  },extra);
-  const ob=new MutationObserver(()=>{if(!document.body.contains(body)){parar();ob.disconnect()}});ob.observe($("#modalHost"),{childList:true});
-}
-const carregarJsQR=()=>new Promise((res,rej)=>{if(window.jsQR)return res();const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";sc.onload=res;sc.onerror=rej;document.head.append(sc)});
-async function lerQrImagem(file){
-  await carregarJsQR();const url=URL.createObjectURL(file);
-  try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
-    for(const esc of [1,2,0.5]){const cv=document.createElement("canvas");cv.width=Math.round(img.width*esc);cv.height=Math.round(img.height*esc);const ctx=cv.getContext("2d");ctx.drawImage(img,0,0,cv.width,cv.height);const d=ctx.getImageData(0,0,cv.width,cv.height);const q=window.jsQR(d.data,d.width,d.height);if(q?.data)return q.data}
-    return null}finally{URL.revokeObjectURL(url)}
-}
+const open2faForm=(c,x)=>window.PP_TOTP.form2fa(x,recarregar);
 
 function openAcessoForm(c,x={}){
   const sis=dl("ac-sis",x.sistema||"gov.br",SISTEMAS),tit=inp("text",x.titular||"",{placeholder:"Empresa / sócio"}),login=inp("text",x.login||"",{autocomplete:"off"}),senha=inp("password",""+"",{autocomplete:"new-password",placeholder:x.tem_senha?"•••••••• (deixe em branco para manter)":"opcional"}),obs=el("textarea",{placeholder:"2FA? qual telefone recebe o código? validade?"},x.observacoes||"");
