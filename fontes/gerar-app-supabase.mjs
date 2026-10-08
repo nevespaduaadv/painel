@@ -43,8 +43,8 @@ must('<div id="view-calibracao" hidden class="main"></div>');
 must('/*NAV_JURIDICO*/');
 html = html.replace('/*NAV_JURIDICO*/', '{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento"},{tab:"autenticador",label:"Autenticador (2FA)"},');
 must('/*NAV_GRUPOS*/');
-html = html.replace('/*NAV_GRUPOS*/', '{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}');
-html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>');
+html = html.replace('/*NAV_GRUPOS*/', '{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}');
+html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>\n  <div id="view-marketing" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
@@ -213,7 +213,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador");
+    window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing");
     if(equipe())aplicarHash();
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -266,7 +266,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
-html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
+html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="marketing.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');

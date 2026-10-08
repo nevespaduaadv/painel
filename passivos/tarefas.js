@@ -2,7 +2,7 @@
    v_tarefas_pontualidade). Carregado depois de carteira.js; usa os utilitários globais do painel. Só equipe. */
 (()=>{
 "use strict";
-const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",administrativo:"Administrativo",socios:"Sócios"};
+const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo",rh:"RH",socios:"Sócios"};
 const STATUS={aberta:"Aberta",em_andamento:"Em andamento",concluida:"Concluída",cancelada:"Cancelada"};
 const PRIORIDADE={1:"Alta",2:"Normal",3:"Baixa"};
 const FAIXAS=[["atrasada","Atrasadas","e3"],["hoje","Hoje","e3"],["d7","Até 7 dias","e2"],["d15","Até 15 dias","g"],["d30","Até 30 dias","g"],["depois","Depois de 30 dias",""],["sem_prazo","Sem prazo",""],["fechada","Concluídas / canceladas",""]];

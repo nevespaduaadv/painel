@@ -2,7 +2,7 @@
    Carregado depois de tarefas.js; usa os utilitários globais do painel. Cadastro: admin; leitura: equipe. */
 (()=>{
 "use strict";
-const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",administrativo:"Administrativo",socios:"Sócios"};
+const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo",rh:"RH",socios:"Sócios"};
 const PAPEIS={admin:"Administrador",colaborador:"Colaborador"};
 const E={lista:[],semColab:[],ok:false,carregando:false,mostrarInativos:false};
 const horasFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
