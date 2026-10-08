@@ -266,7 +266,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
-html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="marketing.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
+html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="rh.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="marketing.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');

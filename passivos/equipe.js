@@ -38,34 +38,37 @@ function renderEquipe(){
   const tog=check("Mostrar inativos",E.mostrarInativos);tog.input.onchange=()=>{E.mostrarInativos=tog.input.checked;render()};tog.wrap.className="";
   const lista=E.mostrarInativos?E.lista:ativos;
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nome"),el("th",{},"Cargo"),el("th",{},"Núcleo"),el("th",{},"Admissão"),el("th",{},"Usuário"),el("th",{class:"r"},"Horas 30d"),el("th",{class:"r"},"Registros 30d"),el("th",{class:"r"},"Tarefas"),el("th",{class:"r"},"Processos"),el("th",{},""))),
-    el("tbody",{},lista.length?lista.map(c=>el("tr",{style:c.ativo?"":"opacity:.6"},
+    el("tbody",{},lista.length?lista.map(c=>el("tr",{style:(c.ativo?"":"opacity:.6;")+"cursor:pointer",onclick:e=>{if(e.target.closest("button"))return;window.PP_RH?.abrir(c.id)}},
       el("td",{},el("b",{},c.nome),c.ativo?null:el("span",{class:"pill g",style:"margin-left:6px"},"inativo"),c.responsabilidades?el("div",{class:"note"},c.responsabilidades.slice(0,90)+(c.responsabilidades.length>90?"…":"")):null),
       el("td",{},c.cargo||"—",c.oab?el("div",{class:"note"},"OAB "+c.oab):null),el("td",{},NUCLEOS[c.nucleo]||"—"),el("td",{},c.data_admissao?fmtD(parseD(c.data_admissao)):"—",c.data_desligamento?el("div",{class:"note"},"saída "+fmtD(parseD(c.data_desligamento))):null),
       el("td",{},c.login_email?el("span",{},c.login_email,el("div",{class:"note"},PAPEIS[c.login_papel]||c.login_papel)):el("span",{class:"pill e2"},"sem login")),
       el("td",{class:"r num"},horasFmt(c.horas_30d)),el("td",{class:"r num"},String(c.registros_30d)),el("td",{class:"r num"},String(c.tarefas_abertas),c.tarefas_atrasadas>0?el("span",{class:"pill e3",style:"margin-left:4px"},c.tarefas_atrasadas+" atras."):null),el("td",{class:"r num"},String(c.processos_ativos)),
-      el("td",{},(admin()||c.perfil_id===PP.perfil?.id)?el("button",{class:"btn sm",onclick:()=>openColabForm(c)},"Editar"):null))):el("tr",{},el("td",{colspan:10,class:"note"},"Nenhum colaborador cadastrado. Use “+ Colaborador” ou cadastre a partir dos usuários acima."))));
+      el("td",{},el("div",{class:"actions",style:"flex-wrap:nowrap"},el("button",{class:"btn sm",onclick:()=>window.PP_RH?.abrir(c.id)},"Ficha"),(admin()||c.perfil_id===PP.perfil?.id)?el("button",{class:"btn sm",onclick:()=>openColabForm(c)},"Editar"):null)))):el("tr",{},el("td",{colspan:10,class:"note"},"Nenhum colaborador cadastrado. Use “+ Colaborador” ou cadastre a partir dos usuários acima."))));
   v.append(el("div",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Colaboradores"),tog.wrap),el("div",{class:"tbl"},tb)));
 }
 function openColabForm(c={}){
   const souAdmin=admin(),proprio=c.perfil_id&&c.perfil_id===PP.perfil?.id;
   const nome=inp("text",c.nome||""),cargo=inp("text",c.cargo||"",{placeholder:"Ex.: Advogada, Assistente jurídico"}),nuc=sel({"":"—",...NUCLEOS},c.nucleo||""),adm=inp("date",c.data_admissao||""),desl=inp("date",c.data_desligamento||""),
-        email=inp("email",c.email||""),tel=inp("text",c.telefone||""),oab=inp("text",c.oab||"",{placeholder:"Ex.: 123456/SP"}),resp=el("textarea",{placeholder:"O que esta pessoa cuida no dia a dia."},c.responsabilidades||""),ativo=check("Ativo",c.ativo!==false);
+        email=inp("email",c.email||""),tel=inp("text",c.telefone||""),oab=inp("text",c.oab||"",{placeholder:"Ex.: 123456/SP"}),resp=el("textarea",{placeholder:"O que esta pessoa cuida no dia a dia."},c.responsabilidades||""),ativo=check("Ativo",c.ativo!==false),
+        apelido=inp("text",c.apelido||"",{placeholder:"Como é chamado(a)"}),nasc=inp("date",c.data_nascimento||""),cidade=inp("text",c.cidade||""),linkedin=inp("url",c.linkedin||"",{placeholder:"https://linkedin.com/in/…"}),bio=el("textarea",{placeholder:"Sobre mim, em 2–3 linhas (aparece na ficha para a equipe)."},c.bio||"");
   const opcoesPerfil={"":"— sem usuário —",...Object.fromEntries(E.semColab.map(p=>[p.id,`${p.email}${p.nome?" · "+p.nome:""}`]))};
   if(c.perfil_id&&!opcoesPerfil[c.perfil_id])opcoesPerfil[c.perfil_id]=c.login_email||"(usuário vinculado)";
   const perfil=sel(opcoesPerfil,c.perfil_id||"");
   const ro=!souAdmin;if(ro){for(const i of [cargo,nuc,adm,desl,oab,resp,perfil,ativo.input])i.disabled=true}
   const body=el("div",{class:"form"},field("co-nome","Nome",nome),field("co-cargo","Cargo",cargo),field("co-nuc","Núcleo",nuc),field("co-adm","Data de admissão",adm),field("co-desl","Data de desligamento",desl),
-    field("co-email","E-mail",email),field("co-tel","Telefone",tel),field("co-oab","OAB",oab),field("co-perfil","Usuário do sistema",perfil,souAdmin?"Só aparecem usuários da equipe ainda sem colaborador. Crie o usuário no Supabase e defina o perfil na aba Usuários.":null),ativo.wrap,field("co-resp","Responsabilidades",resp));
+    field("co-email","E-mail",email),field("co-tel","Telefone",tel),field("co-oab","OAB",oab),field("co-apelido","Apelido",apelido),field("co-nasc","Nascimento",nasc,"Só dia e mês aparecem para a equipe (aniversariantes)."),field("co-cidade","Cidade",cidade),field("co-linkedin","LinkedIn",linkedin),field("co-bio","Sobre",bio),field("co-perfil","Usuário do sistema",perfil,souAdmin?"Só aparecem usuários da equipe ainda sem colaborador. Crie o usuário no Supabase e defina o perfil na aba Usuários.":null),ativo.wrap,field("co-resp","Responsabilidades",resp));
   const extra=(c.id&&souAdmin)?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este colaborador? Horas e tarefas dele perdem o vínculo."))return;const {error}=await SB.from("colaboradores").delete().eq("id",c.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível excluir (há registros vinculados? prefira inativar)":"Colaborador excluído");E.ok=false;garantir()}},"Excluir"):null;
   modal(c.id?"Editar colaborador":"Novo colaborador",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
-    const row=ro?{nome:nome.value.trim(),email:email.value.trim()||null,telefone:tel.value.trim()||null}
-      :{nome:nome.value.trim(),cargo:cargo.value.trim()||null,nucleo:nuc.value||null,data_admissao:adm.value||null,data_desligamento:desl.value||null,email:email.value.trim()||null,telefone:tel.value.trim()||null,oab:oab.value.trim()||null,responsabilidades:resp.value.trim()||null,perfil_id:perfil.value||null,ativo:ativo.input.checked&&!desl.value};
+    const basicos={apelido:apelido.value.trim()||null,data_nascimento:nasc.value||null,cidade:cidade.value.trim()||null,linkedin:linkedin.value.trim()||null,bio:bio.value.trim()||null};
+    const row=ro?{nome:nome.value.trim(),email:email.value.trim()||null,telefone:tel.value.trim()||null,...basicos}
+      :{...basicos,nome:nome.value.trim(),cargo:cargo.value.trim()||null,nucleo:nuc.value||null,data_admissao:adm.value||null,data_desligamento:desl.value||null,email:email.value.trim()||null,telefone:tel.value.trim()||null,oab:oab.value.trim()||null,responsabilidades:resp.value.trim()||null,perfil_id:perfil.value||null,ativo:ativo.input.checked&&!desl.value};
     const {error}=c.id?await SB.from("colaboradores").update(row).eq("id",c.id):await SB.from("colaboradores").insert(row);
     if(error)throw new Error(error.code==="23505"?"Este usuário já está vinculado a outro colaborador":"Não foi possível salvar");
-    toast("Colaborador salvo");E.ok=false;garantir();
+    toast("Colaborador salvo");E.ok=false;garantir();window.PP_RH?.invalidar();
   },extra);
 }
+window.PP_EQUIPE={openColabForm,get lista(){return E.lista},recarregar(){E.ok=false;garantir()},NUCLEOS};
 
 /* ---------- Integração ---------- */
 {const _r=render;render=function(){_r();const ve=$("#view-equipe");if(!ve)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="equipe")S.tab="clientes";ve.hidden=S.tab!=="equipe";if(S.tab==="equipe")renderEquipe()}}

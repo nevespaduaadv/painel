@@ -9,6 +9,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
 | `passivos/conhecimento.js` | **Base de conhecimento** (Jurídico): artigos em Markdown por tema (teses, POPs, produtos de crédito, negociação, proteção patrimonial, holding), busca full-text, edição com versões, diagramas mermaid. |
+| `passivos/rh.js` | **RH**: ficha do colaborador (foto, dados básicos), PDI e acompanhamento (1:1/feedback), dados sensíveis + salário + histórico só para admin; aniversariantes. |
 | `passivos/marketing.js` | **Marketing — pautas de conteúdo**: calendário, kanban e lista; fluxo de aprovação das sócias (aprovar / pedir ajuste), comentários, links de criativo e legenda. |
 | `passivos/autenticador.js` | **Autenticador (2FA)**: códigos TOTP dos acessos dos clientes sempre visíveis (janela de códigos vinda do banco; o segredo fica no Vault). Widget reutilizado na ficha. |
 | `passivos/documentos.js` | **Documentos base (Drive)**, dentro da base de conhecimento: índice pesquisável da pasta JURÍDICO do Google Drive (modelos de peças, tópicos, jurisprudência, planilhas) — os arquivos continuam no Drive; a equipe descreve, marca destaques e adiciona links. |
@@ -50,7 +51,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`, `0015_pr8_base_conhecimento`, `0017_pr8b_documentos_base`, `0020_pr10_cofre_2fa`, `0021_pr10b_contas_escritorio`, `0022_pr11_marketing_pautas`. Cargas 0016 (artigos iniciais) e 0018 (índice do Drive) fora do repo. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`, `0015_pr8_base_conhecimento`, `0017_pr8b_documentos_base`, `0020_pr10_cofre_2fa`, `0021_pr10b_contas_escritorio`, `0022_pr11_marketing_pautas`, `0023_pr12_rh`. Cargas 0016 (artigos iniciais) e 0018 (índice do Drive) fora do repo. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
