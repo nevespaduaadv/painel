@@ -31,7 +31,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px
 h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.005em}
 h1{font-size:28px} h2{font-size:22px} h3{font-size:18px}
 button,input,select,textarea{font:inherit;color:inherit}
-.num{font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:lining-nums tabular-nums}
 
 /* Top bar */
 .top{background:var(--navy);color:#F3EFE6;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
@@ -427,9 +427,9 @@ function renderMain(){
 
   /* Sub-abas da página do cliente. Timeline e Processos são fornecidos pelo módulo da carteira (window.PP_MOD) quando conectado ao Supabase. */
   const MOD=window.PP_MOD||{};const cnt=MOD.contagens?MOD.contagens(c):{};
-  const SUBS=[["geral","Visão geral"],["contratos","Contratos",ks.length],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["notas","Notas internas",null,true]];
+  const SUBS=[["geral","Visão geral"],["contratos","Contratos",ks.length],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
   if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub="geral";
-  if(S.sub==="notas"&&readOnly())S.sub="geral";
+  if((S.sub==="notas"||S.sub==="tarefas")&&readOnly())S.sub="geral";
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.filter(s=>!s[3]||!readOnly()).map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
 
   if(S.sub==="contratos"){
@@ -446,6 +446,11 @@ function renderMain(){
   if(S.sub==="processos"){
     const host=el("section",{class:"card section"});m.append(host);
     if(MOD.processos)MOD.processos(c,host);else host.append(el("div",{class:"empty"},el("h3",{},"Processos"),el("div",{},"Disponível na versão do painel conectada ao banco de dados.")));
+    return;
+  }
+  if(S.sub==="tarefas"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.tarefas)MOD.tarefas(c,host);else host.append(el("div",{class:"empty"},"Disponível na versão do painel conectada ao banco de dados."));
     return;
   }
   if(S.sub==="notas"){

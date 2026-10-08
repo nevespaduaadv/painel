@@ -7,6 +7,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `index.html` | Portal: login único e azulejos por perfil (admin, colaborador, cliente). |
 | `passivos/index.html` | Painel de Passivos Bancários (gerado — **não editar à mão**). |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
+| `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
 | `fontes/painel.html` | Protótipo-fonte do painel (motor de projeção, dashboard, formulários). |
 | `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta login, runtime Supabase, aba Usuários e o `carteira.js`). |
 | `fontes/gerar-pagina-cliente.mjs` | Legado: gerava a página fixa `alphamec/` a partir de um snapshot do banco antigo. |
@@ -24,7 +25,7 @@ O login usa o projeto Supabase de produção (chave publicável — pública por
 
 ## Alterar o painel
 
-1. Edite `fontes/painel.html` (lógica e layout) ou `passivos/carteira.js` (timeline/processos).
+1. Edite `fontes/painel.html` (lógica e layout), `passivos/carteira.js` (timeline/processos) ou `passivos/tarefas.js` (tarefas/horas).
 2. Regere: `node fontes/gerar-app-supabase.mjs`
 3. Teste localmente e faça commit de **fontes/ + passivos/** juntos.
 
@@ -38,7 +39,9 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`.
+
+Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
 ## Usuários e acessos
 
@@ -51,6 +54,8 @@ Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`.
 - "lance na timeline da Alphamec que fizemos X" → entrada em `entradas_timeline` (interna por padrão; "publique" para o cliente ver).
 - "adicione o processo Y ao cliente Z" → linha em `processos`; andamentos entram em `andamentos` e aparecem na timeline.
 - "atualiza o painel da Alphamec" → não é mais necessário: a área do cliente lê o banco ao vivo.
+- "crie a tarefa X para o cliente Z, prazo dia D, fatal" → linha em `tarefas` (vence em 7/15/30 na aba Tarefas).
+- "lance 2 horas de parecer para a Alphamec" → `apontamentos_horas`; horas informadas na timeline já entram sozinhas.
 - Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos` e cria a entrada "Acordo fechado" na timeline (visível ao cliente).
 - Mudanças de estágio (Res. CMN 4.966) são registradas automaticamente toda madrugada (pg_cron `estagios_diario`).
 

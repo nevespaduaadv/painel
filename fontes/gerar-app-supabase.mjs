@@ -33,12 +33,14 @@ html = html.replace('</style>', `
 
 // 2) Cabeçalho: aba Usuários (admin) + caixa do usuário com Sair
 must('<label class="switch edit-only">');
+html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>',
+  '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="tarefas" id="tab-tarefas">Tarefas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="horas" id="tab-horas">Horas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>');
 html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>',
   '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>\n    <button class="tab edit-only admin-only" role="tab" aria-selected="false" data-tab="usuarios" id="tab-usuarios">Usuários</button>');
 html = html.replace('<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>',
   '<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>\n  <div class="userbox" id="userbox" hidden><a class="btn" href="../">Portal</a><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>');
 must('<div id="view-calibracao" hidden class="main"></div>');
-html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>');
+html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
@@ -162,7 +164,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    const hash=(location.hash||"").slice(1); if(["clientes","historico","regras","calibracao","usuarios"].includes(hash)&&equipe())S.tab=hash;
+    const hash=(location.hash||"").slice(1); if(["clientes","historico","regras","calibracao","usuarios","tarefas","horas"].includes(hash)&&equipe())S.tab=hash;
     ligarTempoReal();
     resolve();
   });
@@ -212,7 +214,7 @@ html = html.slice(0,idx) + extra + html.slice(idx);
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', '<script src="carteira.js"></script>\n</body>');
+html = html.replace('</body>', '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n</body>');
 
 fs.writeFileSync(out, html);
 console.log('ok', out);
