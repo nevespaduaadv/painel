@@ -64,3 +64,10 @@ PR 6 (ficha + importação do onboarding) → PR 7 (navegação) → PR 8 (conhe
 3. Quais páginas do Notion entram primeiro (ex.: intranet jurídica, playbooks, onboarding)?
 4. ADVBox: você consegue exportar CSV pelo painel deles, ou prefere que eu navegue no site pelo app?
 5. Repositório: tornar privado (GitHub Pro) — recomendado antes de importar o Notion.
+
+## 6. Frontend — reforma estrutural no PR 7
+- Substituir o esquema "protótipo + gerador por âncoras" por um app único: `app.html`, CSS compartilhado, módulos JS por área (clientes, prazos, jurídico, gestão), roteador por `#`, motor de projeção como módulo puro com testes.
+- Componentes únicos (tabela, formulário, modal, pills, KPIs, exportação CSV) em vez de cópias por módulo.
+- Área do cliente mobile-first (cards em vez de tabelas largas; link abre no WhatsApp).
+- Acabamento: esqueletos de carregamento, estados vazios com instrução, botões de modal contextuais, diálogo de confirmação, busca global, aviso de atualização em tempo real.
+- Manter: identidade visual, modo escuro, gráficos SVG sem biblioteca, Supabase + RLS como única fonte.
