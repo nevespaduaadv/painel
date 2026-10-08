@@ -12,16 +12,19 @@ const norm=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
 
 /* ---------- widget vivo ---------- */
 function widget(acessoId,{compacto=false}={}){
-  const code=el("span",{class:"num totp-code"},"······");const bar=el("div",{class:"totp-bar"},el("div",{class:"totp-fill"}));const rest=el("span",{class:"totp-rest"},"");
-  const box=el("div",{class:"totp"+(compacto?" sm":""),title:"Clique para copiar"},code,el("div",{class:"totp-meta"},bar,rest));
+  const code=el("span",{class:"num totp-code"},"······");
+  const R=compacto?11:15,C=2*Math.PI*R;const ring=el("div",{class:"totp-ring"});ring.innerHTML=`<svg viewBox="0 0 ${R*2+6} ${R*2+6}"><circle class="bg" cx="${R+3}" cy="${R+3}" r="${R}"/><circle class="fg" cx="${R+3}" cy="${R+3}" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="0"/></svg><span class="s"></span>`;
+  const fg=ring.querySelector(".fg"),rest=ring.querySelector(".s");
   let j=null,timer=null,vivo=true,atual="";
-  box.onclick=async()=>{if(!atual)return;try{await navigator.clipboard.writeText(atual);toast("Código copiado")}catch{}};
-  async function pedir(){const {data,error}=await SB.rpc("totp_janela",{acesso_id:acessoId,qtd:JANELA});if(error||!data?.length){code.textContent="—";rest.textContent=error?.message?.includes("não cadastrado")?"sem 2FA":"indisponível";return false}j=data[0];return true}
+  const copiar=async(e)=>{e&&e.stopPropagation();if(!atual)return;try{await navigator.clipboard.writeText(atual);toast("Código copiado");btn.classList.add("ok");setTimeout(()=>btn.classList.remove("ok"),1200)}catch{toast("Não foi possível copiar")}};
+  const btn=el("button",{class:"btn totp-copy",title:"Copiar código",onclick:copiar},el("span",{class:"ic"},"⧉"),el("span",{class:"tx"},"Copiar"));
+  const box=el("div",{class:"totp"+(compacto?" sm":""),title:"Clique para copiar"},code,ring,btn);box.onclick=copiar;
+  async function pedir(){const {data,error}=await SB.rpc("totp_janela",{acesso_id:acessoId,qtd:JANELA});if(error||!data?.length){code.textContent="—";rest.textContent="";ring.title=error?.message?.includes("não cadastrado")?"sem 2FA":"indisponível";return false}j=data[0];return true}
   function tick(){
     if(!vivo||!j)return;const now=Date.now()/1000;const idx=Math.floor((now-j.inicio)/j.periodo);const restam=j.periodo-((now-j.inicio)%j.periodo);
     if(idx<0||idx>=j.codigos.length){j=null;pedir().then(ok=>{if(ok)tick()});return}
-    atual=j.codigos[idx];code.textContent=atual.replace(/(\d{3})(?=\d)/g,"$1 ");rest.textContent=Math.ceil(restam)+"s";
-    bar.firstChild.style.width=(restam/j.periodo*100).toFixed(1)+"%";bar.firstChild.classList.toggle("warn",restam<=5);
+    atual=j.codigos[idx];code.textContent=atual.replace(/(\d{3})(?=\d)/g,"$1 ");rest.textContent=Math.ceil(restam);
+    fg.style.strokeDashoffset=(C*(1-restam/j.periodo)).toFixed(2);ring.classList.toggle("warn",restam<=5);
   }
   pedir().then(ok=>{if(ok){tick();timer=setInterval(tick,1000)}});
   const mo=new MutationObserver(()=>{if(!document.body.contains(box)){vivo=false;clearInterval(timer);mo.disconnect()}});mo.observe(document.body,{childList:true,subtree:true});
@@ -72,10 +75,11 @@ function decodificarMigracao(uri){
   const contas=[];
   for(const [f,v] of campos(b)){if(f!==1||!(v instanceof Uint8Array))continue;
     const o={secret:"",name:"",issuer:"",alg:"sha1",digits:6,type:2};
-    for(const [g,w] of campos(v)){if(g===1)o.secret=base32(w);else if(g===2)o.name=td.decode(w);else if(g===3)o.issuer=td.decode(w);else if(g===4)o.alg=({1:"sha1",2:"sha256",3:"sha512"})[Number(w)]||"sha1";else if(g===5)o.digits=Number(w)===2?8:6;else if(g===6)o.type=Number(w)}
+    for(const [g,w] of campos(v)){if(g===1)o.secret=base32(w);else if(g===2)o.name=limpo(td.decode(w));else if(g===3)o.issuer=limpo(td.decode(w));else if(g===4)o.alg=({1:"sha1",2:"sha256",3:"sha512"})[Number(w)]||"sha1";else if(g===5)o.digits=Number(w)===2?8:6;else if(g===6)o.type=Number(w)}
     contas.push(o)}
   return contas;
 }
+const limpo=t=>{try{return decodeURIComponent((t||"").replace(/\+/g," "))}catch(_){return t||""}};
 const uriDe=o=>`otpauth://totp/${encodeURIComponent(o.issuer?o.issuer+":"+o.name:o.name)}?secret=${o.secret}&digits=${o.digits}&algorithm=${o.alg.toUpperCase()}${o.issuer?"&issuer="+encodeURIComponent(o.issuer):""}`;
 
 /* ---------- formulários ---------- */
@@ -137,12 +141,15 @@ async function carregar(){
 }
 const garantir=()=>{if(!A.ok&&!A.carregando)carregar();return A.ok};
 
+const OBS_IMPORT="importado do Google Authenticator";
 function cardConta(x,{cliente=false}={}){
-  return el("div",{class:"card totp-card"},
-    el("div",{class:"totp-head"},el("div",{style:"min-width:0"},el("div",{class:"n"},x.sistema,x.totp_emissor&&norm(x.totp_emissor)!==norm(x.sistema)?el("span",{class:"note"}," · "+x.totp_emissor):null),cliente?el("div",{class:"s"},x.cliente_nome):x.titular?el("div",{class:"s"},x.titular):null,x.login?el("div",{class:"s num"},x.login):null,x.observacoes?el("div",{class:"s",style:"white-space:normal"},x.observacoes):null),
-      el("div",{class:"actions",style:"flex-wrap:nowrap"},cliente?el("button",{class:"btn sm",onclick:()=>{S.tab="clientes";S.sel=x.cliente_id;S.sub="resumo";render()}},"Ficha"):el("button",{class:"btn sm edit-only",title:"Editar conta",onclick:()=>formConta(x)},"Editar"),!cliente?el("button",{class:"btn sm edit-only",title:x.tem_2fa?"Substituir ou remover 2FA":"Configurar 2FA",onclick:()=>form2fa(x,()=>{A.ok=false;carregar()})},x.tem_2fa?"⚙ 2FA":"Configurar 2FA"):null)),
+  const obs=x.observacoes&&x.observacoes!==OBS_IMPORT?x.observacoes:null;
+  return el("div",{class:"card totp-row"},
+    el("div",{class:"totp-info"},el("div",{class:"n"},limpo(x.sistema),x.totp_emissor&&norm(limpo(x.totp_emissor))!==norm(limpo(x.sistema))?el("span",{class:"note"}," · "+limpo(x.totp_emissor)):null),
+      el("div",{class:"s"},[cliente?x.cliente_nome:x.titular,limpo(x.login)].filter(Boolean).join(" · ")),obs?el("div",{class:"s",style:"white-space:normal"},obs):null,
+      x.tem_senha?el("div",{class:"s",style:"display:flex;gap:6px;align-items:center;margin-top:4px"},"Senha:",celSenha(x)):null),
     x.tem_2fa?widget(x.id):el("div",{class:"note"},"Sem 2FA cadastrado."),
-    x.tem_senha?el("div",{style:"display:flex;gap:8px;align-items:center;font-size:12.5px"},el("span",{class:"note"},"Senha:"),celSenha(x)):null);
+    el("div",{class:"actions totp-acoes"},cliente?el("button",{class:"btn sm",onclick:()=>{S.tab="clientes";S.sel=x.cliente_id;S.sub="resumo";render()}},"Ficha"):el("button",{class:"btn sm edit-only",title:"Editar conta",onclick:()=>formConta(x)},"Editar"),!cliente?el("button",{class:"btn sm edit-only",title:x.tem_2fa?"Substituir ou remover 2FA":"Configurar 2FA",onclick:()=>form2fa(x,()=>{A.ok=false;carregar()})},x.tem_2fa?"⚙":"Configurar 2FA"):null));
 }
 function renderAutenticador(){
   const v=$("#view-autenticador");v.replaceChildren();
@@ -158,15 +165,19 @@ function renderAutenticador(){
   const grupos=[...new Set(contas.map(c=>c.grupo||"Sem grupo"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   for(const g of grupos){
     v.append(el("h2",{style:"margin:18px 0 8px;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)"},g,el("span",{class:"cnt",style:"margin-left:8px"},String(contas.filter(c=>(c.grupo||"Sem grupo")===g).length))));
-    v.append(el("div",{class:"totp-grid",style:"margin-top:0"},contas.filter(c=>(c.grupo||"Sem grupo")===g).map(c=>cardConta(c))));
+    v.append(el("div",{class:"totp-lista"},contas.filter(c=>(c.grupo||"Sem grupo")===g).map(c=>cardConta(c))));
   }
   const cli=A.clientes.filter(f);
   if(cli.length){v.append(el("h2",{style:"margin:22px 0 8px;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)"},"Acessos de clientes com 2FA",el("span",{class:"cnt",style:"margin-left:8px"},String(cli.length))));
-    v.append(el("div",{class:"totp-grid",style:"margin-top:0"},cli.map(c=>cardConta(c,{cliente:true}))))}
+    v.append(el("div",{class:"totp-lista"},cli.map(c=>cardConta(c,{cliente:true}))))}
   if(nq&&!contas.length&&!cli.length)v.append(el("div",{class:"card empty",style:"margin-top:14px"},"Nada encontrado."));
 }
 
-const CSS=`.totp{display:inline-flex;flex-direction:column;gap:4px;cursor:pointer;user-select:none;min-width:150px}.totp .totp-code{font-size:26px;font-weight:700;letter-spacing:.08em;line-height:1.1;color:var(--ink,var(--text))}.totp.sm .totp-code{font-size:19px}.totp-meta{display:flex;align-items:center;gap:8px}.totp-bar{flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.totp-fill{height:100%;background:var(--gold,#B8964A);transition:width 1s linear}.totp-fill.warn{background:var(--crit,#b4452f)}.totp-rest{font-size:11.5px;color:var(--muted);min-width:28px;text-align:right;font-variant-numeric:tabular-nums}.totp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px}.totp-card{padding:14px 16px;display:flex;flex-direction:column;gap:12px}.totp-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.totp-head .n{font-weight:700;overflow-wrap:anywhere}.totp-head .s{font-size:12.5px;color:var(--muted)}`;
+const CSS=`.totp{display:inline-flex;align-items:center;gap:14px;cursor:pointer;user-select:none}.totp .totp-code{font-size:28px;font-weight:700;letter-spacing:.1em;line-height:1;color:var(--ink,var(--text));font-variant-numeric:tabular-nums}.totp.sm{gap:10px}.totp.sm .totp-code{font-size:20px}
+.totp-ring{position:relative;width:40px;height:40px;flex:none}.totp.sm .totp-ring{width:32px;height:32px}.totp-ring svg{width:100%;height:100%;transform:rotate(-90deg)}.totp-ring circle{fill:none;stroke-width:3}.totp-ring .bg{stroke:var(--line)}.totp-ring .fg{stroke:var(--gold,#B8964A);transition:stroke-dashoffset 1s linear;stroke-linecap:round}.totp-ring.warn .fg{stroke:var(--crit,#b4452f)}.totp-ring .s{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}.totp.sm .totp-ring .s{font-size:10px}
+.totp-copy{display:inline-flex;align-items:center;gap:6px;padding:6px 10px}.totp-copy .ic{font-size:15px;line-height:1}.totp-copy.ok{background:var(--gold-soft);border-color:var(--gold)}.totp.sm .totp-copy .tx{display:none}.totp.sm .totp-copy{padding:4px 7px}
+.totp-lista{display:flex;flex-direction:column;gap:8px}.totp-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:12px 16px}.totp-info{min-width:0}.totp-info .n{font-weight:700;overflow-wrap:anywhere}.totp-info .s{font-size:12.5px;color:var(--muted)}.totp-acoes{flex-wrap:nowrap}
+@media (max-width:860px){.totp-row{grid-template-columns:1fr;gap:10px}.totp .totp-code{font-size:24px}}`;
 document.head.append(el("style",{},CSS));
 
 window.PP_TOTP={widget,form2fa,celSenha,leitorQr,decodificarMigracao,invalidar(){A.ok=false}};
