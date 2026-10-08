@@ -1,0 +1,944 @@
+<title>Painel de Passivos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
+:root{
+  --navy:#0C1F38; --gold:#B8964A; --gold-soft:#E7DCC2;
+  --bg:#F6F4EF; --surface:#FFFFFF; --surface-2:#EFEBE2; --line:#D9D3C6;
+  --fg:#1B2433; --muted:#5E6878; --faint:#8A93A3;
+  --ok:#2E7D5B; --warn:#B8860B; --crit:#A23B3B; --info:#2F5C8F;
+  --ch-a:#2E5FA3; --ch-b:#B07A1C; --ch-grid:#E4DFD3;
+  --display:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  --body:"Source Sans 3","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0B1626; --surface:#122238; --surface-2:#182C47; --line:#27405F;
+  --fg:#E9E4D8; --muted:#A9B2C2; --faint:#7D889B; --gold-soft:#3E3522;
+  --ok:#5BB38A; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5A8FD6; --ch-b:#B8861E; --ch-grid:#24395A; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0B1626; --surface:#122238; --surface-2:#182C47; --line:#27405F;
+  --fg:#E9E4D8; --muted:#A9B2C2; --faint:#7D889B; --gold-soft:#3E3522;
+  --ok:#5BB38A; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5A8FD6; --ch-b:#B8861E; --ch-grid:#24395A; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;margin:0}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.005em}
+h1{font-size:28px} h2{font-size:22px} h3{font-size:18px}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* Top bar */
+.top{background:var(--navy);color:#F3EFE6;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.brand{display:flex;flex-direction:column}
+.brand b{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1}
+.brand small{color:#C9B98C;letter-spacing:.12em;text-transform:uppercase;font-size:10.5px;font-weight:600}
+.tabs{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.tab{background:transparent;border:1px solid transparent;color:#D7D2C6;padding:7px 12px;border-radius:var(--r);cursor:pointer}
+.tab:hover{border-color:#3B5074}
+.tab[aria-selected="true"]{background:#1A3353;color:#fff;border-color:#2C4B74}
+.switch{display:flex;align-items:center;gap:8px;color:#D7D2C6;font-size:13px;cursor:pointer;user-select:none}
+.switch input{accent-color:var(--gold);width:16px;height:16px}
+
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-inline:20px}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+/* Sidebar */
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.list{display:flex;flex-direction:column}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--line);cursor:pointer;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%}
+.row:first-child{border-top:0}
+.row:hover{background:var(--surface-2)}
+.row[aria-current="true"]{background:var(--gold-soft)}
+.row .n{font-weight:600}
+.row .s{color:var(--muted);font-size:13px}
+.search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+
+/* Buttons */
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 13px;border-radius:var(--r);cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover{background:#163055}
+.btn.gold{background:var(--gold);color:#1B1A14;border-color:var(--gold)}
+.btn.sm{padding:5px 9px;font-size:13px}
+.btn.danger{color:var(--crit)}
+.btn:focus-visible,.tab:focus-visible,.row:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* Main */
+.main{display:flex;flex-direction:column;gap:18px;min-width:0}
+.head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;color:var(--gold);font-weight:700}
+.sub{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{padding:14px 16px}
+.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.kpi .v{font-family:var(--display);font-size:28px;font-weight:600;line-height:1.1;margin-top:4px}
+.kpi .h{font-size:12.5px;color:var(--muted);margin-top:4px}
+
+.section{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.section-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+
+/* Contract cards */
+.contracts{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+@media (max-width:420px){.contracts{grid-template-columns:1fr}}
+.ct{padding:0;display:flex;flex-direction:column;overflow:hidden}
+.ct-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.ct-h .bank{font-weight:700;font-size:16px}
+.ct-h .prod{color:var(--muted);font-size:13px}
+.ct-b{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.kv .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.kv .v{font-weight:600}
+.ct-proj{border-top:1px solid var(--line);padding:12px 16px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px}
+.range{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.range .big{font-family:var(--display);font-size:30px;font-weight:700;line-height:1}
+.range .mm{color:var(--muted);font-size:13px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;position:relative}
+.bar>i{position:absolute;left:0;top:0;bottom:0;background:var(--gold);border-radius:4px}
+.ct-f{border-top:1px solid var(--line);padding:10px 16px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
+.ct-f .acts{display:flex;gap:6px}
+
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;letter-spacing:.02em;border:1px solid transparent}
+.pill.e1{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.pill.e2{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.e3{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit)}
+.pill.c{background:color-mix(in srgb,var(--info) 14%,transparent);color:var(--info)}
+.pill.g{background:var(--gold-soft);color:var(--fg)}
+.conf{font-size:12px;color:var(--muted)}
+.conf b{color:var(--fg)}
+
+.spark{width:100%;height:auto;display:block;margin-top:4px}
+.spark text{font-family:var(--body);fill:var(--muted)}
+.dash{display:grid;grid-template-columns:1fr;gap:16px}
+.chart{padding:18px 22px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.chart svg.wide{max-width:980px}
+.chart .donut-wrap{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.chart .donut-wrap .legend{flex-direction:column;gap:10px;font-size:14px}
+.chart h3{font-size:20px}
+.chart .sub{font-size:14px}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.chart .lbl{fill:var(--fg);font-weight:600}
+.chart .val{fill:var(--fg);font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tip{position:fixed;pointer-events:none;background:var(--navy);color:#fff;font-size:12.5px;padding:7px 10px;border-radius:6px;z-index:40;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.25);line-height:1.35}
+.hit:hover{opacity:.85}
+.note{font-size:13px;color:var(--muted)}
+.disclaimer{border-left:3px solid var(--gold);padding:10px 14px;background:var(--surface);font-size:13px;color:var(--muted)}
+
+/* Timeline */
+.tl{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:6px;padding-left:16px}
+.tl li{list-style:none;position:relative;padding:4px 0 12px}
+.tl li::before{content:"";position:absolute;left:-23px;top:10px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)}
+.tl .d{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* Forms */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.f input,.f select,.f textarea{padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);width:100%;min-width:0}
+.f textarea{min-height:70px;resize:vertical}
+.f.full{grid-column:1/-1}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.modal{position:fixed;inset:0;background:rgba(6,14,28,.55);display:flex;align-items:flex-start;justify-content:center;padding:4vh 16px;overflow:auto;z-index:20}
+.modal .card{width:min(820px,100%);padding:20px;display:flex;flex-direction:column;gap:14px}
+.help{font-size:12.5px;color:var(--muted)}
+
+/* Tables */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.r,th.r{text-align:right}
+td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+
+.empty{padding:28px 20px;text-align:center;color:var(--muted)}
+.empty h3{color:var(--fg);margin-bottom:6px}
+.toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:14px;z-index:30;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.ro .edit-only{display:none!important}
+@media (prefers-reduced-motion:no-preference){.row,.btn,.tab{transition:background .12s}}
+
+[hidden]{display:none!important}
+/* --- Supabase: login e modos --- */
+.login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
+.login .card{width:min(420px,100%);padding:28px;display:flex;flex-direction:column;gap:14px}
+.login .eyebrow{color:var(--gold)}
+.login h1{font-size:26px}
+.login .f input{padding:10px 12px}
+.login .err{color:var(--crit);font-size:13px;min-height:18px}
+.login .btn.primary{width:100%;padding:11px}
+.modo-cliente .side,.modo-cliente .tabs,.modo-cliente .switch{display:none!important}
+.modo-cliente .grid{grid-template-columns:1fr}
+.nao-admin .admin-only{display:none!important}
+.userbox{display:flex;align-items:center;gap:10px;color:#D7D2C6;font-size:13px}
+.userbox .btn{background:transparent;color:#D7D2C6;border-color:#3B5074;padding:5px 10px;font-size:13px}
+.pendente{text-align:center;padding:48px 20px;color:var(--muted)}
+.pendente h2{color:var(--fg);margin-bottom:8px}
+</style>
+
+<header class="top">
+  <div class="brand"><small>Neves Pádua Advocacia</small><b>Painel de Passivos Bancários</b></div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="clientes" id="tab-clientes">Clientes</button>
+    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>
+    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="regras" id="tab-regras">Regras de projeção</button>
+    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>
+    <button class="tab edit-only admin-only" role="tab" aria-selected="false" data-tab="usuarios" id="tab-usuarios">Usuários</button>
+  </nav>
+  <label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>
+  <div class="userbox" id="userbox" hidden><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>
+</header>
+
+<div class="wrap">
+  <div id="view-clientes" class="grid">
+    <aside class="side">
+      <input class="search" id="q" placeholder="Buscar cliente…" aria-label="Buscar cliente">
+      <div class="card list" id="clientList"><div class="empty">Carregando…</div></div>
+      <button class="btn primary edit-only" id="btnNewClient">+ Novo cliente</button>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>
+
+  <div id="view-historico" hidden class="main"></div>
+  <div id="view-regras" hidden class="main"></div>
+  <div id="view-calibracao" hidden class="main"></div>
+  <div id="view-usuarios" hidden class="main"></div>
+</div>
+
+<div id="modalHost"></div>
+<div id="toast" class="toast" hidden></div>
+
+<div class="login" id="login">
+  <div class="card">
+    <div class="eyebrow">Neves Pádua Advocacia</div>
+    <h1>Painel de Passivos Bancários</h1>
+    <div class="f"><label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br"></div>
+    <div class="f"><label for="l-senha">Senha</label><input id="l-senha" type="password" autocomplete="current-password"></div>
+    <div class="err" id="l-err"></div>
+    <button class="btn primary" id="l-btn">Entrar</button>
+    <div class="note">Acesso restrito à equipe do escritório e aos clientes convidados. Esqueceu a senha? Fale com o escritório.</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ---------- Runtime Supabase: mesma interface do banco do protótipo (doc/collection/onSnapshot) ---------- */
+const SB = window.supabase.createClient("https://ksdwzljfjfucjevdqxvx.supabase.co", "sb_publishable_tt__gxUjGaujzylisID0KQ_qaeaU1-l");
+const PP = {perfil:null, listeners:{}, cache:{}};
+const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
+const NOTA_CAMPO = {clientes:"notasInternas", contratos:"notas"};
+const equipe = ()=>PP.perfil && (PP.perfil.papel==="admin"||PP.perfil.papel==="colaborador");
+
+async function carregar(col){
+  if(col==="historico" && !equipe()){
+    const {data,error}=await SB.from("referencias").select("*");
+    if(error) throw error;
+    // formato compatível com referencias(): divida/valorAcordo sintéticos a partir do desconto
+    return data.filter(r=>r.desc!=null).map(r=>({id:r.id,credor:r.credor,grupo:r.grupo,forma:r.forma,status:r.status,data:r.data,divida:1,valorAcordo:1-Number(r.desc)}));
+  }
+  const {data,error}=await SB.from(TABELAS[col]).select("*").order("id");
+  if(error) throw error;
+  let notas={};
+  if(NOTA_CAMPO[col] && equipe()){
+    const {data:ns}=await SB.from("notas_internas").select("id,texto");
+    for(const n of (ns||[])) notas[n.id]=n.texto;
+  }
+  return data.map(r=>{const d={id:r.id,...r.dados};if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
+}
+async function notificar(col){
+  try{const rows=await carregar(col);PP.cache[col]=rows;for(const cb of (PP.listeners[col]||[]))cb({docs:rows.map(r=>({id:r.id,data:()=>r}))})}
+  catch(e){console.warn("carregar",col,e);toast("Falha ao carregar "+col)}
+}
+async function notificarRegras(){
+  const {data,error}=await SB.from("regras").select("dados").eq("id","regras").maybeSingle();
+  if(error){console.warn(error);return}
+  for(const cb of (PP.listeners.regras||[]))cb({exists:!!data,data:()=>data?data.dados:null});
+}
+function parseRef(p){const [col,id]=p.split("/");return {col,id}}
+async function gravar(col,id,doc,{merge=false}={}){
+  if(col==="config"){const {error}=await SB.from("regras").upsert({id:"regras",dados:doc});if(error)throw error;return}
+  const d={...doc};delete d.id;
+  const notaCampo=NOTA_CAMPO[col];let nota=null;
+  if(notaCampo){nota=d[notaCampo]??"";delete d[notaCampo]}
+  if(merge){const {data:cur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();Object.assign(d,{...(cur?cur.dados:{}),...d})}
+  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;
+  const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
+  if(notaCampo && !merge){
+    const nid=(col==="clientes"?"cliente:":"contrato:")+id;
+    const {error:e2}=await SB.from("notas_internas").upsert({id:nid,cliente_id:col==="clientes"?id:d.clienteId,contrato_id:col==="contratos"?id:null,texto:nota||""});
+    if(e2)throw e2;
+  }
+}
+const novoId=(col)=>col.slice(0,3)+"-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+window.__PP_RUNTIME={use:async(n)=>{
+  if(n==="db")return {
+    doc:(p)=>{const {col,id}=parseRef(p);return {
+      onSnapshot:(cb)=>{if(col==="config"){(PP.listeners.regras??=[]).push(cb);notificarRegras()}},
+      set:async(doc)=>{await gravar(col,id,doc);await notificar(col)},
+      update:async(partial)=>{await gravar(col,id,partial,{merge:true});await notificar(col)},
+      delete:async()=>{const {error}=await SB.from(col==="config"?"regras":TABELAS[col]).delete().eq("id",id);if(error)throw error;await notificar(col)}
+    }},
+    collection:(col)=>({
+      onSnapshot:(cb)=>{(PP.listeners[col]??=[]).push(cb);notificar(col)},
+      add:async(doc)=>{const id=novoId(col);await gravar(col,id,doc);await notificar(col);return {id}}
+    })
+  };
+  if(n==="user")return {can:async()=>equipe(),id:async()=>PP.perfil?.id||null};
+  return null;
+}};
+/* tempo real: quando algo muda no banco, recarrega a coleção afetada */
+function ligarTempoReal(){
+  const mapa={clientes:"clientes",contratos:"contratos",historico:"historico",notas_internas:null,regras:"regras",perfis:"perfis"};
+  const ch=SB.channel("painel");
+  for(const t of Object.keys(mapa)){
+    ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{
+      if(t==="regras")notificarRegras();
+      else if(t==="notas_internas"){notificar("clientes");notificar("contratos")}
+      else if(t==="perfis"){if(typeof renderUsuarios==="function"&&S.tab==="usuarios")renderUsuarios()}
+      else notificar(mapa[t]);
+    });
+  }
+  ch.subscribe();
+}
+/* ---------- Login e perfil ---------- */
+window.__PP_LOGIN = new Promise(resolve=>{
+  const show=(v)=>{document.querySelector("#login").hidden=!v};
+  async function entrar(){
+    const email=document.querySelector("#l-email").value.trim(), senha=document.querySelector("#l-senha").value;
+    document.querySelector("#l-err").textContent="";
+    const {error}=await SB.auth.signInWithPassword({email,password:senha});
+    if(error){document.querySelector("#l-err").textContent="E-mail ou senha incorretos.";return}
+  }
+  document.querySelector("#l-btn").onclick=entrar;
+  document.querySelector("#l-senha").onkeydown=e=>{if(e.key==="Enter")entrar()};
+  document.querySelector("#btnSair").onclick=async()=>{await SB.auth.signOut();location.reload()};
+  let iniciado=false;
+  SB.auth.onAuthStateChange(async(ev,session)=>{
+    if(!session){show(true);return}
+    if(iniciado)return;iniciado=true;
+    const {data:perfil}=await SB.from("perfis").select("*").eq("id",session.user.id).maybeSingle();
+    PP.perfil=perfil||{id:session.user.id,papel:"pendente"};
+    document.querySelector("#userbox").hidden=false;document.querySelector("#userName").textContent=perfil?.nome||session.user.email;
+    show(false);
+    if(PP.perfil.papel==="pendente"){
+      document.body.classList.add("modo-cliente");
+      document.querySelector("#main").innerHTML='<div class="card pendente"><h2>Acesso em análise</h2><div>Seu usuário foi criado, mas ainda não recebeu um perfil. Peça ao administrador do escritório para liberar o acesso.</div></div>';
+      document.querySelector("#clientList").innerHTML="";
+      return; // não resolve: nada carrega
+    }
+    if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
+    if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
+    if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
+    ligarTempoReal();
+    resolve();
+  });
+});
+
+</script>
+<script>
+/* ---------- Tabelas regulatórias ---------- */
+// Res. BCB 352/2023, Anexo I (ativos inadimplidos, >90 dias): provisão = A + B × meses desde o inadimplemento, teto 100%.
+// Coeficientes coincidem com os fatores A e B da Lei 14.467/2022, art. 3º.
+const CARTEIRAS = {
+  C1:{A:0.055,B:0.045,nome:"C1 — Alienação fiduciária de imóvel, garantia da União, fundo garantidor (FGO/FGI)"},
+  C2:{A:0.30, B:0.034,nome:"C2 — Leasing, hipoteca, penhor, alienação fiduciária de bem móvel, depósito, fiança bancária, seguro de crédito"},
+  C3:{A:0.45, B:0.037,nome:"C3 — Desconto/antecipação de recebíveis, cessão fiduciária, aval ou fiança de terceiro, outras garantias"},
+  C4:{A:0.35, B:0.045,nome:"C4 — Capital de giro, ACC/ACE, debêntures sem garantia; rural investimento sem garantia"},
+  C5:{A:0.50, B:0.034,nome:"C5 — Rotativo sem garantia (cheque especial, cartão, conta garantida), crédito pessoal, rural custeio, demais sem garantia"}
+};
+// Anexo II (não inadimplidos, até 90 dias): por faixa de atraso.
+const ANEXO2 = [
+  {max:14,  p:{C1:.014,C2:.014,C3:.019,C4:.019,C5:.019}},
+  {max:30,  p:{C1:.035,C2:.035,C3:.035,C4:.035,C5:.075}},
+  {max:60,  p:{C1:.045,C2:.06, C3:.13, C4:.13, C5:.15}},
+  {max:90,  p:{C1:.05, C2:.17, C3:.32, C4:.32, C5:.38}},
+];
+const PRODUTOS = {
+  giro:"Capital de giro", cheque:"Cheque especial", contagar:"Conta garantida", cartao:"Cartão de crédito / corporativo",
+  receb:"Antecipação de recebíveis / desconto", pronampe:"PRONAMPE / FGO / FGI", rural_custeio:"Crédito rural — custeio",
+  rural_invest:"Crédito rural — investimento", veiculo:"Financiamento de veículo / máquina", imovel:"Financiamento imobiliário",
+  leasing:"Leasing", ccb:"CCB / empréstimo simples", outro:"Outro"
+};
+const GARANTIAS = {
+  nenhuma:"Sem garantia", aval:"Aval / fiança de sócio ou terceiro", recebiveis:"Cessão fiduciária de recebíveis",
+  real_movel:"Alienação fiduciária / penhor de bem móvel", hipoteca:"Hipoteca", real_imovel:"Alienação fiduciária de imóvel",
+  fundo:"Fundo garantidor (FGO / FGI)", fianca_bancaria:"Fiança bancária / seguro de crédito"
+};
+const SITUACOES = {
+  emdia:"Em dia", cobranca:"Cobrança administrativa", negativado:"Negativado / protestado", ajuizado:"Ajuizado (execução / monitória)",
+  prejuizo:"Baixado a prejuízo", cedido:"Cedido a FIDC / securitizadora", acordo:"Acordo em andamento", quitado:"Quitado"
+};
+
+function carteiraAuto(produto, garantia){
+  if(garantia==="fundo"||garantia==="real_imovel"||produto==="pronampe"||produto==="imovel") return "C1";
+  if(garantia==="real_movel"||garantia==="hipoteca"||garantia==="fianca_bancaria"||produto==="leasing"||produto==="veiculo") return "C2";
+  if(garantia==="recebiveis"||produto==="receb"||garantia==="aval") return "C3";
+  if(produto==="giro"||produto==="rural_invest") return "C4";
+  return "C5";
+}
+
+/* ---------- Grupos de credor (comportamento observado) ---------- */
+const GRUPOS = {varejo:"Banco de varejo",cooperativa:"Cooperativa de crédito",fidc:"FIDC / securitizadora",digital:"Banco digital / fintech",outro:"Outro"};
+const FASES = {administrativa:"Cobrança administrativa",ajuizado:"Ajuizado",execucao:"Execução / cumprimento de sentença",cedido:"Cedido a FIDC"};
+const FORMAS = {avista:"À vista",parcelado:"Parcelado"};
+const TITULARES = {PJ:"Pessoa jurídica",PF:"Pessoa física (sócio)"};
+function grupoBanco(nome){
+  const n=(nome||"").toLowerCase();
+  if(/sicoob|sicredi|cresol|unicred|ailos|coopera|credi/.test(n))return "cooperativa";
+  if(/fidc|ativos|securitiz|recovery|ipanema|kobe|hoepers/.test(n))return "fidc";
+  if(/nubank|inter|c6|picpay|neon|mercado pago|stone|infinite|will|original|pag/.test(n))return "digital";
+  if(/ita[uú]|bradesco|santander|aymor|caixa|brasil|bb|safra|btg|banrisul|bnb|nordeste|amaz[oô]nia|votorantim|bv|pan|daycoval|abc|sofisa/.test(n))return "varejo";
+  return "outro";
+}
+const normBanco=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").split(/[\s(]/)[0];
+
+/* ---------- Regras padrão (editáveis na aba Regras) ---------- */
+const REGRAS_PADRAO = {
+  minDiasAtraso:180,          // só projetar acordo a partir de 6 meses de atraso
+  usarHistorico:true,         // base primária = acordos reais; provisão vira contexto
+  minRefs:2,                  // mínimo de acordos do mesmo credor para usar a mediana dele
+  descontoBase:-15,           // fallback regulatório: desconto = provisão − 15 p.p. (quando não há histórico)
+  amplitude:10,               // faixa = provável ± 10 p.p. quando há poucas referências
+  fatorParcelado:-15,         // cenário parcelado = à vista − 15 p.p. (quando não há referência parcelada)
+  tetoDesconto:97,
+  margemReserva:10,           // reserva mensal = valor alvo × (1+10%) / meses
+  prazoReservaPadrao:6,
+  atualizacaoMensal:1.0,      // % a.m. de atualização do saldo em atraso (juros de mora + correção) para estimar a dívida na data-alvo
+  fatoresGarantia:{nenhuma:0,aval:-5,recebiveis:-10,real_movel:-5,hipoteca:"travar",real_imovel:"travar",fundo:"travar",fianca_bancaria:"travar"},
+  fatoresProduto:{giro:0,cheque:0,contagar:0,cartao:0,receb:-5,pronampe:0,rural_custeio:-5,rural_invest:-5,veiculo:0,imovel:0,leasing:0,ccb:0,outro:0},
+  fatoresSituacao:{emdia:0,cobranca:0,negativado:0,ajuizado:0,prejuizo:5,cedido:0,acordo:0,quitado:0},
+  fatoresTitular:{PJ:-5,PF:0},
+  fatoresGrupo:{varejo:0,cooperativa:-25,fidc:0,digital:-5,outro:-10},
+  fatoresBanco:{"Itaú":0,"Bradesco":0,"Santander":0,"Banco do Brasil":0,"Caixa":0,"Sicoob":0,"Sicredi":0,"Safra":0,"BTG":0,"Nubank":0,"Inter":0,"C6":0,"PicPay":0}
+};
+
+/* ---------- Cálculo ---------- */
+const DAY=86400000;
+const hoje=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const parseD=s=>{if(!s)return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const fmtD=d=>d?d.toLocaleDateString("pt-BR"):"—";
+const addDays=(d,n)=>new Date(d.getTime()+n*DAY);
+const BRL=v=>(v==null||isNaN(v))?"—":v.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const pct=v=>(v==null||isNaN(v))?"—":Math.round(v*100)+"%";
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+
+function diasAtraso(c, ref=hoje()){const d=parseD(c.dataInicioAtraso);return d?Math.max(0,Math.round((ref-d)/DAY)):0}
+function estagio(dias){return dias>90?3:dias>30?2:1}
+function provisao(carteira,dias){
+  if(dias<=90){const f=ANEXO2.find(x=>dias<=x.max);return f.p[carteira]}
+  const k=CARTEIRAS[carteira];const meses=Math.floor((dias-90)/30);
+  return Math.min(1,k.A+k.B*meses);
+}
+function mesesInad(dias){return dias>90?Math.floor((dias-90)/30):0}
+
+/* Referências: histórico de acordos (base do escritório) + acordos fechados nos clientes do painel. */
+function referencias(){
+  const h=(S.historico||[]).filter(x=>x.status==="fechado"&&x.divida>0).map(x=>({credor:x.credor,grupo:x.grupo||grupoBanco(x.credor),forma:x.forma||"avista",desc:1-x.valorAcordo/x.divida,data:x.data,origem:"historico"}));
+  const k=S.contratos.filter(x=>x.acordo&&x.acordo.fechado&&x.acordo.saldoNoAcordo>0).map(x=>({credor:x.banco,grupo:grupoBanco(x.banco),forma:(x.acordo.parcelas||1)>1?"parcelado":"avista",desc:+x.acordo.descontoObtido/100,data:x.acordo.data,origem:"cliente"}));
+  return h.concat(k);
+}
+const mediana=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const quartil=(a,q)=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const i=(s.length-1)*q;const lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo)};
+
+function projetar(c,R,refsAll,ref=hoje()){
+  const dias=diasAtraso(c,ref);
+  const cart=c.carteiraOverride||carteiraAuto(c.produto,c.garantia);
+  const prov=provisao(cart,dias);
+  const est=estagio(dias);
+  const fg=R.fatoresGarantia[c.garantia]??0;
+  const travado=fg==="travar";
+  const abertura=parseD(c.dataInicioAtraso)?addDays(parseD(c.dataInicioAtraso),R.minDiasAtraso):null;
+  const janelaAberta=dias>=R.minDiasAtraso;
+  const grupo=grupoBanco(c.banco);
+  const nb=normBanco(c.banco);
+  const refsBanco=refsAll.filter(r=>normBanco(r.credor)===nb);
+  const refsGrupo=refsAll.filter(r=>r.grupo===grupo);
+  let faixa=null,base=null;
+  if(!travado){
+    const teto=R.tetoDesconto/100;
+    const ajusteComum=((fg||0)+(R.fatoresProduto[c.produto]??0)+(R.fatoresSituacao[c.situacao]??0)+(R.fatoresTitular[c.titular||"PJ"]??0)+(R.fatoresBanco[c.banco]??0))/100;
+    // equivalente à vista: acordos parcelados entram convertidos (desconto − fatorParcelado), para não desperdiçar referência
+    const eqAV=r=>r.forma==="parcelado"?r.desc-R.fatorParcelado/100:r.desc;
+    const av=refsBanco.map(eqAV), pa=refsBanco.filter(r=>r.forma==="parcelado").map(r=>r.desc);
+    const avG=refsGrupo.map(eqAV), paG=refsGrupo.filter(r=>r.forma==="parcelado").map(r=>r.desc);
+    let avista,parcelado,fonte,pool;
+    if(R.usarHistorico&&av.length>=R.minRefs){avista=mediana(av)+ajusteComum;fonte="banco";pool=av;}
+    else if(R.usarHistorico&&avG.length>=R.minRefs){avista=mediana(avG)+ajusteComum;fonte="grupo";pool=avG;}
+    else{avista=prov+(R.descontoBase+(R.fatoresGrupo[grupo]??0))/100+ajusteComum;fonte="provisao";pool=[];}
+    if(R.usarHistorico&&pa.length>=1&&fonte==="banco")parcelado=mediana(pa)+ajusteComum;
+    else if(R.usarHistorico&&paG.length>=R.minRefs&&fonte!=="provisao")parcelado=mediana(paG)+ajusteComum;
+    else parcelado=avista+R.fatorParcelado/100;
+    avista=clamp(avista,0,teto);parcelado=clamp(parcelado,0,teto);
+    const min=pool.length>=3?clamp(quartil(pool,.25)+ajusteComum,0,teto):clamp(avista-R.amplitude/100,0,teto);
+    const max=pool.length>=3?clamp(quartil(pool,.75)+ajusteComum,0,teto):clamp(avista+R.amplitude/100,0,teto);
+    faixa={min:Math.min(min,avista),provavel:avista,max:Math.max(max,avista),parcelado};
+    base={fonte,n:pool.length,mediana:pool.length?mediana(pool):null};
+  }
+  const saldo=+c.saldoAtual||+c.valorOriginal||0;
+  const meses=+c.prazoReservaMeses||R.prazoReservaPadrao;
+  // Cenário na data-alvo (hoje + prazo de reserva): saldo atualizado e provisão do banco nessa data
+  const dataAlvo=new Date(ref);dataAlvo.setMonth(dataAlvo.getMonth()+meses);
+  const diasAlvo=c.dataInicioAtraso?dias+meses*30:0;
+  const provAlvo=provisao(cart,diasAlvo);
+  const taxa=(c.atualizacaoMensal!=null&&c.atualizacaoMensal!==""?+c.atualizacaoMensal:R.atualizacaoMensal)/100;
+  const saldoAlvo=c.dataInicioAtraso?saldo*Math.pow(1+taxa,meses):saldo;
+  if(faixa&&base.fonte==="provisao"){ // base regulatória: refaz a faixa com a provisão da data-alvo
+    const teto=R.tetoDesconto/100;const ajusteComum=((fg||0)+(R.fatoresProduto[c.produto]??0)+(R.fatoresSituacao[c.situacao]??0)+(R.fatoresTitular[c.titular||"PJ"]??0)+(R.fatoresBanco[c.banco]??0))/100;
+    const av=clamp(provAlvo+(R.descontoBase+(R.fatoresGrupo[grupo]??0))/100+ajusteComum,0,teto);
+    faixa={min:clamp(av-R.amplitude/100,0,teto),provavel:av,max:clamp(av+R.amplitude/100,0,teto),parcelado:clamp(av+R.fatorParcelado/100,0,teto)};
+  }
+  const valorAcordo=faixa?saldoAlvo*(1-faixa.provavel):null;      // acordo à vista na data-alvo
+  const valorParcelado=faixa?saldoAlvo*(1-faixa.parcelado):null;
+  const valorAcordoHoje=faixa?saldo*(1-faixa.provavel):null;
+  const janelaNoPrazo=diasAlvo>=R.minDiasAtraso;
+  const reservaMensal=valorAcordo!=null?valorAcordo*(1+R.margemReserva/100)/meses:null;
+  const nSim=refsBanco.length;
+  const conf=nSim>=5?"alta":nSim>=2?"média":refsGrupo.length>=5?"média":"baixa";
+  return {dias,cart,prov,est,travado,janelaAberta,abertura,faixa,base,grupo,saldo,saldoAlvo,dataAlvo,diasAlvo,provAlvo,janelaNoPrazo,valorAcordo,valorAcordoHoje,valorParcelado,meses,reservaMensal,conf,nSim,nGrupo:refsGrupo.length};
+}
+function curva(c,cart,mesesAFrente=18){
+  const d0=parseD(c.dataInicioAtraso);if(!d0)return [];
+  const out=[];for(let m=0;m<=mesesAFrente;m++){const ref=new Date(hoje());ref.setMonth(ref.getMonth()+m);out.push(provisao(cart,Math.max(0,Math.round((ref-d0)/DAY))))}
+  return out;
+}
+
+/* ---------- Estado ---------- */
+const S={db:null,dbStatus:"pending",user:null,canWrite:null,clientes:[],contratos:[],historico:[],regras:structuredClone(REGRAS_PADRAO),sel:null,tab:"clientes",clientView:false,q:""};
+const $=s=>document.querySelector(s);
+const el=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(k==="html")e.innerHTML=v;else if(v!=null)e.setAttribute(k,v)}for(const k of kids.flat()){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(k))}return e};
+let toastT;const toast=m=>{const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)};
+const readOnly=()=>S.clientView||S.canWrite===false;
+
+const SVGNS="http://www.w3.org/2000/svg";
+const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);for(const[k,v]of Object.entries(attrs)){if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!=null)e.setAttribute(k,v)}for(const k of kids.flat()){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(k))}return e};
+
+/* ---------- Render ---------- */
+function render(){
+  document.body.classList.toggle("ro",readOnly());
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===S.tab)));
+  $("#view-clientes").hidden=S.tab!=="clientes";$("#view-historico").hidden=S.tab!=="historico";$("#view-regras").hidden=S.tab!=="regras";$("#view-calibracao").hidden=S.tab!=="calibracao";
+  if(S.tab==="clientes"){renderList();renderMain()}
+  if(S.tab==="historico")renderHistorico();
+  if(S.tab==="regras")renderRegras();
+  if(S.tab==="calibracao")renderCalib();
+}
+function renderList(){
+  const host=$("#clientList");host.replaceChildren();
+  const q=S.q.toLowerCase();
+  const cs=S.clientes.filter(c=>!q||(c.nome||"").toLowerCase().includes(q)).sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  if(!cs.length){host.append(el("div",{class:"empty"},S.db?"Nenhum cliente cadastrado. Use “Novo cliente” para começar.":S.dbStatus==="pending"?"Conectando ao banco de dados…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta."));return}
+  for(const c of cs){
+    const ks=S.contratos.filter(x=>x.clienteId===c.id&&x.situacao!=="quitado");
+    const total=ks.reduce((s,x)=>s+(+x.saldoAtual||+x.valorOriginal||0),0);
+    host.append(el("button",{class:"row","aria-current":String(S.sel===c.id),onclick:()=>{S.sel=c.id;render()}},
+      el("div",{},el("div",{class:"n"},c.nome||"(sem nome)"),el("div",{class:"s"},`${ks.length} contrato${ks.length===1?"":"s"} · ${BRL(total)}`))));
+  }
+}
+function renderMain(){
+  const m=$("#main");m.replaceChildren();
+  const c=S.clientes.find(x=>x.id===S.sel);
+  if(!c){m.append(el("div",{class:"card empty"},el("h3",{},"Selecione um cliente"),el("div",{},"O painel mostra, por contrato, o estágio do crédito, a provisão mínima que o banco precisa manter e a faixa de acordo projetada, com a reserva mensal sugerida.")));return}
+  const R=S.regras;const acordos=referencias();
+  const ks=S.contratos.filter(x=>x.clienteId===c.id).sort((a,b)=>(b.saldoAtual||0)-(a.saldoAtual||0));
+  const ativos=ks.filter(x=>x.situacao!=="quitado");
+  const P=ativos.map(k=>({k,p:projetar(k,R,acordos)}));
+  const saldoTotal=P.reduce((s,x)=>s+x.p.saldo,0);
+  const emProj=x=>x.p.valorAcordo!=null&&x.k.dataInicioAtraso;
+  const neg=P.filter(emProj), fora=P.filter(x=>!emProj(x));
+  const saldoNeg=neg.reduce((s,x)=>s+x.p.saldo,0), saldoFora=fora.reduce((s,x)=>s+x.p.saldo,0);
+  const acordoTotal=neg.reduce((s,x)=>s+x.p.valorAcordo,0);
+  const reservaTotal=neg.reduce((s,x)=>s+x.p.reservaMensal,0);
+  const alvoTotal=neg.reduce((s,x)=>s+x.p.valorAcordo*(1+R.margemReserva/100),0);
+  const mesesRef=neg.map(x=>x.p.meses);const mesesMax=mesesRef.length?Math.max(...mesesRef):R.prazoReservaPadrao;
+  const acumulada=+c.reservaAcumulada||0;
+  const nEmDia=fora.filter(x=>!x.k.dataInicioAtraso).length, nTrav=fora.filter(x=>x.p.travado&&x.k.dataInicioAtraso).length;
+  const foraTxt=[nEmDia?`${nEmDia} em dia`:null,nTrav?`${nTrav} com garantia (negociação por outra via)`:null].filter(Boolean).join(" · ")||"nenhum";
+
+  m.append(el("div",{class:"head"},
+    el("div",{},el("div",{class:"eyebrow"},"Acompanhamento de passivos"),el("h1",{},c.nome),el("div",{class:"sub"},[c.cnpj?`CNPJ ${c.cnpj}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
+    el("div",{class:"actions edit-only"},el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
+
+  m.append(el("div",{class:"kpis"},
+    kpi("Saldo total em aberto",BRL(saldoTotal),`${ativos.length} contrato${ativos.length===1?"":"s"} ativo${ativos.length===1?"":"s"}`),
+    kpi("Em negociação",BRL(saldoNeg),`${neg.length} contrato${neg.length===1?"":"s"} em atraso · é sobre este valor que o acordo é projetado`),
+    kpi("Fora da negociação",BRL(saldoFora),foraTxt),
+    kpi("Acordo projetado",BRL(acordoTotal),saldoNeg?`em até ${mesesMax} meses · economia de ${pct(1-acordoTotal/saldoNeg)} sobre o valor em negociação`:"nenhum contrato em atraso para projetar")));
+  m.append(el("div",{class:"kpis"},
+    kpi("Reserva mensal sugerida",BRL(reservaTotal),reservaTotal?"para chegar ao acordo projetado no prazo de reserva":"—"),
+    kpi("Reserva acumulada",BRL(acumulada),alvoTotal?`${pct(Math.min(1,acumulada/alvoTotal))} do alvo de ${BRL(alvoTotal)}`:""),
+    kpi("Economia projetada",BRL(Math.max(0,saldoNeg-acordoTotal)),saldoNeg?"diferença entre o saldo em negociação e o acordo projetado à vista":"")));
+  if(alvoTotal){const b=el("div",{class:"bar"},el("i",{style:`width:${Math.min(100,acumulada/alvoTotal*100)}%`}));m.append(b)}
+
+  if(P.length)m.append(renderDashboard(P,R));
+
+  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Contratos"),el("span",{class:"note"},`Projeção baseada em ${acordos.length} acordos reais do escritório · estágio conforme Res. CMN 4.966/2021 · provisão mínima conforme Res. BCB 352/2023`)));
+  if(!ks.length)sec.append(el("div",{class:"empty"},"Nenhum contrato cadastrado para este cliente."));
+  else sec.append(el("div",{class:"contracts"},ks.map(k=>contractCard(k,projetar(k,R,acordos),R))));
+  m.append(sec);
+
+  const tl=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Linha do tempo"),el("button",{class:"btn sm edit-only",onclick:()=>openEventForm(c)},"+ Registrar atuação")));
+  const evs=[...(c.timeline||[])].sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  if(!evs.length)tl.append(el("div",{class:"note"},"Nenhuma atuação registrada ainda."));
+  else tl.append(el("ul",{class:"tl"},evs.map((e,i)=>el("li",{},el("div",{class:"d"},fmtD(parseD(e.data))),el("div",{},e.texto),readOnly()?null:el("button",{class:"btn sm danger edit-only",style:"margin-top:4px",onclick:()=>removeEvent(c,e)},"remover")))));
+  m.append(tl);
+
+  if(!readOnly()&&c.notasInternas)m.append(el("section",{class:"card section edit-only"},el("h3",{},"Notas internas"),el("div",{style:"white-space:pre-wrap"},c.notasInternas)));
+
+  m.append(el("div",{class:"disclaimer"},"Os valores de acordo e de reserva são projeções para visualização do cliente, calculadas a partir do histórico de acordos do escritório com cada instituição e dos pisos regulatórios de provisão. Não representam promessa de resultado nem proposta do banco. A negociação depende da instituição, das garantias, da forma de pagamento e do momento do crédito."));
+}
+function kpi(l,v,h){return el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v num"},v),el("div",{class:"h"},h))}
+
+/* ---------- Dashboard visual do cliente ---------- */
+let tipEl=null;
+function tip(e,html){if(!tipEl){tipEl=el("div",{class:"tip"});document.body.append(tipEl)}tipEl.innerHTML=html;tipEl.hidden=false;const x=Math.min(e.clientX+14,window.innerWidth-280),y=e.clientY+14;tipEl.style.left=x+"px";tipEl.style.top=y+"px"}
+function untip(){if(tipEl)tipEl.hidden=true}
+const shortName=k=>`${k.banco}${k.titular==="PF"?" (PF)":""} · ${(PRODUTOS[k.produto]||k.produto||"").split(" /")[0].split(" —")[0]}`;
+const estLabel=e=>e===3?"Estágio 3 · inadimplido":e===2?"Estágio 2 · atraso 31–90 dias":"Estágio 1 · em dia ou atraso ≤30 dias";
+const estColor=e=>e===3?"var(--crit)":e===2?"var(--warn)":"var(--ok)";
+
+function renderDashboard(P,R){
+  const wrap=el("section",{class:"dash"});
+  const rows=[...P].sort((a,b)=>b.p.saldo-a.p.saldo);
+  const total=rows.reduce((s,x)=>s+x.p.saldo,0);
+
+  /* 1. Onde está a dívida — barras horizontais por contrato, cor = estágio */
+  {
+    const W=900,rowH=42,padL=8,padR=110,labelW=240,top=8;const H=top+rows.length*rowH+8;
+    const max=Math.max(...rows.map(x=>x.p.saldo),1);const x0=padL+labelW,xw=W-x0-padR;
+    const svg=sv("svg",{viewBox:`0 0 ${W} ${H}`,class:"wide",role:"img","aria-label":"Saldo por contrato, colorido pelo estágio do crédito"});
+    [0,.5,1].forEach(f=>svg.append(sv("line",{x1:x0+xw*f,x2:x0+xw*f,y1:top,y2:H-6,stroke:"var(--ch-grid)","stroke-width":1})));
+    rows.forEach((x,i)=>{const y=top+i*rowH;const w=Math.max(4,xw*x.p.saldo/max);
+      svg.append(sv("text",{x:padL,y:y+rowH/2+4,class:"lbl"},trunc(shortName(x.k),34)));
+      if(!(x.p.valorAcordo!=null&&x.k.dataInicioAtraso))svg.append(sv("text",{x:padL,y:y+rowH/2+16,"font-size":"10"},x.k.dataInicioAtraso?"fora da negociação por provisão":"em dia — fora da negociação"));
+      svg.append(sv("rect",{x:x0,y:y+9,width:w,height:rowH-18,rx:4,fill:estColor(x.p.est),opacity:(x.p.valorAcordo!=null&&x.k.dataInicioAtraso)?1:.45,class:"hit",
+        onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>${estLabel(x.p.est)}<br>Saldo: ${BRL(x.p.saldo)} (${pct(x.p.saldo/total)} do total)<br>Provisão mínima do banco: ${pct(x.p.prov)}`),onmouseleave:untip}));
+      svg.append(sv("text",{x:x0+w+6,y:y+rowH/2+4,class:"val"},BRL(x.p.saldo)));
+    });
+    wrap.append(el("div",{class:"card chart"},el("h3",{},"Onde está a dívida"),el("div",{class:"sub"},"Saldo de cada contrato e em que estágio o banco o classifica"),svg,
+      el("div",{class:"legend"},el("span",{},el("i",{style:"background:var(--ok)"}),"Estágio 1 · em dia"),el("span",{},el("i",{style:"background:var(--warn)"}),"Estágio 2 · 31–90 dias"),el("span",{},el("i",{style:"background:var(--crit)"}),"Estágio 3 · inadimplido"))));
+  }
+
+  /* 2. Saldo × acordo projetado — barras pareadas */
+  {
+    const proj=rows.filter(x=>x.p.faixa&&x.k.dataInicioAtraso);
+    if(proj.length){
+      const W=900,rowH=56,padL=8,padR=110,labelW=240,top=8;const H=top+proj.length*rowH+8;
+      const max=Math.max(...proj.map(x=>x.p.saldo),1);const x0=padL+labelW,xw=W-x0-padR;
+      const svg=sv("svg",{viewBox:`0 0 ${W} ${H}`,class:"wide",role:"img","aria-label":"Saldo atual comparado ao acordo projetado à vista, por contrato"});
+      [0,.5,1].forEach(f=>svg.append(sv("line",{x1:x0+xw*f,x2:x0+xw*f,y1:top,y2:H-6,stroke:"var(--ch-grid)","stroke-width":1})));
+      proj.forEach((x,i)=>{const y=top+i*rowH;const w1=Math.max(4,xw*x.p.saldo/max),w2=Math.max(4,xw*x.p.valorAcordo/max);const aberta=true;
+        svg.append(sv("text",{x:padL,y:y+rowH/2+4,class:"lbl"},trunc(shortName(x.k),34)));
+        svg.append(sv("rect",{x:x0,y:y+8,width:w1,height:18,rx:4,fill:"var(--ch-a)",class:"hit",onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>Saldo atual: ${BRL(x.p.saldo)}`),onmouseleave:untip}));
+        svg.append(sv("rect",{x:x0,y:y+30,width:w2,height:18,rx:4,fill:"var(--ch-b)",opacity:aberta?1:.45,class:"hit",onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>Acordo projetado à vista em ${fmtD(x.p.dataAlvo)}: ${BRL(x.p.valorAcordo)}<br>Dívida estimada nessa data: ${BRL(x.p.saldoAlvo)}<br>Desconto provável ${pct(x.p.faixa.provavel)} (faixa ${pct(x.p.faixa.min)}–${pct(x.p.faixa.max)})<br>Parcelado: ${BRL(x.p.valorParcelado)} (${pct(x.p.faixa.parcelado)})<br>${x.p.janelaAberta?"Negociável hoje":"Janela abre em "+fmtD(x.p.abertura)}`),onmouseleave:untip}));
+        svg.append(sv("text",{x:x0+w1+8,y:y+21,class:"val"},BRL(x.p.saldo)));
+        svg.append(sv("text",{x:x0+w2+8,y:y+43,class:"val"},`${BRL(x.p.valorAcordo)}${aberta?"":" *"}`));
+      });
+      const econ=proj.reduce((s,x)=>s+(x.p.saldo-x.p.valorAcordo),0);const mm=Math.max(...proj.map(x=>x.p.meses));
+      wrap.append(el("div",{class:"card chart"},el("h3",{},"Hoje × acordo projetado"),el("div",{class:"sub"},`Saldo de hoje comparado ao acordo à vista previsto no fim do prazo de reserva (${mm} meses) · economia potencial: ${BRL(econ)}`),svg,
+        el("div",{class:"legend"},el("span",{},el("i",{style:"background:var(--ch-a)"}),"Saldo atual"),el("span",{},el("i",{style:"background:var(--ch-b)"}),"Acordo projetado (à vista, no prazo de reserva)"))));
+    }
+  }
+
+  /* 3. Linha do tempo das janelas — de quando o atraso começou até a abertura da janela */
+  {
+    const tl=rows.filter(x=>parseD(x.k.dataInicioAtraso)&&!x.p.travado);
+    if(tl.length){
+      const t0=Math.min(...tl.map(x=>parseD(x.k.dataInicioAtraso).getTime()));
+      const t1=Math.max(hoje().getTime()+90*DAY,...tl.map(x=>x.p.abertura.getTime()+30*DAY));
+      const W=900,rowH=40,padL=8,padR=20,labelW=240,top=22;const H=top+tl.length*rowH+26;
+      const x0=padL+labelW,xw=W-x0-padR;const X=t=>x0+xw*(t-t0)/(t1-t0);
+      const svg=sv("svg",{viewBox:`0 0 ${W} ${H}`,class:"wide",role:"img","aria-label":"Linha do tempo: início do atraso, hoje e abertura da janela de acordo por contrato"});
+      // meses
+      const d=new Date(t0);d.setDate(1);d.setMonth(d.getMonth()+1);
+      for(;d.getTime()<t1;d.setMonth(d.getMonth()+1)){const x=X(d.getTime());svg.append(sv("line",{x1:x,x2:x,y1:top-4,y2:H-18,stroke:"var(--ch-grid)"}));if(d.getMonth()%3===0)svg.append(sv("text",{x,y:H-6,"text-anchor":"middle"},d.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"})))}
+      const xh=X(hoje().getTime());
+      svg.append(sv("line",{x1:xh,x2:xh,y1:top-8,y2:H-18,stroke:"var(--navy)","stroke-width":1.5,"stroke-dasharray":"4 3"}));
+      svg.append(sv("text",{x:xh,y:top-9,"text-anchor":"middle",class:"lbl"},"hoje"));
+      tl.forEach((x,i)=>{const y=top+i*rowH;const xa=X(parseD(x.k.dataInicioAtraso).getTime()),xj=X(x.p.abertura.getTime());
+        svg.append(sv("text",{x:padL,y:y+rowH/2+4,class:"lbl"},trunc(shortName(x.k),34)));
+        svg.append(sv("rect",{x:xa,y:y+13,width:Math.max(2,Math.min(xh,xj)-xa),height:14,rx:4,fill:estColor(x.p.est),class:"hit",onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>Atraso desde ${fmtD(parseD(x.k.dataInicioAtraso))} (${x.p.dias} dias)<br>${estLabel(x.p.est)}`),onmouseleave:untip}));
+        if(xj>xh)svg.append(sv("rect",{x:xh,y:y+13,width:xj-xh,height:14,rx:4,fill:"var(--ch-grid)",class:"hit",onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>Janela de acordo abre em ${fmtD(x.p.abertura)}<br>Provisão do banco nessa data: ${pct(provisao(x.p.cart,R.minDiasAtraso))}`),onmouseleave:untip}));
+        svg.append(sv("circle",{cx:xj,cy:y+20,r:7,fill:x.p.janelaAberta?"var(--gold)":"var(--surface)",stroke:"var(--gold)","stroke-width":2,class:"hit",onmousemove:e=>tip(e,`<b>${shortName(x.k)}</b><br>${x.p.janelaAberta?"Janela de acordo aberta desde":"Janela de acordo abre em"} ${fmtD(x.p.abertura)}`),onmouseleave:untip}));
+      });
+      wrap.append(el("div",{class:"card chart"},el("h3",{},"Quando o banco tende a negociar"),el("div",{class:"sub"},`Do início do atraso até a abertura da janela de acordo (${R.minDiasAtraso} dias)`),svg,
+        el("div",{class:"legend"},el("span",{},el("i",{style:"background:var(--crit)"}),"Tempo de atraso já decorrido"),el("span",{},el("i",{style:"background:var(--ch-grid)"}),"Até a janela abrir"),el("span",{},el("i",{style:"background:var(--gold);border-radius:50%"}),"Abertura da janela"))));
+    }
+  }
+
+  /* 4. Composição por estágio — donut simples com rótulo central */
+  {
+    const by={1:0,2:0,3:0};rows.forEach(x=>by[x.p.est]+=x.p.saldo);
+    const segs=[1,2,3].map(e=>({e,v:by[e]})).filter(s=>s.v>0);
+    const W=300,cx=150,cy=150,r=118,sw=36;let a0=-Math.PI/2;
+    const svg=sv("svg",{viewBox:`0 0 ${W} 300`,role:"img","aria-label":"Participação de cada estágio no saldo total",style:"width:300px;max-width:100%;flex:0 0 auto"});
+    segs.forEach(s=>{const a1=a0+2*Math.PI*s.v/total;const gap=segs.length>1?0.03:0;const p=arcPath(cx,cy,r,a0+gap/2,a1-gap/2);
+      svg.append(sv("path",{d:p,fill:"none",stroke:estColor(s.e),"stroke-width":sw,"stroke-linecap":"butt",class:"hit",onmousemove:e=>tip(e,`<b>${estLabel(s.e)}</b><br>${BRL(s.v)} · ${pct(s.v/total)} do saldo`),onmouseleave:untip}));a0=a1});
+    const pri=segs.sort((a,b)=>b.v-a.v)[0];
+    svg.append(sv("text",{x:cx,y:cy-2,"text-anchor":"middle",class:"val",style:"font-size:34px;font-weight:700;font-family:var(--display)"},pct(pri.v/total)));
+    svg.append(sv("text",{x:cx,y:cy+22,"text-anchor":"middle",style:"font-size:14px"},`em estágio ${pri.e}`));
+    wrap.append(el("div",{class:"card chart"},el("h3",{},"Situação da carteira"),el("div",{class:"sub"},"Quanto do saldo total está em cada estágio"),
+      el("div",{class:"donut-wrap"},svg,el("div",{class:"legend"},segs.map(s=>el("span",{},el("i",{style:`background:${estColor(s.e)}`}),`${estLabel(s.e)} — ${BRL(s.v)} (${pct(s.v/total)})`))))));
+  }
+  return wrap;
+}
+function arcPath(cx,cy,r,a0,a1){const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);const big=(a1-a0)>Math.PI?1:0;return `M${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${big} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`}
+const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
+
+function contractCard(k,p,R){
+  const quitado=k.situacao==="quitado";
+  const card=el("article",{class:"card ct"});
+  card.append(el("div",{class:"ct-h"},
+    el("div",{},el("div",{class:"bank"},k.banco||"Banco",k.titular==="PF"?el("span",{class:"pill g",style:"margin-left:8px;vertical-align:middle"},"CPF do sócio"):null),el("div",{class:"prod"},PRODUTOS[k.produto]||k.produto," · ",GARANTIAS[k.garantia]||"")),
+    el("div",{style:"display:flex;flex-direction:column;gap:4px;align-items:flex-end"},el("span",{class:`pill e${p.est}`},quitado?"Quitado":`Estágio ${p.est}`),el("span",{class:"pill c"},p.cart))));
+  card.append(el("div",{class:"ct-b"},
+    kv("Valor original",BRL(+k.valorOriginal)),kv("Saldo atual",BRL(p.saldo)),
+    kv("Atraso",k.dataInicioAtraso?`${p.dias} dias (desde ${fmtD(parseD(k.dataInicioAtraso))})`:"sem atraso informado"),
+    kv("Parcelas",k.parcelasTotal?`${k.parcelasPagas||0} de ${k.parcelasTotal} pagas`:"—"),
+    kv("Provisão mínima do banco",pct(p.prov)+(p.est===3?` · ${mesesInad(p.dias)} mês${mesesInad(p.dias)===1?"":"es"} inadimplido`:"")),
+    kv("Situação",SITUACOES[k.situacao]||"—")));
+  const proj=el("div",{class:"ct-proj"});
+  if(quitado){proj.append(el("div",{class:"note"},"Contrato encerrado."))}
+  else if(k.acordo&&k.acordo.fechado){
+    proj.append(el("div",{class:"eyebrow"},"Acordo fechado"),el("div",{class:"range"},el("span",{class:"big num"},BRL(+k.acordo.valorPago)),el("span",{class:"mm"},`desconto obtido ${pct(+k.acordo.descontoObtido/100)} em ${fmtD(parseD(k.acordo.data))}`)));
+  } else if(p.travado){
+    proj.append(el("div",{class:"eyebrow"},"Acordo por provisão: não projetado"),el("div",{class:"note"},"Com garantia real ou fundo garantidor, o banco recupera o crédito pela garantia e a provisão pesa pouco. A negociação segue por outra via (defesa, substituição de garantia, FGO pós-honra). Reserva sugerida: definir manualmente."));
+  } else if(!k.dataInicioAtraso){
+    proj.append(el("div",{class:"eyebrow"},k.situacao==="acordo"?"Acordo em andamento":"Contrato em dia"),el("div",{class:"note"},k.situacao==="acordo"?"Parcelas do acordo em pagamento. Se houver descumprimento, informe a data do primeiro atraso para o painel projetar o próximo cenário.":"Sem atraso registrado. A projeção de acordo passa a valer a partir do primeiro atraso informado."));
+  } else {
+    const b=p.base;
+    const fonteTxt=b.fonte==="banco"?`mediana de ${b.n} acordo${b.n===1?"":"s"} com ${k.banco}`:b.fonte==="grupo"?`mediana de ${b.n} acordos com ${GRUPOS[p.grupo].toLowerCase()}s`:`sem histórico para este credor: base regulatória (provisão ${pct(p.provAlvo)} ${R.descontoBase} p.p.)`;
+    proj.append(el("div",{class:"eyebrow"},`Previsão de acordo em ${fmtD(p.dataAlvo)} · ${p.meses} meses`),
+      el("div",{class:"range"},el("span",{class:"big num"},BRL(p.valorAcordo)),el("span",{class:"mm num"},`à vista · desconto provável ${pct(p.faixa.provavel)} · faixa ${pct(p.faixa.min)} a ${pct(p.faixa.max)}`)),
+      el("div",{class:"range"},el("span",{class:"num",style:"font-weight:600"},`Parcelado: ${BRL(p.valorParcelado)}`),el("span",{class:"mm num"},`desconto ${pct(p.faixa.parcelado)}`)),
+      el("div",{class:"note num"},`Dívida estimada nessa data: ${BRL(p.saldoAlvo)} (atualização ${(( (k.atualizacaoMensal!=null&&k.atualizacaoMensal!=="")?+k.atualizacaoMensal:R.atualizacaoMensal)).toLocaleString("pt-BR")}% a.m.) · provisão mínima do banco: ${pct(p.provAlvo)}`),
+      el("div",{class:"range"},el("span",{class:"num",style:"font-weight:700"},`Reserva: ${BRL(p.reservaMensal)}/mês`),el("span",{class:"mm"},`por ${p.meses} meses, com margem de ${R.margemReserva}%`)),
+      el("div",{class:"conf"},p.janelaAberta?el("span",{class:"pill e1"},"Negociável hoje"):el("span",{class:"pill e2"},p.janelaNoPrazo?`Janela abre em ${fmtD(p.abertura)}`:`Janela abre só em ${fmtD(p.abertura)}, após o prazo`),p.janelaAberta?` · acordo hoje: ~${BRL(p.valorAcordoHoje)}`:"",` · Confiança `,el("b",{},p.conf),` · ${fonteTxt}`));
+  }
+  if(!quitado&&k.dataInicioAtraso){proj.append(spark(curva(k,p.cart),p.prov))}
+  card.append(proj);
+  card.append(el("div",{class:"ct-f"},el("span",{},k.notas&&!readOnly()?k.notas:""),el("div",{class:"acts edit-only"},
+    el("button",{class:"btn sm",onclick:()=>openContractForm(k)},"Editar"),
+    (!quitado&&!(k.acordo&&k.acordo.fechado))?el("button",{class:"btn sm gold",onclick:()=>openAcordoForm(k,p)},"Registrar acordo"):null)));
+  return card;
+}
+function kv(k,v){return el("div",{class:"kv"},el("div",{class:"k"},k),el("div",{class:"v num"},v))}
+function spark(vals,atual){
+  const W=300,H=64,pad=6,padB=16;const n=vals.length;if(n<2)return el("div");
+  const x=i=>pad+i*(W-2*pad)/(n-1), y=v=>pad+(1-v)*(H-pad-padB);
+  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const svg=sv("svg",{class:"spark",viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Curva de provisão mínima do banco nos próximos 18 meses"});
+  svg.append(sv("text",{x:pad,y:y(1)+3,"font-size":"9"},"100%"),sv("line",{x1:pad+26,x2:W-pad,y1:y(1),y2:y(1),stroke:"var(--line)","stroke-dasharray":"3 3"}));
+  svg.append(sv("text",{x:pad,y:y(.5)+3,"font-size":"9"},"50%"),sv("line",{x1:pad+26,x2:W-pad,y1:y(.5),y2:y(.5),stroke:"var(--line)","stroke-dasharray":"3 3"}));
+  svg.append(sv("polygon",{points:`${x(0)},${y(0)} ${pts} ${x(n-1)},${y(0)}`,fill:"var(--gold)",opacity:".15"}));
+  svg.append(sv("polyline",{points:pts,fill:"none",stroke:"var(--gold)","stroke-width":"2"}));
+  svg.append(sv("circle",{cx:x(0),cy:y(vals[0]),r:"3.5",fill:"var(--navy)",stroke:"var(--gold)","stroke-width":"1.5"}));
+  svg.append(sv("text",{x:pad,y:H-3,"font-size":"9.5"},`Provisão do banco: hoje ${pct(vals[0])}`));
+  svg.append(sv("text",{x:W-pad,y:H-3,"text-anchor":"end","font-size":"9.5"},`em 18 meses ${pct(vals[n-1])}`));
+  return svg;
+}
+
+/* ---------- Regras ---------- */
+function renderRegras(){
+  const v=$("#view-regras");v.replaceChildren();const R=S.regras;
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Motor de projeção"),el("h1",{},"Regras de projeção"),el("div",{class:"sub"},"Ajustes em pontos percentuais somados à provisão mínima regulatória. Alterações valem para todos os clientes imediatamente."))));
+  const g=el("div",{class:"card section"},el("h3",{},"Como o painel projeta"),
+    el("div",{class:"note"},"1) Se o credor tem acordos reais na Base de acordos, a projeção parte da mediana dos descontos à vista daquele credor. 2) Se não tem, usa a mediana do grupo (varejo, cooperativa, FIDC…). 3) Sem histórico algum, cai na base regulatória: provisão mínima do banco + desconto base. Em todos os casos somam-se os fatores de garantia, produto, situação, titular e banco."),
+    el("div",{class:"form"},
+    numF("Mínimo de dias de atraso para projetar","minDiasAtraso",R.minDiasAtraso,"Antes disso o painel mostra só a data de abertura da janela."),
+    numF("Mínimo de acordos do credor para usar a mediana dele","minRefs",R.minRefs,"Abaixo disso usa o grupo."),
+    numF("Desconto base regulatório (p.p. sobre a provisão)","descontoBase",R.descontoBase,"Só quando não há histórico."),
+    numF("Cenário parcelado (p.p. em relação ao à vista)","fatorParcelado",R.fatorParcelado,"Usado quando o credor não tem acordo parcelado na base."),
+    numF("Amplitude da faixa (± p.p.)","amplitude",R.amplitude,"Com 3+ referências a faixa vira o intervalo interquartil."),
+    numF("Teto de desconto (%)","tetoDesconto",R.tetoDesconto,""),
+    numF("Margem de segurança da reserva (%)","margemReserva",R.margemReserva,""),
+    numF("Prazo padrão de reserva (meses)","prazoReservaPadrao",R.prazoReservaPadrao,"Pode ser alterado por contrato. Define a data-alvo da previsão."),
+    numF("Atualização do saldo em atraso (% a.m.)","atualizacaoMensal",R.atualizacaoMensal,"Juros de mora + correção para estimar a dívida na data-alvo. Padrão 1% a.m.; pode ser sobrescrito por contrato.")));
+  v.append(g);
+  v.append(fatorTable("Fator por garantia","fatoresGarantia",GARANTIAS,"“travar” desliga a projeção para aquele contrato. Veículo com alienação fiduciária fechou com 83–89% no histórico, por isso não está travado."));
+  v.append(fatorTable("Fator por grupo de credor (só na base regulatória)","fatoresGrupo",GRUPOS,"Cooperativas negociam muito menos desconto que bancos de varejo (41–67% × 79–97% no histórico)."));
+  v.append(fatorTable("Fator por titular","fatoresTitular",TITULARES,"Quase todo o histórico é dívida no CPF do sócio. Para PJ o painel aplica um desconto a menos até haver base própria."));
+  v.append(fatorTable("Fator por produto","fatoresProduto",PRODUTOS,""));
+  v.append(fatorTable("Fator por situação","fatoresSituacao",SITUACOES,"Os acordos reais vieram tanto da fase administrativa quanto de execução, com descontos parecidos; por isso os fatores começam em zero."));
+  const bancos=Object.fromEntries(Object.keys(R.fatoresBanco).map(b=>[b,b]));
+  const tb=fatorTable("Fator por banco","fatoresBanco",bancos,"Flexibilidade observada por instituição. Comece em 0 e calibre com os acordos reais.");
+  const add=el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},el("input",{id:"novoBanco",placeholder:"Novo banco…",style:"padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)"}),el("button",{class:"btn sm",onclick:()=>{const n=$("#novoBanco").value.trim();if(!n)return;S.regras.fatoresBanco[n]=0;saveRegras()}},"Adicionar banco"));
+  tb.append(add);v.append(tb);
+  v.append(el("div",{class:"card section"},el("h3",{},"Tabela regulatória (referência)"),el("div",{class:"note"},"Anexo I da Res. BCB 352/2023: provisão mínima para ativos inadimplidos (atraso > 90 dias) = A + B × meses contados do mês do inadimplemento, até 100%."),
+    el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Carteira"),el("th",{class:"r"},"A (mês 0)"),el("th",{class:"r"},"B (por mês)"),el("th",{class:"r"},"6 meses"),el("th",{class:"r"},"12 meses"),el("th",{class:"r"},"100% em"))),
+      el("tbody",{},Object.entries(CARTEIRAS).map(([k,c])=>el("tr",{},el("td",{},el("b",{},k)," ",el("span",{class:"note"},c.nome.slice(5))),el("td",{class:"r num"},pct(c.A)),el("td",{class:"r num"},(c.B*100).toFixed(1)+" p.p."),el("td",{class:"r num"},pct(Math.min(1,c.A+c.B*6))),el("td",{class:"r num"},pct(Math.min(1,c.A+c.B*12))),el("td",{class:"r num"},Math.ceil((1-c.A)/c.B)+" meses"))))))));
+  v.append(el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>{S.regras=structuredClone(REGRAS_PADRAO);saveRegras()}},"Restaurar padrão")));
+}
+function numF(l,key,val,help){return el("div",{class:"f"},el("label",{for:"r-"+key},l),el("input",{id:"r-"+key,type:"number",step:"any",value:val,onchange:e=>{S.regras[key]=+e.target.value;saveRegras()}}),help?el("div",{class:"help"},help):null)}
+function fatorTable(title,key,labels,help){
+  const R=S.regras;
+  return el("div",{class:"card section"},el("h3",{},title),el("div",{class:"note"},help),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Item"),el("th",{class:"r"},"Ajuste (p.p.)"))),
+    el("tbody",{},Object.entries(labels).map(([k,l])=>{const cur=R[key][k];return el("tr",{},el("td",{},l),el("td",{class:"r"},el("input",{id:`f-${key}-${k}`,value:cur==="travar"?"travar":(cur??0),onchange:e=>{const t=e.target.value.trim().toLowerCase();S.regras[key][k]=t==="travar"?"travar":(+t||0);saveRegras()}})))})))));
+}
+async function saveRegras(){if(!needDb())return;try{await S.db.doc("config/regras").set(S.regras);toast("Regras salvas")}catch(e){toast("Não foi possível salvar as regras")}render()}
+
+/* ---------- Base de acordos (histórico do escritório) ---------- */
+function descOf(h){return h.divida>0?1-h.valorAcordo/h.divida:null}
+function renderHistorico(){
+  const v=$("#view-historico");v.replaceChildren();
+  const hs=[...S.historico].sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  const fechados=hs.filter(h=>h.status==="fechado");
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Como cada credor negocia"),el("h1",{},"Base de acordos"),el("div",{class:"sub"},`${fechados.length} acordos fechados e ${hs.length-fechados.length} propostas. É esta base que alimenta a projeção dos clientes.`)),
+    el("div",{class:"actions edit-only"},el("button",{class:"btn primary",onclick:()=>openHistForm({})},"+ Registrar acordo"))));
+  // resumo por credor
+  const porCredor={};for(const h of fechados){const k=normBanco(h.credor);(porCredor[k]??={nome:h.credor.split(" (")[0],grupo:h.grupo||grupoBanco(h.credor),av:[],pa:[]});(h.forma==="parcelado"?porCredor[k].pa:porCredor[k].av).push(descOf(h))}
+  const rows=Object.values(porCredor).sort((a,b)=>(b.av.length+b.pa.length)-(a.av.length+a.pa.length));
+  v.append(el("div",{class:"card section"},el("h3",{},"Resumo por credor"),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"Grupo"),el("th",{class:"r"},"Acordos"),el("th",{class:"r"},"À vista · mediana"),el("th",{class:"r"},"À vista · faixa"),el("th",{class:"r"},"Parcelado · mediana"))),
+    el("tbody",{},rows.map(r=>el("tr",{},el("td",{},el("b",{},r.nome)),el("td",{},GRUPOS[r.grupo]),el("td",{class:"r num"},r.av.length+r.pa.length),el("td",{class:"r num"},pct(mediana(r.av))),el("td",{class:"r num"},r.av.length?`${pct(Math.min(...r.av))} – ${pct(Math.max(...r.av))}`:"—"),el("td",{class:"r num"},pct(mediana(r.pa))))))))));
+  if(!hs.length){v.append(el("div",{class:"card empty"},el("h3",{},"Nenhum acordo na base"),el("div",{},"Registre os acordos já fechados pelo escritório para que a projeção use a experiência real com cada banco.")));return}
+  v.append(el("div",{class:"card section"},el("h3",{},"Todos os acordos"),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Data"),el("th",{},"Credor"),el("th",{},"Produto"),el("th",{},"Titular"),el("th",{},"Fase"),el("th",{class:"r"},"Dívida"),el("th",{class:"r"},"Acordo"),el("th",{class:"r"},"Desconto"),el("th",{},"Forma"),el("th",{},"Status"),el("th",{class:"edit-only"},""))),
+    el("tbody",{},hs.map(h=>el("tr",{},el("td",{class:"num"},fmtD(parseD(h.data))),el("td",{},el("b",{},h.credor),h.obs?el("div",{class:"note",style:"max-width:360px"},h.obs):null),el("td",{},PRODUTOS[h.produto]||h.produto||"—"),el("td",{},h.titular||"—"),el("td",{},FASES[h.fase]||h.fase||"—"),el("td",{class:"r num"},BRL(+h.divida)),el("td",{class:"r num"},BRL(+h.valorAcordo)),el("td",{class:"r num"},el("b",{},pct(descOf(h)))),el("td",{},h.forma==="parcelado"?`${h.parcelas?h.parcelas+"x":"parcelado"}`:"à vista"),el("td",{},el("span",{class:"pill "+(h.status==="fechado"?"e1":"e2")},h.status==="fechado"?"Fechado":"Proposta")),el("td",{class:"edit-only"},el("button",{class:"btn sm",onclick:()=>openHistForm(h)},"Editar")))))))));
+}
+function openHistForm(h={}){
+  const credor=inp("text",h.credor,{list:"bancos",placeholder:"Ex.: Itaú"});const dl=el("datalist",{id:"bancos"},Object.keys(S.regras.fatoresBanco).map(b=>el("option",{value:b})));
+  const grupo=sel(GRUPOS,h.grupo||grupoBanco(h.credor||""));credor.oninput=()=>{grupo.value=grupoBanco(credor.value)};
+  const tit=sel(TITULARES,h.titular||"PF"),prod=sel(PRODUTOS,h.produto||"ccb"),gar=sel(GARANTIAS,h.garantia||"nenhuma"),fase=sel(FASES,h.fase||"administrativa"),forma=sel(FORMAS,h.forma||"avista"),status=sel({fechado:"Fechado",proposta:"Proposta do banco (não fechada)"},h.status||"fechado");
+  const divida=inp("number",h.divida,{step:"100"}),valor=inp("number",h.valorAcordo,{step:"100"}),npar=inp("number",h.parcelas||1,{min:1}),data=inp("date",h.data||new Date().toISOString().slice(0,10)),dias=inp("number",h.diasAtraso??"",{min:0}),obs=el("textarea",{},h.obs||"");
+  const descNote=el("div",{class:"help"});const upd=()=>{const d=+divida.value,a=+valor.value;descNote.textContent=d&&a>=0?`Desconto: ${pct(1-a/d)}`:""};divida.oninput=valor.oninput=upd;upd();
+  const body=el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"h-credor"},"Credor"),Object.assign(credor,{id:"h-credor"}),dl),field("h-grupo","Grupo",grupo),field("h-tit","Titular",tit),field("h-prod","Produto",prod),field("h-gar","Garantia",gar),field("h-fase","Fase na data do acordo",fase),
+    field("h-div","Dívida confessada / atualizada (R$)",divida),el("div",{class:"f"},el("label",{for:"h-val"},"Valor do acordo (R$)"),Object.assign(valor,{id:"h-val"}),descNote),field("h-forma","Forma",forma),field("h-npar","Nº de parcelas",npar),field("h-data","Data do acordo",data),field("h-dias","Dias de atraso na data (se souber)",dias),field("h-status","Status",status),field("h-obs","Observações (cliente anonimizado, processo, condições)",obs));
+  const extra=h.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este acordo da base?"))return;await S.db.doc("historico/"+h.id).delete();$("#modalHost").replaceChildren();toast("Acordo excluído")}},"Excluir"):null;
+  modal(h.id?"Editar acordo":"Registrar acordo na base",body,async()=>{
+    if(!credor.value.trim())throw new Error("Informe o credor");if(!(+divida.value)||!valor.value)throw new Error("Informe dívida e valor do acordo");
+    const d={credor:credor.value.trim(),grupo:grupo.value,titular:tit.value,produto:prod.value,garantia:gar.value,fase:fase.value,divida:+divida.value,valorAcordo:+valor.value,forma:forma.value,parcelas:forma.value==="parcelado"?(+npar.value||null):1,data:data.value,diasAtraso:dias.value?+dias.value:null,status:status.value,obs:obs.value};
+    if(!(d.credor in S.regras.fatoresBanco)){S.regras.fatoresBanco[d.credor]=0;await S.db.doc("config/regras").set(S.regras)}
+    if(h.id)await S.db.doc("historico/"+h.id).set(d);else await S.db.collection("historico").add(d);toast("Acordo salvo na base");
+  },extra);
+}
+
+/* ---------- Calibração ---------- */
+function renderCalib(){
+  const v=$("#view-calibracao");v.replaceChildren();
+  const acordos=S.contratos.filter(x=>x.acordo&&x.acordo.fechado);
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Projetado × real"),el("h1",{},"Calibração"),el("div",{class:"sub"},"Acordos fechados nos clientes do painel, comparados com o que o sistema havia projetado. Cada um também entra automaticamente na Base de acordos."))));
+  if(!acordos.length){v.append(el("div",{class:"card empty"},el("h3",{},"Nenhum acordo de cliente registrado"),el("div",{},"Use “Registrar acordo” no card do contrato quando um acordo for fechado. Enquanto isso, a projeção se apoia na Base de acordos.")));return}
+  const rows=acordos.map(k=>{const c=S.clientes.find(x=>x.clienteId===k.clienteId||x.id===k.clienteId);const cart=k.carteiraOverride||carteiraAuto(k.produto,k.garantia);return {k,c,cart,real:+k.acordo.descontoObtido/100,proj:k.acordo.descontoProjetado!=null?+k.acordo.descontoProjetado:null}});
+  const porBanco={};for(const r of rows){(porBanco[r.k.banco]??={n:0,soma:0,desvio:0,nd:0});const s=porBanco[r.k.banco];s.n++;s.soma+=r.real;if(r.proj!=null){s.desvio+=(r.real-r.proj);s.nd++}}
+  v.append(el("div",{class:"card section"},el("h3",{},"Por banco"),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Banco"),el("th",{class:"r"},"Acordos"),el("th",{class:"r"},"Desconto médio real"),el("th",{class:"r"},"Desvio médio (real − projetado)"),el("th",{class:"r"},"Fator atual"),el("th",{},"Sugestão"))),
+    el("tbody",{},Object.entries(porBanco).map(([b,s])=>{const dv=s.nd?s.desvio/s.nd:0;const atual=S.regras.fatoresBanco[b]??0;return el("tr",{},el("td",{},b),el("td",{class:"r num"},s.n),el("td",{class:"r num"},pct(s.soma/s.n)),el("td",{class:"r num"},s.nd?(dv*100>0?"+":"")+(dv*100).toFixed(1)+" p.p.":"—"),el("td",{class:"r num"},atual+" p.p."),el("td",{},s.nd>=3&&Math.abs(dv)>=0.03?el("button",{class:"btn sm",onclick:()=>{S.regras.fatoresBanco[b]=Math.round(atual+dv*100);saveRegras()}},`Ajustar para ${Math.round(atual+dv*100)} p.p.`):el("span",{class:"note"},s.nd<3?"aguardando 3 acordos":"calibrado")))}))))));
+  v.append(el("div",{class:"card section"},el("h3",{},"Acordos fechados nos clientes"),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Cliente"),el("th",{},"Banco"),el("th",{},"Produto"),el("th",{},"Carteira"),el("th",{class:"r"},"Dias de atraso"),el("th",{class:"r"},"Saldo"),el("th",{class:"r"},"Projetado"),el("th",{class:"r"},"Real"),el("th",{},"Forma"),el("th",{},"Data"))),
+    el("tbody",{},rows.sort((a,b)=>(b.k.acordo.data||"").localeCompare(a.k.acordo.data||"")).map(r=>el("tr",{},el("td",{},r.c?r.c.nome:"—"),el("td",{},r.k.banco),el("td",{},PRODUTOS[r.k.produto]),el("td",{},r.cart),el("td",{class:"r num"},r.k.acordo.diasNoAcordo??"—"),el("td",{class:"r num"},BRL(+r.k.acordo.saldoNoAcordo||+r.k.saldoAtual)),el("td",{class:"r num"},r.proj!=null?pct(r.proj):"—"),el("td",{class:"r num"},pct(r.real)),el("td",{},(r.k.acordo.parcelas||1)>1?`${r.k.acordo.parcelas}x`:"à vista"),el("td",{},fmtD(parseD(r.k.acordo.data))))))))));
+}
+
+/* ---------- Formulários ---------- */
+function needDb(){if(S.db)return true;toast(S.dbStatus==="pending"?"Conectando ao banco de dados, aguarde alguns segundos…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta.");return false}
+function modal(title,body,onSave,extra){
+  if(!needDb())return;
+  const host=$("#modalHost");host.replaceChildren();
+  const close=()=>host.replaceChildren();
+  const card=el("div",{class:"card",role:"dialog","aria-modal":"true"},el("h2",{},title),body,
+    el("div",{class:"actions"},extra||null,el("button",{class:"btn",onclick:close},"Cancelar"),el("button",{class:"btn primary",onclick:async()=>{try{await onSave();close()}catch(e){toast(e.message||"Não foi possível salvar")}}},"Salvar")));
+  host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
+  card.querySelector("input,select,textarea")?.focus();
+}
+const field=(id,l,input,help)=>el("div",{class:"f"+(input.tagName==="TEXTAREA"?" full":"")},el("label",{for:id},l),Object.assign(input,{id}),help?el("div",{class:"help"},help):null);
+const inp=(type,value,attrs={})=>el("input",{type,value:value??"",...attrs});
+const sel=(opts,value)=>{const s=el("select",{});for(const[k,v]of Object.entries(opts))s.append(el("option",{value:k,selected:k===value?"":null},v));return s};
+const bancoInput=(value)=>{const i=inp("text",value,{list:"bancos",placeholder:"Ex.: Itaú",id:"k-banco"});const dl=el("datalist",{id:"bancos"},Object.keys(S.regras.fatoresBanco).map(b=>el("option",{value:b})));const w=el("div",{},i,dl);return {wrap:w,input:i}};
+
+function openClientForm(c={}){
+  const nome=inp("text",c.nome),cnpj=inp("text",c.cnpj),resp=inp("text",c.responsavel),res=inp("number",c.reservaAcumulada,{step:"100"}),notas=el("textarea",{},c.notasInternas||"");
+  const body=el("div",{class:"form"},field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ",cnpj),field("c-resp","Responsável no escritório",resp),field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas));
+  const extra=c.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este cliente e manter os contratos órfãos?"))return;await S.db.doc("clientes/"+c.id).delete();S.sel=null;$("#modalHost").replaceChildren();toast("Cliente excluído")}},"Excluir"):null;
+  modal(c.id?"Editar cliente":"Novo cliente",body,async()=>{
+    if(!nome.value.trim())throw new Error("Informe o nome do cliente");
+    const data={nome:nome.value.trim(),cnpj:cnpj.value.trim(),responsavel:resp.value.trim(),reservaAcumulada:+res.value||0,notasInternas:notas.value,timeline:c.timeline||[],createdAt:c.createdAt||new Date().toISOString()};
+    if(c.id)await S.db.doc("clientes/"+c.id).set(data);else{const ref=await S.db.collection("clientes").add(data);S.sel=ref.id}
+    toast("Cliente salvo");
+  },extra);
+}
+function confirmInline(body,msg){let box=body.querySelector(".confirm");if(box){return box.dataset.ok==="1"}box=el("div",{class:"f full confirm",style:"color:var(--crit);font-weight:600"},msg+" Clique em Excluir novamente para confirmar.");box.dataset.ok="1";body.append(box);return false}
+
+function openContractForm(k={}){
+  const R=S.regras;
+  const b=bancoInput(k.banco),prod=sel(PRODUTOS,k.produto||"giro"),gar=sel(GARANTIAS,k.garantia||"nenhuma"),sit=sel(SITUACOES,k.situacao||"cobranca"),tit=sel(TITULARES,k.titular||"PJ");
+  const vo=inp("number",k.valorOriginal,{step:"100"}),sa=inp("number",k.saldoAtual,{step:"100"}),dc=inp("date",k.dataContrato),da=inp("date",k.dataInicioAtraso),pp=inp("number",k.parcelasPagas,{min:0}),pt=inp("number",k.parcelasTotal,{min:0}),pr=inp("number",k.prazoReservaMeses||R.prazoReservaPadrao,{min:1}),am=inp("number",k.atualizacaoMensal??"",{step:"0.1",placeholder:String(R.atualizacaoMensal)});
+  const cart=sel({"":"Automática","C1":"C1","C2":"C2","C3":"C3","C4":"C4","C5":"C5"},k.carteiraOverride||"");
+  const notas=el("textarea",{},k.notas||"");
+  const autoNote=el("div",{class:"help"});const upd=()=>{autoNote.textContent="Carteira automática: "+carteiraAuto(prod.value,gar.value)};prod.onchange=gar.onchange=upd;upd();
+  const body=el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
+    field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-dc","Data do contrato",dc),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
+    field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),field("k-sit","Situação",sit),field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
+    el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),field("k-notas","Notas internas",notas));
+  const extra=k.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este contrato?"))return;await S.db.doc("contratos/"+k.id).delete();$("#modalHost").replaceChildren();toast("Contrato excluído")}},"Excluir"):null;
+  modal(k.id?"Editar contrato":"Novo contrato",body,async()=>{
+    if(!b.input.value.trim())throw new Error("Informe o banco");
+    if(!da.value&&sit.value!=="quitado"&&sit.value!=="emdia")throw new Error("Informe o início do atraso");
+    const data={clienteId:k.clienteId,banco:b.input.value.trim(),titular:tit.value,produto:prod.value,garantia:gar.value,situacao:sit.value,valorOriginal:+vo.value||0,saldoAtual:+sa.value||+vo.value||0,dataContrato:dc.value||"",dataInicioAtraso:da.value||"",parcelasPagas:+pp.value||0,parcelasTotal:+pt.value||0,prazoReservaMeses:+pr.value||R.prazoReservaPadrao,atualizacaoMensal:am.value===""?null:+am.value,carteiraOverride:cart.value||"",notas:notas.value,acordo:k.acordo||null,createdAt:k.createdAt||new Date().toISOString()};
+    if(!(data.banco in S.regras.fatoresBanco)){S.regras.fatoresBanco[data.banco]=0;await S.db.doc("config/regras").set(S.regras)}
+    if(k.id)await S.db.doc("contratos/"+k.id).set(data);else await S.db.collection("contratos").add(data);
+    toast("Contrato salvo");
+  },extra);
+}
+function openAcordoForm(k,p){
+  const data=inp("date",new Date().toISOString().slice(0,10)),vp=inp("number","",{step:"100"}),desc=inp("number",p.faixa?Math.round(p.faixa.provavel*100):"",{min:0,max:100}),npar=inp("number",1,{min:1});
+  vp.oninput=()=>{if(p.saldo&&vp.value)desc.value=Math.round((1-(+vp.value)/p.saldo)*100)};desc.oninput=()=>{if(p.saldo&&desc.value)vp.value=Math.round(p.saldo*(1-(+desc.value)/100))};
+  const body=el("div",{class:"form"},field("a-data","Data do acordo",data),field("a-vp","Valor total pago/acordado (R$)",vp,`Saldo na data: ${BRL(p.saldo)}`),field("a-desc","Desconto obtido (%)",desc,p.faixa?`Projetado: ${pct(p.faixa.provavel)} à vista · ${pct(p.faixa.parcelado)} parcelado`:"Sem projeção para este contrato"),field("a-npar","Número de parcelas",npar,"1 = à vista"));
+  modal("Registrar acordo fechado",body,async()=>{
+    if(!vp.value)throw new Error("Informe o valor acordado");
+    const novo={...k,situacao:"acordo",acordo:{fechado:true,data:data.value,valorPago:+vp.value,descontoObtido:+desc.value,parcelas:+npar.value||1,descontoProjetado:p.faixa?((+npar.value||1)>1?p.faixa.parcelado:p.faixa.provavel):null,saldoNoAcordo:p.saldo,diasNoAcordo:p.dias}};delete novo.id;
+    await S.db.doc("contratos/"+k.id).set(novo);toast("Acordo registrado e enviado para a calibração");
+  });
+}
+function openEventForm(c){
+  const data=inp("date",new Date().toISOString().slice(0,10)),txt=el("textarea",{placeholder:"Ex.: Proposta formal enviada ao Itaú com pedido de 60% de desconto."});
+  modal("Registrar atuação",el("div",{class:"form"},field("e-data","Data",data),field("e-txt","O que foi feito",txt)),async()=>{
+    if(!txt.value.trim())throw new Error("Descreva a atuação");
+    const tl=[...(c.timeline||[]),{data:data.value,texto:txt.value.trim(),id:Math.random().toString(36).slice(2,9)}].slice(-120);
+    await S.db.doc("clientes/"+c.id).update({timeline:tl});toast("Atuação registrada");
+  });
+}
+async function removeEvent(c,e){if(!needDb())return;const tl=(c.timeline||[]).filter(x=>x.id!==e.id);await S.db.doc("clientes/"+c.id).update({timeline:tl})}
+
+/* ---------- Boot ---------- */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{S.tab=t.dataset.tab;try{localStorage.setItem("pp-tab",S.tab)}catch(_){}render()});
+$("#q").oninput=e=>{S.q=e.target.value;renderList()};
+$("#viewClient").onchange=e=>{S.clientView=e.target.checked;if(S.clientView){S.tab="clientes"}render()};
+$("#btnNewClient").onclick=()=>openClientForm({});$("#btnNewClient").disabled=true;
+try{const t=localStorage.getItem("pp-tab");if(t)S.tab=t}catch(_){}
+render();
+
+(async()=>{
+  await window.__PP_LOGIN; const use=n=>window.__PP_RUNTIME.use(n);
+  const [db,user]=await Promise.all([use("db"),use("user")]);
+  S.db=db;S.user=user;S.dbStatus=db?"ok":"off";
+  $("#btnNewClient").disabled=!db;
+  if(!db){render();return}
+  try{const w=await user?.can("data.write");S.canWrite=w===null||w===undefined?null:!!w}catch(_){S.canWrite=null}
+  render();
+  db.doc("config/regras").onSnapshot(s=>{if(s.exists){const r=s.data();const m={...structuredClone(REGRAS_PADRAO),...r};for(const k of ["fatoresGarantia","fatoresProduto","fatoresSituacao","fatoresBanco","fatoresTitular","fatoresGrupo"])m[k]={...REGRAS_PADRAO[k],...(r[k]||{})};S.regras=m}render()},e=>console.warn(e));
+  db.collection("historico").onSnapshot(s=>{S.historico=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
+  db.collection("clientes").onSnapshot(s=>{S.clientes=s.docs.map(d=>({id:d.id,...d.data()}));if(!S.sel&&S.clientes.length)S.sel=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""))[0].id;render()},e=>{console.warn(e);toast("Falha ao carregar clientes")});
+  db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
+})();
+
+/* ---------- Usuários (admin) ---------- */
+async function renderUsuarios(){
+  const v=$("#view-usuarios");v.replaceChildren();
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acessos"),el("h1",{},"Usuários"),el("div",{class:"sub"},"Para criar um usuário novo: Supabase → Authentication → Users → Add user (com Auto Confirm). Ele aparece aqui como 'pendente'; defina o perfil e, se for cliente, a empresa."))));
+  const {data:ps,error}=await SB.from("perfis").select("*").order("email");
+  if(error){v.append(el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
+  const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",pendente:"Pendente (sem acesso)"};
+  const clientes=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},""))),
+    el("tbody",{},ps.map(p=>{
+      const nome=inp("text",p.nome||"");
+      const papel=sel(PAPEIS,p.papel);
+      const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");
+      const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
+        const upd={nome:nome.value.trim(),papel:papel.value,cliente_id:papel.value==="cliente"?(cli.value||null):null};
+        if(papel.value==="cliente"&&!cli.value){toast("Escolha a empresa do cliente");return}
+        const {error}=await SB.from("perfis").update(upd).eq("id",p.id);
+        toast(error?"Não foi possível salvar":"Usuário salvo");
+      }},"Salvar");
+      return el("tr",{},el("td",{},p.email||"—"),el("td",{},nome),el("td",{},papel),el("td",{},cli),el("td",{},salvar));
+    })));
+  v.append(el("div",{class:"card section"},el("div",{class:"tbl"},tb)));
+}
+{ const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
+</script>
