@@ -230,6 +230,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-negociacoes" hidden class="main"></div>
   <div id="view-monitoramento" hidden class="main"></div>
   <div id="view-publicacoes" hidden class="main"></div>
+  <div id="view-conhecimento" hidden class="main"></div>
 </div>
 
 <div id="modalHost"></div>
@@ -454,7 +455,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"clientes",label:"Clientes"},
-  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
+  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
   {grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}

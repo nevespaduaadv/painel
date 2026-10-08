@@ -105,3 +105,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Tela: aba Publicações (Jurídico) com KPIs, filtros, leitura em modal com link do tribunal, "Atualizar agora" e "Buscar período…" (histórico, máx. 400 dias por pedido).
 - Validado pelo navegador da Maria Júlia: a API aceita os filtros de data (32 publicações entre 01 e 08/10). Risco: a API bloqueou o servidor fora do Brasil; o Supabase fica em São Paulo, mas se bloquear, `djen_requisicoes.erro` mostra e o plano B é uma Edge Function ou rodar a busca pelo navegador.
 - Correção de rota: o `#` de um módulo ainda não registrado (antes do login) é preservado até o módulo carregar.
+
+## 12. PR 8 (08/10) — base de conhecimento
+- Migration `0015`: `conteudos` (área, tema, título, resumo, corpo em Markdown, tags, publicado, autor, versão, origem/id_externo, tsvector em português mantido por gatilho) + `conteudos_versoes` (versão anterior guardada a cada edição; restaurar pela tela). RLS: equipe lê/edita, admin exclui (provisório até definir quem edita). `conhecimento_buscar(q)` com `websearch_to_tsquery` e trecho destacado.
+- Carga `0016` (fora do repo): 4 páginas do Notion (Jurídico, Novos Negócios, Acordos, Pós-Vendas — POPs, scripts, checklists, fluxogramas) + 53 artigos das referências técnicas (teses de defesa, produtos de crédito PJ, negociação e proteção patrimonial, RJ e crédito rural, holding familiar), um artigo por seção. Upsert por `id_externo` só enquanto o artigo está na versão 1 (não sobrescreve edição manual).
+- Tela: aba Base de conhecimento (Jurídico) com lista por tema, busca, leitura (marked + sanitização própria + mermaid sob demanda), editor Markdown com pré-visualização, versões e relacionados; rota `#conhecimento/<slug>`.
+- Ficou para depois: matriz completa de blindagem (tabela do Notion), páginas Serviços Jurídicos / Procedimentos Internos / Backoffice; sugestão de artigo a partir da ficha do cliente; documentos-base do Drive (ver §13).

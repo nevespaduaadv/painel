@@ -8,6 +8,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/index.html` | App interno "Clientes" (gerado — **não editar à mão**). Navegação por áreas no topo (Clientes · Jurídico ▾ · Equipe ▾ · Gestão), rotas no `#` (`#clientes/<id>/<aba>`, `#tarefas`, `#negociacoes`…) com voltar do navegador e breadcrumb na página do cliente. |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
+| `passivos/conhecimento.js` | **Base de conhecimento** (Jurídico): artigos em Markdown por tema (teses, POPs, produtos de crédito, negociação, proteção patrimonial, holding), busca full-text, edição com versões, diagramas mermaid. |
 | `passivos/publicacoes.js` | Aba **Publicações (DJEN)**: intimações por OAB importadas pelo banco (pg_net + pg_cron), vinculadas ao processo, com tarefa de análise; triagem das sem vínculo. |
 | `passivos/fluxo.js` | **Fluxo PJ** (etapas 0–10 do Notion na ficha), abas **Negociações** (kanban do setor de acordos) e **Monitoramento** (checagem processual por cliente); sub-aba Negociações na página do cliente. |
 | `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
@@ -46,7 +47,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`, `0015_pr8_base_conhecimento`. Carga 0016 (artigos iniciais) fora do repo. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
