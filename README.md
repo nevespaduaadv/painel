@@ -8,6 +8,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/index.html` | App interno "Clientes" (gerado — **não editar à mão**). Navegação por áreas no topo (Clientes · Jurídico ▾ · Equipe ▾ · Gestão), rotas no `#` (`#clientes/<id>/<aba>`, `#tarefas`, `#negociacoes`…) com voltar do navegador e breadcrumb na página do cliente. |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
+| `passivos/publicacoes.js` | Aba **Publicações (DJEN)**: intimações por OAB importadas pelo banco (pg_net + pg_cron), vinculadas ao processo, com tarefa de análise; triagem das sem vínculo. |
 | `passivos/fluxo.js` | **Fluxo PJ** (etapas 0–10 do Notion na ficha), abas **Negociações** (kanban do setor de acordos) e **Monitoramento** (checagem processual por cliente); sub-aba Negociações na página do cliente. |
 | `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
@@ -45,7 +46,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
@@ -71,6 +72,7 @@ Validação local antes de enviar: as migrations rodam em sequência num Postgre
 - "checado hoje o monitoramento da Via Rios" → `monitoramentos.ultima_checagem` (próxima = amanhã). Cliente novo nasce com tarefas de onboarding, monitoramento e, se tiver dívida em atraso, negociação (gatilho `fluxo_novo_cliente`).
 - Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos`, cria a entrada "Acordo fechado" na timeline (visível ao cliente) e conclui a negociação daquele contrato.
 - Mudanças de estágio (Res. CMN 4.966) são registradas automaticamente toda madrugada (pg_cron `estagios_diario`).
+- **DJEN**: o banco busca as publicações da OAB 488.803/SP 3× ao dia em dias úteis (`djen_diario`, 06h/10h/15h) e processa as respostas a cada 10 min (`djen_processar`). Parâmetros em `regras` (id `djen`: oab, uf, dias_retroativos). Para trazer histórico: aba Publicações → "Buscar período…". Se a API bloquear o servidor, a tabela `djen_requisicoes` mostra o erro.
 
 ## Power BI / Looker
 

@@ -98,3 +98,10 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Página do cliente: breadcrumb "Clientes › Empresa › Aba"; no celular a lista some ao abrir um cliente e aparece o botão "← Clientes".
 - Portal: azulejos agrupados por área, "Clientes" em destaque; Comercial, Marketing e Financeiro aparecem como "Em breve" (sem página ainda).
 - Fica para depois (parte estrutural do §6): app único com módulos e componentes compartilhados, área do cliente mobile-first, esqueletos de carregamento, busca global.
+
+## 11. PR 7½ (08/10) — publicações do DJEN
+- Migration `0014`: `pg_net` + `pg_cron`. `djen_solicitar()` enfileira GET em `comunicaapi.pje.jus.br` (OAB/UF em `regras.djen`, filtro `dataDisponibilizacaoInicio/Fim`, 100 por página); `djen_processar()` lê `net._http_response`, grava em `publicacoes` (upsert por id do DJEN, texto sem HTML) e pede a próxima página. Agenda: `djen_diario` 09/13/18 UTC dias úteis (últimos 3 dias, sobreposto), `djen_processar` a cada 10 min.
+- Vínculo automático pelo número CNJ (dígitos) → `andamentos` tipo `intimacao` (interno) + tarefa "Analisar publicação" (prazo D+1, prioridade alta, responsável do processo). Processo cadastrado depois puxa as publicações antigas. Sem vínculo → triagem na aba (vincular a processo existente, criar processo no cliente com o número preenchido, ou ignorar).
+- Tela: aba Publicações (Jurídico) com KPIs, filtros, leitura em modal com link do tribunal, "Atualizar agora" e "Buscar período…" (histórico, máx. 400 dias por pedido).
+- Validado pelo navegador da Maria Júlia: a API aceita os filtros de data (32 publicações entre 01 e 08/10). Risco: a API bloqueou o servidor fora do Brasil; o Supabase fica em São Paulo, mas se bloquear, `djen_requisicoes.erro` mostra e o plano B é uma Edge Function ou rodar a busca pelo navegador.
+- Correção de rota: o `#` de um módulo ainda não registrado (antes do login) é preservado até o módulo carregar.

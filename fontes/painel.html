@@ -418,7 +418,7 @@ function aplicarHash(){
   return true;
 }
 let _hashInicial=true;
-function syncHash(){const h=hashAtual();const inicial=_hashInicial;_hashInicial=false;if(location.hash===h)return;try{if(inicial||!location.hash)history.replaceState(null,"",h);else history.pushState(null,"",h)}catch(_){}}
+function syncHash(){const h=hashAtual();const atual=(location.hash||"").slice(1).split("/")[0];if(atual&&!ROTAS.includes(atual))return; /* rota de módulo ainda não registrado: preserva */ const inicial=_hashInicial;_hashInicial=false;if(location.hash===h)return;try{if(inicial||!location.hash)history.replaceState(null,"",h);else history.pushState(null,"",h)}catch(_){}}
 window.addEventListener("popstate",()=>{if(aplicarHash()){document.body.classList.remove("ro");render()}});
 function breadcrumb(c){
   const voltar=()=>{S.sel=null;render()};
