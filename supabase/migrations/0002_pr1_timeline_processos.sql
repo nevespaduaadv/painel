@@ -28,6 +28,14 @@ begin
   return coalesce(new, old);
 end $$;
 
+-- conversão de texto 'AAAA-MM-DD' em data, marcada imutável para uso em coluna gerada
+create or replace function public.data_imm(t text) returns date language plpgsql immutable as $$
+begin
+  if t is null or t = '' then return null; end if;
+  return to_date(t, 'YYYY-MM-DD');
+exception when others then return null;
+end $$;
+
 -- ---------- Colunas geradas nas tabelas existentes ----------
 alter table public.clientes
   add column if not exists nome text generated always as (dados->>'nome') stored,
@@ -41,7 +49,7 @@ alter table public.contratos
   add column if not exists garantia text generated always as (dados->>'garantia') stored,
   add column if not exists situacao text generated always as (dados->>'situacao') stored,
   add column if not exists saldo_atual numeric generated always as (nullif(dados->>'saldoAtual','')::numeric) stored,
-  add column if not exists data_inicio_atraso date generated always as (nullif(dados->>'dataInicioAtraso','')::date) stored,
+  add column if not exists data_inicio_atraso date generated always as (public.data_imm(dados->>'dataInicioAtraso')) stored,
   add column if not exists estagio_registrado smallint;   -- último estágio observado (para o gatilho de mudança)
 
 -- ---------- Pessoas ----------
