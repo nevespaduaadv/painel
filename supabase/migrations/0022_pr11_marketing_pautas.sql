@@ -32,6 +32,7 @@ create table if not exists public.pautas (
   ordem integer not null default 0,
   created_at timestamptz default now(), created_by uuid, updated_at timestamptz default now(), updated_by uuid
 );
+alter table public.pautas add column if not exists hora_prevista time;   -- horário de publicação (como no agendador)
 create index if not exists pautas_data_idx on public.pautas(data_prevista);
 create index if not exists pautas_status_idx on public.pautas(status, ordem);
 
@@ -77,7 +78,8 @@ drop policy if exists pcom_del on public.pautas_comentarios; create policy pcom_
 revoke all on public.pautas from anon; revoke all on public.pautas_comentarios from anon;
 do $$ begin if exists (select 1 from pg_roles where rolname='bi') then revoke all on public.pautas from bi; revoke all on public.pautas_comentarios from bi; end if; end $$;
 
-create or replace view public.v_pautas with (security_invoker = true) as
+drop view if exists public.v_pautas;
+create view public.v_pautas with (security_invoker = true) as
 select p.*, co.nome as responsavel_nome, ap.nome as aprovado_por_nome,
        (select count(*) from public.pautas_comentarios c where c.pauta_id = p.id and c.tipo in ('comentario','ajuste')) as n_comentarios,
        (select c.texto from public.pautas_comentarios c where c.pauta_id = p.id and c.tipo = 'ajuste' order by c.created_at desc limit 1) as ultimo_ajuste,
