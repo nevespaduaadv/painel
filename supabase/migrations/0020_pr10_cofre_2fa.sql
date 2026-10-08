@@ -176,3 +176,27 @@ from public.acessos_sistemas;
 revoke all on public.v_acessos_sistemas from anon;
 
 select 'ok 0020' as resultado;
+
+-- Janela de códigos (atual + próximos N) para a tela ficar "viva" como um autenticador, com um único registro no log.
+create or replace function public.totp_janela(acesso_id uuid, qtd int default 10) returns table (inicio bigint, periodo int, codigos text[])
+language plpgsql security definer set search_path = public, vault as $$
+declare a public.acessos_sistemas; s text; k bytea; ts bigint := floor(extract(epoch from clock_timestamp()))::bigint; i int; arr text[] := '{}';
+begin
+  if not public.sou_equipe() then raise exception 'sem permissão'; end if;
+  select * into a from public.acessos_sistemas where id = acesso_id; if a.id is null or a.totp_secret_id is null then raise exception '2FA não cadastrado'; end if;
+  select decrypted_secret into s from vault.decrypted_secrets where id = a.totp_secret_id;
+  k := public.base32_decode(s); qtd := greatest(1, least(qtd, 20));
+  for i in 0..qtd-1 loop arr := arr || public.totp_calcular(k, ts + i*a.totp_periodo, a.totp_digitos, a.totp_periodo, a.totp_algoritmo); end loop;
+  perform public._acesso_log(a, 'codigo_2fa');
+  return query select (ts - ts % a.totp_periodo)::bigint, a.totp_periodo::int, arr;
+end $$;
+grant execute on function public.totp_janela(uuid, int) to authenticated;
+
+-- Lista para a tela Autenticador (todos os acessos com 2FA da carteira)
+create or replace view public.v_autenticador with (security_invoker = true) as
+select a.id, a.cliente_id, c.nome as cliente_nome, a.sistema, a.titular, a.login, a.totp_emissor, a.totp_periodo, a.totp_digitos
+from public.acessos_sistemas a join public.clientes c on c.id = a.cliente_id
+where a.totp_secret_id is not null;
+revoke all on public.v_autenticador from anon;
+
+select 'ok 0020b' as resultado;

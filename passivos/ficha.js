@@ -167,22 +167,8 @@ function celSenha(x){
 }
 function cel2fa(c,x){
   if(!x.tem_2fa)return el("button",{class:"btn sm edit-only",onclick:()=>open2faForm(c,x)},"Configurar 2FA");
-  const box=el("div",{style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap"});
-  const code=el("button",{class:"btn sm primary",title:"Gerar código do autenticador"},"Código");
-  const info=el("span",{class:"note"},x.totp_emissor||"");
-  let timer=null,ciclos=0;
-  const mostrar=async()=>{
-    if(ciclos++>=2){ciclos=0;code.replaceChildren("Código");code.onclick=mostrar;info.textContent=x.totp_emissor||"";return}
-    const {data,error}=await SB.rpc("totp_codigo",{acesso_id:x.id});if(error||!data?.length){toast("Não foi possível gerar o código");return}
-    let {codigo,restam,periodo,proximo}=data[0];
-    code.replaceChildren(el("span",{class:"num",style:"font-size:16px;letter-spacing:.12em"},codigo),el("span",{class:"cnt",style:"margin-left:8px"},restam+"s"));
-    code.title="Clique para copiar";code.onclick=async()=>{try{await navigator.clipboard.writeText(codigo);toast("Código copiado")}catch{}};
-    clearInterval(timer);timer=setInterval(()=>{restam--;const cnt=code.querySelector(".cnt");if(cnt)cnt.textContent=restam+"s";if(restam<=0){clearInterval(timer);mostrar()}},1000);
-    info.textContent=(x.totp_emissor?x.totp_emissor+" · ":"")+"próximo: "+proximo;
-  };
-  code.onclick=mostrar;
-  box.append(code,info);
-  return box;
+  const w=window.PP_TOTP?window.PP_TOTP.widget(x.id,{compacto:true}):el("span",{class:"note"},"carregando…");
+  return el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},w,el("button",{class:"btn sm edit-only",title:"Substituir ou remover o 2FA",onclick:()=>open2faForm(c,x)},"⚙"));
 }
 function open2faForm(c,x){
   const seg=el("textarea",{rows:"3",placeholder:"Cole a chave manual (ex.: gezd gnbv gy3t qojq …) ou a URI otpauth://totp/…",autocomplete:"off",spellcheck:"false"});

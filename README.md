@@ -9,6 +9,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
 | `passivos/conhecimento.js` | **Base de conhecimento** (Jurídico): artigos em Markdown por tema (teses, POPs, produtos de crédito, negociação, proteção patrimonial, holding), busca full-text, edição com versões, diagramas mermaid. |
+| `passivos/autenticador.js` | **Autenticador (2FA)**: códigos TOTP dos acessos dos clientes sempre visíveis (janela de códigos vinda do banco; o segredo fica no Vault). Widget reutilizado na ficha. |
 | `passivos/documentos.js` | **Documentos base (Drive)**, dentro da base de conhecimento: índice pesquisável da pasta JURÍDICO do Google Drive (modelos de peças, tópicos, jurisprudência, planilhas) — os arquivos continuam no Drive; a equipe descreve, marca destaques e adiciona links. |
 | `passivos/publicacoes.js` | Aba **Publicações (DJEN)**: intimações por OAB importadas pelo banco (pg_net + pg_cron), vinculadas ao processo, com tarefa de análise; triagem das sem vínculo. |
 | `passivos/fluxo.js` | **Fluxo PJ** (etapas 0–10 do Notion na ficha), abas **Negociações** (kanban do setor de acordos) e **Monitoramento** (checagem processual por cliente); sub-aba Negociações na página do cliente. |
