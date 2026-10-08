@@ -48,7 +48,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`, `0015_pr8_base_conhecimento`, `0017_pr8b_documentos_base`. Cargas 0016 (artigos iniciais) e 0018 (índice do Drive) fora do repo. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`, `0014_pr7b_publicacoes_djen`, `0015_pr8_base_conhecimento`, `0017_pr8b_documentos_base`, `0020_pr10_cofre_2fa`. Cargas 0016 (artigos iniciais) e 0018 (índice do Drive) fora do repo. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 

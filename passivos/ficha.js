@@ -26,7 +26,7 @@ async function carregar(cid){
     const [a,b,c,d]=await Promise.all([SB.from("contatos").select("*").eq("cliente_id",cid).order("principal",{ascending:false}).order("nome"),
       equipe()?SB.from("bens").select("*").eq("cliente_id",cid).order("tipo"):{data:[]},
       SB.from("documentos").select("*").eq("cliente_id",cid).order("data",{ascending:false,nullsFirst:false}),
-      equipe()?SB.from("acessos_sistemas").select("*").eq("cliente_id",cid).order("sistema"):{data:[]}]);
+      equipe()?SB.from("v_acessos_sistemas").select("*").eq("cliente_id",cid).order("sistema"):{data:[]}]);
     if(S.sel!==cid)return;
     F.cid=cid;F.contatos=a.data||[];F.bens=b.data||[];F.documentos=c.data||[];F.acessos=d.data||[];
   }catch(e){console.warn("ficha",e)}
@@ -83,11 +83,10 @@ function renderResumo(c,host,ind){
     el("tbody",{},F.documentos.map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},TIPOS_DOC[d.tipo]||"—"),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))));
   host.append(docs);
   // Acessos a sistemas (gov.br etc.) — só equipe; senha oculta até clicar
-  const ac=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Acessos a sistemas"),el("div",{class:"note"},"gov.br, e-CAC, bancos — informados pelo cliente. Fica fora da área do cliente e do BI; toda alteração é auditada.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openAcessoForm(c)},"+ Acesso"))));
+  const ac=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Acessos a sistemas"),el("div",{class:"note"},"gov.br, e-CAC, bancos — informados pelo cliente. Senhas e segredos 2FA ficam no cofre criptografado; cada consulta é registrada. Fora da área do cliente e do BI.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openAcessoForm(c)},"+ Acesso"))));
   if(ok&&!F.acessos.length)ac.append(el("div",{class:"note"},"Nenhum acesso cadastrado."));
-  else if(ok)ac.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Sistema"),el("th",{},"Titular"),el("th",{},"Login"),el("th",{},"Senha"),el("th",{},"Observações"),el("th",{},""))),
-    el("tbody",{},F.acessos.map(x=>{const sp=el("span",{class:"num"},"••••••••");let on=false;const bt=el("button",{class:"btn sm",onclick:()=>{on=!on;sp.textContent=on?(x.senha||"—"):"••••••••";bt.textContent=on?"Ocultar":"Mostrar"}},"Mostrar");const cp=el("button",{class:"btn sm",onclick:async()=>{try{await navigator.clipboard.writeText(x.senha||"");toast("Senha copiada")}catch{toast("Não foi possível copiar")}}},"Copiar");
-      return el("tr",{},el("td",{},el("b",{},x.sistema)),el("td",{},x.titular||"—"),el("td",{class:"num"},x.login||"—"),el("td",{},el("div",{style:"display:flex;gap:6px;align-items:center"},sp,x.senha?bt:null,x.senha?cp:null)),el("td",{},x.observacoes||"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openAcessoForm(c,x)},"Editar")))})))));
+  else if(ok)ac.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Sistema"),el("th",{},"Titular"),el("th",{},"Login"),el("th",{},"Senha"),el("th",{},"2FA"),el("th",{},"Observações"),el("th",{},""))),
+    el("tbody",{},F.acessos.map(x=>el("tr",{},el("td",{},el("b",{},x.sistema)),el("td",{},x.titular||"—"),el("td",{class:"num"},x.login||"—"),el("td",{},celSenha(x)),el("td",{},cel2fa(c,x)),el("td",{},x.observacoes||"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openAcessoForm(c,x)},"Editar"))))))));
   host.append(ac);
   if(c.observacoes_onboarding)host.append(el("section",{class:"card section"},el("h2",{},"Respostas do onboarding"),el("div",{class:"note",style:"white-space:pre-wrap"},c.observacoes_onboarding)));
 }
@@ -156,14 +155,72 @@ function openDocForm(c,d={}){
   },extra);
 }
 
+
+/* ---------- Cofre: senha e 2FA (TOTP) — o segredo nunca chega ao navegador ---------- */
+function celSenha(x){
+  if(!x.tem_senha)return el("span",{class:"note"},"—");
+  const sp=el("span",{class:"num"},"••••••••");let on=false,cache=null;
+  const pegar=async(motivo)=>{if(cache)return cache;const {data,error}=await SB.rpc("acesso_senha",{acesso_id:x.id,motivo});if(error)throw error;cache=data;return data};
+  const bt=el("button",{class:"btn sm",onclick:async()=>{try{if(!on){sp.textContent=await pegar("ver_senha")||"—"}else sp.textContent="••••••••";on=!on;bt.textContent=on?"Ocultar":"Mostrar"}catch(e){toast("Não foi possível obter a senha")}}},"Mostrar");
+  const cp=el("button",{class:"btn sm",onclick:async()=>{try{await navigator.clipboard.writeText(await pegar("copiar_senha")||"");toast("Senha copiada")}catch{toast("Não foi possível copiar")}}},"Copiar");
+  return el("div",{style:"display:flex;gap:6px;align-items:center"},sp,bt,cp);
+}
+function cel2fa(c,x){
+  if(!x.tem_2fa)return el("button",{class:"btn sm edit-only",onclick:()=>open2faForm(c,x)},"Configurar 2FA");
+  const box=el("div",{style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap"});
+  const code=el("button",{class:"btn sm primary",title:"Gerar código do autenticador"},"Código");
+  const info=el("span",{class:"note"},x.totp_emissor||"");
+  let timer=null,ciclos=0;
+  const mostrar=async()=>{
+    if(ciclos++>=2){ciclos=0;code.replaceChildren("Código");code.onclick=mostrar;info.textContent=x.totp_emissor||"";return}
+    const {data,error}=await SB.rpc("totp_codigo",{acesso_id:x.id});if(error||!data?.length){toast("Não foi possível gerar o código");return}
+    let {codigo,restam,periodo,proximo}=data[0];
+    code.replaceChildren(el("span",{class:"num",style:"font-size:16px;letter-spacing:.12em"},codigo),el("span",{class:"cnt",style:"margin-left:8px"},restam+"s"));
+    code.title="Clique para copiar";code.onclick=async()=>{try{await navigator.clipboard.writeText(codigo);toast("Código copiado")}catch{}};
+    clearInterval(timer);timer=setInterval(()=>{restam--;const cnt=code.querySelector(".cnt");if(cnt)cnt.textContent=restam+"s";if(restam<=0){clearInterval(timer);mostrar()}},1000);
+    info.textContent=(x.totp_emissor?x.totp_emissor+" · ":"")+"próximo: "+proximo;
+  };
+  code.onclick=mostrar;
+  box.append(code,info);
+  return box;
+}
+function open2faForm(c,x){
+  const seg=el("textarea",{rows:"3",placeholder:"Cole a chave manual (ex.: gezd gnbv gy3t qojq …) ou a URI otpauth://totp/…",autocomplete:"off",spellcheck:"false"});
+  const st=el("div",{class:"note"});
+  const arq=inp("file","",{accept:"image/*"});arq.onchange=async()=>{const f=arq.files?.[0];if(!f)return;st.textContent="Lendo QR…";try{const r=await lerQrImagem(f);if(r){seg.value=r;st.textContent="QR lido. Confira e salve."}else st.textContent="Não encontrei um QR nessa imagem."}catch(e){st.textContent="Não foi possível ler a imagem."}};
+  let stream=null,raf=null;const video=el("video",{style:"width:100%;max-height:260px;border-radius:8px;background:#000;display:none",playsinline:"",muted:""});
+  const parar=()=>{if(raf)cancelAnimationFrame(raf);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.style.display="none"};
+  const cam=el("button",{class:"btn sm",onclick:async()=>{if(stream){parar();cam.textContent="Ler com a câmera";return}try{await carregarJsQR();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});video.srcObject=stream;video.style.display="block";await video.play();cam.textContent="Parar câmera";
+      const cv=document.createElement("canvas");const ctx=cv.getContext("2d",{willReadFrequently:true});
+      const tick=()=>{if(!stream)return;if(video.readyState===4){cv.width=video.videoWidth;cv.height=video.videoHeight;ctx.drawImage(video,0,0);const img=ctx.getImageData(0,0,cv.width,cv.height);const q=window.jsQR(img.data,img.width,img.height);if(q?.data){seg.value=q.data;st.textContent="QR lido. Confira e salve.";parar();cam.textContent="Ler com a câmera";return}}raf=requestAnimationFrame(tick)};tick();
+    }catch(e){st.textContent="Câmera indisponível neste dispositivo/navegador. Use a chave manual ou uma imagem do QR."}}},"Ler com a câmera");
+  const body=el("div",{class:"form"},el("div",{class:"f full note"},`${x.sistema}${x.login?" · "+x.login:""}. No sistema do cliente, ative a verificação em duas etapas por aplicativo autenticador e use a chave/QR aqui — o painel passa a gerar os códigos para a equipe.`),
+    el("div",{class:"f full"},el("label",{},"Chave ou QR"),seg),el("div",{class:"f full",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},el("label",{class:"btn sm",style:"cursor:pointer"},"Ler QR de uma imagem",Object.assign(arq,{style:"display:none"})),cam),el("div",{class:"f full"},video),el("div",{class:"f full"},st));
+  const extra=x.tem_2fa&&PP.perfil?.papel==="admin"?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Remover o 2FA deste acesso?"))return;const {error}=await SB.rpc("totp_remover",{acesso_id:x.id});if(error){toast("Não foi possível remover");return}parar();$("#modalHost").replaceChildren();toast("2FA removido");recarregar()}},"Remover 2FA"):null;
+  modal(x.tem_2fa?"Substituir 2FA":"Configurar 2FA",body,async()=>{
+    const v=seg.value.trim();if(!v)throw new Error("Cole a chave ou leia o QR");
+    const {error}=await SB.rpc("totp_cadastrar",{acesso_id:x.id,segredo:v});if(error)throw new Error(error.message||"Segredo inválido");
+    parar();toast("2FA cadastrado — o código já pode ser gerado");recarregar();
+  },extra);
+  const ob=new MutationObserver(()=>{if(!document.body.contains(body)){parar();ob.disconnect()}});ob.observe($("#modalHost"),{childList:true});
+}
+const carregarJsQR=()=>new Promise((res,rej)=>{if(window.jsQR)return res();const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";sc.onload=res;sc.onerror=rej;document.head.append(sc)});
+async function lerQrImagem(file){
+  await carregarJsQR();const url=URL.createObjectURL(file);
+  try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+    for(const esc of [1,2,0.5]){const cv=document.createElement("canvas");cv.width=Math.round(img.width*esc);cv.height=Math.round(img.height*esc);const ctx=cv.getContext("2d");ctx.drawImage(img,0,0,cv.width,cv.height);const d=ctx.getImageData(0,0,cv.width,cv.height);const q=window.jsQR(d.data,d.width,d.height);if(q?.data)return q.data}
+    return null}finally{URL.revokeObjectURL(url)}
+}
+
 function openAcessoForm(c,x={}){
-  const sis=dl("ac-sis",x.sistema||"gov.br",SISTEMAS),tit=inp("text",x.titular||"",{placeholder:"Empresa / sócio"}),login=inp("text",x.login||"",{autocomplete:"off"}),senha=inp("text",x.senha||"",{autocomplete:"off"}),obs=el("textarea",{placeholder:"2FA? qual telefone recebe o código? validade?"},x.observacoes||"");
-  const body=el("div",{class:"form"},field("ac-sis","Sistema",sis.wrap),field("ac-tit","Titular do acesso",tit),field("ac-login","Login (CPF/CNPJ/usuário)",login),field("ac-senha","Senha",senha),field("ac-obs","Observações",obs));
+  const sis=dl("ac-sis",x.sistema||"gov.br",SISTEMAS),tit=inp("text",x.titular||"",{placeholder:"Empresa / sócio"}),login=inp("text",x.login||"",{autocomplete:"off"}),senha=inp("password",""+"",{autocomplete:"new-password",placeholder:x.tem_senha?"•••••••• (deixe em branco para manter)":"opcional"}),obs=el("textarea",{placeholder:"2FA? qual telefone recebe o código? validade?"},x.observacoes||"");
+  const body=el("div",{class:"form"},field("ac-sis","Sistema",sis.wrap),field("ac-tit","Titular do acesso",tit),field("ac-login","Login (CPF/CNPJ/usuário)",login),field("ac-senha","Senha",senha,x.tem_senha?"Guardada no cofre. Para trocar, digite a nova; para apagar, digite \"apagar\".":"Vai para o cofre criptografado, não fica na tabela."),field("ac-obs","Observações",obs));
   const extra=x.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este acesso?"))return;await SB.from("acessos_sistemas").delete().eq("id",x.id);$("#modalHost").replaceChildren();toast("Acesso excluído");recarregar()}},"Excluir"):null;
   modal(x.id?"Editar acesso":"Novo acesso",body,async()=>{
     if(!sis.input.value.trim())throw new Error("Informe o sistema");
-    const row={cliente_id:c.id,sistema:sis.input.value.trim(),titular:tit.value.trim()||null,login:login.value.trim()||null,senha:senha.value||null,observacoes:obs.value.trim()||null};
-    const {error}=x.id?await SB.from("acessos_sistemas").update(row).eq("id",x.id):await SB.from("acessos_sistemas").insert(row);if(error)throw error;
+    const row={cliente_id:c.id,sistema:sis.input.value.trim(),titular:tit.value.trim()||null,login:login.value.trim()||null,observacoes:obs.value.trim()||null};
+    let id=x.id;if(id){const {error}=await SB.from("acessos_sistemas").update(row).eq("id",id);if(error)throw error}else{const {data,error}=await SB.from("acessos_sistemas").insert(row).select("id").single();if(error)throw error;id=data.id}
+    const sv=senha.value;if(sv){const {error}=await SB.rpc("acesso_senha_definir",{acesso_id:id,senha:sv.trim().toLowerCase()==="apagar"?"":sv});if(error)throw error}
     toast("Acesso salvo");recarregar();
   },extra);
 }
