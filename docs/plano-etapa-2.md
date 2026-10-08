@@ -1,6 +1,6 @@
 # Sistema de Carteira de Contratos — Plano da etapa 2
 
-**Neves Pádua Advocacia · 07/10/2026 · para confirmação antes de construir**
+**Neves Pádua Advocacia · 07/10/2026 · confirmado em 07/10 (itens 1–5); PR 1 em construção**
 
 Repositório: `nevespaduaadv/painel` (GitHub Pages) · Banco: Supabase `ksdwzljfjfucjevdqxvx` (São Paulo).
 
@@ -208,6 +208,22 @@ Regra a partir de agora: nada de alterar o schema pelo painel do Supabase sem mi
 Depois do PR 1, comandos como "lance na timeline da Alphamec que fizemos X" ou "adicione o processo Y ao cliente Z" viram inserções diretas nas tabelas a partir desta conversa, com `fonte = 'claude'` e o responsável que você indicar. "Atualiza o painel da Alphamec" continua regerando a página fixa; a visão ao vivo não precisa.
 
 ---
+
+## 5b. Referência de indicadores para o dashboard (prints Legale/Power BI, 07/10)
+O que importa é o conteúdo, não a estética. Indicadores a reproduzir nas views (PR 3), adaptados à realidade do escritório:
+
+**Equipe / produtividade** — total de andamentos (publicações) e de tarefas (compromissos) no período; por responsável; por tipo; por cliente; em atraso (total, por responsável, por tipo); concluídos com antecedência × com atraso (por responsável e por tipo); status (concluído × pendente); filtros: ano/período, gestor, usuário, cliente, processo.
+
+**Jurídico** — base de processos (ativos × encerrados), processos sem providência (sem andamento/tarefa recente), quantidade por área, por tipo de ação, por fase, por assunto, polo (autor × réu); tabela de processos com último compromisso e dias desde a última atualização; filtros: unidade/núcleo, status, ano, área, cliente, responsável.
+
+**Andamentos / publicações** — quantidade no período, sem providência, sem vínculo com processo; por status, por área, por data (série temporal); por usuário; tabela detalhada.
+
+**Contratos (carteira)** — quantidade e valor original por ano; por cliente; por área/produto; tabela cliente → contratos → valor; além dos nossos: por estágio (1/2/3), por banco, saldo sob gestão, acordos fechados e economia obtida × projetada.
+
+**Financeiro (fase posterior, via Asaas)** — receita × despesa com variação mensal; resultado e acumulado; total recebido × a receber (quantidade e valor), pago × a pagar; inadimplência acumulada, no período, por cliente, por plano de contas, série temporal; receita/despesa por unidade, plano de contas, grupo de cliente/fornecedor. O schema financeiro será desenhado para alimentar exatamente esses cortes.
+
+## 5c. Regeração desativada (07/10)
+Com a visão do cliente ao vivo, as rotinas de regeração (artefato reserva às quartas e publicação no GitHub) foram desativadas. A página fixa `alphamec/` permanece no ar com a posição de 07/10/2026 até o PR 4 definir seu destino (manter como opção por token ou retirar).
 
 ## 6. Para você confirmar
 1. Manter o motor v2 (mediana dos acordos reais) em vez do "provisão − 15 p.p." do briefing. **Recomendo manter.**
