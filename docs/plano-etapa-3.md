@@ -71,3 +71,7 @@ PR 6 (ficha + importação do onboarding) → PR 7 (navegação) → PR 8 (conhe
 - Área do cliente mobile-first (cards em vez de tabelas largas; link abre no WhatsApp).
 - Acabamento: esqueletos de carregamento, estados vazios com instrução, botões de modal contextuais, diálogo de confirmação, busca global, aviso de atualização em tempo real.
 - Manter: identidade visual, modo escuro, gráficos SVG sem biblioteca, Supabase + RLS como única fonte.
+
+## 7. Itens adicionados em 08/10 (a validar)
+- **Publicações DJEN por OAB** (Edge Function diária → `andamentos` com fonte='djen' → tarefa de prazo + timeline + alerta). Testar a API com a OAB do escritório antes de prometer. Depois: contagem de prazo assistida, modelos de documentos, agenda (Google Calendar), Asaas, monitoramento Escavador/Judit por CNPJ.
+- **Cofre de códigos 2FA (TOTP)** dos acessos a PJe/e-SAJ/gov.br: segredo cifrado no banco, cofre por pessoa com compartilhamento explícito e auditoria de consulta. Decisão pendente da Maria Júlia sobre enfraquecimento do 2FA e titularidade dos acessos; alternativa pronta: Bitwarden/1Password.
