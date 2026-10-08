@@ -45,7 +45,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`, `0012_acessos_sistemas`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
@@ -63,6 +63,7 @@ Validação local antes de enviar: as migrations rodam em sequência num Postgre
 - "atualiza o painel da Alphamec" → não é mais necessário: a área do cliente (login ou link) lê o banco ao vivo.
 - "gera o link da Alphamec" / "revoga o link" → `clientes.acesso_por_token` + `token` (botão "Link do cliente" no painel).
 - "atualize a ficha da Alphamec: sócio X, CNPJ Y, história Z" → colunas da ficha em `clientes`, `contatos`, `bens`, `documentos`.
+- Acessos do cliente (gov.br, e-CAC, bancos) ficam em `acessos_sistemas` — só equipe, fora de views, BI e área do cliente; senha oculta na tela até clicar "Mostrar". Nunca em `clientes`, notas ou timeline.
 - "crie a tarefa X para o cliente Z, prazo dia D, fatal" → linha em `tarefas` (vence em 7/15/30 na aba Tarefas).
 - "lance 2 horas de parecer para a Alphamec" → `apontamentos_horas`; horas informadas na timeline já entram sozinhas.
 - "abre uma negociação com o Santander para a CL Comércio" → linha em `negociacoes` (kanban: iniciar → extrajudicial → pós-judicialização → minuta → formalizado → pagamento pendente → concluído).

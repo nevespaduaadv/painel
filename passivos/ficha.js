@@ -10,7 +10,8 @@ const TIPOS_DOC={contrato_bancario:"Contrato bancário",contrato_honorarios:"Con
 const ORIGENS=["Meta Ads","Google","Indicação","Orgânico / Instagram","Parceiro","Base antiga","Outro"];
 const PLANOS=["Gestão de Passivos Bancários PJ","Superendividamento","Revisional","Defesa em execução","Estruturação societária","Outro"];
 const UFS="AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
-const F={cid:null,carregando:null,contatos:[],bens:[],documentos:[]};
+const F={cid:null,carregando:null,contatos:[],bens:[],documentos:[],acessos:[]};
+const SISTEMAS=["gov.br","e-CAC","Internet banking","Certificado digital","Serasa","Portal do tribunal","Outro"];
 const horasFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
 const check=(label,checked,help)=>{const i=el("input",{type:"checkbox",style:"width:16px;height:16px;flex:none;margin:0;accent-color:var(--gold)"});i.checked=!!checked;return {wrap:el("div",{class:"f",style:"justify-content:center"},el("label",{style:"display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px"},i,label),help?el("div",{class:"help"},help):null),input:i}};
 const tri=(v)=>sel({"":"—",true:"Sim",false:"Não"},v==null?"":String(v));
@@ -22,11 +23,12 @@ const cnpjMask=v=>{const d=(v||"").replace(/\D/g,"");return d.length===14?d.repl
 async function carregar(cid){
   if(F.carregando===cid)return;F.carregando=cid;
   try{
-    const [a,b,c]=await Promise.all([SB.from("contatos").select("*").eq("cliente_id",cid).order("principal",{ascending:false}).order("nome"),
+    const [a,b,c,d]=await Promise.all([SB.from("contatos").select("*").eq("cliente_id",cid).order("principal",{ascending:false}).order("nome"),
       equipe()?SB.from("bens").select("*").eq("cliente_id",cid).order("tipo"):{data:[]},
-      SB.from("documentos").select("*").eq("cliente_id",cid).order("data",{ascending:false,nullsFirst:false})]);
+      SB.from("documentos").select("*").eq("cliente_id",cid).order("data",{ascending:false,nullsFirst:false}),
+      equipe()?SB.from("acessos_sistemas").select("*").eq("cliente_id",cid).order("sistema"):{data:[]}]);
     if(S.sel!==cid)return;
-    F.cid=cid;F.contatos=a.data||[];F.bens=b.data||[];F.documentos=c.data||[];
+    F.cid=cid;F.contatos=a.data||[];F.bens=b.data||[];F.documentos=c.data||[];F.acessos=d.data||[];
   }catch(e){console.warn("ficha",e)}
   finally{if(F.carregando===cid)F.carregando=null}
   if(S.tab==="clientes"&&S.sel===cid)render();
@@ -80,6 +82,13 @@ function renderResumo(c,host,ind){
   else if(ok)docs.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Título"),el("th",{},"Tipo"),el("th",{},"Data"),el("th",{},"Vínculo"),el("th",{},"Cliente vê"),el("th",{},""))),
     el("tbody",{},F.documentos.map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},TIPOS_DOC[d.tipo]||"—"),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))));
   host.append(docs);
+  // Acessos a sistemas (gov.br etc.) — só equipe; senha oculta até clicar
+  const ac=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Acessos a sistemas"),el("div",{class:"note"},"gov.br, e-CAC, bancos — informados pelo cliente. Fica fora da área do cliente e do BI; toda alteração é auditada.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openAcessoForm(c)},"+ Acesso"))));
+  if(ok&&!F.acessos.length)ac.append(el("div",{class:"note"},"Nenhum acesso cadastrado."));
+  else if(ok)ac.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Sistema"),el("th",{},"Titular"),el("th",{},"Login"),el("th",{},"Senha"),el("th",{},"Observações"),el("th",{},""))),
+    el("tbody",{},F.acessos.map(x=>{const sp=el("span",{class:"num"},"••••••••");let on=false;const bt=el("button",{class:"btn sm",onclick:()=>{on=!on;sp.textContent=on?(x.senha||"—"):"••••••••";bt.textContent=on?"Ocultar":"Mostrar"}},"Mostrar");const cp=el("button",{class:"btn sm",onclick:async()=>{try{await navigator.clipboard.writeText(x.senha||"");toast("Senha copiada")}catch{toast("Não foi possível copiar")}}},"Copiar");
+      return el("tr",{},el("td",{},el("b",{},x.sistema)),el("td",{},x.titular||"—"),el("td",{class:"num"},x.login||"—"),el("td",{},el("div",{style:"display:flex;gap:6px;align-items:center"},sp,x.senha?bt:null,x.senha?cp:null)),el("td",{},x.observacoes||"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openAcessoForm(c,x)},"Editar")))})))));
+  host.append(ac);
   if(c.observacoes_onboarding)host.append(el("section",{class:"card section"},el("h2",{},"Respostas do onboarding"),el("div",{class:"note",style:"white-space:pre-wrap"},c.observacoes_onboarding)));
 }
 const pill=(l,v,cls)=>v==null?null:el("span",{class:"pill "+(v?cls:"g"),style:v?"":"opacity:.6"},l+": "+(v?"sim":"não"));
@@ -147,8 +156,20 @@ function openDocForm(c,d={}){
   },extra);
 }
 
+function openAcessoForm(c,x={}){
+  const sis=dl("ac-sis",x.sistema||"gov.br",SISTEMAS),tit=inp("text",x.titular||"",{placeholder:"Empresa / sócio"}),login=inp("text",x.login||"",{autocomplete:"off"}),senha=inp("text",x.senha||"",{autocomplete:"off"}),obs=el("textarea",{placeholder:"2FA? qual telefone recebe o código? validade?"},x.observacoes||"");
+  const body=el("div",{class:"form"},field("ac-sis","Sistema",sis.wrap),field("ac-tit","Titular do acesso",tit),field("ac-login","Login (CPF/CNPJ/usuário)",login),field("ac-senha","Senha",senha),field("ac-obs","Observações",obs));
+  const extra=x.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este acesso?"))return;await SB.from("acessos_sistemas").delete().eq("id",x.id);$("#modalHost").replaceChildren();toast("Acesso excluído");recarregar()}},"Excluir"):null;
+  modal(x.id?"Editar acesso":"Novo acesso",body,async()=>{
+    if(!sis.input.value.trim())throw new Error("Informe o sistema");
+    const row={cliente_id:c.id,sistema:sis.input.value.trim(),titular:tit.value.trim()||null,login:login.value.trim()||null,senha:senha.value||null,observacoes:obs.value.trim()||null};
+    const {error}=x.id?await SB.from("acessos_sistemas").update(row).eq("id",x.id):await SB.from("acessos_sistemas").insert(row);if(error)throw error;
+    toast("Acesso salvo");recarregar();
+  },extra);
+}
+
 /* ---------- Integração ---------- */
 window.PP_MOD=window.PP_MOD||{};
 window.PP_MOD.resumo=renderResumo;
-window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("ficha");for(const t of ["contatos","bens","documentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
+window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("ficha");for(const t of ["contatos","bens","documentos","acessos_sistemas"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
 })();
