@@ -265,7 +265,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n<script src="../passivos/ficha.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n<script src="ficha.js"></script>\n<script src="fluxo.js"></script>\n<script src="publicacoes.js"></script>\n<script src="conhecimento.js"></script>\n</body>');
+html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n<script src="../passivos/ficha.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n<script src="ficha.js"></script>\n<script src="fluxo.js"></script>\n<script src="publicacoes.js"></script>\n<script src="documentos.js"></script>\n<script src="conhecimento.js"></script>\n</body>');
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');

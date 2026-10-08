@@ -2,7 +2,8 @@
    Supabase: conteudos, conteudos_versoes, v_conteudos, rpc conhecimento_buscar. Markdown: marked (CDN) + sanitização própria; diagramas: mermaid (CDN, sob demanda). Só equipe. */
 (()=>{
 "use strict";
-const K={lista:[],ok:false,carregando:false,sel:null,art:null,versoes:[],busca:"",resultados:null,editando:false,tema:""};
+const K={lista:[],ok:false,carregando:false,sel:null,art:null,versoes:[],busca:"",resultados:null,resultadosDocs:null,editando:false,tema:""};
+const DOCS=()=>window.PP_DOCS;
 const ROTA_ART=()=>"#conhecimento"+(K.sel?"/"+K.sel:"");
 let marked=null,mermaid=null;
 const carregarLib=(src,glob)=>new Promise((res,rej)=>{if(window[glob])return res(window[glob]);const s=document.createElement("script");s.src=src;s.onload=()=>res(window[glob]);s.onerror=rej;document.head.append(s)});
@@ -18,6 +19,7 @@ async function carregar(){
 const garantir=()=>{if(!K.ok&&!K.carregando)carregar();return K.ok};
 async function abrir(slug){
   K.sel=slug;K.editando=false;K.art=null;K.versoes=[];render();
+  if(slug==="documentos")return;
   const {data}=await SB.from("conteudos").select("*").eq("slug",slug).maybeSingle();
   if(!data){toast("Artigo não encontrado");K.sel=null;render();return}
   K.art=data;const v=await SB.from("conteudos_versoes").select("id,versao,created_at,editado_por").eq("conteudo_id",data.id).order("versao",{ascending:false}).limit(20);K.versoes=v.data||[];
@@ -47,7 +49,7 @@ async function renderMd(md,host){
 /* ---------- Telas ---------- */
 function renderConhecimento(){
   const v=$("#view-conhecimento");v.replaceChildren();
-  const ok=garantir();
+  const ok=garantir();DOCS()?.garantir();
   const temas=[...new Set(K.lista.map(c=>c.tema))];
   const head=el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Base de conhecimento"),el("div",{class:"sub"},"Teses, procedimentos (POPs), produtos de crédito, negociação, proteção patrimonial. Qualquer pessoa da equipe edita; cada edição guarda a versão anterior.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>novoArtigo()},"+ Artigo")));
@@ -57,8 +59,11 @@ function renderConhecimento(){
   // lateral: busca + temas
   const q=inp("search",K.busca,{placeholder:"Buscar na base…"});let t;q.oninput=()=>{K.busca=q.value;clearTimeout(t);t=setTimeout(buscar,350)};
   const side=el("aside",{class:"side"},q);
+  const nDocs=DOCS()?.total||0;
+  side.append(el("div",{class:"card list"},el("button",{class:"row","aria-current":String(K.sel==="documentos"),onclick:()=>abrir("documentos")},el("div",{},el("div",{class:"n"},"📁 Documentos base (Drive)"),el("div",{class:"s"},nDocs?`${nDocs} arquivos indexados — modelos, tópicos, jurisprudência`:"modelos, tópicos, jurisprudência")))));
   if(K.resultados){side.append(el("div",{class:"card list"},K.resultados.length?K.resultados.map(r=>el("button",{class:"row","aria-current":String(K.sel===r.slug),onclick:()=>{abrir(r.slug)}},el("div",{},el("div",{class:"n"},r.titulo),el("div",{class:"s"},r.tema),el("div",{class:"s",style:"white-space:normal"},Object.assign(el("span",{}),{innerHTML:sanitizar(r.trecho||"")})))))
-    :el("div",{class:"empty"},"Nada encontrado.")))}
+    :el("div",{class:"empty"},"Nada encontrado nos artigos.")));
+    if(K.resultadosDocs?.length)side.append(el("div",{class:"card list"},el("div",{style:"padding:8px 12px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)"},"Documentos (Drive)",el("span",{class:"cnt",style:"margin-left:6px"},String(K.resultadosDocs.length))),K.resultadosDocs.map(r=>el("a",{class:"row",href:r.url,target:"_blank",rel:"noopener",style:"text-decoration:none"},el("div",{},el("div",{class:"n"},r.titulo),el("div",{class:"s"},r.caminho||"JURÍDICO"),r.trecho&&r.trecho.trim()?el("div",{class:"s",style:"white-space:normal"},Object.assign(el("span",{}),{innerHTML:sanitizar(r.trecho)})):null)))))}
   else{
     const sel=el("select",{},el("option",{value:""},"Todos os temas"),temas.map(tm=>el("option",{value:tm,selected:K.tema===tm?"":null},tm)));sel.onchange=()=>{K.tema=sel.value;render()};
     side.append(sel);
@@ -70,7 +75,8 @@ function renderConhecimento(){
   }
   grid.append(side);
   const main=el("main",{class:"main"});grid.append(main);v.append(grid);
-  if(!K.sel){main.append(el("div",{class:"card empty"},el("h3",{},"Escolha um artigo"),el("div",{},`${K.lista.length} artigos em ${temas.length} temas. Use a busca para encontrar por palavra (ex.: "prescrição intercorrente", "Pronampe", "leilão").`)));return}
+  if(!K.sel){main.append(el("div",{class:"card empty"},el("h3",{},"Escolha um artigo"),el("div",{},`${K.lista.length} artigos em ${temas.length} temas. Use a busca para encontrar por palavra (ex.: "prescrição intercorrente", "Pronampe", "leilão") — ela procura também nos documentos do Drive.`),el("div",{style:"margin-top:10px"},el("button",{class:"btn sm",onclick:()=>abrir("documentos")},"📁 Documentos base (Drive)"))));return}
+  if(K.sel==="documentos"){if(DOCS()){DOCS().voltar=()=>{K.sel=null;render()};DOCS().render(main)}else main.append(el("div",{class:"note"},"Módulo de documentos indisponível."));return}
   if(!K.art){main.append(el("div",{class:"note"},"Carregando artigo…"));return}
   if(K.editando){renderEditor(main);return}
   const a=K.art;
@@ -84,9 +90,9 @@ function renderConhecimento(){
   if(K.versoes.length)main.append(el("section",{class:"card section"},el("h2",{},"Versões anteriores"),el("div",{class:"note"},K.versoes.map(x=>`v${x.versao} (${new Date(x.created_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"})})`).join(" · ")),el("div",{class:"actions",style:"justify-content:flex-start"},K.versoes.slice(0,5).map(x=>el("button",{class:"btn sm",onclick:()=>verVersao(x)},"Ver v"+x.versao)))));
 }
 async function buscar(){
-  const qq=K.busca.trim();if(qq.length<3){K.resultados=null;render();return}
-  const {data,error}=await SB.rpc("conhecimento_buscar",{q:qq,lim:30});if(error){toast("Busca indisponível");return}
-  K.resultados=data||[];render();
+  const qq=K.busca.trim();if(qq.length<3){K.resultados=null;K.resultadosDocs=null;render();return}
+  const [{data,error},docs]=await Promise.all([SB.rpc("conhecimento_buscar",{q:qq,lim:30}),DOCS()?DOCS().buscar(qq,12):Promise.resolve([])]);if(error){toast("Busca indisponível");return}
+  K.resultados=data||[];K.resultadosDocs=docs;render();
 }
 function renderEditor(main){
   const a=K.art;const temas=[...new Set(K.lista.map(c=>c.tema))];
