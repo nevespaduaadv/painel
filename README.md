@@ -7,12 +7,14 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `index.html` | Portal: login único e azulejos por perfil (admin, colaborador, cliente). |
 | `passivos/index.html` | Painel de Passivos Bancários (gerado — **não editar à mão**). |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
+| `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
 | `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
 | `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
 | `gestao/index.html` | Dashboard de gestão (carteira, jurídico, equipe, alertas). Lê só as views `v_*`; página independente, mesma sessão de login. |
 | `fontes/painel.html` | Protótipo-fonte do painel (motor de projeção, dashboard, formulários). |
 | `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta login, runtime Supabase, aba Usuários e o `carteira.js`). |
+| `fontes/importar-onboarding.py` | Gera SQL (fora do repo) com os dados dos formulários de onboarding e o índice de documentos da pasta de cada cliente. |
 | `fontes/gerar-pagina-cliente.mjs` | Legado: gerava a página fixa `alphamec/` a partir de um snapshot do banco antigo. |
 | `alphamec/index.html` | Página fixa do cliente Alphamec (congelada na posição de 07/10/2026). |
 | `supabase/migrations/*.sql` | Modelo de dados versionado. Toda alteração de schema entra aqui. |
@@ -42,7 +44,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`. Cargas de dados (0007, 0009…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
@@ -59,6 +61,7 @@ Validação local antes de enviar: as migrations rodam em sequência num Postgre
 - "adicione o processo Y ao cliente Z" → linha em `processos`; andamentos entram em `andamentos` e aparecem na timeline.
 - "atualiza o painel da Alphamec" → não é mais necessário: a área do cliente (login ou link) lê o banco ao vivo.
 - "gera o link da Alphamec" / "revoga o link" → `clientes.acesso_por_token` + `token` (botão "Link do cliente" no painel).
+- "atualize a ficha da Alphamec: sócio X, CNPJ Y, história Z" → colunas da ficha em `clientes`, `contatos`, `bens`, `documentos`.
 - "crie a tarefa X para o cliente Z, prazo dia D, fatal" → linha em `tarefas` (vence em 7/15/30 na aba Tarefas).
 - "lance 2 horas de parecer para a Alphamec" → `apontamentos_horas`; horas informadas na timeline já entram sozinhas.
 - Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos` e cria a entrada "Acordo fechado" na timeline (visível ao cliente).

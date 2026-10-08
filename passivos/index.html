@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Painel de Passivos</title>
+<title>Clientes — Neves Pádua Advocacia</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
@@ -192,7 +192,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 <body>
 
 <header class="top">
-  <div class="brand"><small>Neves Pádua Advocacia</small><b>Painel de Passivos Bancários</b></div>
+  <div class="brand"><small>Neves Pádua Advocacia</small><b>Clientes</b></div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" data-tab="clientes" id="tab-clientes">Clientes</button>
     <button class="tab edit-only" role="tab" aria-selected="false" data-tab="tarefas" id="tab-tarefas">Tarefas</button>
@@ -247,6 +247,7 @@ const SB = window.supabase.createClient("https://ksdwzljfjfucjevdqxvx.supabase.c
 const PP = {perfil:null, listeners:{}, cache:{}};
 const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
 const NOTA_CAMPO = {clientes:"notasInternas", contratos:"notas"};
+const FICHA_COLS = ["nome","ativo","cpf_titular","tipo_pessoa","nome_fantasia","cidade","uf","segmento","faturamento_mensal","funcionarios","historia","situacao_atual","origem","closer","data_fechamento","data_onboarding","plano","status","negativado","usa_maquininha","tem_consorcio","outros_cnpjs","assuntos_interesse","disponibilidade","observacoes_onboarding","proxima_reuniao","created_at","updated_at","estagio_registrado"];
 const equipe = ()=>PP.perfil && (PP.perfil.papel==="admin"||PP.perfil.papel==="colaborador");
 
 async function carregar(col){
@@ -263,7 +264,9 @@ async function carregar(col){
     const {data:ns}=await SB.from("notas_internas").select("id,texto");
     for(const n of (ns||[])) notas[n.id]=n.texto;
   }
-  return data.map(r=>{const d={id:r.id,...r.dados};if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
+  return data.map(r=>{const d={id:r.id,...r.dados};
+    if(col==="clientes"){for(const [k,v] of Object.entries(r)){if(!["id","dados","token","acesso_por_token","created_by","updated_by"].includes(k)&&v!=null)d[k]=v}} // colunas da ficha (0008)
+    if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
 }
 async function notificar(col){
   try{const rows=await carregar(col);PP.cache[col]=rows;for(const cb of (PP.listeners[col]||[]))cb({docs:rows.map(r=>({id:r.id,data:()=>r}))})}
@@ -281,7 +284,8 @@ async function gravar(col,id,doc,{merge=false}={}){
   const notaCampo=NOTA_CAMPO[col];let nota=null;
   if(notaCampo){nota=d[notaCampo]??"";delete d[notaCampo]}
   if(merge){const {data:cur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();Object.assign(d,{...(cur?cur.dados:{}),...d})}
-  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;
+  if(col==="clientes"){for(const k of FICHA_COLS)delete d[k]}   // colunas da ficha não vão para o jsonb
+  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;if(col==="clientes"&&d.cnpj)row.cnpj=d.cnpj;
   const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
   if(notaCampo && !merge){
     const nid=(col==="clientes"?"cliente:":"contrato:")+id;
@@ -579,16 +583,21 @@ function renderMain(){
   const foraTxt=[nEmDia?`${nEmDia} em dia`:null,nTrav?`${nTrav} com garantia (negociação por outra via)`:null].filter(Boolean).join(" · ")||"nenhum";
 
   m.append(el("div",{class:"head"},
-    el("div",{},el("div",{class:"eyebrow"},"Acompanhamento de passivos"),el("h1",{},c.nome),el("div",{class:"sub"},[c.cnpj?`CNPJ ${c.cnpj}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
+    el("div",{},el("div",{class:"eyebrow"},c.cidade||c.segmento?[c.segmento,c.cidade&&(c.cidade+(c.uf?"/"+c.uf:""))].filter(Boolean).join(" · "):"Cliente"),el("h1",{},c.nome),el("div",{class:"sub"},[c.cnpj?`${c.tipo_pessoa==="PF"?"CPF":"CNPJ"} ${fmtDoc(c.cnpj)}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
     el("div",{class:"actions edit-only"},(window.PP_MOD&&window.PP_MOD.acoesCliente)?window.PP_MOD.acoesCliente(c):null,el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
 
   /* Sub-abas da página do cliente. Timeline e Processos são fornecidos pelo módulo da carteira (window.PP_MOD) quando conectado ao Supabase. */
   const MOD=window.PP_MOD||{};const cnt=MOD.contagens?MOD.contagens(c):{};
-  const SUBS=[["geral","Visão geral"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
-  if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub="geral";
+  const SUBS=[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
+  if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub=MOD.resumo?"resumo":"geral";
   if((S.sub==="notas"||S.sub==="tarefas")&&readOnly())S.sub="geral";
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.filter(s=>!s[3]||!readOnly()).map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
 
+  if(S.sub==="resumo"){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);
+    if(MOD.resumo)MOD.resumo(c,host,{ks,ativos,saldoTotal,saldoNeg,acordoTotal,reservaTotal});else{S.sub="geral";render()}
+    return;
+  }
   if(S.sub==="contratos"){
     const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Contratos"),el("span",{class:"note"},`Projeção baseada em ${acordos.length} acordos reais do escritório · estágio conforme Res. CMN 4.966/2021 · provisão mínima conforme Res. BCB 352/2023`)));
     if(!ks.length)sec.append(el("div",{class:"empty"},"Nenhum contrato cadastrado para este cliente."));
@@ -762,6 +771,7 @@ function renderDashboard(P,R){
   return wrap;
 }
 function arcPath(cx,cy,r,a0,a1){const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);const big=(a1-a0)>Math.PI?1:0;return `M${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${big} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`}
+const fmtDoc=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5"):d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):String(v||"")};
 const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
 
 function contractCard(k,p,R){
@@ -1028,5 +1038,6 @@ async function renderUsuarios(){
 <script src="carteira.js"></script>
 <script src="tarefas.js"></script>
 <script src="equipe.js"></script>
+<script src="ficha.js"></script>
 </body>
 </html>

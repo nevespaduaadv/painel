@@ -58,7 +58,7 @@ const PP = {perfil:null, listeners:{}, cache:{}};
 const equipe = ()=>false;
 let DADOS = null;
 /* SB falso com a mesma interface de consulta usada pelo módulo da carteira (from/select/eq/in/order) */
-const TAB = {entradas_timeline:()=>DADOS.entradas_timeline, processos:()=>DADOS.processos, andamentos:()=>DADOS.andamentos, anexos:()=>[], colaboradores:()=>[], perfis:()=>[], acordos:()=>DADOS.acordos};
+const TAB = {entradas_timeline:()=>DADOS.entradas_timeline, processos:()=>DADOS.processos, andamentos:()=>DADOS.andamentos, anexos:()=>[], colaboradores:()=>[], perfis:()=>[], acordos:()=>DADOS.acordos, contatos:()=>[], bens:()=>[], documentos:()=>DADOS.documentos||[]};
 function consulta(t){const f=[];const o={select(){return o},eq(k,v){f.push(r=>r[k]===v);return o},in(k,vs){f.push(r=>vs.includes(r[k]));return o},order(){return o},maybeSingle(){o._s=true;return o},single(){o._s=true;return o},
   then(res){const d=(TAB[t]?TAB[t]():[]).filter(r=>f.every(x=>x(r)));res({data:o._s?(d[0]||null):d,error:null})}};return o}
 const SB = {from:consulta, channel:()=>({on(){return this},subscribe(){}}), storage:{from:()=>({createSignedUrl:async()=>({data:null,error:new Error("indisponível")})})}, auth:{signOut:async()=>{}}};
@@ -67,7 +67,7 @@ window.__PP_RUNTIME={use:async(n)=>{
   if(n==="db")return {
     doc:(p)=>({onSnapshot:(cb)=>{if(p==="config/regras")cb({exists:!!DADOS.regras,data:()=>DADOS.regras})},set:async()=>{},update:async()=>{},delete:async()=>{}}),
     collection:(col)=>({onSnapshot:(cb)=>{
-      const rows=col==="clientes"?[{id:DADOS.cliente.id,...DADOS.cliente.dados}]:col==="contratos"?DADOS.contratos.map(k=>({id:k.id,...k.dados})):col==="historico"?refs():[];
+      const rows=col==="clientes"?[{id:DADOS.cliente.id,...DADOS.cliente.dados,...(DADOS.ficha||{})}]:col==="contratos"?DADOS.contratos.map(k=>({id:k.id,...k.dados})):col==="historico"?refs():[];
       cb({docs:rows.map(r=>({id:r.id,data:()=>r}))})},add:async()=>{throw new Error("somente leitura")}})
   };
   if(n==="user")return {can:async()=>false,id:async()=>null};
@@ -107,6 +107,7 @@ const SB = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.
 const PP = {perfil:null, listeners:{}, cache:{}};
 const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
 const NOTA_CAMPO = {clientes:"notasInternas", contratos:"notas"};
+const FICHA_COLS = ["nome","ativo","cpf_titular","tipo_pessoa","nome_fantasia","cidade","uf","segmento","faturamento_mensal","funcionarios","historia","situacao_atual","origem","closer","data_fechamento","data_onboarding","plano","status","negativado","usa_maquininha","tem_consorcio","outros_cnpjs","assuntos_interesse","disponibilidade","observacoes_onboarding","proxima_reuniao","created_at","updated_at","estagio_registrado"];
 const equipe = ()=>PP.perfil && (PP.perfil.papel==="admin"||PP.perfil.papel==="colaborador");
 
 async function carregar(col){
@@ -123,7 +124,9 @@ async function carregar(col){
     const {data:ns}=await SB.from("notas_internas").select("id,texto");
     for(const n of (ns||[])) notas[n.id]=n.texto;
   }
-  return data.map(r=>{const d={id:r.id,...r.dados};if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
+  return data.map(r=>{const d={id:r.id,...r.dados};
+    if(col==="clientes"){for(const [k,v] of Object.entries(r)){if(!["id","dados","token","acesso_por_token","created_by","updated_by"].includes(k)&&v!=null)d[k]=v}} // colunas da ficha (0008)
+    if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
 }
 async function notificar(col){
   try{const rows=await carregar(col);PP.cache[col]=rows;for(const cb of (PP.listeners[col]||[]))cb({docs:rows.map(r=>({id:r.id,data:()=>r}))})}
@@ -141,7 +144,8 @@ async function gravar(col,id,doc,{merge=false}={}){
   const notaCampo=NOTA_CAMPO[col];let nota=null;
   if(notaCampo){nota=d[notaCampo]??"";delete d[notaCampo]}
   if(merge){const {data:cur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();Object.assign(d,{...(cur?cur.dados:{}),...d})}
-  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;
+  if(col==="clientes"){for(const k of FICHA_COLS)delete d[k]}   // colunas da ficha não vão para o jsonb
+  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;if(col==="clientes"&&d.cnpj)row.cnpj=d.cnpj;
   const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
   if(notaCampo && !merge){
     const nid=(col==="clientes"?"cliente:":"contrato:")+id;
@@ -261,7 +265,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n</body>');
+html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n<script src="../passivos/ficha.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n<script src="ficha.js"></script>\n</body>');
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
