@@ -270,6 +270,7 @@ const REGRAS_PADRAO = {
   tetoDesconto:97,
   margemReserva:10,           // reserva mensal = valor alvo × (1+10%) / meses
   prazoReservaPadrao:6,
+  diasSemRegistro:15,        // alerta de gestão: cliente sem registro na timeline há mais de X dias
   atualizacaoMensal:1.0,      // % a.m. de atualização do saldo em atraso (juros de mora + correção) para estimar a dívida na data-alvo
   fatoresGarantia:{nenhuma:0,aval:-5,recebiveis:-10,real_movel:-5,hipoteca:"travar",real_imovel:"travar",fundo:"travar",fianca_bancaria:"travar"},
   fatoresProduto:{giro:0,cheque:0,contagar:0,cartao:0,receb:-5,pronampe:0,rural_custeio:-5,rural_invest:-5,veiculo:0,imovel:0,leasing:0,ccb:0,outro:0},
@@ -650,6 +651,7 @@ function renderRegras(){
     numF("Teto de desconto (%)","tetoDesconto",R.tetoDesconto,""),
     numF("Margem de segurança da reserva (%)","margemReserva",R.margemReserva,""),
     numF("Prazo padrão de reserva (meses)","prazoReservaPadrao",R.prazoReservaPadrao,"Pode ser alterado por contrato. Define a data-alvo da previsão."),
+    numF("Alerta: dias sem registro na timeline","diasSemRegistro",R.diasSemRegistro,"Usado pelo dashboard de gestão para apontar clientes parados."),
     numF("Atualização do saldo em atraso (% a.m.)","atualizacaoMensal",R.atualizacaoMensal,"Juros de mora + correção para estimar a dívida na data-alvo. Padrão 1% a.m.; pode ser sobrescrito por contrato.")));
   v.append(g);
   v.append(fatorTable("Fator por garantia","fatoresGarantia",GARANTIAS,"“travar” desliga a projeção para aquele contrato. Veículo com alienação fiduciária fechou com 83–89% no histórico, por isso não está travado."));
