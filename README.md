@@ -7,6 +7,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `index.html` | Portal: login único e azulejos por perfil (admin, colaborador, cliente). |
 | `passivos/index.html` | Painel de Passivos Bancários (gerado — **não editar à mão**). |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
+| `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
 | `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
 | `gestao/index.html` | Dashboard de gestão (carteira, jurídico, equipe, alertas). Lê só as views `v_*`; página independente, mesma sessão de login. |
@@ -41,14 +42,14 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
 ## Usuários e acessos
 
 - Criar usuário: Supabase → Authentication → Users → **Add user** (com *Auto Confirm*). O primeiro usuário vira admin; os demais nascem `pendente`.
-- Definir perfil: painel → aba **Usuários** (admin). Para cliente, escolha a empresa. Ao salvar um admin/colaborador, o sistema cria o registro correspondente em `colaboradores` (usado como responsável na timeline e nos processos).
+- Definir perfil: painel → aba **Usuários** (admin). Para cliente, escolha a empresa. Ao salvar um admin/colaborador, o sistema cria o registro correspondente em `colaboradores`; complete cargo, núcleo e admissão na aba **Equipe**. Quem sai: marque a data de desligamento (vira inativo; o histórico de horas e tarefas fica).
 - Cliente logado vê só a própria empresa e só o que está marcado como *visível ao cliente*. Notas internas e a base de acordos nunca saem da equipe (RLS).
 - **Link sem login (opcional)**: na página do cliente → "Link do cliente" → Gerar. O link `cliente/?t=TOKEN` mostra a mesma área do cliente (Visão geral · Contratos · Reserva de quitação · Andamento · Processos) lendo a função `painel_por_token`, que entrega só o publicado. Quem tem o link vê; revogue e gere outro quando precisar. Os acessos ficam em `acessos_token`.
 

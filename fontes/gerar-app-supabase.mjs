@@ -40,11 +40,11 @@ must('<label class="switch edit-only">');
 html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>',
   '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="tarefas" id="tab-tarefas">Tarefas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="horas" id="tab-horas">Horas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>');
 html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>',
-  '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>\n    <button class="tab edit-only admin-only" role="tab" aria-selected="false" data-tab="usuarios" id="tab-usuarios">Usuários</button>');
+  '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="equipe" id="tab-equipe">Equipe</button>\n    <button class="tab edit-only admin-only" role="tab" aria-selected="false" data-tab="usuarios" id="tab-usuarios">Usuários</button>');
 html = html.replace('<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>',
   '<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>\n  <div class="userbox" id="userbox" hidden><a class="btn" href="../">Portal</a><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>');
 must('<div id="view-calibracao" hidden class="main"></div>');
-html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>');
+html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
@@ -259,7 +259,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n</body>');
+html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n</body>');
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
