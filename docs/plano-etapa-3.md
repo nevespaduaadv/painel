@@ -91,3 +91,10 @@ Lido via conector: página "GESTÃO DE PASSIVOS PJ" (Cadastro Central, Contratos
 ## 9. PR 9 (08/10) — retroativo do ADVBox
 
 Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/filter-movements`) e convertido por `supabase/dados/advbox-import.py` em `0013_advbox_retroativo.sql` (fora do repo). 28 processos do ADVBox dos 14 clientes PJ: 15 com número CNJ (criados/vinculados em `processos`, `id_externo = advbox:<id>`), 13 "S/N" (pastas administrativas "Gestão de Passivos PJ" — só o histórico entra, no cliente). Andamentos do tribunal → `andamentos` (movimentação), intimações → `andamentos` (intimação), tarefas pendentes → `tarefas` abertas (núcleo jurídico, responsável pelo nome do ADVBox), tarefas concluídas e mudanças de etapa → `entradas_timeline` (interna, automática). Versões editadas/excluídas e "processo cadastrado" ficam de fora. Tudo interno por padrão; publicar ao cliente é decisão caso a caso.
+
+## 10. PR 7 (08/10) — navegação por áreas, rotas e breadcrumb
+- Topo do app: **Clientes** (centro) · **Jurídico ▾** (Tarefas e prazos, Negociações, Monitoramento, Base de acordos, Regras de projeção, Calibração) · **Equipe ▾** (Colaboradores, Horas, Usuários) · **Gestão** (dashboard). O nome da área atual aparece no logo. Menus definidos em `NAV` no `fontes/painel.html`; o gerador injeta os itens dos módulos nos marcadores `/*NAV_JURIDICO*/` e `/*NAV_GRUPOS*/`.
+- Rotas no `#`: `#clientes/<id>/<aba>` e `#<area>`; o botão voltar do navegador funciona (pushState/popstate), links do portal abrem direto na área.
+- Página do cliente: breadcrumb "Clientes › Empresa › Aba"; no celular a lista some ao abrir um cliente e aparece o botão "← Clientes".
+- Portal: azulejos agrupados por área, "Clientes" em destaque; Comercial, Marketing e Financeiro aparecem como "Em breve" (sem página ainda).
+- Fica para depois (parte estrutural do §6): app único com módulos e componentes compartilhados, área do cliente mobile-first, esqueletos de carregamento, busca global.

@@ -37,6 +37,10 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:.005
 .tile p{margin:0;color:var(--muted);font-size:14px;flex:1}
 .tile .go{color:var(--gold);font-weight:700;font-size:13px;letter-spacing:.04em}
 .tile.ext .go::after{content:" ↗"}
+.area{margin-top:26px}.area h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-family:var(--body);font-weight:700}
+.area .tiles{margin-top:10px}
+.tile.destaque{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,var(--surface))}
+.tile.breve{opacity:.55;cursor:default}.tile.breve:hover{background:var(--surface);border-color:var(--line)}
 .sec{margin-top:30px}
 .sec h2{font-size:18px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-family:var(--body);font-size:12px}
 .login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
@@ -80,15 +84,20 @@ const $ = s => document.querySelector(s);
 
 /* Módulos do portal. 'papeis' define quem vê o azulejo. Links externos levam ext:true. */
 const MODULOS = [
-  {titulo:"Clientes", desc:"Ficha, passivos bancários, reserva, timeline, processos e tarefas de cada cliente.", href:"passivos/", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Minha área", desc:"Situação dos contratos, previsão de acordo, reserva sugerida e andamento do trabalho.", href:"passivos/", papeis:["cliente"], go:"Abrir"},
-  {titulo:"Dashboard de gestão", desc:"Carteira, jurídico, equipe e alertas em uma tela. Mesmas views que alimentam o Power BI.", href:"gestao/", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Tarefas e prazos", desc:"O que vence em 7, 15 e 30 dias, prazos fatais e tarefas por cliente e responsável.", href:"passivos/#tarefas", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Horas", desc:"Lance suas horas e acompanhe o timesheet por colaborador, cliente e atividade.", href:"passivos/#horas", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Base de acordos", desc:"Como cada credor negocia: histórico de acordos reais do escritório.", href:"passivos/#historico", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Regras de projeção", desc:"Parâmetros do motor de projeção e tabela regulatória.", href:"passivos/#regras", papeis:["admin"], go:"Abrir"},
-  {titulo:"Equipe", desc:"Colaboradores, núcleos, admissão e vínculo com o usuário de cada um.", href:"passivos/#equipe", papeis:["admin","colaborador"], go:"Abrir"},
-  {titulo:"Usuários e acessos", desc:"Definir perfis da equipe e dos clientes.", href:"passivos/#usuarios", papeis:["admin"], go:"Gerenciar"},
+  {area:"Clientes", titulo:"Clientes", desc:"Ficha, fluxo PJ, passivos bancários, reserva, timeline, processos, tarefas e negociações de cada cliente.", href:"passivos/#clientes", papeis:["admin","colaborador"], go:"Abrir", destaque:true},
+  {area:"Minha área", titulo:"Minha área", desc:"Situação dos contratos, previsão de acordo, reserva sugerida e andamento do trabalho.", href:"passivos/", papeis:["cliente"], go:"Abrir", destaque:true},
+  {area:"Jurídico", titulo:"Tarefas e prazos", desc:"O que vence em 7, 15 e 30 dias, prazos fatais e tarefas por cliente e responsável.", href:"passivos/#tarefas", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Jurídico", titulo:"Negociações", desc:"Kanban do setor de acordos: da abertura ao acordo concluído, por banco e cliente.", href:"passivos/#negociacoes", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Jurídico", titulo:"Monitoramento processual", desc:"Checagem periódica dos CPFs/CNPJs de clientes, sócios e avalistas.", href:"passivos/#monitoramento", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Jurídico", titulo:"Base de acordos", desc:"Como cada credor negocia: histórico de acordos reais do escritório.", href:"passivos/#historico", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Jurídico", titulo:"Regras de projeção", desc:"Parâmetros do motor de projeção e tabela regulatória.", href:"passivos/#regras", papeis:["admin"], go:"Abrir"},
+  {area:"Equipe", titulo:"Colaboradores", desc:"Quem é quem, núcleos, admissão e vínculo com o usuário de cada um.", href:"passivos/#equipe", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Equipe", titulo:"Horas", desc:"Lance suas horas e acompanhe o timesheet por colaborador, cliente e atividade.", href:"passivos/#horas", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Equipe", titulo:"Usuários e acessos", desc:"Definir perfis da equipe e dos clientes.", href:"passivos/#usuarios", papeis:["admin"], go:"Gerenciar"},
+  {area:"Gestão", titulo:"Dashboard de gestão", desc:"Carteira, jurídico, equipe e alertas em uma tela. Mesmas views que alimentam o Power BI.", href:"gestao/", papeis:["admin","colaborador"], go:"Abrir"},
+  {area:"Em breve", titulo:"Comercial", desc:"Leads, funil e fechamentos — hoje na planilha e no CRM.", papeis:["admin","colaborador"], breve:true},
+  {area:"Em breve", titulo:"Marketing", desc:"Campanhas, conteúdo e indicadores de tráfego.", papeis:["admin","colaborador"], breve:true},
+  {area:"Em breve", titulo:"Financeiro", desc:"Honorários, cobranças e inadimplência — hoje no ASAAS e na planilha.", papeis:["admin","colaborador"], breve:true},
 ];
 
 function render(perfil){
@@ -98,14 +107,19 @@ function render(perfil){
   h.innerHTML=`<div class="eyebrow">${papel==="cliente"?"Área do cliente":"Área do escritório"}</div><h1>Olá, ${perfil.nome||perfil.email||""}</h1><div class="sub">${papel==="cliente"?"Aqui você acompanha o trabalho do escritório na sua empresa.":"Escolha um sistema para começar."}</div>`;
   m.append(h);
   if(papel==="pendente"){m.innerHTML+='<div class="card empty" style="margin-top:22px"><h2>Acesso em análise</h2><div>Seu usuário foi criado, mas ainda não recebeu um perfil. Peça ao administrador do escritório para liberar o acesso.</div></div>';return}
-  const tiles=document.createElement("div");tiles.className="tiles";
-  for(const mod of MODULOS.filter(x=>x.papeis.includes(papel))){
-    const a=document.createElement("a");a.className="tile"+(mod.ext?" ext":"");a.href=mod.href;if(mod.ext)a.target="_blank";
-    a.innerHTML=`<h3></h3><p></p><span class="go"></span>`;
-    a.querySelector("h3").textContent=mod.titulo;a.querySelector("p").textContent=mod.desc;a.querySelector(".go").textContent=mod.go||"Abrir";
-    tiles.append(a);
+  const mods=MODULOS.filter(x=>x.papeis.includes(papel));
+  for(const area of [...new Set(mods.map(x=>x.area))]){
+    const sec=document.createElement("section");sec.className="area";
+    if(papel!=="cliente"){const h2=document.createElement("h2");h2.textContent=area;sec.append(h2)}
+    const tiles=document.createElement("div");tiles.className="tiles";
+    for(const mod of mods.filter(x=>x.area===area)){
+      const a=document.createElement(mod.breve?"div":"a");a.className="tile"+(mod.ext?" ext":"")+(mod.destaque?" destaque":"")+(mod.breve?" breve":"");if(!mod.breve)a.href=mod.href;if(mod.ext)a.target="_blank";
+      a.innerHTML=`<h3></h3><p></p><span class="go"></span>`;
+      a.querySelector("h3").textContent=mod.titulo;a.querySelector("p").textContent=mod.desc;a.querySelector(".go").textContent=mod.breve?"Em breve":(mod.go||"Abrir");
+      tiles.append(a);
+    }
+    sec.append(tiles);m.append(sec);
   }
-  m.append(tiles);
 }
 
 async function entrar(){

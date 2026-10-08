@@ -43,6 +43,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tab{background:transparent;border:1px solid transparent;color:#D7D2C6;padding:7px 12px;border-radius:var(--r);cursor:pointer}
 .tab:hover{border-color:#3B5074}
 .tab[aria-selected="true"]{background:#1A3353;color:#fff;border-color:#2C4B74}
+.menu{position:relative}
+.menu-list{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--navy);border:1px solid #2C4B74;border-radius:var(--r);padding:6px;min-width:210px;z-index:20;flex-direction:column;gap:2px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.menu.open .menu-list{display:flex}
+.menu-list .tab{text-align:left;width:100%}
+.tab.grp::after{content:" ▾";font-size:11px;opacity:.8}
+.tab.grp[aria-selected="true"]{background:#1A3353}
+a.tab{text-decoration:none;display:inline-block}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);flex-wrap:wrap;margin-bottom:10px}
+.crumbs a,.crumbs button{background:none;border:0;padding:0;color:var(--info);cursor:pointer;font:inherit;font-weight:600}
+.crumbs .sep{color:var(--faint)}
+.btn-voltar{display:none}
+@media (max-width:860px){.grid.has-sel .side{display:none}.btn-voltar{display:inline-flex}.crumbs .crumb-cli{display:none}}
 .switch{display:flex;align-items:center;gap:8px;color:#D7D2C6;font-size:13px;cursor:pointer;user-select:none}
 .switch input{accent-color:var(--gold);width:16px;height:16px}
 
@@ -175,13 +187,8 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 <body>
 
 <header class="top">
-  <div class="brand"><small>Neves Pádua Advocacia</small><b>Clientes</b></div>
-  <nav class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="true" data-tab="clientes" id="tab-clientes">Clientes</button>
-    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>
-    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="regras" id="tab-regras">Regras de projeção</button>
-    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>
-  </nav>
+  <div class="brand"><small>Neves Pádua Advocacia</small><b id="brandArea">Clientes</b></div>
+  <nav class="tabs" role="tablist" id="nav"></nav>
   <label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>
 </header>
 
@@ -382,14 +389,52 @@ const SVGNS="http://www.w3.org/2000/svg";
 const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);for(const[k,v]of Object.entries(attrs)){if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!=null)e.setAttribute(k,v)}for(const k of kids.flat()){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(k))}return e};
 
 /* ---------- Render ---------- */
+/* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
+const NAV=[{tab:"clientes",label:"Clientes"},
+  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[/*NAV_JURIDICO*/{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
+  /*NAV_GRUPOS*/];
+const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
+const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
+function irPara(tab){S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));render()}
+function renderNav(){
+  const nav=$("#nav");nav.replaceChildren();
+  for(const n of NAV){
+    if(n.link){nav.append(el("a",{class:"tab "+(n.cls||""),href:n.link},n.label));continue}
+    if(n.tab){nav.append(el("button",{class:"tab "+(n.cls||""),role:"tab","aria-selected":String(S.tab===n.tab),"data-tab":n.tab,onclick:()=>irPara(n.tab)},n.tab==="clientes"&&readOnly()?"Minha área":n.label));continue}
+    const itens=n.itens.map(i=>el("button",{class:"tab "+(i.cls||""),role:"tab","aria-selected":String(S.tab===i.tab),"data-tab":i.tab,onclick:()=>irPara(i.tab)},i.label));
+    const sel=n.itens.some(i=>i.tab===S.tab);
+    const wrap=el("div",{class:"menu "+(n.cls||"")},el("button",{class:"tab grp","aria-selected":String(sel),"aria-haspopup":"true",onclick:e=>{e.stopPropagation();const o=wrap.classList.contains("open");document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));if(!o)wrap.classList.add("open")}},n.label),el("div",{class:"menu-list"},itens));
+    nav.append(wrap);
+  }
+  const b=$("#brandArea");if(b)b.textContent=readOnly()?"Minha área":(AREA_DE[S.tab]||"Clientes");
+}
+document.addEventListener("click",()=>document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open")));
+function hashAtual(){return S.tab==="clientes"?"#clientes"+(S.sel?"/"+encodeURIComponent(S.sel)+(S.sub?"/"+S.sub:""):""):"#"+S.tab}
+function aplicarHash(){
+  const h=(location.hash||"").slice(1);if(!h)return false;
+  const [tab,id,sub]=h.split("/");if(!ROTAS.includes(tab))return false;
+  if(tab!=="clientes"&&readOnly())return false;
+  S.tab=tab;if(tab==="clientes"){if(id&&!readOnly())S.sel=decodeURIComponent(id);if(sub)S.sub=sub}
+  return true;
+}
+let _hashInicial=true;
+function syncHash(){const h=hashAtual();const inicial=_hashInicial;_hashInicial=false;if(location.hash===h)return;try{if(inicial||!location.hash)history.replaceState(null,"",h);else history.pushState(null,"",h)}catch(_){}}
+window.addEventListener("popstate",()=>{if(aplicarHash()){document.body.classList.remove("ro");render()}});
+function breadcrumb(c){
+  const voltar=()=>{S.sel=null;render()};
+  return el("div",{class:"crumbs"},el("button",{class:"btn sm btn-voltar",onclick:voltar},"← Clientes"),el("button",{class:"crumb-cli",onclick:voltar},"Clientes"),el("span",{class:"sep crumb-cli"},"›"),el("span",{},c.nome),S.sub?[el("span",{class:"sep"},"›"),el("span",{},({resumo:"Resumo",geral:"Passivos",contratos:"Contratos",reserva:"Reserva de quitação",timeline:"Timeline",processos:"Processos",tarefas:"Tarefas",negociacoes:"Negociações",notas:"Notas internas"})[S.sub]||S.sub)]:null);
+}
+
 function render(){
   document.body.classList.toggle("ro",readOnly());
-  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===S.tab)));
+  renderNav();
+  $("#view-clientes").classList.toggle("has-sel",S.tab==="clientes"&&!!S.sel);
   $("#view-clientes").hidden=S.tab!=="clientes";$("#view-historico").hidden=S.tab!=="historico";$("#view-regras").hidden=S.tab!=="regras";$("#view-calibracao").hidden=S.tab!=="calibracao";
   if(S.tab==="clientes"){renderList();renderMain()}
   if(S.tab==="historico")renderHistorico();
   if(S.tab==="regras")renderRegras();
   if(S.tab==="calibracao")renderCalib();
+  syncHash();
 }
 function renderList(){
   const host=$("#clientList");host.replaceChildren();
@@ -423,6 +468,7 @@ function renderMain(){
   const nEmDia=fora.filter(x=>!x.k.dataInicioAtraso).length, nTrav=fora.filter(x=>x.p.travado&&x.k.dataInicioAtraso).length;
   const foraTxt=[nEmDia?`${nEmDia} em dia`:null,nTrav?`${nTrav} com garantia (negociação por outra via)`:null].filter(Boolean).join(" · ")||"nenhum";
 
+  if(!readOnly())m.append(breadcrumb(c));
   m.append(el("div",{class:"head"},
     el("div",{},el("div",{class:"eyebrow"},c.cidade||c.segmento?[c.segmento,c.cidade&&(c.cidade+(c.uf?"/"+c.uf:""))].filter(Boolean).join(" · "):"Cliente"),el("h1",{},c.nome),el("div",{class:"sub"},[c.cnpj?`${c.tipo_pessoa==="PF"?"CPF":"CNPJ"} ${fmtDoc(c.cnpj)}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
     el("div",{class:"actions edit-only"},(window.PP_MOD&&window.PP_MOD.acoesCliente)?window.PP_MOD.acoesCliente(c):null,el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
@@ -830,11 +876,11 @@ function openEventForm(c){
 async function removeEvent(c,e){if(!needDb())return;const tl=(c.timeline||[]).filter(x=>x.id!==e.id);await S.db.doc("clientes/"+c.id).update({timeline:tl})}
 
 /* ---------- Boot ---------- */
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{S.tab=t.dataset.tab;try{localStorage.setItem("pp-tab",S.tab)}catch(_){}render()});
 $("#q").oninput=e=>{S.q=e.target.value;renderList()};
 $("#viewClient").onchange=e=>{S.clientView=e.target.checked;if(S.clientView){S.tab="clientes"}render()};
 $("#btnNewClient").onclick=()=>openClientForm({});$("#btnNewClient").disabled=true;
-try{const t=localStorage.getItem("pp-tab");if(t)S.tab=t}catch(_){}
+try{const t=localStorage.getItem("pp-tab");if(t&&ROTAS.includes(t))S.tab=t}catch(_){}
+aplicarHash();
 render();
 
 (async()=>{
@@ -847,7 +893,7 @@ render();
   render();
   db.doc("config/regras").onSnapshot(s=>{if(s.exists){const r=s.data();const m={...structuredClone(REGRAS_PADRAO),...r};for(const k of ["fatoresGarantia","fatoresProduto","fatoresSituacao","fatoresBanco","fatoresTitular","fatoresGrupo"])m[k]={...REGRAS_PADRAO[k],...(r[k]||{})};S.regras=m}render()},e=>console.warn(e));
   db.collection("historico").onSnapshot(s=>{S.historico=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
-  db.collection("clientes").onSnapshot(s=>{S.clientes=s.docs.map(d=>({id:d.id,...d.data()}));if(!S.sel&&S.clientes.length)S.sel=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""))[0].id;render()},e=>{console.warn(e);toast("Falha ao carregar clientes")});
+  db.collection("clientes").onSnapshot(s=>{S.clientes=s.docs.map(d=>({id:d.id,...d.data()}));if(!S.sel&&S.clientes.length&&window.innerWidth>860)S.sel=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""))[0].id;render()},e=>{console.warn(e);toast("Falha ao carregar clientes")});
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
