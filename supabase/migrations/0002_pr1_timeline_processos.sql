@@ -17,11 +17,6 @@ begin
   return new;
 end $$;
 
--- colaborador ligado ao usuário logado (null se não houver)
-create or replace function public.meu_colaborador() returns uuid
-language sql stable security definer set search_path = public as $$
-  select id from public.colaboradores where perfil_id = auth.uid() limit 1
-$$;
 
 -- auditoria: ids uuid nas tabelas novas → texto
 create or replace function public.auditar() returns trigger language plpgsql security definer set search_path = public as $$
@@ -61,6 +56,12 @@ create table if not exists public.colaboradores (
   ativo boolean not null default true,
   created_at timestamptz default now(), created_by uuid, updated_at timestamptz default now(), updated_by uuid
 );
+-- colaborador ligado ao usuário logado (null se não houver)
+create or replace function public.meu_colaborador() returns uuid
+language sql stable security definer set search_path = public as $$
+  select id from public.colaboradores where perfil_id = auth.uid() limit 1
+$$;
+
 create table if not exists public.contatos (
   id uuid primary key default gen_random_uuid(),
   cliente_id text not null references public.clientes(id) on delete cascade,
