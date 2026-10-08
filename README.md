@@ -8,6 +8,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/index.html` | Painel de Passivos Bancários (gerado — **não editar à mão**). |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
+| `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
 | `gestao/index.html` | Dashboard de gestão (carteira, jurídico, equipe, alertas). Lê só as views `v_*`; página independente, mesma sessão de login. |
 | `fontes/painel.html` | Protótipo-fonte do painel (motor de projeção, dashboard, formulários). |
 | `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta login, runtime Supabase, aba Usuários e o `carteira.js`). |
@@ -40,7 +41,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
@@ -49,12 +50,14 @@ Validação local antes de enviar: as migrations rodam em sequência num Postgre
 - Criar usuário: Supabase → Authentication → Users → **Add user** (com *Auto Confirm*). O primeiro usuário vira admin; os demais nascem `pendente`.
 - Definir perfil: painel → aba **Usuários** (admin). Para cliente, escolha a empresa. Ao salvar um admin/colaborador, o sistema cria o registro correspondente em `colaboradores` (usado como responsável na timeline e nos processos).
 - Cliente logado vê só a própria empresa e só o que está marcado como *visível ao cliente*. Notas internas e a base de acordos nunca saem da equipe (RLS).
+- **Link sem login (opcional)**: na página do cliente → "Link do cliente" → Gerar. O link `cliente/?t=TOKEN` mostra a mesma área do cliente (Visão geral · Contratos · Reserva de quitação · Andamento · Processos) lendo a função `painel_por_token`, que entrega só o publicado. Quem tem o link vê; revogue e gere outro quando precisar. Os acessos ficam em `acessos_token`.
 
 ## Operação do dia a dia (comandos para o Claude)
 
 - "lance na timeline da Alphamec que fizemos X" → entrada em `entradas_timeline` (interna por padrão; "publique" para o cliente ver).
 - "adicione o processo Y ao cliente Z" → linha em `processos`; andamentos entram em `andamentos` e aparecem na timeline.
-- "atualiza o painel da Alphamec" → não é mais necessário: a área do cliente lê o banco ao vivo.
+- "atualiza o painel da Alphamec" → não é mais necessário: a área do cliente (login ou link) lê o banco ao vivo.
+- "gera o link da Alphamec" / "revoga o link" → `clientes.acesso_por_token` + `token` (botão "Link do cliente" no painel).
 - "crie a tarefa X para o cliente Z, prazo dia D, fatal" → linha em `tarefas` (vence em 7/15/30 na aba Tarefas).
 - "lance 2 horas de parecer para a Alphamec" → `apontamentos_horas`; horas informadas na timeline já entram sozinhas.
 - Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos` e cria a entrada "Acordo fechado" na timeline (visível ao cliente).

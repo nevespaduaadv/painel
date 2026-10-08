@@ -1,12 +1,16 @@
-// Gera passivos/index.html (painel conectado ao Supabase: login + banco + tempo real) a partir de fontes/painel.html.
-// Uso: node fontes/gerar-app-supabase.mjs [saida.html]   (padrão: passivos/index.html)
+// Gera passivos/index.html (painel com login) e cliente/index.html (acesso por token) a partir de fontes/painel.html.
+// Uso: node fontes/gerar-app-supabase.mjs
 import fs from 'fs';
 import path from 'path';
 const base = path.dirname(new URL(import.meta.url).pathname);
 const out = process.argv[2] || path.join(base,'..','passivos','index.html');
 const SUPABASE_URL = 'https://ksdwzljfjfucjevdqxvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_tt__gxUjGaujzylisID0KQ_qaeaU1-l';
+const outToken = path.join(base,'..','cliente','index.html');
 
+// Gera o painel em dois modos: 'login' (passivos/, equipe e clientes com usuário) e 'token' (cliente/?t=…, sem login,
+// lê tudo de uma função SQL que entrega só o que o cliente pode ver).
+function gerar(modo){
 let html = fs.readFileSync(path.join(base,'painel.html'),'utf8');
 const must=(needle)=>{if(!html.includes(needle)){console.error('âncora não encontrada:',needle.slice(0,60));process.exit(1)}};
 
@@ -44,6 +48,47 @@ html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<di
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
+if(modo==='token'){
+html = html.replace('<script>', `<div class="login" id="login"><div class="card"><div class="eyebrow">Neves Pádua Advocacia</div><h1>Área do cliente</h1><div class="note" id="l-msg">Carregando a sua posição…</div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ---------- Runtime por token: sem login. Os dados vêm de painel_por_token(t) (só o publicado para o cliente). ---------- */
+const REAL = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.stringify(SUPABASE_KEY)});
+const PP = {perfil:null, listeners:{}, cache:{}};
+const equipe = ()=>false;
+let DADOS = null;
+/* SB falso com a mesma interface de consulta usada pelo módulo da carteira (from/select/eq/in/order) */
+const TAB = {entradas_timeline:()=>DADOS.entradas_timeline, processos:()=>DADOS.processos, andamentos:()=>DADOS.andamentos, anexos:()=>[], colaboradores:()=>[], perfis:()=>[], acordos:()=>DADOS.acordos};
+function consulta(t){const f=[];const o={select(){return o},eq(k,v){f.push(r=>r[k]===v);return o},in(k,vs){f.push(r=>vs.includes(r[k]));return o},order(){return o},maybeSingle(){o._s=true;return o},single(){o._s=true;return o},
+  then(res){const d=(TAB[t]?TAB[t]():[]).filter(r=>f.every(x=>x(r)));res({data:o._s?(d[0]||null):d,error:null})}};return o}
+const SB = {from:consulta, channel:()=>({on(){return this},subscribe(){}}), storage:{from:()=>({createSignedUrl:async()=>({data:null,error:new Error("indisponível")})})}, auth:{signOut:async()=>{}}};
+const refs = ()=>(DADOS.referencias||[]).filter(r=>r.desc!=null).map(r=>({id:r.id,credor:r.credor,grupo:r.grupo,forma:r.forma,status:r.status,data:r.data,divida:1,valorAcordo:1-Number(r.desc)}));
+window.__PP_RUNTIME={use:async(n)=>{
+  if(n==="db")return {
+    doc:(p)=>({onSnapshot:(cb)=>{if(p==="config/regras")cb({exists:!!DADOS.regras,data:()=>DADOS.regras})},set:async()=>{},update:async()=>{},delete:async()=>{}}),
+    collection:(col)=>({onSnapshot:(cb)=>{
+      const rows=col==="clientes"?[{id:DADOS.cliente.id,...DADOS.cliente.dados}]:col==="contratos"?DADOS.contratos.map(k=>({id:k.id,...k.dados})):col==="historico"?refs():[];
+      cb({docs:rows.map(r=>({id:r.id,data:()=>r}))})},add:async()=>{throw new Error("somente leitura")}})
+  };
+  if(n==="user")return {can:async()=>false,id:async()=>null};
+  return null;
+}};
+window.__PP_LOGIN = (async()=>{
+  const t=new URLSearchParams(location.search).get("t");
+  const falha=(m)=>{document.querySelector("#l-msg").textContent=m;return new Promise(()=>{})};
+  if(!t)return falha("Este link está incompleto. Peça ao escritório o link de acesso.");
+  const {data,error}=await REAL.rpc("painel_por_token",{t});
+  if(error||!data)return falha("Link inválido ou revogado. Peça ao escritório um link novo.");
+  DADOS=data;REAL.rpc("registrar_acesso_token",{t}).then(()=>{},()=>{});
+  PP.perfil={papel:"cliente",cliente_id:data.cliente.id};
+  document.body.classList.add("modo-cliente","nao-admin");S.clientView=true;S.sel=data.cliente.id;S.tab="clientes";
+  document.querySelector("#login").hidden=true;
+  const ub=document.querySelector("#userbox");ub.hidden=false;ub.replaceChildren(document.createTextNode("Acesso por link · posição de "+new Date(data.gerado_em).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})));
+  const h=(location.hash||"").slice(1);if(["reserva","timeline","processos","contratos"].includes(h))S.sub=h;
+})();
+</script>
+<script>`);
+} else {
 html = html.replace('<script>', `<div class="login" id="login">
   <div class="card">
     <div class="eyebrow">Neves Pádua Advocacia</div>
@@ -172,6 +217,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
 
 </script>
 <script>`);
+}
 
 // 4) Boot: usa o runtime do Supabase e só inicia após login
 must('const use=n=>(window.claude&&typeof claude.use==="function")?claude.use(n).catch(()=>null):Promise.resolve(null);');
@@ -209,12 +255,17 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 `;
-const idx = html.lastIndexOf('</script>');
-html = html.slice(0,idx) + extra + html.slice(idx);
+if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0,idx) + extra + html.slice(idx);}
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n</body>');
+html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n</body>');
+if(modo==='token'){
+  html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
+  html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
+}
+return html;
+}
 
-fs.writeFileSync(out, html);
-console.log('ok', out);
+fs.mkdirSync(path.dirname(out),{recursive:true}); fs.writeFileSync(out, gerar('login')); console.log('ok', out);
+fs.mkdirSync(path.dirname(outToken),{recursive:true}); fs.writeFileSync(outToken, gerar('token')); console.log('ok', outToken);

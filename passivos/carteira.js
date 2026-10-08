@@ -117,7 +117,7 @@ function renderTimeline(c,host){
   if(!evs.length){host.append(el("div",{class:"empty"},cliente?"Nenhuma atuação publicada ainda. Assim que o escritório registrar o trabalho, ele aparece aqui.":"Nenhuma atuação registrada com este filtro."));return}
   host.append(el("ul",{class:"tl"},evs.map(e=>{
     const anexos=M.anexos.filter(a=>a.entrada_id===e.id);
-    const meta=[responsavelDe(e),horasFmt(e.horas),nomeContrato(e.contrato_id),e.processo_id?("Proc. "+(processoDe(e.processo_id)?.numero_cnj||"")):null].filter(Boolean).join(" · ");
+    const meta=[cliente?null:responsavelDe(e),cliente?null:horasFmt(e.horas),nomeContrato(e.contrato_id),e.processo_id?("Proc. "+(processoDe(e.processo_id)?.numero_cnj||"")):null].filter(Boolean).join(" · ");
     return el("li",{},
       el("div",{class:"d"},fmtD(parseD(e.data))," ",el("span",{class:"pill "+(e.automatica?"c":"g")},TIPOS[e.tipo]||e.tipo),cliente?null:el("span",{class:"pill "+(e.visivel_cliente?"e1":"e2"),style:"margin-left:6px"},e.visivel_cliente?"Visível ao cliente":"Interno")),
       el("div",{style:"white-space:pre-wrap"},e.descricao),
@@ -168,13 +168,13 @@ function renderProcessos(c,host){
   if(!garantirCarregado(c)){host.append(el("div",{class:"note"},"Carregando…"));return}
   if(!M.processos.length){host.append(el("div",{class:"empty"},el("h3",{},"Nenhum processo vinculado"),el("div",{},cliente?"Não há processo judicial em andamento. O trabalho do escritório segue registrado na aba Andamento.":"Cadastre os processos do cliente para acompanhar prazos e andamentos. Clientes sem processo continuam normalmente.")));return}
   const ordem=[...M.processos].sort((a,b)=>(a.status==="encerrado")-(b.status==="encerrado")||(a.proximo_prazo||"9999").localeCompare(b.proximo_prazo||"9999"));
-  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
+  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Último andamento"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
     el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{M.procSel=M.procSel===p.id?null:p.id;render()}},
       el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
       el("td",{},p.tipo_acao||"—",p.polo?el("div",{class:"note"},p.polo==="ativo"?"polo ativo":"polo passivo"):null),
       el("td",{},[p.tribunal,p.vara].filter(Boolean).join(" · ")||"—"),el("td",{},p.parte_contraria||"—"),
       el("td",{},p.banco||nomeContrato(p.contrato_id)||"—",p.contrato_id&&p.banco?el("div",{class:"note"},nomeContrato(p.contrato_id)):null),
-      el("td",{},p.fase||"—"),el("td",{},prazoPill(p)),cliente?null:el("td",{},responsavelDe(p)),el("td",{},el("span",{class:"pill "+(p.status==="ativo"?"e1":p.status==="suspenso"?"e2":"g")},STATUS_PROC[p.status]||p.status))))));
+      el("td",{},p.fase||"—"),el("td",{},(()=>{const ua=M.andamentos.filter(a=>a.processo_id===p.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0];return ua?el("span",{},fmtD(parseD(ua.data)),el("div",{class:"note"},(ua.tipo?ua.tipo+": ":"")+ua.descricao.slice(0,70)+(ua.descricao.length>70?"…":""))):el("span",{class:"note"},"—")})()),el("td",{},prazoPill(p)),cliente?null:el("td",{},responsavelDe(p)),el("td",{},el("span",{class:"pill "+(p.status==="ativo"?"e1":p.status==="suspenso"?"e2":"g")},STATUS_PROC[p.status]||p.status))))));
   host.append(el("div",{class:"tbl"},tb));
   const p=M.processos.find(x=>x.id===M.procSel);
   if(p)host.append(detalheProcesso(c,p));
@@ -226,10 +226,30 @@ function openAndamentoForm(p,a={}){
   },extra);
 }
 
+/* ---------- Link de acesso do cliente (token, sem login) ---------- */
+function novoToken(){const b=new Uint8Array(32);crypto.getRandomValues(b);return btoa(String.fromCharCode(...b)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function botaoLinkCliente(c){return el("button",{class:"btn sm",onclick:()=>openLinkCliente(c)},"Link do cliente")}
+async function openLinkCliente(c){
+  const [{data:row},{data:ac}]=await Promise.all([SB.from("clientes").select("acesso_por_token,token").eq("id",c.id).maybeSingle(),SB.from("v_acessos_token").select("*").eq("cliente_id",c.id).maybeSingle()]);
+  const ativo=!!(row&&row.acesso_por_token&&row.token);
+  const url=ativo?new URL("../cliente/?t="+row.token,location.href).href:null;
+  const body=el("div",{class:"form"},
+    el("div",{class:"f full"},el("div",{class:"note"},"Duas formas de o cliente acessar: (1) login no portal, com usuário criado na aba Usuários — recomendado; (2) este link com código secreto, sem login. Quem tiver o link vê a área do cliente (só o publicado). Dá para revogar e gerar outro a qualquer momento.")),
+    el("div",{class:"f full"},el("label",{},"Situação"),el("div",{},ativo?el("span",{class:"pill e1"},"Link ativo"):el("span",{class:"pill e2"},"Sem link ativo"),ac&&ac.ultimo_acesso?el("span",{class:"note",style:"margin-left:8px"},`último acesso ${new Date(ac.ultimo_acesso).toLocaleString("pt-BR")} · ${ac.acessos_30d} nos últimos 30 dias`):null)),
+    ativo?el("div",{class:"f full"},el("label",{},"Link"),el("input",{type:"text",readonly:"",value:url,onclick:e=>e.target.select()})):null);
+  const acts=el("div",{class:"actions",style:"justify-content:flex-start"},
+    ativo?el("button",{class:"btn sm",onclick:()=>{navigator.clipboard?.writeText(url);toast("Link copiado")}},"Copiar link"):null,
+    el("button",{class:"btn sm primary",onclick:async()=>{if(ativo&&!confirmInline(body,"Gerar um link novo invalida o anterior."))return;const {error}=await SB.from("clientes").update({acesso_por_token:true,token:novoToken()}).eq("id",c.id);if(error){toast("Não foi possível gerar");return}$("#modalHost").replaceChildren();toast("Link gerado");openLinkCliente(c)}},ativo?"Gerar novo link":"Gerar link"),
+    ativo?el("button",{class:"btn sm danger",onclick:async()=>{const {error}=await SB.from("clientes").update({acesso_por_token:false}).eq("id",c.id);if(error){toast("Não foi possível revogar");return}$("#modalHost").replaceChildren();toast("Link revogado")}},"Revogar"):null);
+  body.append(el("div",{class:"f full"},acts));
+  modal("Link de acesso do cliente",body,async()=>{});
+}
+
 /* ---------- Integração com o painel ---------- */
 window.PP_MOD={
   timeline:renderTimeline,
   processos:renderProcessos,
+  acoesCliente:botaoLinkCliente,
   contagens:c=>garantirCarregado(c)?{timeline:M.timeline.length,processos:M.processos.filter(p=>p.status!=="encerrado").length}:{}
 };
 const h=(location.hash||"").slice(1);if(["timeline","processos"].includes(h))S.sub=h;

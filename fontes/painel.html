@@ -424,11 +424,11 @@ function renderMain(){
 
   m.append(el("div",{class:"head"},
     el("div",{},el("div",{class:"eyebrow"},"Acompanhamento de passivos"),el("h1",{},c.nome),el("div",{class:"sub"},[c.cnpj?`CNPJ ${c.cnpj}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
-    el("div",{class:"actions edit-only"},el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
+    el("div",{class:"actions edit-only"},(window.PP_MOD&&window.PP_MOD.acoesCliente)?window.PP_MOD.acoesCliente(c):null,el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
 
   /* Sub-abas da página do cliente. Timeline e Processos são fornecidos pelo módulo da carteira (window.PP_MOD) quando conectado ao Supabase. */
   const MOD=window.PP_MOD||{};const cnt=MOD.contagens?MOD.contagens(c):{};
-  const SUBS=[["geral","Visão geral"],["contratos","Contratos",ks.length],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
+  const SUBS=[["geral","Visão geral"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
   if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub="geral";
   if((S.sub==="notas"||S.sub==="tarefas")&&readOnly())S.sub="geral";
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.filter(s=>!s[3]||!readOnly()).map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
@@ -439,6 +439,7 @@ function renderMain(){
     else sec.append(el("div",{class:"contracts"},ks.map(k=>contractCard(k,projetar(k,R,acordos),R))));
     m.append(sec,disclaimer());return;
   }
+  if(S.sub==="reserva"){m.append(renderReserva(c,neg,fora,R,acumulada,alvoTotal,reservaTotal,mesesMax),disclaimer());return}
   if(S.sub==="timeline"){
     const host=el("section",{class:"card section"});m.append(host);
     if(MOD.timeline)MOD.timeline(c,host);else legacyTimeline(c,host);
@@ -476,6 +477,30 @@ function renderMain(){
   if(P.length)m.append(renderDashboard(P,R));
   if(!P.length&&!ks.length)m.append(el("div",{class:"card empty"},"Nenhum contrato cadastrado para este cliente. Use “+ Contrato” para começar."));
   m.append(disclaimer());
+}
+/* Reserva de quitação: quanto guardar, por contrato, para chegar ao acordo projetado no prazo */
+function renderReserva(c,neg,fora,R,acumulada,alvoTotal,reservaTotal,mesesMax){
+  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Reserva de quitação"),el("div",{class:"actions"},el("button",{class:"btn sm edit-only",onclick:()=>openClientForm(c)},"Atualizar reserva acumulada"))));
+  if(!neg.length){sec.append(el("div",{class:"empty"},el("h3",{},"Nenhum contrato em projeção"),el("div",{},"A reserva é calculada para contratos em atraso com data de início informada. Contratos em dia ficam fora do cálculo.")));return sec}
+  const linhas=neg.map(x=>{const alvo=x.p.valorAcordo*(1+R.margemReserva/100);const aloc=alvoTotal?Math.min(alvo,acumulada*alvo/alvoTotal):0;const falta=Math.max(0,alvo-aloc);return {x,alvo,aloc,falta,aporte:x.p.meses?falta/x.p.meses:falta}});
+  const faltaTotal=linhas.reduce((s,l)=>s+l.falta,0),aporteTotal=linhas.reduce((s,l)=>s+l.aporte,0);
+  sec.append(el("div",{class:"kpis"},
+    kpi("Reserva acumulada",BRL(acumulada),alvoTotal?`${pct(Math.min(1,acumulada/alvoTotal))} do alvo`:""),
+    kpi("Alvo total",BRL(alvoTotal),`acordos projetados à vista + ${R.margemReserva}% de margem`),
+    kpi("Falta reservar",BRL(faltaTotal),faltaTotal?`em até ${mesesMax} meses`:"alvo atingido"),
+    kpi("Aporte mensal necessário",BRL(aporteTotal),`considerando o que já foi reservado · referência sem reserva: ${BRL(reservaTotal)}/mês`)));
+  if(alvoTotal)sec.append(el("div",{class:"bar"},el("i",{style:`width:${Math.min(100,acumulada/alvoTotal*100)}%`})));
+  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Contrato"),el("th",{},"Janela de acordo"),el("th",{class:"r"},"Saldo hoje"),el("th",{class:"r"},"Acordo projetado"),el("th",{class:"r"},"Alvo c/ margem"),el("th",{class:"r"},"Reserva alocada"),el("th",{class:"r"},"Falta"),el("th",{class:"r"},"Meses"),el("th",{class:"r"},"Aporte / mês"))),
+    el("tbody",{},linhas.sort((a,b)=>(a.x.p.dataAlvo||0)-(b.x.p.dataAlvo||0)).map(({x,alvo,aloc,falta,aporte})=>el("tr",{},
+      el("td",{},el("b",{},shortName(x.k)),el("div",{class:"note"},`Estágio ${x.p.est} · ${x.p.dias} dias de atraso`)),
+      el("td",{},x.p.janelaAberta?el("span",{class:"pill e1"},"Aberta"):el("span",{class:"pill e2"},`Abre em ${fmtD(x.p.abertura)}`)),
+      el("td",{class:"r num"},BRL(x.p.saldo)),el("td",{class:"r num"},BRL(x.p.valorAcordo),el("div",{class:"note"},`à vista em ${fmtD(x.p.dataAlvo)}`)),
+      el("td",{class:"r num"},BRL(alvo)),el("td",{class:"r num"},BRL(aloc)),el("td",{class:"r num"},falta?BRL(falta):el("span",{class:"pill e1"},"coberto")),el("td",{class:"r num"},String(x.p.meses)),el("td",{class:"r num"},el("b",{},BRL(aporte))))),
+      el("tr",{style:"background:var(--surface-2)"},el("td",{colspan:2},el("b",{},"Total")),el("td",{class:"r num"},BRL(neg.reduce((s,x)=>s+x.p.saldo,0))),el("td",{class:"r num"},BRL(neg.reduce((s,x)=>s+x.p.valorAcordo,0))),el("td",{class:"r num"},BRL(alvoTotal)),el("td",{class:"r num"},BRL(Math.min(acumulada,alvoTotal))),el("td",{class:"r num"},BRL(faltaTotal)),el("td",{class:"r num"},String(mesesMax)),el("td",{class:"r num"},el("b",{},BRL(aporteTotal))))));
+  sec.append(el("div",{class:"tbl"},tb));
+  sec.append(el("div",{class:"note"},"A reserva acumulada é distribuída entre os contratos na proporção do alvo de cada um. O aporte mensal é o que falta dividido pelos meses até a data-alvo de cada contrato."));
+  if(fora.length)sec.append(el("div",{class:"note"},el("b",{},"Fora da reserva: "),fora.map(x=>shortName(x.k)+(x.k.dataInicioAtraso?" (garantia · negociação por outra via)":" (em dia)")).join(" · ")));
+  return sec;
 }
 function disclaimer(){return el("div",{class:"disclaimer"},"Os valores de acordo e de reserva são projeções para visualização do cliente, calculadas a partir do histórico de acordos do escritório com cada instituição e dos pisos regulatórios de provisão. Não representam promessa de resultado nem proposta do banco. A negociação depende da instituição, das garantias, da forma de pagamento e do momento do crédito.")}
 /* Linha do tempo embutida no cliente (versão sem banco relacional). Na versão Supabase, o módulo da carteira substitui esta função. */

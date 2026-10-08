@@ -222,6 +222,9 @@ O que importa é o conteúdo, não a estética. Indicadores a reproduzir nas vie
 
 **Financeiro (fase posterior, via Asaas)** — receita × despesa com variação mensal; resultado e acumulado; total recebido × a receber (quantidade e valor), pago × a pagar; inadimplência acumulada, no período, por cliente, por plano de contas, série temporal; receita/despesa por unidade, plano de contas, grupo de cliente/fornecedor. O schema financeiro será desenhado para alimentar exatamente esses cortes.
 
+## 5d. Situação (08/10)
+PR 1–4 publicados (migrations 0002–0005). Acesso do cliente: login (padrão) + link por token (`cliente/?t=…`), conforme decidido. A página fixa `alphamec/` continua no ar como foto de 07/10 até o escritório migrar a Alphamec para login ou link por token.
+
 ## 5c. Regeração desativada (07/10)
 Com a visão do cliente ao vivo, as rotinas de regeração (artefato reserva às quartas e publicação no GitHub) foram desativadas. A página fixa `alphamec/` permanece no ar com a posição de 07/10/2026 até o PR 4 definir seu destino (manter como opção por token ou retirar).
 
