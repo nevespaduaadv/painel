@@ -457,8 +457,8 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"clientes",label:"Clientes"},
-  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento"},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
-  {grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
+  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
+  {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Comercial)",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento (Marketing)",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Financeiro)",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
 function irPara(tab){S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));render()}
@@ -467,8 +467,9 @@ function renderNav(){
   for(const n of NAV){
     if(n.link){nav.append(el("a",{class:"tab "+(n.cls||""),href:n.link},n.label));continue}
     if(n.tab){nav.append(el("button",{class:"tab "+(n.cls||""),role:"tab","aria-selected":String(S.tab===n.tab),"data-tab":n.tab,onclick:()=>irPara(n.tab)},n.tab==="clientes"&&readOnly()?"Minha área":n.label));continue}
-    const itens=n.itens.map(i=>el("button",{class:"tab "+(i.cls||""),role:"tab","aria-selected":String(S.tab===i.tab),"data-tab":i.tab,onclick:()=>irPara(i.tab)},i.label));
-    const sel=n.itens.some(i=>i.tab===S.tab);
+    const ativo=i=>S.tab===i.tab&&(!i.sel||i.sel());
+    const itens=n.itens.map(i=>el("button",{class:"tab "+(i.cls||""),role:"tab","aria-selected":String(ativo(i)),"data-tab":i.tab,onclick:()=>{if(i.hash){document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));try{history.pushState(null,"",i.hash)}catch(_){}if(typeof aplicarHash==="function"&&aplicarHash()){try{localStorage.setItem("pp-tab",i.tab)}catch(_){}render()}return}irPara(i.tab)}},i.label));
+    const sel=n.itens.some(ativo);
     const wrap=el("div",{class:"menu "+(n.cls||"")},el("button",{class:"tab grp","aria-selected":String(sel),"aria-haspopup":"true",onclick:e=>{e.stopPropagation();const o=wrap.classList.contains("open");document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));if(!o)wrap.classList.add("open")}},n.label),el("div",{class:"menu-list"},itens));
     nav.append(wrap);
   }
@@ -963,7 +964,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mv00pmyo"></script>
-<script src="../passivos/ficha.js?v=mv00pmyo"></script>
+<script src="../passivos/carteira.js?v=mv0109up"></script>
+<script src="../passivos/ficha.js?v=mv0109up"></script>
 </body>
 </html>

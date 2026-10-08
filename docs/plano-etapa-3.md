@@ -151,3 +151,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Tela: aba **Máquina de ideias** em Marketing (sugestões aguardando triagem com Levar p/ aprovação / Aprovar / Descartar; pedidos ao robô; botão "Pedir ideias ao robô" e "🤖 Pedir ao robô" dentro da pauta).
 - `ferramentas/robo-marketing.mjs`: CLI que loga como o robô (ROBO_EMAIL/ROBO_SENHA no ambiente, nunca no repo) — `contexto`, `criar`, `atender`, `comentar`. Usado pelas tarefas agendadas do Claude (segunda: 5 pautas da semana a partir do radar; diário: atender pedidos pendentes).
 - **Arrastar e soltar** (`passivos/dnd.js`, mouse e toque) nos kanbans de Pautas (não-admin não solta em "Aprovado"; soltar em "Ajustar" abre o pedido de ajuste) e de Negociações. O seletor de etapa continua como alternativa.
+
+## 20. (08/10) — áreas Comercial, Marketing e Financeiro no portal e no menu
+- Base de conhecimento ganhou rota por área: `#conhecimento/area:<comercial|financeiro|marketing|juridico|…>` filtra a lista de temas; `#conhecimento/<slug>` abre o artigo direto.
+- Menu do painel: grupos **Comercial** (Base de conhecimento), **Marketing** (Pautas de conteúdo, Base de conhecimento) e **Financeiro** (Base de conhecimento). Item de menu pode apontar para um hash (`hash`) e definir quando está selecionado (`sel`), para o mesmo módulo aparecer em mais de um grupo com filtro diferente.
+- Portal (`index.html`): azulejos "Em breve" de Comercial e Financeiro substituídos por "Base de conhecimento (área)".
+- Pendente de decisão: permissão de leitura por núcleo (hoje toda a equipe lê todas as áreas).

@@ -5,7 +5,8 @@
 const K={lista:[],ok:false,carregando:false,sel:null,art:null,versoes:[],busca:"",resultados:null,resultadosDocs:null,editando:false,tema:"",area:""};
 const AREAS={juridico:"Jurídico",comercial:"Comercial",financeiro:"Financeiro",administrativo:"Administrativo",marketing:"Marketing",geral:"Geral"};
 const DOCS=()=>window.PP_DOCS;
-const ROTA_ART=()=>"#conhecimento"+(K.sel?"/"+K.sel:"");
+const ROTA_ART=()=>"#conhecimento"+(K.sel?"/"+K.sel:K.area?"/area:"+K.area:"");
+window.PP_KB={get area(){return K.area}};
 let marked=null,mermaid=null;
 const carregarLib=(src,glob)=>new Promise((res,rej)=>{if(window[glob])return res(window[glob]);const s=document.createElement("script");s.src=src;s.onload=()=>res(window[glob]);s.onerror=rej;document.head.append(s)});
 async function libs(){if(!marked){await carregarLib("https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js","marked");marked=window.marked}return marked}
@@ -19,6 +20,7 @@ async function carregar(){
 }
 const garantir=()=>{if(!K.ok&&!K.carregando)carregar();return K.ok};
 async function abrir(slug){
+  if(slug&&slug.startsWith("area:")){K.area=slug.slice(5);K.tema="";K.sel=null;K.art=null;render();return}
   K.sel=slug;K.editando=false;K.art=null;K.versoes=[];render();
   if(slug==="documentos")return;
   const {data}=await SB.from("conteudos").select("*").eq("slug",slug).maybeSingle();
@@ -130,6 +132,6 @@ const CSS=`.md{line-height:1.6;font-size:15px}.md h1{font-size:24px;margin:18px 
 document.head.append(el("style",{},CSS));
 {const _r=render;render=function(){_r();const vk=$("#view-conhecimento");if(!vk)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="conhecimento")S.tab="clientes";vk.hidden=S.tab!=="conhecimento";if(S.tab==="conhecimento"){renderConhecimento();const h=ROTA_ART();if(location.hash!==h&&K.sel!=="novo"){try{history.replaceState(null,"",h)}catch(_){}}}}}
 // rota #conhecimento/<slug>
-{const _a=window.aplicarHash;if(typeof _a==="function")window.aplicarHash=function(){const r=_a();const [tab,slug]=(location.hash||"").slice(1).split("/");if(tab==="conhecimento"&&slug&&slug!==K.sel){abrir(decodeURIComponent(slug))}return r}}
+{const _a=window.aplicarHash;if(typeof _a==="function")window.aplicarHash=function(){const r=_a();const [tab,slug]=(location.hash||"").slice(1).split("/");if(tab==="conhecimento"&&slug&&slug!==K.sel){const d=decodeURIComponent(slug);if(d.startsWith("area:")){if(d.slice(5)!==K.area)abrir(d)}else abrir(d)}return r}}
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const [tab,slug]=(location.hash||"").slice(1).split("/");if(tab==="conhecimento"&&slug)abrir(decodeURIComponent(slug));const ch=SB.channel("conhecimento");ch.on("postgres_changes",{event:"*",schema:"public",table:"conteudos"},()=>{K.ok=false;if(S.tab==="conhecimento")garantir()});ch.subscribe()}});
 })();

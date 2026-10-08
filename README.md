@@ -4,7 +4,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 
 | Caminho | O que é |
 |---|---|
-| `index.html` | Portal: login único e azulejos por área (Clientes · Jurídico · Equipe · Gestão · em breve Comercial/Marketing/Financeiro), filtrados por perfil. |
+| `index.html` | Portal: login único e azulejos por área (Clientes · Jurídico · Comercial · Marketing · Financeiro · Equipe · Gestão), filtrados por perfil. |
 | `passivos/index.html` | App interno "Clientes" (gerado — **não editar à mão**). Navegação por áreas no topo (Clientes · Jurídico ▾ · Equipe ▾ · Gestão), rotas no `#` (`#clientes/<id>/<aba>`, `#tarefas`, `#negociacoes`…) com voltar do navegador e breadcrumb na página do cliente. |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |

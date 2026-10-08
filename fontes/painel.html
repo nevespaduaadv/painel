@@ -401,8 +401,9 @@ function renderNav(){
   for(const n of NAV){
     if(n.link){nav.append(el("a",{class:"tab "+(n.cls||""),href:n.link},n.label));continue}
     if(n.tab){nav.append(el("button",{class:"tab "+(n.cls||""),role:"tab","aria-selected":String(S.tab===n.tab),"data-tab":n.tab,onclick:()=>irPara(n.tab)},n.tab==="clientes"&&readOnly()?"Minha área":n.label));continue}
-    const itens=n.itens.map(i=>el("button",{class:"tab "+(i.cls||""),role:"tab","aria-selected":String(S.tab===i.tab),"data-tab":i.tab,onclick:()=>irPara(i.tab)},i.label));
-    const sel=n.itens.some(i=>i.tab===S.tab);
+    const ativo=i=>S.tab===i.tab&&(!i.sel||i.sel());
+    const itens=n.itens.map(i=>el("button",{class:"tab "+(i.cls||""),role:"tab","aria-selected":String(ativo(i)),"data-tab":i.tab,onclick:()=>{if(i.hash){document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));try{history.pushState(null,"",i.hash)}catch(_){}if(typeof aplicarHash==="function"&&aplicarHash()){try{localStorage.setItem("pp-tab",i.tab)}catch(_){}render()}return}irPara(i.tab)}},i.label));
+    const sel=n.itens.some(ativo);
     const wrap=el("div",{class:"menu "+(n.cls||"")},el("button",{class:"tab grp","aria-selected":String(sel),"aria-haspopup":"true",onclick:e=>{e.stopPropagation();const o=wrap.classList.contains("open");document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));if(!o)wrap.classList.add("open")}},n.label),el("div",{class:"menu-list"},itens));
     nav.append(wrap);
   }
