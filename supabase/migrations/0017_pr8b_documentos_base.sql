@@ -23,7 +23,8 @@ create table if not exists public.documentos_base (
   busca tsvector,
   created_at timestamptz default now(), created_by uuid, updated_at timestamptz default now(), updated_by uuid
 );
-create unique index if not exists documentos_base_drive_uidx on public.documentos_base(drive_id) where drive_id is not null;
+drop index if exists public.documentos_base_drive_uidx;
+create unique index if not exists documentos_base_drive_uidx on public.documentos_base(drive_id); -- único (nulos permitidos); sem WHERE para o upsert da tela funcionar
 create index if not exists documentos_base_caminho_idx on public.documentos_base(area, caminho, titulo);
 create index if not exists documentos_base_busca_idx on public.documentos_base using gin (busca);
 

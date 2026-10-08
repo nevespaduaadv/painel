@@ -49,7 +49,7 @@ function renderDocs(main){
   main.append(el("div",{class:"crumbs"},el("button",{onclick:()=>{window.PP_DOCS.voltar?.()}},"Base de conhecimento"),el("span",{class:"sep"},"›"),el("span",{},"Documentos base (Drive)")));
   main.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico · Google Drive"),el("h1",{},"Documentos base"),
       el("div",{class:"sub"},"Modelos de peças, tópicos, jurisprudência, planilhas e materiais da pasta JURÍDICO. Os arquivos continuam no Drive — aqui você encontra, descreve e marca os mais usados. ",ultima?"Índice sincronizado em "+new Date(ultima).toLocaleDateString("pt-BR")+".":"")),
-    el("div",{class:"actions"},el("a",{class:"btn sm",href:PASTA_RAIZ_URL,target:"_blank",rel:"noopener"},"Abrir pasta no Drive"),el("button",{class:"btn sm primary",onclick:()=>editar(null)},"+ Adicionar link"))));
+    el("div",{class:"actions"},el("a",{class:"btn sm",href:PASTA_RAIZ_URL,target:"_blank",rel:"noopener"},"Abrir pasta no Drive"),PP.perfil?.papel==="admin"?el("button",{class:"btn sm",onclick:importar},"Importar índice (JSON)"):null,el("button",{class:"btn sm primary",onclick:()=>editar(null)},"+ Adicionar link"))));
   if(!ok){main.append(el("div",{class:"note"},"Carregando documentos…"));return}
   const {urlPorCaminho,caminhos}=pastas();
   // filtros
@@ -108,6 +108,35 @@ function editar(d){
     const {error}=novo?await SB.from("documentos_base").insert(row):await SB.from("documentos_base").update(row).eq("id",d.id);
     if(error)throw error;toast(novo?"Link adicionado":"Documento atualizado");D.ok=false;await carregar();
   });
+}
+
+/* Importação do índice (admin): arquivo juridico-indice.json gerado a partir do Drive. Upsert por drive_id em lotes;
+   preserva descrição/tags/destaque já editados; o que sumiu do Drive vira ativo=false. */
+function importar(){
+  const f=inp("file","",{accept:"application/json,.json"});
+  const info=el("div",{class:"note"},"Selecione o arquivo juridico-indice.json (gerado pelo mapeamento da pasta JURÍDICO). Pode ser repetido quando o Drive mudar: títulos, pastas e links são atualizados; descrições, tags e destaques editados aqui são preservados.");
+  const prog=el("div",{class:"note"});
+  modal("Importar índice do Drive",el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"Arquivo"),f),el("div",{class:"f full"},info),el("div",{class:"f full"},prog)),async()=>{
+    const file=f.files?.[0];if(!file)throw new Error("Escolha o arquivo JSON");
+    let j;try{j=JSON.parse(await file.text())}catch(_){throw new Error("Arquivo inválido")}
+    const itens=Array.isArray(j)?j:(j.itens||[]);const area=j.area||"juridico";
+    if(!itens.length||!itens[0].drive_id||!itens[0].url)throw new Error("Formato inesperado: esperado {itens:[{drive_id,titulo,url,…}]}");
+    prog.textContent="Lendo índice atual…";
+    const {data:atuais,error:e0}=await SB.from("documentos_base").select("drive_id").eq("origem","drive").eq("area",area).not("drive_id","is",null);if(e0)throw e0;
+    const existentes=new Set((atuais||[]).map(r=>r.drive_id));
+    const base=x=>({area,origem:"drive",drive_id:x.drive_id,pasta_drive_id:x.pasta_drive_id||null,caminho:x.caminho||"",titulo:x.titulo,tipo:x.tipo||"",mime:x.mime||null,url:x.url,tamanho:x.tamanho||null,modificado_em:x.modificado_em||null,ativo:true});
+    const novos=itens.filter(x=>!existentes.has(x.drive_id)).map(x=>({...base(x),tags:x.tags||[]}));
+    const velhos=itens.filter(x=>existentes.has(x.drive_id)).map(base);
+    let feitos=0;const total=novos.length+velhos.length;
+    for(const lote of [novos,velhos])for(let i=0;i<lote.length;i+=100){
+      const {error}=await SB.from("documentos_base").upsert(lote.slice(i,i+100),{onConflict:"drive_id"});if(error)throw error;
+      feitos+=Math.min(100,lote.length-i);prog.textContent=`Gravando… ${feitos}/${total}`;
+    }
+    const ids=new Set(itens.map(x=>x.drive_id));const sumiram=[...existentes].filter(id=>!ids.has(id));
+    for(let i=0;i<sumiram.length;i+=100){const {error}=await SB.from("documentos_base").update({ativo:false}).in("drive_id",sumiram.slice(i,i+100));if(error)throw error}
+    toast(`Índice importado: ${novos.length} novos, ${velhos.length} atualizados, ${sumiram.length} inativados`);D.ok=false;await carregar();
+  });
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Importar";
 }
 async function buscar(q,lim=12){const {data,error}=await SB.rpc("documentos_base_buscar",{q,lim});return error?[]:(data||[])}
 
