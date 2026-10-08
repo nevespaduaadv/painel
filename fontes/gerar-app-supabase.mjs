@@ -209,7 +209,9 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    const hash=(location.hash||"").slice(1); if(["clientes","historico","regras","calibracao","usuarios","tarefas","horas"].includes(hash)&&equipe())S.tab=hash;
+    const ABAS=["clientes","historico","regras","calibracao","usuarios","tarefas","horas","equipe"];
+    const hash=(location.hash||"").slice(1); if(ABAS.includes(hash)&&equipe())S.tab=hash;
+    window.addEventListener("hashchange",()=>{const h=(location.hash||"").slice(1);if(ABAS.includes(h)&&equipe()){S.tab=h;render()}});
     ligarTempoReal();
     resolve();
   });
