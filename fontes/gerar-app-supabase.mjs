@@ -239,7 +239,7 @@ async function renderUsuarios(){
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acessos"),el("h1",{},"Usuários"),el("div",{class:"sub"},"Para criar um usuário novo: Supabase → Authentication → Users → Add user (com Auto Confirm). Ele aparece aqui como 'pendente'; defina o perfil e, se for cliente, a empresa."))));
   const {data:ps,error}=await SB.from("perfis").select("*").order("email");
   if(error){v.append(el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
-  const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",pendente:"Pendente (sem acesso)"};
+  const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",robo:"Robô (só pautas de marketing)",pendente:"Pendente (sem acesso)"};
   const clientes=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},""))),
     el("tbody",{},ps.map(p=>{
@@ -266,7 +266,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
-html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="rh.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="marketing.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
+html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="carteira.js${V}"></script>\n<script src="tarefas.js${V}"></script>\n<script src="equipe.js${V}"></script>\n<script src="rh.js${V}"></script>\n<script src="dnd.js${V}"></script>\n<script src="ficha.js${V}"></script>\n<script src="fluxo.js${V}"></script>\n<script src="publicacoes.js${V}"></script>\n<script src="autenticador.js${V}"></script>\n<script src="marketing.js${V}"></script>\n<script src="documentos.js${V}"></script>\n<script src="conhecimento.js${V}"></script>\n</body>`);
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');

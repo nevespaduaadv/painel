@@ -1064,7 +1064,7 @@ async function renderUsuarios(){
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acessos"),el("h1",{},"Usuários"),el("div",{class:"sub"},"Para criar um usuário novo: Supabase → Authentication → Users → Add user (com Auto Confirm). Ele aparece aqui como 'pendente'; defina o perfil e, se for cliente, a empresa."))));
   const {data:ps,error}=await SB.from("perfis").select("*").order("email");
   if(error){v.append(el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
-  const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",pendente:"Pendente (sem acesso)"};
+  const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",robo:"Robô (só pautas de marketing)",pendente:"Pendente (sem acesso)"};
   const clientes=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},""))),
     el("tbody",{},ps.map(p=>{
@@ -1086,16 +1086,17 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="carteira.js?v=mv00fw7s"></script>
-<script src="tarefas.js?v=mv00fw7s"></script>
-<script src="equipe.js?v=mv00fw7s"></script>
-<script src="rh.js?v=mv00fw7s"></script>
-<script src="ficha.js?v=mv00fw7s"></script>
-<script src="fluxo.js?v=mv00fw7s"></script>
-<script src="publicacoes.js?v=mv00fw7s"></script>
-<script src="autenticador.js?v=mv00fw7s"></script>
-<script src="marketing.js?v=mv00fw7s"></script>
-<script src="documentos.js?v=mv00fw7s"></script>
-<script src="conhecimento.js?v=mv00fw7s"></script>
+<script src="carteira.js?v=mv00pmyj"></script>
+<script src="tarefas.js?v=mv00pmyj"></script>
+<script src="equipe.js?v=mv00pmyj"></script>
+<script src="rh.js?v=mv00pmyj"></script>
+<script src="dnd.js?v=mv00pmyj"></script>
+<script src="ficha.js?v=mv00pmyj"></script>
+<script src="fluxo.js?v=mv00pmyj"></script>
+<script src="publicacoes.js?v=mv00pmyj"></script>
+<script src="autenticador.js?v=mv00pmyj"></script>
+<script src="marketing.js?v=mv00pmyj"></script>
+<script src="documentos.js?v=mv00pmyj"></script>
+<script src="conhecimento.js?v=mv00pmyj"></script>
 </body>
 </html>

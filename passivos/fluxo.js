@@ -80,7 +80,7 @@ function negCard(n,compacto){
   const mover=sel(Object.fromEntries(NEG_ETAPAS),n.etapa);mover.className="";mover.style.cssText="font-size:12px;padding:3px 6px;width:100%";
   mover.onchange=async()=>{const {error}=await SB.from("negociacoes").update({etapa:mover.value}).eq("id",n.id);if(error)toast("Não foi possível mover");else{toast(NEG_LABEL[mover.value]);recarregar()}};
   mover.onclick=e=>e.stopPropagation();
-  return el("div",{class:"card",style:`padding:10px 12px;cursor:pointer;border-left:3px solid ${n.atrasada?"var(--crit)":parada?"var(--warn)":"var(--line)"}`,onclick:()=>openNegForm(null,n)},
+  return el("div",{class:"card neg-card","data-id":n.id,style:`padding:10px 12px;cursor:pointer;border-left:3px solid ${n.atrasada?"var(--crit)":parada?"var(--warn)":"var(--line)"}`,onclick:()=>openNegForm(null,n)},
     compacto?null:el("div",{style:"font-weight:700"},n.cliente_nome),
     el("div",{style:"font-size:13px"},n.titulo),
     el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"},n.banco?el("span",{class:"pill g"},n.banco):null,n.temperatura?el("span",{class:"pill "+TEMP_CLS[n.temperatura]},TEMP[n.temperatura]):null,n.situacao_processual?el("span",{class:"pill c"},n.situacao_processual):null),
@@ -91,7 +91,7 @@ function negCard(n,compacto){
 }
 function renderNegociacoes(){
   const v=$("#view-negociacoes");v.replaceChildren();
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acordos"),el("h1",{},"Negociações"),el("div",{class:"sub"},"Kanban do setor de acordos: uma negociação por banco/contrato, da abertura ao acordo concluído. Clique no card para editar; mude a etapa no seletor.")),
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acordos"),el("h1",{},"Negociações"),el("div",{class:"sub"},"Kanban do setor de acordos: uma negociação por banco/contrato, da abertura ao acordo concluído. Clique no card para editar; arraste entre as colunas (ou use o seletor) para mudar a etapa.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>openNegForm(null,{})},"+ Negociação"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const fc=sel({"":"Todos os clientes",...Object.fromEntries([...new Set(X.neg.map(n=>n.cliente_id))].map(id=>[id,nomeCli(id)]).sort((a,b)=>a[1].localeCompare(b[1])))},X.fCli);fc.onchange=()=>{X.fCli=fc.value;render()};
@@ -103,11 +103,13 @@ function renderNegociacoes(){
     kpi("Acordos concluídos",BRL(concl.reduce((a,n)=>a+(+n.valor_acordo||0),0)),`${concl.length} negociação(ões)`),kpi("Atrasadas / paradas",String(abertas.filter(n=>n.atrasada).length)+" / "+String(abertas.filter(n=>n.dias_parada>15).length),"prazo vencido · sem mexer há 15+ dias")));
   v.append(el("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},fc,fr,tg.wrap));
   const cols=NEG_ETAPAS.filter(([k])=>k!=="concluido"||X.concluidas);
-  v.append(el("div",{style:"display:grid;grid-template-columns:repeat("+cols.length+",minmax(185px,1fr));gap:10px;overflow-x:auto;align-items:start"},cols.map(([k,l])=>{
+  const kb=el("div",{style:"display:grid;grid-template-columns:repeat("+cols.length+",minmax(185px,1fr));gap:10px;overflow-x:auto;align-items:start"},cols.map(([k,l])=>{
     const its=lista.filter(n=>n.etapa===k);
-    return el("div",{style:"display:flex;flex-direction:column;gap:8px;min-width:185px"},el("div",{style:"display:flex;justify-content:space-between;align-items:center;padding:4px 2px;border-bottom:2px solid var(--gold)"},el("b",{style:"font-size:13px"},l),el("span",{class:"pill g"},String(its.length))),
+    return el("div",{class:"neg-col","data-etapa":k,style:"display:flex;flex-direction:column;gap:8px;min-width:185px;min-height:120px;border-radius:8px"},el("div",{style:"display:flex;justify-content:space-between;align-items:center;padding:4px 2px;border-bottom:2px solid var(--gold)"},el("b",{style:"font-size:13px"},l),el("span",{class:"pill g"},String(its.length))),
       its.length?its.map(n=>negCard(n,false)):el("div",{class:"note",style:"padding:8px 2px"},"—"));
-  })));
+  }));
+  v.append(kb);
+  if(window.PP_DND)PP_DND.ativar(kb,{card:".neg-card",coluna:".neg-col",chaveCol:c=>c.dataset.etapa,chaveCard:c=>c.dataset.id,aoSoltar:async(c,etapa)=>{const {error}=await SB.from("negociacoes").update({etapa}).eq("id",c.dataset.id);if(error)toast("Não foi possível mover");else{toast(NEG_LABEL[etapa]);recarregar()}}});
 }
 function renderNegCliente(c,host){
   const ok=garantir();
