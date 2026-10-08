@@ -8,6 +8,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/index.html` | Painel de Passivos Bancários (gerado — **não editar à mão**). |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
+| `passivos/fluxo.js` | **Fluxo PJ** (etapas 0–10 do Notion na ficha), abas **Negociações** (kanban do setor de acordos) e **Monitoramento** (checagem processual por cliente); sub-aba Negociações na página do cliente. |
 | `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
 | `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
@@ -44,7 +45,7 @@ As migrations são SQL puro, numeradas. Para aplicar uma nova:
 
 Nunca altere tabelas/policies pelo painel do Supabase sem registrar a migration correspondente aqui.
 
-Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`. Cargas de dados (0007, 0009…) ficam em `supabase/dados/`, fora do repositório.
+Aplicadas até agora: `0001_esquema_inicial`, `0002_pr1_timeline_processos`, `0003_pr2_tarefas_timesheet`, `0004_pr3_dashboard_views`, `0005_pr4_visao_cliente_token`, `0006_pr5_colaboradores`, `0008_pr6_ficha_cliente`, `0010_pr7a_fluxo_pj_negociacoes`. Cargas de dados (0007, 0009, 0011…) ficam em `supabase/dados/`, fora do repositório.
 
 Validação local antes de enviar: as migrations rodam em sequência num Postgres 16 limpo com stubs de `auth`, `storage` e `cron` (ver histórico do PR 2).
 
@@ -64,7 +65,10 @@ Validação local antes de enviar: as migrations rodam em sequência num Postgre
 - "atualize a ficha da Alphamec: sócio X, CNPJ Y, história Z" → colunas da ficha em `clientes`, `contatos`, `bens`, `documentos`.
 - "crie a tarefa X para o cliente Z, prazo dia D, fatal" → linha em `tarefas` (vence em 7/15/30 na aba Tarefas).
 - "lance 2 horas de parecer para a Alphamec" → `apontamentos_horas`; horas informadas na timeline já entram sozinhas.
-- Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos` e cria a entrada "Acordo fechado" na timeline (visível ao cliente).
+- "abre uma negociação com o Santander para a CL Comércio" → linha em `negociacoes` (kanban: iniciar → extrajudicial → pós-judicialização → minuta → formalizado → pagamento pendente → concluído).
+- "avança a etapa do fluxo da Adriana" / "marca que a Lugimar tem dívida em atraso" → `clientes.etapa_fluxo` / `tem_divida_atraso` (marcar dívida em atraso abre sozinho a negociação "Iniciar acompanhamento" + tarefa para o setor de acordos).
+- "checado hoje o monitoramento da Via Rios" → `monitoramentos.ultima_checagem` (próxima = amanhã). Cliente novo nasce com tarefas de onboarding, monitoramento e, se tiver dívida em atraso, negociação (gatilho `fluxo_novo_cliente`).
+- Acordos: continue usando **Registrar acordo** no card do contrato; o gatilho espelha em `acordos`, cria a entrada "Acordo fechado" na timeline (visível ao cliente) e conclui a negociação daquele contrato.
 - Mudanças de estágio (Res. CMN 4.966) são registradas automaticamente toda madrugada (pg_cron `estagios_diario`).
 
 ## Power BI / Looker

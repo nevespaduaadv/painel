@@ -429,9 +429,9 @@ function renderMain(){
 
   /* Sub-abas da página do cliente. Timeline e Processos são fornecidos pelo módulo da carteira (window.PP_MOD) quando conectado ao Supabase. */
   const MOD=window.PP_MOD||{};const cnt=MOD.contagens?MOD.contagens(c):{};
-  const SUBS=[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true],["notas","Notas internas",null,true]];
+  const SUBS=[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline",readOnly()?"Andamento":"Timeline",cnt.timeline],["processos","Processos",cnt.processos],["tarefas","Tarefas",cnt.tarefas,true]].concat(MOD.negociacoes?[["negociacoes","Negociações",cnt.negociacoes,true]]:[]).concat([["notas","Notas internas",null,true]]);
   if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub=MOD.resumo?"resumo":"geral";
-  if((S.sub==="notas"||S.sub==="tarefas")&&readOnly())S.sub="geral";
+  if((S.sub==="notas"||S.sub==="tarefas"||S.sub==="negociacoes")&&readOnly())S.sub="geral";
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.filter(s=>!s[3]||!readOnly()).map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
 
   if(S.sub==="resumo"){
@@ -460,6 +460,9 @@ function renderMain(){
     const host=el("section",{class:"card section"});m.append(host);
     if(MOD.tarefas)MOD.tarefas(c,host);else host.append(el("div",{class:"empty"},"Disponível na versão do painel conectada ao banco de dados."));
     return;
+  }
+  if(S.sub==="negociacoes"&&MOD.negociacoes){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);MOD.negociacoes(c,host);return;
   }
   if(S.sub==="notas"){
     const sec=el("section",{class:"card section edit-only"},el("div",{class:"section-h"},el("h2",{},"Notas internas"),el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar")));

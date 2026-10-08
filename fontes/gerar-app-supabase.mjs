@@ -38,13 +38,13 @@ html = html.replace('</style>', `
 // 2) Cabeçalho: aba Usuários (admin) + caixa do usuário com Sair
 must('<label class="switch edit-only">');
 html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>',
-  '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="tarefas" id="tab-tarefas">Tarefas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="horas" id="tab-horas">Horas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>');
+  '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="tarefas" id="tab-tarefas">Tarefas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="horas" id="tab-horas">Horas</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="negociacoes" id="tab-negociacoes">Negociações</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="monitoramento" id="tab-monitoramento">Monitoramento</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="historico" id="tab-historico">Base de acordos</button>');
 html = html.replace('<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>',
   '<button class="tab edit-only" role="tab" aria-selected="false" data-tab="calibracao" id="tab-calibracao">Calibração</button>\n    <button class="tab edit-only" role="tab" aria-selected="false" data-tab="equipe" id="tab-equipe">Equipe</button>\n    <button class="tab edit-only admin-only" role="tab" aria-selected="false" data-tab="usuarios" id="tab-usuarios">Usuários</button>');
 html = html.replace('<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>',
   '<label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>\n  <div class="userbox" id="userbox" hidden><a class="btn" href="../">Portal</a><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>');
 must('<div id="view-calibracao" hidden class="main"></div>');
-html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>');
+html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
@@ -107,7 +107,7 @@ const SB = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.
 const PP = {perfil:null, listeners:{}, cache:{}};
 const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
 const NOTA_CAMPO = {clientes:"notasInternas", contratos:"notas"};
-const FICHA_COLS = ["nome","ativo","cpf_titular","tipo_pessoa","nome_fantasia","cidade","uf","segmento","faturamento_mensal","funcionarios","historia","situacao_atual","origem","closer","data_fechamento","data_onboarding","plano","status","negativado","usa_maquininha","tem_consorcio","outros_cnpjs","assuntos_interesse","disponibilidade","observacoes_onboarding","proxima_reuniao","created_at","updated_at","estagio_registrado"];
+const FICHA_COLS = ["nome","ativo","cpf_titular","tipo_pessoa","nome_fantasia","cidade","uf","segmento","faturamento_mensal","funcionarios","historia","situacao_atual","origem","closer","data_fechamento","data_onboarding","plano","status","negativado","usa_maquininha","tem_consorcio","outros_cnpjs","assuntos_interesse","disponibilidade","observacoes_onboarding","proxima_reuniao","created_at","updated_at","estagio_registrado","etapa_fluxo","tem_divida_atraso","adimplente","possui_processos","projeto_reserva","regua","servico","tipos_dividas","responsavel_onboarding_id","notion_url"];
 const equipe = ()=>PP.perfil && (PP.perfil.papel==="admin"||PP.perfil.papel==="colaborador");
 
 async function carregar(col){
@@ -213,7 +213,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    const ABAS=["clientes","historico","regras","calibracao","usuarios","tarefas","horas","equipe"];
+    const ABAS=["clientes","historico","regras","calibracao","usuarios","tarefas","horas","equipe","negociacoes","monitoramento"];
     const hash=(location.hash||"").slice(1); if(ABAS.includes(hash)&&equipe())S.tab=hash;
     window.addEventListener("hashchange",()=>{const h=(location.hash||"").slice(1);if(ABAS.includes(h)&&equipe()){S.tab=h;render()}});
     ligarTempoReal();
@@ -265,7 +265,7 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 
 // 6) Módulo da carteira (timeline + processos), arquivo separado ao lado do index
 must('</body>');
-html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n<script src="../passivos/ficha.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n<script src="ficha.js"></script>\n</body>');
+html = html.replace('</body>', modo==='token' ? '<script src="../passivos/carteira.js"></script>\n<script src="../passivos/ficha.js"></script>\n</body>' : '<script src="carteira.js"></script>\n<script src="tarefas.js"></script>\n<script src="equipe.js"></script>\n<script src="ficha.js"></script>\n<script src="fluxo.js"></script>\n</body>');
 if(modo==='token'){
   html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
