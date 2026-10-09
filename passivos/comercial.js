@@ -92,9 +92,28 @@ function semanasCard(T,A){
     return el("tr",{class:s.lancado?"":"cm-pend"},el("td",{},el("b",{},`S${s.semana}`),el("div",{class:"note"},fmt(s.inicio)+" – "+fmt(s.fim))),ed?el("td",{},f.dias_uteis=inp("number",s.dias_uteis,{min:"0",max:"7",style:"width:60px"})):el("td",{class:"num r"},s.dias_uteis),
       cell("leads"),cell("agendamentos"),cell("propostas"),cell("contratos"),cell("valor","100"),cell("investimento","10"),
       el("td",{class:"r"},!podeEditar?null:ed?[el("button",{class:"btn sm primary",onclick:async()=>{const up={};for(const k in f)up[k]=+f[k].value||0;up.lancado=true;const {error}=await SB.from("comercial_semanas").update(up).eq("id",s.id);if(error){toast(error.message);return}C.edit=null;toast("Semana salva");invalidar()}},"Salvar")," ",el("button",{class:"btn sm",onclick:()=>{C.edit=null;render()}},"Cancelar")]:el("button",{class:"btn sm",onclick:()=>{C.edit=s.id;render()}},s.lancado?"Editar":"Lançar")))});
-  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Semanas em dias corridos (leads e investimento contam sábado e domingo); dias úteis só para o ritmo da SDR. Preencha ao fim de cada semana. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana.")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):null),
+  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Semanas em dias corridos (leads e investimento contam sábado e domingo); dias úteis só para o ritmo da SDR. \"Preencher pelo CRM\" lê os leads; só o investimento Meta é digitado. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana.")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):C.semanas.length?el("button",{class:"btn sm",title:"Leads por data de entrada, agendamentos (fase Reunião agendada), propostas (fase Proposta enviada), contratos e valor (Ganho por data de fechamento). O investimento Meta continua manual.",onclick:preencherPeloCRM},"Preencher pelo CRM"):null),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},cab.map((h,i)=>el("th",{class:i>0&&i<8?"r":""},h)))),el("tbody",{},rows.length?rows:el("tr",{},el("td",{colspan:"9",class:"note"},"Nenhuma semana cadastrada para este mês."))))),
     T.semanas?el("p",{class:"note"},`${T.semanas} de ${C.semanas.length} semanas lançadas · ${T.diasLan} de ${T.diasTot} dias (${pc(T.ritmo)} do mês) · ${T.diasUteisLan} de ${T.diasUteisTot} dias úteis.`):null);
+}
+
+/* ---------- preencher semanas a partir do CRM (leads) ---------- */
+async function preencherPeloCRM(){
+  if(!C.semanas.length){toast("Gere as semanas do mês primeiro");return}
+  const ini=C.semanas[0].inicio,fim=C.semanas.at(-1).fim;
+  const [l,h]=await Promise.all([SB.from("leads").select("id,data_entrada,status,valor,data_fechamento").gte("data_entrada",ini+"T00:00:00-03:00").lte("data_entrada",fim+"T23:59:59-03:00"),
+    SB.from("historico_fases").select("lead_id,para_fase_id,created_at").in("para_fase_id",[4,7]).gte("created_at",ini+"T00:00:00-03:00").lte("created_at",fim+"T23:59:59-03:00").order("created_at")]);
+  if(l.error||h.error){toast((l.error||h.error).message);return}
+  const g=await SB.from("leads").select("id,valor,data_fechamento").eq("status","Ganho").gte("data_fechamento",ini).lte("data_fechamento",fim);
+  const dia=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+  const semanaDe=d=>C.semanas.find(s=>d>=s.inicio&&d<=s.fim);
+  const acc={};C.semanas.forEach(s=>acc[s.id]={leads:0,agendamentos:0,propostas:0,contratos:0,valor:0});
+  for(const x of l.data||[]){const s=semanaDe(dia(x.data_entrada));if(s)acc[s.id].leads++}
+  const visto=new Set();for(const x of h.data||[]){const k=x.lead_id+":"+x.para_fase_id;if(visto.has(k))continue;visto.add(k);const s=semanaDe(dia(x.created_at));if(!s)continue;if(x.para_fase_id===4)acc[s.id].agendamentos++;else acc[s.id].propostas++}
+  for(const x of g.data||[]){const s=semanaDe(x.data_fechamento);if(s){acc[s.id].contratos++;acc[s.id].valor+=+x.valor||0}}
+  const hoje=iso(new Date());let n=0;
+  for(const s of C.semanas){if(s.inicio>hoje)continue;const up={...acc[s.id],lancado:true};const {error}=await SB.from("comercial_semanas").update(up).eq("id",s.id);if(error){toast(error.message);return}n++}
+  toast(`${n} semana(s) preenchida(s) pelo CRM — investimento continua manual`);invalidar();
 }
 
 /* ---------- formulários ---------- */
