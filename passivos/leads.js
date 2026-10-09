@@ -68,7 +68,7 @@ function renderLeads(){
   const v=$("#view-leads");v.replaceChildren();
   const ok=garantir();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Comercial"),el("h1",{},"Leads"),el("div",{class:"sub"},"Funil de vendas (Empresário): arraste os cards entre as fases. Perdido e Abandonado exigem motivo; Ganho fecha a oportunidade.")),
-    el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>modalImportar()},"Importar planilha"),el("button",{class:"btn sm primary edit-only",onclick:()=>formNovo()},"+ Lead"))));
+    el("div",{class:"actions"},admin()?el("button",{class:"btn sm",title:"Confere as credenciais do ChatGuru sem enviar nada",onclick:testarChatguru},"Testar ChatGuru"):null,el("button",{class:"btn sm",onclick:()=>modalImportar()},"Importar planilha"),el("button",{class:"btn sm primary edit-only",onclick:()=>formNovo()},"+ Lead"))));
   if(!ok){v.append(el("div",{class:"note"},"Carregando…"));return}
   v.append(el("div",{class:"tabs",style:"margin:0 0 12px;justify-content:flex-start"},[["kanban","Kanban"],["lista","Lista"],["relatorios","Relatórios"]].map(([k,l])=>el("button",{class:"tab cm-niv","aria-selected":String(L.modo===k),onclick:()=>{L.modo=k;render()}},l))));
   if(L.modo==="relatorios"){renderRelatorios(v);return}
@@ -138,14 +138,31 @@ function renderDetalhe(){
   }else if(L.aba==="observacoes"){
     const ta=el("textarea",{placeholder:"Escreva uma observação…",rows:"3",style:"width:100%"});
     body.append(el("div",{},ta,el("div",{class:"actions",style:"margin:6px 0 12px"},el("button",{class:"btn sm primary",onclick:async()=>{const t=ta.value.trim();if(!t)return;const {error}=await SB.from("observacoes").insert({lead_id:l.id,texto:t,autor_id:PP.perfil.id});if(error){toast(error.message);return}ta.value="";carregarDetalhe(l.id);invalidar()}},"Adicionar observação"))),
-      el("div",{class:"ld-timeline"},L.obs.length?L.obs.map(o=>el("div",{class:"ld-obs"},el("div",{class:"note"},`${o.autor_nome||"—"} · ${fmtDH(o.created_at)}`),el("div",{style:"white-space:pre-wrap"},o.texto))):el("div",{class:"note"},"Nenhuma observação ainda.")));
+      el("div",{class:"ld-timeline"},L.obs.length?L.obs.map(o=>el("div",{class:"ld-obs"},el("div",{class:"note"},`${o.autor_nome||"—"} · ${fmtDH(o.created_at)}`),el("div",{style:"white-space:pre-wrap"},/^(WhatsApp enviado pelo CRM|Anotação enviada ao ChatGuru|Automação do CRM):\n/.test(o.texto)?el("span",{class:"pill",style:"margin-right:6px"},o.texto.split(":\n")[0]):null,o.texto.replace(/^(WhatsApp enviado pelo CRM|Anotação enviada ao ChatGuru|Automação do CRM):\n/,"")))):el("div",{class:"note"},"Nenhuma observação ainda.")));
   }else{
     body.append(el("h3",{},"Fases"),el("div",{class:"ld-timeline"},L.histLead.map(h=>el("div",{class:"ld-obs"},el("div",{class:"note"},`${h.usuario_nome||"sistema"} · ${fmtDH(h.created_at)}`),el("div",{},h.de_fase?`${h.de_fase} → `:"",el("b",{},h.para_fase))))),
       el("h3",{style:"margin-top:12px"},"Auditoria de campos"),el("div",{class:"ld-timeline"},L.audit.length?L.audit.map(a=>el("div",{class:"ld-obs"},el("div",{class:"note"},fmtDH(a.created_at)),el("div",{},el("b",{},ROTULOS[a.campo]||a.campo),": ",el("s",{style:"opacity:.6"},a.campo==="proprietario_id"?nomePerfil(a.valor_antigo)||a.valor_antigo||"—":a.valor_antigo||"—")," → ",a.campo==="proprietario_id"?nomePerfil(a.valor_novo)||a.valor_novo||"—":a.valor_novo||"—"))):el("div",{class:"note"},"Sem alterações registradas.")));
   }
-  const cardM=el("div",{class:"card ld-modal",role:"dialog","aria-modal":"true"},el("div",{class:"head"},el("div",{},el("h2",{style:"margin:0"},l.nome),el("div",{class:"note"},[l.empresa,fone(l.whatsapp),l.email].filter(Boolean).join(" · ")||"—")),el("div",{class:"actions"},waLink(l.whatsapp)?el("a",{class:"btn sm",href:waLink(l.whatsapp),target:"_blank",rel:"noopener"},"WhatsApp"):null,el("button",{class:"btn sm",onclick:close},"Fechar"))),body);
+  const cardM=el("div",{class:"card ld-modal",role:"dialog","aria-modal":"true"},el("div",{class:"head"},el("div",{},el("h2",{style:"margin:0"},l.nome),el("div",{class:"note"},[l.empresa,fone(l.whatsapp),l.email].filter(Boolean).join(" · ")||"—")),el("div",{class:"actions"},l.whatsapp?el("button",{class:"btn sm gold",onclick:()=>modalChatguru(l,"mensagem")},"Enviar WhatsApp"):null,l.whatsapp?el("button",{class:"btn sm",onclick:()=>modalChatguru(l,"anotacao")},"Anotação interna"):null,l.whatsapp?el("button",{class:"btn sm",onclick:()=>abrirNoChatguru(l)},"Abrir no ChatGuru"):null,el("button",{class:"btn sm",onclick:close},"Fechar"))),body);
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},cardM));
 }
+
+/* ---------- ChatGuru (Edge Function "chatguru") ---------- */
+async function chatguru(body){
+  const {data:{session}}=await SB.auth.getSession();if(!session)throw new Error("Faça login de novo");
+  const r=await fetch(SB_URL+"/functions/v1/chatguru/enviar",{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+session.access_token},body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({ok:false,erro:"Resposta inválida"}));if(!r.ok||j.ok===false)throw new Error(j.erro||("HTTP "+r.status));return j;
+}
+function modalChatguru(l,tipo){
+  const ta=el("textarea",{rows:"5",placeholder:tipo==="mensagem"?"Mensagem para o WhatsApp do cliente":"Anotação para a equipe (fica só no ChatGuru)",style:"width:100%"});
+  const body=el("div",{class:"form"},el("div",{class:"f full note"},tipo==="mensagem"?`Sai pelo WhatsApp do escritório para ${fone(l.whatsapp)}. Fica registrado nas observações do lead.`:"Anotação interna no chat do ChatGuru, visível só para a equipe."),el("div",{class:"f full"},ta));
+  modal(tipo==="mensagem"?"Enviar WhatsApp pelo ChatGuru":"Anotação interna no ChatGuru",body,async()=>{const t=ta.value.trim();if(!t)throw new Error("Escreva o texto");const r=await chatguru({acao:tipo,lead_id:l.id,texto:t});toast(r.como==="conversa_iniciada"?"Conversa criada no ChatGuru e mensagem enviada":"Enviado");carregarDetalhe(l.id);invalidar()});
+}
+async function abrirNoChatguru(l){
+  if(l.link_chat){window.open(l.link_chat,"_blank","noopener");return}
+  try{const r=await chatguru({acao:"localizar",lead_id:l.id});if(r.como==="chat"){window.open(r.link,"_blank","noopener");invalidar()}else if(r.como==="lista"){toast("Sem campo link_crm no ChatGuru: abrindo a lista de chats; número copiado");navigator.clipboard?.writeText(r.numero);window.open(r.link,"_blank","noopener")}else toast("Este contato ainda não tem conversa no ChatGuru — envie a primeira mensagem")}catch(e){toast(e.message)}
+}
+async function testarChatguru(){try{const r=await chatguru({acao:"testar"});toast((r.ok?"✓ ":"✗ ")+r.descricao+(r.servidor?" ("+r.servidor+")":""))}catch(e){toast("ChatGuru: "+e.message)}}
 
 /* ---------- novo lead ---------- */
 function formNovo(){
@@ -239,6 +256,7 @@ document.head.append(el("style",{},`
 .ld-funil{display:flex;flex-direction:column;gap:6px}.ld-frow{display:flex;align-items:center;gap:10px;font-size:13px}.ld-frow>span:first-child{width:170px}.ld-frow .num{width:40px;text-align:right}.ld-frow .note{width:48px}
 `));
 window.PP_LEADS={invalidar,render:renderLeads,get leads(){return L.leads},get hist(){return L.hist},carregarHistorico,get fases(){return L.fases}};
-{const _r=render;render=function(){_r();const vl=$("#view-leads");if(!vl)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="leads")S.tab="clientes";vl.hidden=S.tab!=="leads";if(S.tab==="leads")renderLeads()}}
+{const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^leads\/([\w-]+)$/i.exec(h);if(m){L.abrirId=m[1]}return _h.apply(this,arguments)}}
+{const _r=render;render=function(){_r();const vl=$("#view-leads");if(!vl)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="leads")S.tab="clientes";vl.hidden=S.tab!=="leads";if(S.tab==="leads"){renderLeads();if(L.abrirId&&L.ok){const l=L.leads.find(x=>x.id===L.abrirId);L.abrirId=null;if(l)abrirDetalhe(l)}}}}
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("leads");let t;const re=()=>{clearTimeout(t);t=setTimeout(invalidar,500)};ch.on("postgres_changes",{event:"*",schema:"public",table:"leads"},re);ch.on("postgres_changes",{event:"*",schema:"public",table:"observacoes"},()=>{if(L.sel)carregarDetalhe(L.sel.id)});ch.subscribe()}});
 })();

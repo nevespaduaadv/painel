@@ -104,6 +104,7 @@ html = html.replace('<script>', `<div class="login" id="login">
 <script>
 /* ---------- Runtime Supabase: mesma interface do banco do protótipo (doc/collection/onSnapshot) ---------- */
 const SB = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.stringify(SUPABASE_KEY)});
+const SB_URL = ${JSON.stringify(SUPABASE_URL)}, SB_KEY = ${JSON.stringify(SUPABASE_KEY)};
 const PP = {perfil:null, listeners:{}, cache:{}};
 const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
 const NOTA_CAMPO = {clientes:"notasInternas", contratos:"notas"};
