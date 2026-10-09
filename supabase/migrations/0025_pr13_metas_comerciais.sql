@@ -73,7 +73,7 @@ select s.mes,
 from public.comercial_semanas s group by s.mes;
 revoke all on public.v_comercial_mes from anon;
 
--- ---------- semente: outubro/2026 ----------
+-- ---------- semente: outubro/2026 (semanas em dias corridos; dias_uteis só para o ritmo da SDR) ----------
 insert into public.metas_comerciais (mes, nivel, contratos, ticket, propostas, agendamentos, leads, investimento, taxa_prop_contrato, cpl, observacoes) values
  ('2026-10-01','meta', 6, 28000, 30, 43, 123,  8600, 20, 70, 'Ligeiramente acima de julho (melhor mês: R$ 162k).'),
  ('2026-10-01','super',8, 30000, 32, 46, 131,  9200, 25, 70, null),
@@ -81,11 +81,11 @@ insert into public.metas_comerciais (mes, nivel, contratos, ticket, propostas, a
 on conflict (mes, nivel) do nothing;
 
 insert into public.comercial_semanas (mes, semana, inicio, fim, dias_uteis) values
- ('2026-10-01',1,'2026-10-01','2026-10-02',2),
- ('2026-10-01',2,'2026-10-05','2026-10-09',5),
- ('2026-10-01',3,'2026-10-12','2026-10-16',4),   -- 12/10 feriado
- ('2026-10-01',4,'2026-10-19','2026-10-23',5),
- ('2026-10-01',5,'2026-10-26','2026-10-30',5)
+ ('2026-10-01',1,'2026-10-01','2026-10-04',2),
+ ('2026-10-01',2,'2026-10-05','2026-10-11',5),
+ ('2026-10-01',3,'2026-10-12','2026-10-18',4),   -- 12/10 feriado
+ ('2026-10-01',4,'2026-10-19','2026-10-25',5),
+ ('2026-10-01',5,'2026-10-26','2026-10-31',5)
 on conflict (mes, semana) do nothing;
 
 do $$ begin alter publication supabase_realtime add table public.comercial_semanas; exception when others then null; end $$;

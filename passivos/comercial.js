@@ -34,8 +34,10 @@ const meta=niv=>C.metas.find(m=>m.nivel===(niv||C.nivel));
 function totais(){
   const L=C.semanas.filter(s=>s.lancado);
   const sum=k=>L.reduce((a,s)=>a+(+s[k]||0),0);
-  const diasTot=C.semanas.reduce((a,s)=>a+(+s.dias_uteis||0),0)||1,diasLan=L.reduce((a,s)=>a+(+s.dias_uteis||0),0);
-  return {leads:sum("leads"),agendamentos:sum("agendamentos"),propostas:sum("propostas"),contratos:sum("contratos"),valor:sum("valor"),investimento:sum("investimento"),diasTot,diasLan,ritmo:diasLan/diasTot,semanas:L.length};
+  const dias=s=>+s.dias||((parseD(s.fim)-parseD(s.inicio))/864e5+1);
+  const diasTot=C.semanas.reduce((a,s)=>a+dias(s),0)||1,diasLan=L.reduce((a,s)=>a+dias(s),0);
+  const diasUteisTot=C.semanas.reduce((a,s)=>a+(+s.dias_uteis||0),0)||1,diasUteisLan=L.reduce((a,s)=>a+(+s.dias_uteis||0),0);
+  return {leads:sum("leads"),agendamentos:sum("agendamentos"),propostas:sum("propostas"),contratos:sum("contratos"),valor:sum("valor"),investimento:sum("investimento"),diasTot,diasLan,diasUteisTot,diasUteisLan,ritmo:diasLan/diasTot,semanas:L.length};
 }
 const alvo=m=>m?{contratos:+m.contratos,valor:+m.contratos*+m.ticket,ticket:+m.ticket,propostas:+m.propostas,agendamentos:+m.agendamentos,leads:+m.leads,investimento:+m.investimento,agDia:0}:null;
 
@@ -65,7 +67,7 @@ function renderComercial(){
     el("div",{class:"card kpi"},el("div",{class:"l"},"Proposta → contrato"),el("div",{class:"v num"},T.propostas?pc(taxa):"—"),el("div",{class:"h"},`meta ${pc(taxaAlvo)} · CPL ${T.leads?brl(T.investimento/T.leads):"—"} (plan. ${meta()?.cpl?brl(meta().cpl):"—"})`))));
   // funil + SDR + semanas
   const g=el("div",{class:"cm-grid"});
-  g.append(el("div",{class:"card section"},el("h3",{},"Funil do mês — realizado × meta"),funil(T,A),el("p",{class:"note"},`Taxas-base: lead → agendamento 35% · agendamento → proposta 70% · proposta → contrato ${pc(taxaAlvo)}. Linha dourada = ritmo esperado (${pc(T.ritmo)} do mês lançado).`)));
+  g.append(el("div",{class:"card section"},el("h3",{},"Funil do mês — realizado × meta"),funil(T,A),el("p",{class:"note"},`Taxas-base: lead → agendamento 35% · agendamento → proposta 70% · proposta → contrato ${pc(taxaAlvo)}. Linha dourada = ritmo esperado (${pc(T.ritmo)} do mês lançado, em dias corridos).`)));
   g.append(el("div",{class:"card section"},el("h3",{},"Ritmo da SDR"),sdr(T,A)));
   v.append(g);
   v.append(semanasCard(T,A));
@@ -79,7 +81,7 @@ function funil(T,A){
   return el("div",{html:s+"</svg>"});
 }
 function sdr(T,A){
-  const diaAlvo=A.agendamentos/(T.diasTot||1);
+  const diaAlvo=A.agendamentos/(T.diasUteisTot||1);
   const rows=C.semanas.map(s=>{const d=s.lancado&&s.dias_uteis?s.agendamentos/s.dias_uteis:null;return el("div",{class:"cm-sdr-row"},el("span",{},`S${s.semana}`,el("small",{}," "+fmt(s.inicio)+"–"+fmt(s.fim))),el("div",{class:"cm-bar lg"},d!=null?el("i",{style:`width:${Math.min(100,d/(diaAlvo*1.5)*100)}%;background:${d>=diaAlvo?"#2e7d4f":"#b4452f"}`}):null,el("b",{style:`left:${Math.min(100,1/1.5*100)}%`})),el("span",{class:"num"},d!=null?n1(d)+"/dia":"—"))});
   return el("div",{},el("div",{class:"cm-sdr-head"},el("div",{},el("div",{class:"v num",style:"font-size:28px"},n1(diaAlvo)),el("div",{class:"h"},"agendamentos por dia útil (meta)")),el("div",{},el("div",{class:"v num",style:"font-size:28px"},n0(diaAlvo*5)),el("div",{class:"h"},"por semana cheia (5 dias)")),el("div",{},el("div",{class:"v num",style:"font-size:28px"},n0(A.propostas)),el("div",{class:"h"},"propostas no mês (70% dos agendamentos)"))),...rows,el("p",{class:"note"},"Linha dourada = meta diária. Em setembro: 37 agendamentos (1,8/dia), com uma semana de 13 — a meta é fazer dessa semana o padrão."));
 }
@@ -90,9 +92,9 @@ function semanasCard(T,A){
     return el("tr",{class:s.lancado?"":"cm-pend"},el("td",{},el("b",{},`S${s.semana}`),el("div",{class:"note"},fmt(s.inicio)+" – "+fmt(s.fim))),ed?el("td",{},f.dias_uteis=inp("number",s.dias_uteis,{min:"0",max:"7",style:"width:60px"})):el("td",{class:"num r"},s.dias_uteis),
       cell("leads"),cell("agendamentos"),cell("propostas"),cell("contratos"),cell("valor","100"),cell("investimento","10"),
       el("td",{class:"r"},!podeEditar?null:ed?[el("button",{class:"btn sm primary",onclick:async()=>{const up={};for(const k in f)up[k]=+f[k].value||0;up.lancado=true;const {error}=await SB.from("comercial_semanas").update(up).eq("id",s.id);if(error){toast(error.message);return}C.edit=null;toast("Semana salva");invalidar()}},"Salvar")," ",el("button",{class:"btn sm",onclick:()=>{C.edit=null;render()}},"Cancelar")]:el("button",{class:"btn sm",onclick:()=>{C.edit=s.id;render()}},s.lancado?"Editar":"Lançar")))});
-  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Preencha ao fim de cada semana. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana.")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):null),
+  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Semanas em dias corridos (leads e investimento contam sábado e domingo); dias úteis só para o ritmo da SDR. Preencha ao fim de cada semana. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana.")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):null),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},cab.map((h,i)=>el("th",{class:i>0&&i<8?"r":""},h)))),el("tbody",{},rows.length?rows:el("tr",{},el("td",{colspan:"9",class:"note"},"Nenhuma semana cadastrada para este mês."))))),
-    T.semanas?el("p",{class:"note"},`${T.semanas} de ${C.semanas.length} semanas lançadas · ${T.diasLan} de ${T.diasTot} dias úteis (${pc(T.ritmo)} do mês).`):null);
+    T.semanas?el("p",{class:"note"},`${T.semanas} de ${C.semanas.length} semanas lançadas · ${T.diasLan} de ${T.diasTot} dias (${pc(T.ritmo)} do mês) · ${T.diasUteisLan} de ${T.diasUteisTot} dias úteis.`):null);
 }
 
 /* ---------- formulários ---------- */
@@ -113,9 +115,14 @@ function formMetas(){
 async function gerarSemanas(silencioso){
   const ini=parseD(C.mes),fim=new Date(ini.getFullYear(),ini.getMonth()+1,0);
   const rows=[];let d=new Date(ini),n=1;
-  while(d<=fim){const dow=d.getDay();if(dow===0||dow===6){d.setDate(d.getDate()+1);continue}
-    const s0=new Date(d);let dias=0;while(d<=fim&&d.getDay()!==0&&d.getDay()!==6){dias++;d.setDate(d.getDate()+1)}const s1=new Date(d);s1.setDate(s1.getDate()-1);
+  while(d<=fim){const s0=new Date(d);let dias=0;
+    do{const w=d.getDay();if(w!==0&&w!==6)dias++;d.setDate(d.getDate()+1)}while(d<=fim&&d.getDay()!==1);  // até domingo (ou fim do mês)
+    const s1=new Date(d);s1.setDate(s1.getDate()-1);
     rows.push({mes:C.mes,semana:n++,inicio:iso(s0),fim:iso(s1),dias_uteis:dias});}
+  const nd=r=>(parseD(r.fim)-parseD(r.inicio))/864e5+1;
+  if(rows.length>1&&nd(rows[0])<3){rows[1].inicio=rows[0].inicio;rows[1].dias_uteis+=rows[0].dias_uteis;rows.shift()}
+  if(rows.length>1&&nd(rows.at(-1))<3){const u=rows.pop();rows.at(-1).fim=u.fim;rows.at(-1).dias_uteis+=u.dias_uteis}
+  rows.forEach((r,i)=>r.semana=i+1);
   const {error}=await SB.from("comercial_semanas").upsert(rows,{onConflict:"mes,semana",ignoreDuplicates:true});
   if(error){toast(error.message);return}
   if(!silencioso){toast("Semanas geradas — ajuste os dias úteis se houver feriado");invalidar()}
