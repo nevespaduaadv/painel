@@ -14,20 +14,29 @@ interface Resp { ok: boolean; descricao: string; dados: Dict }
 
 const env = (n: string) => Deno.env.get(n) ?? "";
 // Chaves do projeto: aceita as legadas (SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY) e as novas (dicionários JSON).
+function achaChave(v: unknown): string {
+  if (typeof v === "string") return /^(sb_|eyJ)/.test(v) ? v : "";
+  if (Array.isArray(v)) { for (const x of v) { const r = achaChave(x); if (r) return r; } return ""; }
+  if (v && typeof v === "object") { for (const k of ["api_key", "key", "secret", "default"]) { const r = achaChave((v as Dict)[k]); if (r) return r; } for (const x of Object.values(v as Dict)) { const r = achaChave(x); if (r) return r; } }
+  return "";
+}
 function chaveDe(nomeLegado: string, nomeDict: string): string {
   const legado = env(nomeLegado); if (legado) return legado;
-  try { const d = JSON.parse(env(nomeDict) || "{}"); const v = Object.values(d).find((x) => typeof x === "string") as string | undefined; return v ?? ""; } catch { return ""; }
+  try { return achaChave(JSON.parse(env(nomeDict) || "{}")); } catch { return ""; }
 }
 const ANON = chaveDe("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
 const SERVICE = chaveDe("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
 // Segredos do ChatGuru: lidos do Vault do banco (rpc chatguru_segredos, só service_role) e guardados em memória;
 // variáveis de ambiente da função, se existirem, têm prioridade.
 let cacheSeg: Record<string, string> | null = null;
+let ultimoRpc = "";
 async function segredo(n: string): Promise<string> {
   if (env(n)) return env(n);
   if (!cacheSeg) {
     const r = await fetch(`${env("SUPABASE_URL")}/rest/v1/rpc/chatguru_segredos`, { method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: "{}" });
+    ultimoRpc = `${r.status}`;
     cacheSeg = r.ok ? ((await r.json()) as Record<string, string>) ?? {} : {};
+    if (!r.ok) ultimoRpc += " " + (await r.text().catch(() => "")).slice(0, 200);
   }
   return cacheSeg[n] ?? "";
 }
@@ -234,6 +243,13 @@ Deno.serve(async (req) => {
     if (rota === "webhook") return await webhook(req, url);
     if (rota === "enviar") return await enviar(req);
     if (rota === "automacoes") return await automacoes(req);
+    if (rota === "diag") { // só com o token do webhook; não expõe valores
+      const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
+      const tk = url.searchParams.get("token") ?? "";
+      const ambiente = Object.fromEntries(["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_SECRET_KEYS"].map((n) => [n, env(n) ? (env(n).trim().startsWith("[") ? "array" : env(n).trim().startsWith("{") ? "objeto" : "texto") : "vazio"]));
+      if (esperado && igual(tk, esperado)) return json(200, { ok: true, anon: !!ANON, service: !!SERVICE, ambiente, segredos: Object.keys(cacheSeg ?? {}), rpc: ultimoRpc });
+      return json(401, { ok: false, anon: !!ANON, service: !!SERVICE, ambiente, rpc: ultimoRpc });
+    }
     return json(404, { ok: false, erro: "Rota desconhecida." });
   } catch (e) {
     const tempo = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
