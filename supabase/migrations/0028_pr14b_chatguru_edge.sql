@@ -1,7 +1,8 @@
 -- 0028 — PR 14b: automações do CRM apontando para a Edge Function "chatguru" (em vez do servidor da Vercel).
 -- configurar_automacoes(url) agora recebe a URL base da função (…/functions/v1/chatguru) e agenda o pg_cron
 -- para chamar …/automacoes a cada minuto, só quando há passo vencido. Idempotente. Depende de 0027.
-create or replace function public.configurar_automacoes(url_funcao text)
+drop function if exists public.configurar_automacoes(text);
+create function public.configurar_automacoes(url_funcao text)
 returns text language plpgsql security definer set search_path = public as $$
 declare
   token text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
