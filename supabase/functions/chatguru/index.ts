@@ -33,7 +33,7 @@ let ultimoRpc = "";
 async function segredo(n: string): Promise<string> {
   if (env(n)) return env(n);
   if (!cacheSeg) {
-    const r = await fetch(`${env("SUPABASE_URL")}/rest/v1/rpc/chatguru_segredos`, { method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: "{}" });
+    const r = await fetch(`${env("SUPABASE_URL")}/rest/v1/rpc/chatguru_segredos`, { method: "POST", headers: { ...cabecalhos(SERVICE), "Content-Type": "application/json" }, body: "{}" });
     ultimoRpc = `${r.status}`;
     cacheSeg = r.ok ? ((await r.json()) as Record<string, string>) ?? {} : {};
     if (!r.ok) ultimoRpc += " " + (await r.text().catch(() => "")).slice(0, 200);
@@ -165,8 +165,13 @@ async function lerPayload(req: Request): Promise<Dict> {
 }
 
 // ---------- acesso ao banco ----------
+// auth = JWT do usuário (vai em Authorization, com a chave publicável em apikey) ou a chave service (legada = JWT; nova sb_secret_ = só apikey)
+function cabecalhos(auth: string): Record<string, string> {
+  if (auth.startsWith("sb_")) return { apikey: auth };
+  return { apikey: ANON, Authorization: `Bearer ${auth}` };
+}
 function rest(path: string, auth: string, init: { method?: string; body?: string; prefer?: string } = {}) {
-  return fetch(`${env("SUPABASE_URL")}/rest/v1/${path}`, { method: init.method ?? "GET", headers: { apikey: ANON, Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...(init.prefer ? { Prefer: init.prefer } : {}) }, body: init.body });
+  return fetch(`${env("SUPABASE_URL")}/rest/v1/${path}`, { method: init.method ?? "GET", headers: { ...cabecalhos(auth), "Content-Type": "application/json", ...(init.prefer ? { Prefer: init.prefer } : {}) }, body: init.body });
 }
 const service = () => SERVICE;
 
