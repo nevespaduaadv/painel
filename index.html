@@ -51,6 +51,7 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:.005
 .f label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .f input{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);font:inherit;color:inherit;width:100%}
 .err{color:var(--crit);font-size:13px;min-height:18px}
+.note a{color:var(--gold);font-weight:600}
 .note{font-size:13px;color:var(--muted)}
 .empty{padding:40px 20px;text-align:center;color:var(--muted)}
 .empty h2{color:var(--fg);margin-bottom:8px;font-size:24px}
@@ -66,7 +67,19 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:.005
     <div class="f"><label for="l-senha">Senha</label><input id="l-senha" type="password" autocomplete="current-password"></div>
     <div class="err" id="l-err"></div>
     <button class="btn primary" id="l-btn">Entrar</button>
-    <div class="note">Acesso restrito à equipe do escritório e aos clientes convidados. Esqueceu a senha? Fale com o escritório.</div>
+    <div class="note">Acesso restrito à equipe do escritório e aos clientes convidados. <a href="#" id="l-esqueci">Esqueci minha senha</a></div>
+  </div>
+</div>
+
+<div class="login" id="senha" hidden>
+  <div class="card">
+    <div class="eyebrow">Neves Pádua Advocacia</div>
+    <h1 id="s-titulo">Defina sua senha</h1>
+    <div class="note" id="s-sub">Você entrou por um link de convite. Escolha a senha que usará daqui em diante.</div>
+    <div class="f"><label for="s-senha">Nova senha</label><input id="s-senha" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="f"><label for="s-senha2">Repita a senha</label><input id="s-senha2" type="password" autocomplete="new-password"></div>
+    <div class="err" id="s-err"></div>
+    <button class="btn primary" id="s-btn">Salvar senha e entrar</button>
   </div>
 </div>
 
@@ -132,11 +145,26 @@ async function entrar(){
   if(error)$("#l-err").textContent="E-mail ou senha incorretos.";
 }
 $("#l-btn").onclick=entrar;$("#l-senha").onkeydown=e=>{if(e.key==="Enter")entrar()};
+/* convite / recuperação de senha: o link do e-mail chega com #access_token…&type=invite|recovery */
+const URL_PORTAL=location.origin+location.pathname;
+let precisaSenha=/type=(invite|recovery|magiclink)/.test(location.hash);
+$("#l-esqueci").onclick=async e=>{e.preventDefault();const email=$("#l-email").value.trim();if(!email){$("#l-err").textContent="Digite seu e-mail acima e clique de novo.";return}
+  const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:URL_PORTAL});$("#l-err").textContent=error?"Não foi possível enviar o e-mail.":"Enviamos um link para "+email+". Abra-o para definir a nova senha.";};
+async function salvarSenha(){
+  const a=$("#s-senha").value,b=$("#s-senha2").value;$("#s-err").textContent="";
+  if(a.length<8){$("#s-err").textContent="Use pelo menos 8 caracteres.";return}if(a!==b){$("#s-err").textContent="As senhas não conferem.";return}
+  const {error}=await SB.auth.updateUser({password:a});if(error){$("#s-err").textContent=error.message;return}
+  precisaSenha=false;$("#senha").hidden=true;history.replaceState(null,"",URL_PORTAL);location.reload();
+}
+function mostrarSenha(ev){precisaSenha=true;$("#login").hidden=true;$("#senha").hidden=false;if(ev==="PASSWORD_RECOVERY"||/type=recovery/.test(location.hash)){$("#s-titulo").textContent="Nova senha";$("#s-sub").textContent="Escolha a nova senha de acesso ao portal."}$("#s-senha").focus()}
+window.__mostrarSenha=mostrarSenha;
+$("#s-btn").onclick=salvarSenha;$("#s-senha2").onkeydown=e=>{if(e.key==="Enter")salvarSenha()};
 $("#btnSair").onclick=async()=>{await SB.auth.signOut();location.reload()};
 
 let iniciado=false;
 SB.auth.onAuthStateChange(async(ev,session)=>{
   if(!session){$("#login").hidden=false;return}
+  if(precisaSenha||ev==="PASSWORD_RECOVERY"){mostrarSenha(ev);return}
   if(iniciado)return;iniciado=true;
   const {data:perfil}=await SB.from("perfis").select("*").eq("id",session.user.id).maybeSingle();
   const p=perfil||{id:session.user.id,papel:"pendente",email:session.user.email};
