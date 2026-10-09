@@ -4,14 +4,33 @@
 //   /chatguru/enviar            ← painel (JWT do usuário): { acao: "mensagem"|"anotacao"|"localizar"|"testar", lead_id, texto }
 //   /chatguru/automacoes        ← pg_cron (Bearer token da integração 'automacoes'): dispara os passos vencidos
 // Deploy com "Verify JWT" DESLIGADO (o webhook e o cron não têm JWT); cada rota faz a própria autenticação.
-// Secrets: CHATGURU_API_URL, CHATGURU_API_KEY, CHATGURU_ACCOUNT_ID, CHATGURU_PHONE_ID, CHATGURU_WEBHOOK_TOKEN, PAINEL_URL.
-// SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY são injetadas pelo Supabase.
+// Segredos (CHATGURU_API_URL, CHATGURU_API_KEY, CHATGURU_ACCOUNT_ID, CHATGURU_PHONE_ID, CHATGURU_WEBHOOK_TOKEN, PAINEL_URL):
+// no Vault do banco, lidos pela rpc chatguru_segredos (migration 0029); variáveis de ambiente da função, se definidas, prevalecem.
+// SUPABASE_URL e as chaves do projeto são injetadas pelo Supabase.
 
 type Dict = Record<string, unknown>;
 interface Cred { url: string; key: string; accountId: string; phoneId: string }
 interface Resp { ok: boolean; descricao: string; dados: Dict }
 
 const env = (n: string) => Deno.env.get(n) ?? "";
+// Chaves do projeto: aceita as legadas (SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY) e as novas (dicionários JSON).
+function chaveDe(nomeLegado: string, nomeDict: string): string {
+  const legado = env(nomeLegado); if (legado) return legado;
+  try { const d = JSON.parse(env(nomeDict) || "{}"); const v = Object.values(d).find((x) => typeof x === "string") as string | undefined; return v ?? ""; } catch { return ""; }
+}
+const ANON = chaveDe("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
+const SERVICE = chaveDe("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
+// Segredos do ChatGuru: lidos do Vault do banco (rpc chatguru_segredos, só service_role) e guardados em memória;
+// variáveis de ambiente da função, se existirem, têm prioridade.
+let cacheSeg: Record<string, string> | null = null;
+async function segredo(n: string): Promise<string> {
+  if (env(n)) return env(n);
+  if (!cacheSeg) {
+    const r = await fetch(`${env("SUPABASE_URL")}/rest/v1/rpc/chatguru_segredos`, { method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: "{}" });
+    cacheSeg = r.ok ? ((await r.json()) as Record<string, string>) ?? {} : {};
+  }
+  return cacheSeg[n] ?? "";
+}
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info" } });
 
@@ -20,10 +39,12 @@ const MARCADOR_ANOTACAO = "Anotação enviada ao ChatGuru:\n";
 const CAMPO_LINK_CRM = "link_crm";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function credenciais(): Cred | string {
-  const faltando = ["CHATGURU_API_URL", "CHATGURU_API_KEY", "CHATGURU_ACCOUNT_ID", "CHATGURU_PHONE_ID"].filter((n) => !env(n));
-  if (faltando.length) return `Falta configurar nos secrets da função: ${faltando.join(", ")}.`;
-  return { url: env("CHATGURU_API_URL"), key: env("CHATGURU_API_KEY"), accountId: env("CHATGURU_ACCOUNT_ID"), phoneId: env("CHATGURU_PHONE_ID") };
+async function credenciais(): Promise<Cred | string> {
+  const v: Record<string, string> = {};
+  for (const n of ["CHATGURU_API_URL", "CHATGURU_API_KEY", "CHATGURU_ACCOUNT_ID", "CHATGURU_PHONE_ID"]) v[n] = await segredo(n);
+  const faltando = Object.keys(v).filter((n) => !v[n]);
+  if (faltando.length) return `Falta configurar no Vault (chatguru_segredos): ${faltando.join(", ")}.`;
+  return { url: v.CHATGURU_API_URL, key: v.CHATGURU_API_KEY, accountId: v.CHATGURU_ACCOUNT_ID, phoneId: v.CHATGURU_PHONE_ID };
 }
 function igual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -136,13 +157,13 @@ async function lerPayload(req: Request): Promise<Dict> {
 
 // ---------- acesso ao banco ----------
 function rest(path: string, auth: string, init: { method?: string; body?: string; prefer?: string } = {}) {
-  return fetch(`${env("SUPABASE_URL")}/rest/v1/${path}`, { method: init.method ?? "GET", headers: { apikey: env("SUPABASE_ANON_KEY"), Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...(init.prefer ? { Prefer: init.prefer } : {}) }, body: init.body });
+  return fetch(`${env("SUPABASE_URL")}/rest/v1/${path}`, { method: init.method ?? "GET", headers: { apikey: ANON, Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...(init.prefer ? { Prefer: init.prefer } : {}) }, body: init.body });
 }
-const service = () => env("SUPABASE_SERVICE_ROLE_KEY");
+const service = () => SERVICE;
 
 // ---------- rotas ----------
 async function webhook(req: Request, url: URL): Promise<Response> {
-  const esperado = env("CHATGURU_WEBHOOK_TOKEN");
+  const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
   const token = url.searchParams.get("token") ?? "";
   if (!esperado || !igual(token, esperado)) return json(401, { ok: false, erro: "Token inválido." });
   const p = await lerPayload(req);
@@ -152,7 +173,7 @@ async function webhook(req: Request, url: URL): Promise<Response> {
 }
 
 async function enviar(req: Request): Promise<Response> {
-  const cg = credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+  const cg = await credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
   const jwt = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
   if (!jwt) return json(401, { ok: false, erro: "Faça login no painel." });
   const eq = await rest("rpc/sou_equipe", jwt, { method: "POST", body: "{}" });
@@ -168,7 +189,7 @@ async function enviar(req: Request): Promise<Response> {
   if (!lead) return json(404, { ok: false, erro: "Lead não encontrado." });
   if (acao === "localizar") {
     if (lead.link_chat) return json(200, { ok: true, como: "chat", link: lead.link_chat });
-    const r = await localizarChat(cg, lead.whatsapp, `${env("PAINEL_URL") || "https://nevespaduaadv.github.io/painel"}/passivos/#leads/${lead.id}`);
+    const r = await localizarChat(cg, lead.whatsapp, `${(await segredo("PAINEL_URL")) || "https://nevespaduaadv.github.io/painel"}/passivos/#leads/${lead.id}`);
     if (r.como === "chat") { const link = linkDoChat(cg, r.chatId); await rest(`leads?id=eq.${lead.id}`, jwt, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ link_chat: link, chatguru_chat_id: r.chatId }) }); return json(200, { ok: true, como: "chat", link }); }
     if (r.como === "sem_campo") return json(200, { ok: true, como: "lista", link: linkDoChat(cg, null), numero: r.numero });
     return json(200, { ok: true, como: "sem_conversa" });
@@ -184,7 +205,7 @@ async function enviar(req: Request): Promise<Response> {
 
 interface Passo { id: number; passo: number; tentativas: number; automacao: string; texto_abertura: string | null; dialogo: string | null; dialog_id: string | null; lead: { id: string; nome: string; whatsapp: string | null } }
 async function automacoes(req: Request): Promise<Response> {
-  const cg = credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+  const cg = await credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
   const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
   if (!token) return json(401, { ok: false, erro: "Token ausente." });
   const rpc = (f: string, args: Dict) => rest(`rpc/${f}`, service(), { method: "POST", body: JSON.stringify(args) });
