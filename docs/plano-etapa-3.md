@@ -157,3 +157,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Menu do painel: grupos **Comercial** (Base de conhecimento), **Marketing** (Pautas de conteúdo, Base de conhecimento) e **Financeiro** (Base de conhecimento). Item de menu pode apontar para um hash (`hash`) e definir quando está selecionado (`sel`), para o mesmo módulo aparecer em mais de um grupo com filtro diferente.
 - Portal (`index.html`): azulejos "Em breve" de Comercial e Financeiro substituídos por "Base de conhecimento (área)".
 - Pendente de decisão: permissão de leitura por núcleo (hoje toda a equipe lê todas as áreas).
+
+## 21. PR 13 (09/10) — Comercial: metas do mês e lançamento semanal
+- Migration `0025`: `metas_comerciais` (mês × nível meta/super/hiper: contratos, ticket, propostas, agendamentos, leads, investimento, taxa proposta→contrato, CPL; só admin edita), `comercial_semanas` (realizado por semana: leads, agendamentos, propostas, contratos, valor GP, investimento, dias úteis; equipe lança), view `v_comercial_mes`. Semente de outubro/2026 (6/8/10 contratos · R$ 168k/240k/320k; 5 semanas com 12/10 descontado).
+- Tela `passivos/comercial.js` (`#comercial`): seletor de nível, 8 indicadores com barra realizado × meta e marcador de ritmo esperado (proporcional aos dias úteis já lançados), funil do mês, ritmo da SDR por semana (agendamentos/dia útil contra a meta diária), tabela de lançamento semanal editada em linha, formulário de metas (3 colunas; "Copiar do mês anterior"), geração automática das semanas de um mês novo.
+- Regras de negócio embutidas: só contratos de Gestão de Passivos contam; proposta enviada = agendamento qualificado; valor = contratos × ticket.
+- Portal e menu Comercial ganham "Metas do mês". CRM: aguardando autorização do fornecedor (GCV) para integrar.

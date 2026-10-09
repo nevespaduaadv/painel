@@ -233,6 +233,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-conhecimento" hidden class="main"></div>
   <div id="view-autenticador" hidden class="main"></div>
   <div id="view-marketing" hidden class="main"></div>
+  <div id="view-comercial" hidden class="main"></div>
 </div>
 
 <div id="modalHost"></div>
@@ -458,7 +459,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"clientes",label:"Clientes"},
   {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
-  {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Comercial)",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento (Marketing)",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Financeiro)",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
+  {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento (Comercial)",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento (Marketing)",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Financeiro)",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
 function irPara(tab){S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}document.querySelectorAll("#nav .menu.open").forEach(m=>m.classList.remove("open"));render()}
@@ -964,7 +965,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mv0109up"></script>
-<script src="../passivos/ficha.js?v=mv0109up"></script>
+<script src="../passivos/carteira.js?v=mv0vfbl6"></script>
+<script src="../passivos/ficha.js?v=mv0vfbl6"></script>
 </body>
 </html>
