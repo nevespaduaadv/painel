@@ -235,6 +235,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-marketing" hidden class="main"></div>
   <div id="view-comercial" hidden class="main"></div>
   <div id="view-leads" hidden class="main"></div>
+  <div id="view-revisional" hidden class="main"></div>
 </div>
 
 <div id="modalHost"></div>
@@ -365,7 +366,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads");
+    window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional");
     if(equipe())aplicarHash();
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -555,7 +556,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"clientes",label:"Clientes"},
-  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
+  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
   {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento (Comercial)",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento (Marketing)",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Financeiro)",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
@@ -863,6 +864,7 @@ function contractCard(k,p,R){
   card.append(proj);
   card.append(el("div",{class:"ct-f"},el("span",{},k.notas&&!readOnly()?k.notas:""),el("div",{class:"acts edit-only"},
     el("button",{class:"btn sm",onclick:()=>openContractForm(k)},"Editar"),
+    window.PP_REVISIONAL?el("button",{class:"btn sm",onclick:()=>window.PP_REVISIONAL.abrir(k.id)},"Revisional"):null,
     (!quitado&&!(k.acordo&&k.acordo.fechado))?el("button",{class:"btn sm gold",onclick:()=>openAcordoForm(k,p)},"Registrar acordo"):null)));
   return card;
 }
@@ -1090,19 +1092,20 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="carteira.js?v=mv1f6gpf"></script>
-<script src="tarefas.js?v=mv1f6gpf"></script>
-<script src="equipe.js?v=mv1f6gpf"></script>
-<script src="rh.js?v=mv1f6gpf"></script>
-<script src="dnd.js?v=mv1f6gpf"></script>
-<script src="ficha.js?v=mv1f6gpf"></script>
-<script src="fluxo.js?v=mv1f6gpf"></script>
-<script src="publicacoes.js?v=mv1f6gpf"></script>
-<script src="autenticador.js?v=mv1f6gpf"></script>
-<script src="marketing.js?v=mv1f6gpf"></script>
-<script src="comercial.js?v=mv1f6gpf"></script>
-<script src="leads.js?v=mv1f6gpf"></script>
-<script src="documentos.js?v=mv1f6gpf"></script>
-<script src="conhecimento.js?v=mv1f6gpf"></script>
+<script src="carteira.js?v=mv2gv40r"></script>
+<script src="tarefas.js?v=mv2gv40r"></script>
+<script src="equipe.js?v=mv2gv40r"></script>
+<script src="rh.js?v=mv2gv40r"></script>
+<script src="dnd.js?v=mv2gv40r"></script>
+<script src="ficha.js?v=mv2gv40r"></script>
+<script src="fluxo.js?v=mv2gv40r"></script>
+<script src="publicacoes.js?v=mv2gv40r"></script>
+<script src="autenticador.js?v=mv2gv40r"></script>
+<script src="marketing.js?v=mv2gv40r"></script>
+<script src="comercial.js?v=mv2gv40r"></script>
+<script src="leads.js?v=mv2gv40r"></script>
+<script src="revisional.js?v=mv2gv40r"></script>
+<script src="documentos.js?v=mv2gv40r"></script>
+<script src="conhecimento.js?v=mv2gv40r"></script>
 </body>
 </html>

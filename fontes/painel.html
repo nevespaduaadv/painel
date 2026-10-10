@@ -699,6 +699,7 @@ function contractCard(k,p,R){
   card.append(proj);
   card.append(el("div",{class:"ct-f"},el("span",{},k.notas&&!readOnly()?k.notas:""),el("div",{class:"acts edit-only"},
     el("button",{class:"btn sm",onclick:()=>openContractForm(k)},"Editar"),
+    window.PP_REVISIONAL?el("button",{class:"btn sm",onclick:()=>window.PP_REVISIONAL.abrir(k.id)},"Revisional"):null,
     (!quitado&&!(k.acordo&&k.acordo.fechado))?el("button",{class:"btn sm gold",onclick:()=>openAcordoForm(k,p)},"Registrar acordo"):null)));
   return card;
 }
