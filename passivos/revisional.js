@@ -144,7 +144,7 @@ function novaRevisao(){
   const body=el("div",{class:"form"},field("rv-cli","Cliente",cli),field("rv-kon","Contrato",kon));
   modal("Nova revisão",body,async()=>{if(!kon.value)throw new Error("Escolha o contrato");abrirContrato(kon.value)});
 }
-function abrirContrato(id){const k=S.contratos.find(x=>x.id===id);if(!k){toast("Contrato não encontrado");return}V.contrato=k;V.rev=null;V.ent=entradasPadrao(k);V.res=null;V.teseStatus={};S.tab="revisional";render();atualizarMedia()}
+function abrirContrato(id,tent=0){const k=S.contratos.find(x=>x.id===id);if(!k){if(tent<20){setTimeout(()=>abrirContrato(id,tent+1),500);return}toast("Contrato não encontrado");return}V.contrato=k;V.rev=null;V.ent=entradasPadrao(k);V.res=null;V.teseStatus={};S.tab="revisional";render();atualizarMedia()}
 async function abrirRevisao(r){const k=S.contratos.find(x=>x.id===r.contrato_id);if(!k){toast("Contrato não encontrado no painel");return}
   const {data:ts}=await SB.from("revisao_teses").select("*").eq("revisao_id",r.id);
   V.contrato=k;V.rev=r;V.ent={...entradasPadrao(k),...(r.entradas||{})};V.res=null;V.teseStatus={};(ts||[]).forEach(t=>V.teseStatus[t.tese]={status:t.status,automatico:t.automatico,nota:t.nota||"",valor:t.valor_impacto});
