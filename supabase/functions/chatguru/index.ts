@@ -207,6 +207,12 @@ async function enviar(req: Request): Promise<Response> {
     if (!okAlgum) return json(502, { ok: false, erro: rs.map((r) => `${r.canal}: ${r.erro}`).join(" · ") });
     return json(200, { ok: true, canais: rs.filter((r) => r.ok).map((r) => r.canal), avisos: rs.filter((r) => !r.ok).map((r) => `${r.canal}: ${r.erro}`) });
   }
+  if (acao === "growth") { // atualizar os dados de Growth agora (admin)
+    const adm = await rest("rpc/sou_admin", jwt, { method: "POST", body: "{}" });
+    if (!adm.ok || (await adm.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Só administradores atualizam o Growth." });
+    try { return json(200, await coletarGrowth({ dias: Math.min(Number(corpo.dias ?? 3), 90), inicio: txt(corpo.inicio) ?? undefined, fim: txt(corpo.fim) ?? undefined, posts: corpo.posts !== false })); }
+    catch (e) { const erro = e instanceof Error ? e.message : String(e); await rest("rpc/growth_gravar", service(), { method: "POST", body: JSON.stringify({ log: { ok: false, erro } }) }); return json(502, { ok: false, erro }); }
+  }
   if (acao !== "mensagem" && acao !== "anotacao" && acao !== "localizar") return json(400, { ok: false, erro: "Ação inválida." });
   if (typeof cg === "string") return json(500, { ok: false, erro: cg });
   const leadId = String(corpo.lead_id ?? ""); const texto = String(corpo.texto ?? "").trim();
@@ -302,6 +308,89 @@ async function resumo(req: Request): Promise<Response> {
   return json(200, { ok: true, enviados: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => !r.ok).map((r) => ({ colaborador_id: r.colaborador_id, erro: r.erro })) });
 }
 
+// ---------- Growth: Meta Marketing API + Instagram Graph API → tabelas growth_* (segredos META_* no Vault) ----------
+const GRAPH = "https://graph.facebook.com/v21.0";
+const diaISO = (d: Date) => d.toISOString().slice(0, 10);
+const diasAtras = (n: number) => { const d = new Date(Date.now() - 3 * 3600_000); d.setUTCDate(d.getUTCDate() - n); return diaISO(d); }; // "hoje" em BRT
+async function graph(path: string, params: Record<string, string>, token: string): Promise<Dict> {
+  const u = new URL(`${GRAPH}/${path}`); for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v); u.searchParams.set("access_token", token);
+  const r = await fetch(u, { signal: AbortSignal.timeout(40_000) });
+  const j = (await r.json().catch(() => ({}))) as Dict;
+  if (!r.ok) { const e = (j.error ?? {}) as Dict; throw new Error(`Graph ${path.split("/").slice(-1)[0]} ${r.status}: ${String(e.message ?? JSON.stringify(j)).slice(0, 200)}`); }
+  return j;
+}
+async function graphTodos(path: string, params: Record<string, string>, token: string, maxPaginas = 20): Promise<Dict[]> {
+  const out: Dict[] = []; let j = await graph(path, params, token);
+  for (let i = 0; i < maxPaginas; i++) {
+    out.push(...((j.data as Dict[]) ?? []));
+    const next = (j.paging as Dict | undefined)?.next as string | undefined; if (!next) break;
+    const r = await fetch(next, { signal: AbortSignal.timeout(40_000) }); j = (await r.json().catch(() => ({}))) as Dict; if (!r.ok) break;
+  }
+  return out;
+}
+const acoesMapa = (acts: unknown): Record<string, number> => { const m: Record<string, number> = {}; for (const a of (Array.isArray(acts) ? acts : []) as Dict[]) m[String(a.action_type)] = Number(a.value ?? 0); return m; };
+const leadsDe = (m: Record<string, number>) => m["lead"] ?? ((m["onsite_conversion.lead_grouped"] ?? 0) + (m["offsite_conversion.fb_pixel_lead"] ?? 0));
+const conversasDe = (m: Record<string, number>) => m["onsite_conversion.messaging_conversation_started_7d"] ?? m["onsite_conversion.total_messaging_connection"] ?? 0;
+function linhaMeta(r: Dict): Dict {
+  const m = acoesMapa(r.actions);
+  return { data: r.date_start, ad_id: r.ad_id, ad_name: r.ad_name, adset_id: r.adset_id, adset_name: r.adset_name, campaign_id: r.campaign_id, campaign_name: r.campaign_name, objective: r.objective,
+    spend: r.spend, impressions: r.impressions, reach: r.reach, frequency: r.frequency, clicks: r.clicks, link_clicks: r.inline_link_clicks, leads: leadsDe(m), conversas: conversasDe(m), acoes: m };
+}
+async function coletarGrowth(opts: { dias?: number; inicio?: string; fim?: string; posts?: boolean }): Promise<Dict> {
+  const token = await segredo("META_ACCESS_TOKEN"); const conta = await segredo("META_AD_ACCOUNT_ID"); const ig = await segredo("META_IG_USER_ID");
+  if (!token || !conta) throw new Error("Falta META_ACCESS_TOKEN / META_AD_ACCOUNT_ID no Vault.");
+  const fim = opts.fim ?? diasAtras(0); const inicio = opts.inicio ?? diasAtras(Math.max(1, Math.min(opts.dias ?? 3, 90)));
+  const range = JSON.stringify({ since: inicio, until: fim });
+  const avisos: string[] = [];
+  const campos = "spend,impressions,reach,frequency,clicks,inline_link_clicks,actions";
+  const anuncios = (await graphTodos(`${conta}/insights`, { level: "ad", fields: `campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,objective,${campos}`, time_increment: "1", time_range: range, limit: "500" }, token)).map(linhaMeta);
+  const contaDias = (await graphTodos(`${conta}/insights`, { fields: campos, time_increment: "1", time_range: range, limit: "500" }, token)).map((r) => { const m = acoesMapa(r.actions); return { data: r.date_start, spend: r.spend, impressions: r.impressions, reach: r.reach, frequency: r.frequency, clicks: r.clicks, link_clicks: r.inline_link_clicks, leads: leadsDe(m), conversas: conversasDe(m), acoes: m }; });
+  const igDias: Dict[] = []; const igPosts: Dict[] = [];
+  if (ig) {
+    const porDia: Record<string, Dict> = {};
+    try { // séries diárias (reach e follower_count aceitam period=day com valores por dia)
+      const s = await graph(`${ig}/insights`, { metric: "reach,follower_count", period: "day", since: inicio, until: fim }, token);
+      for (const m of (s.data as Dict[]) ?? []) for (const v of (m.values as Dict[]) ?? []) { const d = String(v.end_time).slice(0, 10); (porDia[d] ??= { data: d })[String(m.name)] = v.value; }
+    } catch (e) { avisos.push(`IG séries: ${e instanceof Error ? e.message : e}`); }
+    // métricas "total_value" só vêm agregadas no intervalo → uma chamada por dia (limitado a 30 dias por coleta)
+    const dias: string[] = []; for (let d = new Date(fim + "T00:00:00Z"); diaISO(d) >= inicio && dias.length < 30; d.setUTCDate(d.getUTCDate() - 1)) dias.push(diaISO(d));
+    for (const d of dias) {
+      try {
+        const t = await graph(`${ig}/insights`, { metric: "profile_views,accounts_engaged,total_interactions,website_clicks", period: "day", metric_type: "total_value", since: d, until: d }, token);
+        for (const m of (t.data as Dict[]) ?? []) (porDia[d] ??= { data: d })[String(m.name)] = (m.total_value as Dict | undefined)?.value ?? null;
+      } catch (e) { avisos.push(`IG ${d}: ${e instanceof Error ? e.message : e}`); break; }
+    }
+    try { const p = await graph(ig, { fields: "followers_count" }, token); const hoje = diasAtras(0); (porDia[hoje] ??= { data: hoje }).followers_total = p.followers_count; } catch (e) { avisos.push(`IG perfil: ${e instanceof Error ? e.message : e}`); }
+    igDias.push(...Object.values(porDia));
+    if (opts.posts !== false) {
+      try {
+        const limite = diasAtras(60);
+        const midias = (await graphTodos(`${ig}/media`, { fields: "id,timestamp,media_type,media_product_type,caption,permalink,like_count,comments_count", limit: "50" }, token, 2)).filter((m) => String(m.timestamp).slice(0, 10) >= limite);
+        for (const m of midias.slice(0, 40)) {
+          const linha: Dict = { id: m.id, publicado_em: m.timestamp, media_type: m.media_type, media_product_type: m.media_product_type, caption: m.caption, permalink: m.permalink, like_count: m.like_count, comments_count: m.comments_count };
+          const metricas = m.media_product_type === "STORY" ? "reach,shares,views,total_interactions" : "reach,saved,shares,views,total_interactions";
+          try { const i = await graph(`${m.id}/insights`, { metric: metricas }, token); for (const x of (i.data as Dict[]) ?? []) linha[String(x.name)] = ((x.values as Dict[])?.[0]?.value) ?? null; }
+          catch (e) { linha.erro = e instanceof Error ? e.message : String(e); }
+          igPosts.push(linha);
+        }
+      } catch (e) { avisos.push(`IG posts: ${e instanceof Error ? e.message : e}`); }
+    }
+  } else avisos.push("META_IG_USER_ID não configurado: Instagram ignorado.");
+  const log = { ok: true, inicio, fim, avisos, anuncios: anuncios.length, conta_dias: contaDias.length, ig_dias: igDias.length, ig_posts: igPosts.length };
+  const g = await rest("rpc/growth_gravar", service(), { method: "POST", body: JSON.stringify({ meta_anuncios: anuncios, meta_conta: contaDias, ig_dias: igDias, ig_posts: igPosts, log }) });
+  if (!g.ok) throw new Error(`growth_gravar ${g.status}: ${(await g.text()).slice(0, 300)}`);
+  return { ...log, gravado: await g.json() };
+}
+async function growth(req: Request): Promise<Response> {
+  const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
+  if (!token) return json(401, { ok: false, erro: "Token ausente." });
+  const v = await rest("rpc/automacoes_token_valido", service(), { method: "POST", body: JSON.stringify({ token }) });
+  if (!v.ok || (await v.json().catch(() => null)) !== true) return json(401, { ok: false, erro: "Token inválido." });
+  const corpo = (await req.json().catch(() => ({}))) as Dict;
+  try { return json(200, await coletarGrowth({ dias: Number(corpo.dias ?? 3), inicio: txt(corpo.inicio) ?? undefined, fim: txt(corpo.fim) ?? undefined, posts: corpo.posts !== false })); }
+  catch (e) { const erro = e instanceof Error ? e.message : String(e); await rest("rpc/growth_gravar", service(), { method: "POST", body: JSON.stringify({ log: { ok: false, erro } }) }); return json(502, { ok: false, erro }); }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info" } });
   const url = new URL(req.url);
@@ -312,6 +401,7 @@ Deno.serve(async (req) => {
     if (rota === "enviar") return await enviar(req);
     if (rota === "automacoes") return await automacoes(req);
     if (rota === "resumo") return await resumo(req);
+    if (rota === "growth") return await growth(req);
     if (rota === "diag") { // só com o token do webhook; não expõe valores
       const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
       const tk = url.searchParams.get("token") ?? "";
