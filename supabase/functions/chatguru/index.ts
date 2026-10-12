@@ -21,8 +21,9 @@ function achaChave(v: unknown): string {
   return "";
 }
 function chaveDe(nomeLegado: string, nomeDict: string): string {
-  const legado = env(nomeLegado); if (legado) return legado;
-  try { return achaChave(JSON.parse(env(nomeDict) || "{}")); } catch { return ""; }
+  // prefere as chaves novas (sb_publishable_/sb_secret_); as legadas (JWT anon/service_role) só se não houver novas — elas podem estar desativadas no projeto
+  try { const nova = achaChave(JSON.parse(env(nomeDict) || "{}")); if (nova) return nova; } catch { /* sem dicionário */ }
+  return env(nomeLegado);
 }
 const ANON = chaveDe("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
 const SERVICE = chaveDe("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
