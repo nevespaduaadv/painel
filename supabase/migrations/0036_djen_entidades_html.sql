@@ -21,6 +21,7 @@ begin
   r := replace(r, '&oacute;', 'ó'); r := replace(r, '&ograve;', 'ò'); r := replace(r, '&ocirc;', 'ô'); r := replace(r, '&otilde;', 'õ'); r := replace(r, '&ouml;', 'ö');
   r := replace(r, '&uacute;', 'ú'); r := replace(r, '&ugrave;', 'ù'); r := replace(r, '&ucirc;', 'û'); r := replace(r, '&uuml;', 'ü');
   r := replace(r, '&ccedil;', 'ç'); r := replace(r, '&ntilde;', 'ñ');
+  r := replace(r, '&shy;', ''); r := replace(r, '&cedil;', '¸'); r := replace(r, '&acute;', '´'); r := replace(r, '&rarr;', '→'); r := replace(r, '&larr;', '←'); r := replace(r, '&bull;', '•'); r := replace(r, '&middot;', '·'); r := replace(r, '&laquo;', '«'); r := replace(r, '&raquo;', '»'); r := replace(r, '&copy;', '©'); r := replace(r, '&reg;', '®'); r := replace(r, '&times;', '×'); r := replace(r, '&euro;', '€');
   r := replace(r, '&Aacute;', 'Á'); r := replace(r, '&Agrave;', 'À'); r := replace(r, '&Acirc;', 'Â'); r := replace(r, '&Atilde;', 'Ã');
   r := replace(r, '&Eacute;', 'É'); r := replace(r, '&Ecirc;', 'Ê'); r := replace(r, '&Iacute;', 'Í'); r := replace(r, '&Oacute;', 'Ó'); r := replace(r, '&Ocirc;', 'Ô'); r := replace(r, '&Otilde;', 'Õ'); r := replace(r, '&Uacute;', 'Ú'); r := replace(r, '&Ccedil;', 'Ç');
   r := replace(r, '&lt;', '<'); r := replace(r, '&gt;', '>'); r := replace(r, '&amp;', '&');   -- &amp; por último
