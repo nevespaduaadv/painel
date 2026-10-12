@@ -464,7 +464,7 @@ async function sincronizarAgenda(token: string, apenasColab?: string): Promise<D
           const calEv = String(e.google_calendar_id ?? cal);
           res = await gcal(gt.token, e.cancelado ? "DELETE" : "PATCH", `calendars/${encodeURIComponent(calEv)}/events/${encodeURIComponent(String(e.google_event_id))}`, e.cancelado ? undefined : corpo);
           if (res.status === 404 || res.status === 410) { if (e.cancelado) { marcados.push({ id: e.id, ok: true }); continue; } res = await gcal(gt.token, "POST", `calendars/${encodeURIComponent(cal)}/events`, corpo); }
-          else if (res.status < 300) { marcados.push({ id: e.id, ok: true, google_event_id: e.google_event_id, google_calendar_id: calEv, etag: res.json.etag ?? null }); continue; }
+          else if (res.status < 300) { marcados.push({ id: e.id, ok: true, google_event_id: e.google_event_id, google_calendar_id: calEv, etag: res.json.etag ?? null }); r.enviados = (r.enviados as number) + 1; continue; }
         } else {
           if (e.cancelado) { marcados.push({ id: e.id, ok: true }); continue; }
           res = await gcal(gt.token, "POST", `calendars/${encodeURIComponent(cal)}/events`, corpo);
