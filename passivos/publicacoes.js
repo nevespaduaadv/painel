@@ -2,7 +2,7 @@
    Supabase: publicacoes, v_publicacoes, v_publicacoes_resumo, djen_requisicoes; RPCs djen_atualizar(), djen_buscar_periodo(inicio,fim). Só equipe. */
 (()=>{
 "use strict";
-const U={lista:[],resumo:null,procs:[],ok:false,carregando:false,periodo:"30",soNaoLidas:false,soSemVinculo:false,fCli:"",q:""};
+const U={lista:[],resumo:null,procs:[],colab:[],ok:false,carregando:false,periodo:"30",soNaoLidas:false,soSemVinculo:false,fCli:"",q:""};
 const hojeISO=(n=0)=>{const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const nomeCli=id=>(S.clientes.find(c=>c.id===id)||{}).nome||id||"—";
 
@@ -11,8 +11,8 @@ async function carregar(){
   try{
     let q=SB.from("v_publicacoes").select("*").order("data_disponibilizacao",{ascending:false}).order("id",{ascending:false}).limit(500);
     if(U.periodo!=="todos")q=q.gte("data_disponibilizacao",hojeISO(-Number(U.periodo)));
-    const [a,b,c]=await Promise.all([q,SB.from("v_publicacoes_resumo").select("*").maybeSingle(),SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao,status").order("numero_cnj")]);
-    if(a.error)throw a.error;U.lista=a.data||[];U.resumo=b.data||null;U.procs=c.data||[];U.ok=true;
+    const [a,b,c,d]=await Promise.all([q,SB.from("v_publicacoes_resumo").select("*").maybeSingle(),SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao,status").order("numero_cnj"),SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo").order("nome")]);
+    if(a.error)throw a.error;U.lista=a.data||[];U.resumo=b.data||null;U.procs=c.data||[];U.colab=d.data||[];U.ok=true;
   }catch(e){console.warn("publicacoes",e);toast("Não foi possível carregar as publicações")}
   finally{U.carregando=false}
   render();
@@ -42,13 +42,14 @@ function renderPublicacoes(){
     const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},fmtD(parseD(data))),el("span",{class:"note"},`${ps.length} publicaç${ps.length===1?"ão":"ões"}`)));
     sec.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Processo / cliente"),el("th",{},"Tipo"),el("th",{},"Órgão"),el("th",{},"Partes"),el("th",{},"Resumo"),el("th",{},"Tarefa"),el("th",{},""))),
       el("tbody",{},ps.map(p=>el("tr",{style:p.ignorada?"opacity:.5":(!p.lida?"font-weight:600":"")},
-        el("td",{},el("div",{class:"num"},p.numero_processo||"—"),p.cliente_id?el("div",{class:"note"},p.cliente_nome):el("span",{class:"pill e2"},"sem processo")),
+        el("td",{},el("div",{class:"num"},p.numero_processo||"—"),p.cliente_id?el("div",{class:"note"},p.cliente_nome):p.processo_id?el("span",{class:"pill g"},"fora da base"):el("span",{class:"pill e2"},"sem processo")),
         el("td",{},el("div",{},p.tipo_documento||p.tipo_comunicacao||"—"),p.tipo_documento&&p.tipo_comunicacao?el("div",{class:"note"},p.tipo_comunicacao):null),
         el("td",{},el("div",{},p.tribunal||"—"),el("div",{class:"note"},p.orgao||"")),
         el("td",{class:"note"},(p.destinatarios||[]).map(d=>d.nome).filter(Boolean).slice(0,3).join(", ")||"—"),
         el("td",{style:"max-width:380px"},el("div",{class:"note",style:"font-weight:400;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden"},p.resumo||"—")),
-        el("td",{},p.tarefa_id?el("span",{class:"pill "+(p.tarefa_status==="concluida"?"e1":"e2")},p.tarefa_status==="concluida"?"analisada":"a analisar"+(p.tarefa_prazo?" · "+fmtD(parseD(p.tarefa_prazo)):"")):"—"),
-        el("td",{},el("div",{style:"display:flex;gap:4px;flex-wrap:wrap"},el("button",{class:"btn sm",onclick:()=>abrir(p)},"Ler"),p.sem_vinculo?el("button",{class:"btn sm",onclick:()=>vincular(p)},"Vincular"):null,
+        el("td",{},p.tarefa_id?el("span",{class:"pill "+(p.tarefa_status==="concluida"?"e1":"e2")},p.tarefa_status==="concluida"?"analisada":"a analisar"+(p.tarefa_prazo?" · "+fmtD(parseD(p.tarefa_prazo)):"")):"—",
+          +(p.tarefas_atribuidas||0)?el("div",{class:"note",style:"margin-top:3px"},+(p.tarefas_atribuidas_abertas||0)?"→ "+p.atribuidas_para:`${p.tarefas_atribuidas} tarefa(s) concluída(s)`):null),
+        el("td",{},el("div",{style:"display:flex;gap:4px;flex-wrap:wrap"},el("button",{class:"btn sm",onclick:()=>abrir(p)},"Ler"),el("button",{class:"btn sm primary",onclick:()=>atribuir(p)},"Atribuir"),p.sem_vinculo?el("button",{class:"btn sm",onclick:()=>vincular(p)},"Vincular"):null,
           el("button",{class:"btn sm",onclick:()=>marcar(p,{lida:!p.lida})},p.lida?"Não lida":"Lida"),p.sem_vinculo?el("button",{class:"btn sm",onclick:()=>marcar(p,{ignorada:true,lida:true})},"Ignorar"):p.ignorada?el("button",{class:"btn sm",onclick:()=>marcar(p,{ignorada:false})},"Reativar"):null))))))));
     v.append(sec);
   }
@@ -60,8 +61,33 @@ function abrir(p){
     (p.destinatarios||[]).length?el("div",{class:"note"},"Partes: "+(p.destinatarios||[]).map(d=>d.nome+(d.polo?` (${d.polo})`:"")).join("; ")):null,
     el("div",{style:"white-space:pre-wrap;margin-top:10px;max-height:50vh;overflow:auto;font-size:14px"},p.texto||"(sem texto)"),
     p.link?el("div",{style:"margin-top:10px"},el("a",{href:p.link,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ abrir no tribunal")):null));
-  modal("Publicação de "+fmtD(parseD(p.data_disponibilizacao)),body,async()=>{if(!p.lida)await SB.from("publicacoes").update({lida:true}).eq("id",p.id);recarregar()});
+  modal("Publicação de "+fmtD(parseD(p.data_disponibilizacao)),body,async()=>{if(!p.lida)await SB.from("publicacoes").update({lida:true}).eq("id",p.id);recarregar()},el("button",{class:"btn",onclick:()=>atribuir(p)},"Atribuir tarefa…"));
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Marcar como lida";
+}
+/* Controladoria lê a publicação e abre a tarefa para quem vai tocar o prazo (fica no histórico da tarefa e a pessoa é avisada no sino) */
+const TIPOS_TAREFA_PUB={prazo:"Cumprir prazo",manifestar:"Manifestar nos autos",recurso:"Analisar cabimento de recurso",audiencia:"Preparar audiência",cliente:"Comunicar o cliente",diligencia:"Diligência / providência",ciencia:"Só ciência (sem prazo)"};
+function atribuir(p){
+  const meu=U.colab.find(c=>c.perfil_id===PP.perfil?.id);
+  const proc=U.procs.find(x=>x.id===p.processo_id);
+  const tipo=sel(TIPOS_TAREFA_PUB,"prazo"),titulo=inp("text","",{placeholder:"Ex.: Contestar — prazo de 15 dias"}),resp=sel({"":"— escolha —",...Object.fromEntries(U.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},""),
+        prazo=inp("date",""),fatal=el("input",{type:"checkbox",style:"width:16px;height:16px;margin:0;accent-color:var(--gold)"}),pri=sel({"1":"Alta","2":"Normal","3":"Baixa"},"1"),
+        desc=el("textarea",{rows:5},`Publicação de ${fmtD(parseD(p.data_disponibilizacao))} · ${[p.tribunal,p.orgao,p.tipo_documento||p.tipo_comunicacao].filter(Boolean).join(" · ")}\nProcesso ${p.numero_processo||"s/ nº"}${p.cliente_nome?" · "+p.cliente_nome:""}\n\n${(p.resumo||"").slice(0,400)}`);
+  const sug=()=>{if(!titulo.value.trim()||titulo.dataset.auto==="1"){titulo.value=`${TIPOS_TAREFA_PUB[tipo.value]} — ${p.numero_processo||"publicação"}`;titulo.dataset.auto="1"}};
+  titulo.oninput=()=>{titulo.dataset.auto="0"};tipo.onchange=sug;sug();
+  const body=el("div",{class:"form"},
+    el("div",{class:"f full note"},`Publicação de ${fmtD(parseD(p.data_disponibilizacao))} · ${p.numero_processo||"sem número"}${p.cliente_nome?" · "+p.cliente_nome:" · sem cliente na base"}${proc?"":" · processo não vinculado (a tarefa fica sem processo)"}`),
+    field("at-tipo","Tipo",tipo),field("at-resp","Para quem",resp),field("at-tit","Título da tarefa",titulo),field("at-prazo","Prazo",prazo),
+    el("div",{class:"f",style:"justify-content:center"},el("label",{style:"display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px"},fatal,"Prazo fatal")),field("at-pri","Prioridade",pri),
+    field("at-desc","Instruções / comentário",desc,`Quem recebe vê isto na tarefa e é avisado no sino${meu?" como vindo de "+meu.nome:""}.`));
+  modal("Atribuir tarefa a partir da publicação",body,async()=>{
+    if(!resp.value)throw new Error("Escolha para quem vai a tarefa");
+    if(tipo.value!=="ciencia"&&!prazo.value)throw new Error("Informe o prazo (ou marque “Só ciência”)");
+    const row={titulo:titulo.value.trim()||TIPOS_TAREFA_PUB[tipo.value],descricao:desc.value.trim()||null,cliente_id:p.cliente_id||null,processo_id:p.processo_id||null,responsavel_id:resp.value,nucleo:"juridico",prazo:prazo.value||null,prazo_fatal:fatal.checked,prioridade:+pri.value,status:"aberta",publicacao_id:p.id};
+    const {error}=await SB.from("tarefas").insert(row);if(error)throw new Error("Não foi possível criar a tarefa");
+    await SB.from("publicacoes").update({lida:true}).eq("id",p.id);
+    toast("Tarefa atribuída");recarregar();
+  });
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Atribuir tarefa";
 }
 function vincular(p){
   const opts={"":"— escolha o processo —"};for(const x of U.procs)opts[x.id]=`${x.numero_cnj||"s/ nº"} · ${nomeCli(x.cliente_id)}${x.tipo_acao?" · "+x.tipo_acao:""}`;

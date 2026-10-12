@@ -196,27 +196,30 @@ function detalheProcesso(c,p){
   return box;
 }
 function openProcessoForm(c,p={}){
+  c=c||(p.cliente_id?S.clientes.find(x=>x.id===p.cliente_id):null)||{id:"",nome:""};
   const cnj=inp("text",p.numero_cnj||"",{placeholder:"0000000-00.0000.0.00.0000"}),trib=inp("text",p.tribunal||"",{placeholder:"Ex.: TJSP"}),vara=inp("text",p.vara||"",{placeholder:"Ex.: 2ª Vara Cível de Campinas"}),
         acao=datalistInput("p-acao",p.tipo_acao||"",TIPOS_ACAO),parte=inp("text",p.parte_contraria||""),polo=sel(POLOS,p.polo||"passivo"),kon=selContrato(c,p.contrato_id),
         banco=datalistInput("p-banco",p.banco||"",Object.keys(S.regras.fatoresBanco||{})),fase=datalistInput("p-fase",p.fase||"",FASES_PROC),valor=inp("number",p.valor_causa||"",{step:"100"}),prazo=inp("date",p.proximo_prazo||""),
         fatal=check("Prazo fatal",p.prazo_fatal),resp=selColab(p.responsavel_id||meuColab()?.id),status=sel(STATUS_PROC,p.status||"ativo"),vis=check("Visível ao cliente",p.visivel_cliente!==false,"Desmarque para manter o processo fora da área do cliente."),
         obs=el("textarea",{},p.observacoes||""),
-        cli=sel(Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(x=>[x.id,x.nome])),c.id);
+        cli=sel({"":"— sem cliente (fora da base do sistema) —",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(x=>[x.id,x.nome]))},c.id||"");
   kon.onchange=()=>{const k=contratoDe(kon.value);if(k&&!banco.input.value)banco.input.value=k.banco;if(k&&!parte.value)parte.value=k.banco};
-  cli.onchange=()=>{const novo=S.clientes.find(x=>x.id===cli.value);kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cli.value).map(k=>el("option",{value:k.id},shortName(k))));kon.value="";cli.parentElement.querySelector(".help").textContent=novo&&novo.id!==c.id?`O processo, os andamentos e as tarefas vinculadas passam para ${novo.nome}.`:"Troque para transferir o processo a outro cliente."};
-  const body=el("div",{class:"form"},p.id?field("p-cli","Cliente",cli,"Troque para transferir o processo a outro cliente."):null,field("p-cnj","Número CNJ",cnj),field("p-acao","Tipo de ação",acao.wrap),field("p-trib","Tribunal",trib),field("p-vara","Vara / comarca",vara),
+  cli.onchange=()=>{const novo=S.clientes.find(x=>x.id===cli.value);kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cli.value).map(k=>el("option",{value:k.id},shortName(k))));kon.value="";cli.parentElement.querySelector(".help").textContent=cli.value!==(c.id||"")?(novo?`O processo, os andamentos e as tarefas vinculadas passam para ${novo.nome}.`:"O processo deixa de aparecer na ficha do cliente e fica só na lista de Processos."):"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."};
+  const body=el("div",{class:"form"},field("p-cli","Cliente",cli,"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."),field("p-cnj","Número CNJ",cnj),field("p-acao","Tipo de ação",acao.wrap),field("p-trib","Tribunal",trib),field("p-vara","Vara / comarca",vara),
     field("p-parte","Parte contrária",parte),field("p-polo","Polo do cliente",polo),field("p-con","Contrato relacionado",kon),field("p-banco","Banco relacionado",banco.wrap),
     field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),field("p-prazo","Próximo prazo",prazo),fatal.wrap,field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
   const extra=p.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este processo e todos os andamentos?"))return;const {error}=await SB.from("processos").delete().eq("id",p.id);$("#modalHost").replaceChildren();M.procSel=null;toast(error?"Não foi possível excluir":"Processo excluído")}},"Excluir"):null;
   modal(p.id?"Editar processo":"Novo processo",body,async()=>{
     if(!cnj.value.trim()&&!acao.input.value.trim())throw new Error("Informe o número CNJ ou o tipo de ação");
-    const row={cliente_id:p.id?cli.value:c.id,numero_cnj:cnj.value.trim()||null,tipo_acao:acao.input.value.trim()||null,tribunal:trib.value.trim()||null,vara:vara.value.trim()||null,parte_contraria:parte.value.trim()||null,polo:polo.value,contrato_id:kon.value||null,banco:banco.input.value.trim()||null,fase:fase.input.value.trim()||null,valor_causa:valor.value===""?null:+valor.value,proximo_prazo:prazo.value||null,prazo_fatal:fatal.input.checked,responsavel_id:resp.value||null,status:status.value,visivel_cliente:vis.input.checked,observacoes:obs.value.trim()||null};
+    const row={cliente_id:cli.value||null,numero_cnj:cnj.value.trim()||null,tipo_acao:acao.input.value.trim()||null,tribunal:trib.value.trim()||null,vara:vara.value.trim()||null,parte_contraria:parte.value.trim()||null,polo:polo.value,contrato_id:kon.value||null,banco:banco.input.value.trim()||null,fase:fase.input.value.trim()||null,valor_causa:valor.value===""?null:+valor.value,proximo_prazo:prazo.value||null,prazo_fatal:fatal.input.checked,responsavel_id:resp.value||null,status:status.value,visivel_cliente:vis.input.checked,observacoes:obs.value.trim()||null};
     const q=p.id?SB.from("processos").update(row).eq("id",p.id):SB.from("processos").insert(row).select("id").single();
     const {data,error}=await q;if(error)throw new Error(error.code==="23505"?"Já existe um processo com este número CNJ":"Não foi possível salvar");
-    if(p.id&&cli.value!==c.id){await SB.from("tarefas").update({cliente_id:cli.value}).eq("processo_id",p.id);await SB.from("entradas_timeline").update({cliente_id:cli.value}).eq("processo_id",p.id);M.procSel=null;toast("Processo movido para outro cliente");S.sel=cli.value;S.sub="processos";render();return}
-    if(data?.id)M.procSel=data.id;toast("Processo salvo");
+    if(p.id&&cli.value!==(c.id||"")){await SB.from("tarefas").update({cliente_id:cli.value||null}).eq("processo_id",p.id);if(cli.value)await SB.from("entradas_timeline").update({cliente_id:cli.value}).eq("processo_id",p.id);M.procSel=null;toast(cli.value?"Processo movido para outro cliente":"Processo desvinculado do cliente");if(cli.value){S.sel=cli.value;S.sub="processos";S.tab="clientes"}else{S.tab="processos"}window.PP_PROCESSOS?.recarregar?.();render();return}
+    if(!p.id&&!cli.value){toast("Processo salvo");S.tab="processos";window.PP_PROCESSOS?.recarregar?.();render();return}
+    if(data?.id)M.procSel=data.id;toast("Processo salvo");window.PP_PROCESSOS?.recarregar?.();
   },extra);
 }
+window.PP_CARTEIRA={openProcessoForm,openAndamentoForm:(p,a)=>openAndamentoForm(p,a),abrirProcesso:(cid,pid)=>{S.sel=cid;S.sub="processos";S.tab="clientes";M.procSel=pid;render()}};
 function openAndamentoForm(p,a={}){
   const data=inp("date",a.data||hojeISO()),tipo=datalistInput("a-tipo",a.tipo||"",TIPOS_AND),desc=el("textarea",{placeholder:"Resumo do andamento e o que ele exige do escritório."},a.descricao||""),vis=check("Visível ao cliente",a.visivel_cliente,"O andamento também entra na timeline do cliente com esta mesma visibilidade.");
   const body=el("div",{class:"form"},field("a-data","Data",data),field("a-tipo","Tipo",tipo.wrap),field("a-desc","Descrição",desc),vis.wrap);
