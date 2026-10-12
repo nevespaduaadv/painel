@@ -4,61 +4,68 @@
 <meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Clientes — Neves Pádua Advocacia</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<title>Área do cliente — Neves Pádua Advocacia</title>
 <style>
+@font-face{font-family:"General Sans";font-weight:300;font-display:swap;src:url(../passivos/fontes/general-sans-300.woff2) format("woff2")}
+@font-face{font-family:"General Sans";font-weight:400;font-display:swap;src:url(../passivos/fontes/general-sans-400.woff2) format("woff2")}
+@font-face{font-family:"General Sans";font-weight:500;font-display:swap;src:url(../passivos/fontes/general-sans-500.woff2) format("woff2")}
+@font-face{font-family:"General Sans";font-weight:600;font-display:swap;src:url(../passivos/fontes/general-sans-600.woff2) format("woff2")}
+@font-face{font-family:"General Sans";font-weight:700;font-display:swap;src:url(../passivos/fontes/general-sans-700.woff2) format("woff2")}
 /* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
 :root{
-  --navy:#0C1F38; --gold:#B8964A; --gold-soft:#E7DCC2;
-  --bg:#F6F4EF; --surface:#FFFFFF; --surface-2:#EFEBE2; --line:#D9D3C6;
-  --fg:#1B2433; --muted:#5E6878; --faint:#8A93A3;
-  --ok:#2E7D5B; --warn:#B8860B; --crit:#A23B3B; --info:#2F5C8F;
-  --ch-a:#2E5FA3; --ch-b:#B07A1C; --ch-grid:#E4DFD3;
-  --display:"Cormorant Garamond",Georgia,"Times New Roman",serif;
-  --body:"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --r:10px; --r-sm:8px; --shadow:0 1px 2px rgba(20,30,50,.05),0 6px 20px rgba(20,30,50,.05); --line:#E6E1D6; --surface-2:#F4F1EA;
+  /* Paleta do site nevespaduaadvocacia.com.br: grafite, off-white, bronze suave e verde na ação principal */
+  --navy:#2A2E31; --navy-2:#202426; --navy-3:#3A3F42; --gold:#A69D84; --gold-soft:#EAD8B4;
+  --bg:#EFF0EA; --surface:#FFFFFF; --surface-2:#F5F6F2; --line:#DFE2DA;
+  --fg:#353A3D; --muted:#656D68; --faint:#8E958F;
+  --ok:#1B8245; --warn:#B8860B; --crit:#A23B3B; --info:#2F5C8F;
+  --btn-primary:#1B8245; --btn-primary-shadow:rgba(33,140,75,.22);
+  --ch-a:#2E6F55; --ch-b:#B08A4A; --ch-grid:#E3E6DF;
+  --display:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --body:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --r:12px; --r-sm:10px; --shadow:0 1px 2px rgba(30,34,36,.04),0 8px 24px rgba(30,34,36,.05);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#0B1626; --surface:#122238; --surface-2:#182C47; --line:#223A58;
-  --fg:#E9E4D8; --muted:#A9B2C2; --faint:#7D889B; --gold-soft:#3E3522; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
-  --ok:#5BB38A; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5A8FD6; --ch-b:#B8861E; --ch-grid:#24395A; --navy:#07101E; --navy-3:#1A2E50; --btn-primary:#1F3D6B; color-scheme:dark } }
+  --bg:#1A1D1F; --surface:#24282A; --surface-2:#2C3133; --line:#383E41;
+  --fg:#ECEDE8; --muted:#AEB4AE; --faint:#858B86; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark } }
 :root[data-theme="dark"]{
-  --bg:#0B1626; --surface:#122238; --surface-2:#182C47; --line:#223A58;
-  --fg:#E9E4D8; --muted:#A9B2C2; --faint:#7D889B; --gold-soft:#3E3522; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
-  --ok:#5BB38A; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5A8FD6; --ch-b:#B8861E; --ch-grid:#24395A; --navy:#07101E; --navy-3:#1A2E50; --btn-primary:#1F3D6B; color-scheme:dark }
+  --bg:#1A1D1F; --surface:#24282A; --surface-2:#2C3133; --line:#383E41;
+  --fg:#ECEDE8; --muted:#AEB4AE; --faint:#858B86; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark }
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
 h1{font-size:24px;letter-spacing:-.02em} h2{font-size:18px} h3{font-size:16px}
-.display,h1.display{font-family:var(--display);font-weight:600;letter-spacing:.005em;font-size:30px}
+.display,h1.display{font-family:var(--display);font-weight:600;letter-spacing:-.02em;font-size:28px}
 button,input,select,textarea{font:inherit;color:inherit}
 .num{font-variant-numeric:lining-nums tabular-nums}
 
 /* ---------- Shell: sidebar + barra superior ---------- */
-:root{--sbw:236px;--navy-2:#12294A;--navy-3:#1B365D}
+:root{--sbw:236px}
 .app{display:grid;grid-template-columns:var(--sbw) minmax(0,1fr);min-height:100vh}
 .app.colapsada{--sbw:64px}
-.sb{background:var(--navy);color:#D9D4C7;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow:hidden auto;border-right:1px solid rgba(255,255,255,.06);scrollbar-width:thin;scrollbar-color:#2C4B74 transparent}
-.brand{display:flex;align-items:center;gap:10px;padding:16px 14px 10px;color:#F3EFE6;min-height:62px}
-.brand .mono{width:34px;height:34px;border-radius:9px;background:var(--gold);color:#1B1A14;display:grid;place-items:center;font:700 14px var(--display);flex:0 0 auto;letter-spacing:.02em}
-.brand b{font-family:var(--display);font-size:19px;font-weight:600;line-height:1.05;display:block;white-space:nowrap}
-.brand small{color:var(--gold);letter-spacing:.14em;text-transform:uppercase;font-size:10px;font-weight:700;display:block;white-space:nowrap}
+.sb{background:var(--navy);color:#D9D4C7;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow:hidden auto;border-right:1px solid rgba(255,255,255,.06);scrollbar-width:thin;scrollbar-color:#4A5054 transparent}
+.brand{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 14px 10px;color:#F3EFE6;min-height:62px;flex:0 0 auto}
+.brand .logo{width:118px;height:auto;display:block}
+.brand .mono{display:none;width:26px;height:auto}
+.brand small{color:var(--gold);letter-spacing:.16em;text-transform:uppercase;font-size:9.5px;font-weight:600;display:block;white-space:nowrap}
 .sb .tabs{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;flex:1}
-.sb .grp-h{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;padding:12px 8px 4px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#7D8DA8;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit}
-.sb .grp-h:hover{color:#C9CFDA}
+.sb .grp-h{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;padding:12px 8px 4px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8E958F;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit}
+.sb .grp-h:hover{color:#D9DCD6}
 .sb .grp-h .chev{width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin-right:4px;transition:transform .15s}
 .sb .grp.fechado .grp-h .chev{transform:rotate(-45deg)}
 .sb .grp.fechado .grp-i{display:none}
 .sb .grp-i{display:flex;flex-direction:column;gap:1px}
-.sb .tab{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:8px;border:0;background:transparent;color:#C9CFDA;font-weight:500;font-size:14.5px;cursor:pointer;text-align:left;position:relative;white-space:nowrap;width:100%;text-decoration:none}
+.sb .tab{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px;border:0;background:transparent;color:#CFD3CD;font-weight:500;font-size:14.5px;cursor:pointer;text-align:left;position:relative;white-space:nowrap;width:100%;text-decoration:none}
 .sb .tab:hover{background:rgba(255,255,255,.07);color:#fff}
 .sb .tab[aria-selected="true"]{background:var(--navy-3);color:#fff}
 .sb .tab[aria-selected="true"]::before{content:"";position:absolute;left:-8px;top:7px;bottom:7px;width:3px;border-radius:3px;background:var(--gold)}
 .sb .tab svg{width:18px;height:18px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .sb .tab .cnt{margin-left:auto;background:var(--gold);color:#1B1A14;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .sb .fim{margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
-.colapsada .brand b,.colapsada .brand small,.colapsada .sb .grp-h,.colapsada .sb .tab span{display:none}
+.colapsada .brand .logo,.colapsada .brand small,.colapsada .sb .grp-h,.colapsada .sb .tab span{display:none}
+.colapsada .brand .mono{display:block}
 .colapsada .sb .grp.fechado .grp-i{display:flex}
 .colapsada .sb .grp{border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding-top:6px}
 .colapsada .brand{justify-content:center;padding-inline:0}
@@ -97,7 +104,8 @@ button,input,select,textarea{font:inherit;color:inherit}
   .app.sb-aberta .sb{transform:none}
   .app.sb-aberta .sb-overlay{display:block}
   .app.colapsada{--sbw:260px}
-  .colapsada .brand b,.colapsada .brand small,.colapsada .sb .grp-h,.colapsada .sb .tab span{display:revert}
+  .colapsada .brand .logo,.colapsada .brand small,.colapsada .sb .grp-h,.colapsada .sb .tab span{display:revert}
+  .colapsada .brand .mono{display:none}
   .colapsada .tab{justify-content:flex-start;padding:8px 10px}
   .top .area{display:none}
 }
@@ -128,11 +136,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
 
 /* Buttons */
-.btn{border:1px solid var(--line);background:var(--surface);padding:8px 13px;border-radius:var(--r-sm);cursor:pointer;font-weight:500;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;justify-content:center;line-height:1.3}
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;justify-content:center;line-height:1.3}
 .btn:hover{background:var(--surface-2)}
-.btn.primary{background:var(--btn-primary,var(--navy));color:#fff;border-color:var(--btn-primary,var(--navy))}
-.btn.primary:hover{filter:brightness(1.15)}
-.btn.gold{background:var(--gold);color:#1B1A14;border-color:var(--gold)}
+.btn.primary{background:var(--btn-primary);color:#fff;border-color:var(--btn-primary);box-shadow:0 6px 18px var(--btn-primary-shadow)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.primary .seta{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.18);display:inline-grid;place-items:center;margin-left:-4px}
+.btn.primary .seta svg{width:11px;height:11px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.btn.gold{background:var(--navy);color:#fff;border-color:var(--navy)}
 .btn.sm{padding:5px 10px;font-size:12.5px}
 .btn.icon{width:30px;height:30px;padding:0;color:var(--muted)}
 .btn.icon svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -253,13 +263,18 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 
 [hidden]{display:none!important}
 /* --- Supabase: login e modos --- */
-.login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
-.login .card{width:min(420px,100%);padding:28px;display:flex;flex-direction:column;gap:14px}
-.login .eyebrow{color:var(--gold)}
-.login h1{font-size:26px}
-.login .f input{padding:10px 12px}
+.login{position:fixed;inset:0;background:radial-gradient(900px 600px at 20% 10%,#3A3F42 0%,var(--navy-2,#202426) 60%);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
+.login .card{width:min(440px,100%);padding:32px 32px 28px;display:flex;flex-direction:column;gap:12px;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.login .logo{width:120px;height:auto;margin:0 auto 8px;display:block}
+:root[data-theme="dark"] .login .logo{filter:invert(1) brightness(1.6)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login .logo{filter:invert(1) brightness(1.6)}}
+.login .eyebrow{color:var(--gold);text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:600;text-align:center}
+.login h1{font-size:26px;text-align:center;letter-spacing:-.02em}
+.login .sub{color:var(--muted);text-align:center;margin-top:-6px;margin-bottom:6px}
+.login .f input{padding:11px 13px;border-radius:10px}
 .login .err{color:var(--crit);font-size:13px;min-height:18px}
-.login .btn.primary{width:100%;padding:11px}
+.login .btn.primary{width:100%;padding:11px;font-size:15px;gap:10px;margin-top:2px}
+.login .note{text-align:center;font-size:12.5px}
 .modo-cliente .side,.modo-cliente .sb,.modo-cliente .sb-overlay,.modo-cliente .switch,.modo-cliente #btnSb,.modo-cliente .busca{display:none!important}
 .modo-cliente .app{grid-template-columns:1fr}
 .modo-cliente .grid{grid-template-columns:1fr}
@@ -277,7 +292,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 
 <div class="app" id="app">
 <aside class="sb" id="sb">
-  <div class="brand"><div class="mono">NP</div><div><small>Neves Pádua</small><b>Painel</b></div></div>
+  <div class="brand"><img class="logo" src="../passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="../passivos/img/monograma-branco.png" alt="NP"><small>Sistema interno</small></div>
   <nav class="tabs" role="tablist" id="nav"></nav>
 </aside>
 <div class="sb-overlay" onclick="document.getElementById('app').classList.remove('sb-aberta')"></div>
@@ -1159,7 +1174,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mv5boes3"></script>
-<script src="../passivos/ficha.js?v=mv5boes3"></script>
+<script src="../passivos/carteira.js?v=mv5cgyk4"></script>
+<script src="../passivos/ficha.js?v=mv5cgyk4"></script>
 </body>
 </html>

@@ -19,13 +19,18 @@ must('</style>');
 html = html.replace('</style>', `
 [hidden]{display:none!important}
 /* --- Supabase: login e modos --- */
-.login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
-.login .card{width:min(420px,100%);padding:28px;display:flex;flex-direction:column;gap:14px}
-.login .eyebrow{color:var(--gold)}
-.login h1{font-size:26px}
-.login .f input{padding:10px 12px}
+.login{position:fixed;inset:0;background:radial-gradient(900px 600px at 20% 10%,#3A3F42 0%,var(--navy-2,#202426) 60%);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
+.login .card{width:min(440px,100%);padding:32px 32px 28px;display:flex;flex-direction:column;gap:12px;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.login .logo{width:120px;height:auto;margin:0 auto 8px;display:block}
+:root[data-theme="dark"] .login .logo{filter:invert(1) brightness(1.6)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login .logo{filter:invert(1) brightness(1.6)}}
+.login .eyebrow{color:var(--gold);text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:600;text-align:center}
+.login h1{font-size:26px;text-align:center;letter-spacing:-.02em}
+.login .sub{color:var(--muted);text-align:center;margin-top:-6px;margin-bottom:6px}
+.login .f input{padding:11px 13px;border-radius:10px}
 .login .err{color:var(--crit);font-size:13px;min-height:18px}
-.login .btn.primary{width:100%;padding:11px}
+.login .btn.primary{width:100%;padding:11px;font-size:15px;gap:10px;margin-top:2px}
+.login .note{text-align:center;font-size:12.5px}
 .modo-cliente .side,.modo-cliente .sb,.modo-cliente .sb-overlay,.modo-cliente .switch,.modo-cliente #btnSb,.modo-cliente .busca{display:none!important}
 .modo-cliente .app{grid-template-columns:1fr}
 .modo-cliente .grid{grid-template-columns:1fr}
@@ -97,12 +102,14 @@ window.__PP_LOGIN = (async()=>{
 } else {
 html = html.replace('<script>', `<div class="login" id="login">
   <div class="card">
-    <div class="eyebrow">Neves Pádua Advocacia</div>
-    <h1>Painel de Passivos Bancários</h1>
+    <img class="logo" src="passivos/img/logo-escura.png" alt="">
+    <div class="eyebrow">Sistema interno</div>
+    <h1>Neves Pádua Advocacia</h1>
+    <div class="sub">Painel interno do escritório.</div>
     <div class="f"><label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br"></div>
     <div class="f"><label for="l-senha">Senha</label><input id="l-senha" type="password" autocomplete="current-password"></div>
     <div class="err" id="l-err"></div>
-    <button class="btn primary" id="l-btn">Entrar</button>
+    <button class="btn primary" id="l-btn"><span class="seta"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>Entrar</button>
     <div class="note">Acesso restrito à equipe do escritório e aos clientes convidados. Esqueceu a senha? Fale com o escritório.</div>
   </div>
 </div>
@@ -275,8 +282,9 @@ must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
 html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="passivos/carteira.js${V}"></script>\n<script src="passivos/tarefas.js${V}"></script>\n<script src="passivos/prazos.js${V}"></script>\n<script src="passivos/notificacoes.js${V}"></script>\n<script src="passivos/painel.js${V}"></script>\n<script src="passivos/equipe.js${V}"></script>\n<script src="passivos/rh.js${V}"></script>\n<script src="passivos/dnd.js${V}"></script>\n<script src="passivos/ficha.js${V}"></script>\n<script src="passivos/fluxo.js${V}"></script>\n<script src="passivos/publicacoes.js${V}"></script>\n<script src="passivos/processos.js${V}"></script>\n<script src="passivos/autenticador.js${V}"></script>\n<script src="passivos/marketing.js${V}"></script>\n<script src="passivos/comercial.js${V}"></script>\n<script src="passivos/growth.js${V}"></script>\n<script src="passivos/leads.js${V}"></script>\n<script src="passivos/revisional.js${V}"></script>\n<script src="passivos/pecas.js${V}"></script>\n<script src="passivos/superendividamento.js${V}"></script>\n<script src="passivos/documentos.js${V}"></script>\n<script src="passivos/conhecimento.js${V}"></script>\n</body>`);
 if(modo==='token'){
-  html = html.replace('<title>Painel de Passivos</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
+  html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
+  html = html.replace(/url\(passivos\/fontes\//g,'url(../passivos/fontes/').replace(/src="passivos\/img\//g,'src="../passivos/img/');
 }
 return html;
 }
