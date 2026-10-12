@@ -22,9 +22,9 @@ const serieGiro=prazo=>prazo&&prazo<=12?25441:25442;
 const ROTATIVOS=new Set([25443,25445,25446,25455]);
 
 // ---------- matemática financeira ----------
-function price(P,i,n){if(!P||!n)return null;if(!i)return {parcela:P/n,total:P,juros:0};const im=i/100;const parcela=P*im/(1-Math.pow(1+im,-n));return {parcela,total:parcela*n,juros:parcela*n-P}}
-function sac(P,i,n){if(!P||!n)return null;const im=(i||0)/100;const am=P/n;const juros=im*P*(n+1)/2;return {parcela:am+P*im,parcelaFinal:am+am*im,total:P+juros,juros}}
-function tir(P,parcela,n){if(!P||!parcela||!n||parcela*n<=P)return null;let lo=0,hi=1;for(let k=0;k<80;k++){const mid=(lo+hi)/2;const pv=parcela*(1-Math.pow(1+mid,-n))/mid;if(pv>P)lo=mid;else hi=mid}return (lo+hi)/2*100}
+function price(P,i,n,g=0){if(!P||!n)return null;if(!i)return {parcela:P/n,total:P,juros:0};const im=i/100;const parcela=P*Math.pow(1+im,g)*im/(1-Math.pow(1+im,-n));return {parcela,total:parcela*n,juros:parcela*n-P}}
+function sac(P,i,n,g=0){if(!P||!n)return null;const im=(i||0)/100;const P2=P*Math.pow(1+im,g);const am=P2/n;const juros=im*P2*(n+1)/2+(P2-P);return {parcela:am+P2*im,parcelaFinal:am+am*im,total:P+juros,juros}}
+function tir(P,parcela,n,g=0){if(!P||!parcela||!n||parcela*n<=P)return null;let lo=0,hi=1;for(let k=0;k<80;k++){const mid=(lo+hi)/2;const pv=parcela*(1-Math.pow(1+mid,-n))/mid/Math.pow(1+mid,g);if(pv>P)lo=mid;else hi=mid}return (lo+hi)/2*100}
 function iofEsperado(P,dias){if(!P)return null;const d=Math.min(Math.max(dias||0,0),365);return P*(0.0038+0.000041*d)}
 
 // ---------- dados ----------
@@ -54,7 +54,7 @@ async function contexto(serie,mesIso){try{const [y,m]=mesIso.split("-").map(Numb
 function entradasPadrao(k){
   const prazo=+k.parcelasTotal||null;
   return {serie:SERIE_POR_PRODUTO[k.produto]||serieGiro(prazo),data:k.dataContrato||"",valor:+k.valorOriginal||null,prazo,sistema:ROTATIVOS.has(SERIE_POR_PRODUTO[k.produto])?"rotativo":"price",
-    taxaMensal:null,taxaAnual:null,parcela:null,cet:null,clausulaCap:"nao_consta",capDiaria:"nao",
+    taxaMensal:null,taxaAnual:null,parcela:null,cet:null,valorFinanciado:null,carencia:0,clausulaCap:"nao_consta",capDiaria:"nao",
     moraJuros:1,multa:2,comissaoPerm:"nao",comissaoCumulada:"nao",
     tarifas:{tac:0,tec:0,cadastro:0,avaliacao:0,registro:0,seguro:0,iof:0,outras:0},
     relacionamentoAnterior:"nao_sei",seguroOpcional:"nao_sei",avaliacaoComprovada:"nao_sei",porte:"me_epp",prazoDias:null};
@@ -64,9 +64,9 @@ function entradasPadrao(k){
 function calcular(e,media,selic){
   const r={serie:e.serie,media,mes:mes1(e.data),avisos:[]};
   const s=V.series.find(x=>x.codigo===+e.serie);r.serieNome=s?s.nome:String(e.serie);
-  const i=num(e.taxaMensal),ia=num(e.taxaAnual),P=num(e.valor),n=e.sistema==="rotativo"?null:(+e.prazo||null);
+  const i=num(e.taxaMensal),ia=num(e.taxaAnual),P0=num(e.valor),Pf=num(e.valorFinanciado),P=Pf||P0,g=Math.max(0,+e.carencia||0),n=e.sistema==="rotativo"?null:(+e.prazo||null);r.valorBase=P;r.carencia=g;r.encargosFinanciados=Pf&&P0?Pf-P0:0;
   // 1. média BACEN
-  if(i!=null&&media!=null){r.razao=i/media;r.classe=r.razao>=1.5?"forte":r.razao>=1.2?"indicio":"dentro";r.mediaAA=aa(media)}
+  if(media!=null)r.mediaAA=aa(media);if(i!=null&&media!=null){r.razao=i/media;r.classe=r.razao>=1.5?"forte":r.razao>=1.2?"indicio":"dentro"}
   if(i!=null)r.taxaAA=aa(i);
   // 1b. teto regulado (Pronampe)
   if(e.serie===29978||V.contrato?.produto==="pronampe"){if(selic!=null){const antes=e.data&&e.data<"2021-06-02";r.tetoPronampe={selic,spread:antes?1.25:6,aa:selic+(antes?1.25:6)};r.tetoPronampe.am=amDe(r.tetoPronampe.aa);if(i!=null)r.acimaTeto=i>r.tetoPronampe.am+0.005}else r.avisos.push("Selic do mês não disponível para calcular o teto do Pronampe.")}
@@ -78,17 +78,17 @@ function calcular(e,media,selic){
     else if(ia>r.equivalente+0.02)r.capSituacao="acima_equivalente";
     else r.capSituacao="abaixo";}
   // 3. TIR
-  const parc=num(e.parcela);if(P&&n&&parc){r.tir=tir(P,parc,n);if(r.tir!=null&&i!=null)r.tirDif=r.tir-i}
+  const parc=num(e.parcela);if(P&&n&&parc){r.tir=tir(P,parc,n,g);if(r.tir!=null&&i!=null)r.tirDif=r.tir-i}
   // 4. CET
   const cet=num(e.cet);if(cet!=null&&i!=null){r.cetSituacao=cet+0.01<r.taxaAA?"abaixo_taxa":"ok"}else if(cet==null)r.cetSituacao="ausente";
   // 5. parcelas e totais
   if(P&&n&&i!=null){
-    r.contratada=e.sistema==="sac"?sac(P,i,n):price(P,i,n);
-    r.semCapitalizacao=sac(P,i,n);
-    if(media!=null)r.pelaMedia=e.sistema==="sac"?sac(P,media,n):price(P,media,n);
+    r.contratada=e.sistema==="sac"?sac(P,i,n,g):price(P,i,n,g);
+    r.semCapitalizacao=sac(P,i,n,g);
+    if(media!=null)r.pelaMedia=e.sistema==="sac"?sac(P,media,n,g):price(P,media,n,g);
     if(r.pelaMedia)r.difMedia=r.contratada.juros-r.pelaMedia.juros;
     r.difCapitalizacao=r.contratada.juros-r.semCapitalizacao.juros;
-    if(r.tetoPronampe&&r.tetoPronampe.am!=null){const t=e.sistema==="sac"?sac(P,r.tetoPronampe.am,n):price(P,r.tetoPronampe.am,n);r.difTeto=r.contratada.juros-t.juros}
+    if(r.tetoPronampe&&r.tetoPronampe.am!=null){const t=e.sistema==="sac"?sac(P,r.tetoPronampe.am,n,g):price(P,r.tetoPronampe.am,n,g);r.difTeto=r.contratada.juros-t.juros}
   }else if(P&&e.sistema==="rotativo"&&i!=null){r.rotativo={jurosMes:P*i/100,jurosMesMedia:media!=null?P*media/100:null,juros12:P*(Math.pow(1+i/100,12)-1),juros12Media:media!=null?P*(Math.pow(1+media/100,12)-1):null}}
   // 6. mora
   const mj=num(e.moraJuros),mu=num(e.multa);r.moraJurosAcima=mj!=null&&mj>1.0001;r.multaAcima=mu!=null&&mu>2.0001;
@@ -97,7 +97,7 @@ function calcular(e,media,selic){
   const t=e.tarifas||{};const tv=k=>num(t[k])||0;
   r.tarifas={tac:tv("tac"),tec:tv("tec"),cadastro:tv("cadastro"),avaliacao:tv("avaliacao"),registro:tv("registro"),seguro:tv("seguro"),iof:tv("iof"),outras:tv("outras")};
   r.tacTecIndevida=(r.tarifas.tac+r.tarifas.tec)>0&&e.data>="2008-05-01";
-  r.iofEsperado=iofEsperado(P,e.prazoDias||(n?n*30:365));r.iofAcima=r.tarifas.iof>0&&r.iofEsperado!=null&&r.tarifas.iof>r.iofEsperado*1.05;
+  r.iofEsperado=iofEsperado(P0||P,e.prazoDias||(n?n*30:365));r.iofAcima=r.tarifas.iof>0&&r.iofEsperado!=null&&r.tarifas.iof>r.iofEsperado*1.05;
   r.repeticaoPotencial=(r.tacTecIndevida?r.tarifas.tac+r.tarifas.tec:0)+(e.relacionamentoAnterior==="sim"?r.tarifas.cadastro:0)+(e.avaliacaoComprovada==="nao"?r.tarifas.avaliacao+r.tarifas.registro:0)+(e.seguroOpcional==="nao"?r.tarifas.seguro:0)+(r.iofAcima?r.tarifas.iof-r.iofEsperado:0);
   // 8. teses automáticas
   const st={};
@@ -181,7 +181,7 @@ function renderEntradas(){
   const SNN={sim:"Sim",nao:"Não",nao_sei:"Não sei / verificar"};
   const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h3",{},"1. Dados do contrato"),el("span",{class:"note"},"Taxas em % · valores em R$")));
   sec.append(el("div",{class:"form"},campo("Série do BACEN (modalidade)",serie,"Taxa média mensal, recursos livres, PJ"),campo("Data da contratação",data),campo("Valor liberado",n("valor",{step:"100"})),campo("Sistema",sistema),campo("Prazo (meses)",n("prazo",{step:"1"})),
-    campo("Taxa mensal contratada (%)",n("taxaMensal",{step:"0.0001"})),campo("Taxa anual contratada (%)",n("taxaAnual",{step:"0.0001"}),"Como consta no contrato"),campo("Parcela contratual (R$)",n("parcela",{step:"0.01"}),"Opcional: para a taxa implícita (TIR)"),campo("CET anual informado (%)",n("cet",{step:"0.0001"})),
+    campo("Taxa mensal contratada (%)",n("taxaMensal",{step:"0.0001"})),campo("Taxa anual contratada (%)",n("taxaAnual",{step:"0.0001"}),"Como consta no contrato"),campo("Parcela contratual (R$)",n("parcela",{step:"0.01"}),"Opcional: para a taxa implícita (TIR)"),campo("Valor financiado (R$)",n("valorFinanciado",{step:"0.01"}),"Liberado + IOF/tarifas/seguro financiados; vazio = valor liberado"),campo("Carência (meses até a 1ª parcela, além de 1)",n("carencia",{step:"1",min:"0"}),"Ex.: 1ª parcela 90 dias após = 2"),campo("CET anual informado (%)",n("cet",{step:"0.0001"})),
     campo("Cláusula expressa de capitalização",o3("clausulaCap",{sim:"Sim, expressa (mensal)",nao:"Não há",nao_consta:"Não verifiquei ainda"})),campo("Capitalização diária prevista",o3("capDiaria",{nao:"Não",sim:"Sim"})),campo("Porte da empresa",o3("porte",{me_epp:"ME / EPP",medio:"Médio porte",grande:"Grande porte"}),"Afeta CET e CDC")));
   sec.append(el("h3",{style:"margin-top:14px"},"2. Encargos de inadimplência"),el("div",{class:"form"},campo("Juros de mora (% a.m.)",n("moraJuros",{step:"0.01"})),campo("Multa moratória (%)",n("multa",{step:"0.01"})),campo("Comissão de permanência prevista",o3("comissaoPerm",{nao:"Não",sim:"Sim"})),campo("Cumulada com juros/multa/correção",o3("comissaoCumulada",{nao:"Não",sim:"Sim"}))));
   sec.append(el("h3",{style:"margin-top:14px"},"3. Tarifas e produtos embutidos (R$)"),el("div",{class:"form"},campo("TAC (abertura de crédito)",t("tac")),campo("TEC (emissão de boleto/carnê)",t("tec")),campo("Tarifa de cadastro",t("cadastro")),campo("Tarifa de avaliação do bem",t("avaliacao")),campo("Registro do contrato",t("registro")),campo("Seguro prestamista",t("seguro")),campo("IOF financiado",t("iof")),campo("Outras tarifas",t("outras")),
@@ -204,7 +204,8 @@ function renderResultado(r){
   const linhas=[];
   if(r.contratada){const cen=[["Contratada ("+(e.sistema==="sac"?"SAC":"Price")+")",r.contratada],["Sem capitalização (juros simples sobre saldo, SAC)",r.semCapitalizacao],r.pelaMedia?[`Pela média BACEN (${pc(r.media,2)} a.m.)`,r.pelaMedia]:null].filter(Boolean);
     linhas.push(el("table",{class:"tbl"},el("thead",{},el("tr",{},el("th",{},"Cenário"),el("th",{},"1ª parcela"),el("th",{},"Total pago"),el("th",{},"Juros"),el("th",{},"Diferença"))),el("tbody",{},cen.map(([l,x])=>el("tr",{},el("td",{},l),el("td",{class:"num"},brl(x.parcela)),el("td",{class:"num"},brl(x.total)),el("td",{class:"num"},brl(x.juros)),el("td",{class:"num"},x===r.contratada?"—":brl(r.contratada.juros-x.juros)))))));
-    if(r.tir!=null)linhas.push(el("div",{class:"note"},`Taxa implícita da parcela informada (TIR): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente":"compatível com a contratada"}.`));
+    if(r.tir!=null)linhas.push(el("div",{class:"note"},`Taxa implícita da parcela informada (TIR, base ${brl(r.valorBase)}${r.carencia?`, carência ${r.carencia} mês(es)`:""}): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente (confira valor financiado e carência antes de concluir)":"compatível com a contratada"}.`));
+    if(r.encargosFinanciados)linhas.push(el("div",{class:"note"},`Encargos financiados no principal: ${brl(r.encargosFinanciados)} — os juros incidem também sobre IOF/tarifas (base de juros ${brl(r.valorBase)}).`));
   }else if(r.rotativo){linhas.push(el("div",{class:"note"},`Rotativo: juros de ${brl(r.rotativo.jurosMes)}/mês sobre ${brl(num(e.valor))} (${brl(r.rotativo.juros12)} em 12 meses)${r.rotativo.jurosMesMedia!=null?` · pela média seriam ${brl(r.rotativo.jurosMesMedia)}/mês (${brl(r.rotativo.juros12Media)} em 12 meses)`:""}.`))}
   else linhas.push(el("div",{class:"note"},"Informe valor, prazo e taxa mensal para simular as parcelas."));
   const tar=r.tarifas?Object.values(r.tarifas).reduce((a,b)=>a+b,0):0;
