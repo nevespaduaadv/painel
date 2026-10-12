@@ -475,7 +475,7 @@ const NAV=[{tab:"clientes",label:"Clientes"},
   /*NAV_GRUPOS*/];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
-function irPara(tab){S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}fecharSb();render()}
+function irPara(tab){if(tab==="clientes"&&!readOnly()){S.sel=null;S.q=""}S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}fecharSb();render()}
 function fecharSb(){$("#app")?.classList.remove("sb-aberta")}
 /* Ícones do menu (traço, 24×24) por aba/grupo */
 const ICONES={
@@ -1072,7 +1072,7 @@ render();
   render();
   db.doc("config/regras").onSnapshot(s=>{if(s.exists){const r=s.data();const m={...structuredClone(REGRAS_PADRAO),...r};for(const k of ["fatoresGarantia","fatoresProduto","fatoresSituacao","fatoresBanco","fatoresTitular","fatoresGrupo"])m[k]={...REGRAS_PADRAO[k],...(r[k]||{})};S.regras=m}render()},e=>console.warn(e));
   db.collection("historico").onSnapshot(s=>{S.historico=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
-  db.collection("clientes").onSnapshot(s=>{S.clientes=s.docs.map(d=>({id:d.id,...d.data()}));if(!S.sel&&S.clientes.length&&window.innerWidth>860)S.sel=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""))[0].id;render()},e=>{console.warn(e);toast("Falha ao carregar clientes")});
+  db.collection("clientes").onSnapshot(s=>{S.clientes=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>{console.warn(e);toast("Falha ao carregar clientes")});
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>

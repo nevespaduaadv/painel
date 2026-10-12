@@ -238,7 +238,7 @@ function botaoLinkCliente(c){return el("button",{class:"btn sm",onclick:()=>open
 async function openLinkCliente(c){
   const [{data:row},{data:ac}]=await Promise.all([SB.from("clientes").select("acesso_por_token,token").eq("id",c.id).maybeSingle(),SB.from("v_acessos_token").select("*").eq("cliente_id",c.id).maybeSingle()]);
   const ativo=!!(row&&row.acesso_por_token&&row.token);
-  const url=ativo?new URL("../cliente/?t="+row.token,location.href).href:null;
+  const url=ativo?new URL("cliente/?t="+row.token,document.baseURI).href:null;
   const body=el("div",{class:"form"},
     el("div",{class:"f full"},el("div",{class:"note"},"Duas formas de o cliente acessar: (1) login no portal, com usuário criado na aba Usuários — recomendado; (2) este link com código secreto, sem login. Quem tiver o link vê a área do cliente (só o publicado). Dá para revogar e gerar outro a qualquer momento.")),
     el("div",{class:"f full"},el("label",{},"Situação"),el("div",{},ativo?el("span",{class:"pill e1"},"Link ativo"):el("span",{class:"pill e2"},"Sem link ativo"),ac&&ac.ultimo_acesso?el("span",{class:"note",style:"margin-left:8px"},`último acesso ${new Date(ac.ultimo_acesso).toLocaleString("pt-BR")} · ${ac.acessos_30d} nos últimos 30 dias`):null)),

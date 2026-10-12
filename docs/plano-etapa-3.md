@@ -229,3 +229,8 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - `processos.cliente_id` opcional; `v_processos` com left join. Formulário do processo tem "Cliente" com a opção "sem cliente (fora da base)"; trocar transfere andamentos, tarefas e timeline.
 - Tela **Processos** (`processos.js`, aba `processos`): todos os processos, filtros (status, cliente/só sem cliente, responsável, busca), detalhe com andamentos, "+ Processo" sem cliente, "+ Tarefa", "+ Andamento"; deep link `#processos/<id>`.
 - Publicações: botão **Atribuir** (lista e leitura) abre tarefa para quem vai tocar o prazo (tipo, responsável, título sugerido, prazo, fatal, prioridade, instruções); grava `tarefas.publicacao_id`, marca lida; a coluna "Tarefa" mostra "→ Mario · 22/10". `v_publicacoes` ganha `tarefas_atribuidas`, `tarefas_atribuidas_abertas`, `atribuidas_para`.
+
+## §32 — URLs e página inicial
+- O app passou a ser gerado em `index.html` (raiz): `https://nevespaduaadv.github.io/painel/#painel`, `#clientes`, `#clientes/<id>/<aba>`, `#processos`… O antigo Portal (cards) foi removido; `passivos/index.html` só redireciona (preserva o hash) para links antigos. `cliente/?t=…` continua.
+- Scripts ficam em `passivos/*.js` (referenciados como `passivos/x.js`); timbrado em `passivos/modelos/`.
+- "Clientes" no menu abre a lista (tabela com filtro) e limpa a seleção; não há mais seleção automática do primeiro cliente.

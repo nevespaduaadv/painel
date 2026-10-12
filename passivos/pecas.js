@@ -6,7 +6,7 @@
 "use strict";
 const DOCX_URL="https://cdn.jsdelivr.net/npm/docx@9.0.2/build/index.umd.js";
 const JSZIP_URL="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
-const TIMBRADO_URL="modelos/papel-timbrado.docx";
+const TIMBRADO_URL=new URL("passivos/modelos/papel-timbrado.docx",document.baseURI).href;
 const P={modelos:[],blocos:[],escritorio:null,ok:false,aba:"modelos",modelo:null,tese:null,peca:"inicial"};
 const admin=()=>PP.perfil?.papel==="admin";
 const brl=x=>x==null||!Number.isFinite(+x)?null:new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(+x);

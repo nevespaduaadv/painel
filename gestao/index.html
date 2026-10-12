@@ -82,7 +82,7 @@ td.r,th.r{text-align:right}
 <div class="login" id="gate"><div><div class="eyebrow">Neves Pádua Advocacia</div><h1 style="font-size:26px;margin:8px 0">Dashboard de Gestão</h1><div id="gateMsg">Verificando acesso…</div></div></div>
 <header class="top">
   <div class="brand"><small>Neves Pádua Advocacia</small><b>Dashboard de Gestão</b></div>
-  <div class="userbox"><a class="btn" href="../">Portal</a><a class="btn" href="../passivos/">Painel</a><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>
+  <div class="userbox"><a class="btn" href="../">Painel</a><span id="userName"></span><button class="btn" id="btnSair">Sair</button></div>
 </header>
 <main class="wrap" id="main" hidden>
   <div class="head">
@@ -200,9 +200,9 @@ function render(){
   const semReg=(D.semRegistro||[]).filter(c=>c.alerta);const lim=(D.semRegistro||[])[0]?.limite_dias??15;
   const atras=(D.prazos||[]).filter(p=>p.faixa==="atrasada");const fatais=(D.prazos||[]).filter(p=>p.prazo_fatal&&["hoje","d7"].includes(p.faixa));
   const itens=[];
-  if(semReg.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${semReg.length} cliente${semReg.length===1?"":"s"} sem registro na timeline há mais de ${lim} dias`),el("div",{class:"note"},semReg.map(c=>`${c.cliente_nome} (${c.dias_sem_registro}d)`).join(" · "))),el("a",{class:"btn",href:"../passivos/#timeline"},"Abrir painel")));
-  if(atras.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${atras.length} prazo${atras.length===1?"":"s"} vencido${atras.length===1?"":"s"}`),el("div",{class:"note"},atras.slice(0,5).map(p=>`${p.cliente_nome}: ${trunc(p.descricao,40)} (${fmtD(parseD(p.prazo))})`).join(" · "))),el("a",{class:"btn",href:"../passivos/#tarefas"},"Ver tarefas")));
-  if(fatais.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${fatais.length} prazo${fatais.length===1?"":"s"} fata${fatais.length===1?"l":"is"} nos próximos 7 dias`),el("div",{class:"note"},fatais.map(p=>`${p.cliente_nome}: ${trunc(p.descricao,40)} (${fmtD(parseD(p.prazo))})`).join(" · "))),el("a",{class:"btn",href:"../passivos/#tarefas"},"Ver prazos")));
+  if(semReg.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${semReg.length} cliente${semReg.length===1?"":"s"} sem registro na timeline há mais de ${lim} dias`),el("div",{class:"note"},semReg.map(c=>`${c.cliente_nome} (${c.dias_sem_registro}d)`).join(" · "))),el("a",{class:"btn",href:"../#timeline"},"Abrir painel")));
+  if(atras.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${atras.length} prazo${atras.length===1?"":"s"} vencido${atras.length===1?"":"s"}`),el("div",{class:"note"},atras.slice(0,5).map(p=>`${p.cliente_nome}: ${trunc(p.descricao,40)} (${fmtD(parseD(p.prazo))})`).join(" · "))),el("a",{class:"btn",href:"../#tarefas"},"Ver tarefas")));
+  if(fatais.length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${fatais.length} prazo${fatais.length===1?"":"s"} fata${fatais.length===1?"l":"is"} nos próximos 7 dias`),el("div",{class:"note"},fatais.map(p=>`${p.cliente_nome}: ${trunc(p.descricao,40)} (${fmtD(parseD(p.prazo))})`).join(" · "))),el("a",{class:"btn",href:"../#tarefas"},"Ver prazos")));
   if((D.semProv||[]).length)itens.push(el("div",{class:"alerta"},el("div",{},el("b",{},`${D.semProv.length} processo${D.semProv.length===1?"":"s"} sem providência`),el("div",{class:"note"},"ativo, sem andamento em 30 dias e sem tarefa aberta"))));
   al.append(itens.length?el("div",{style:"display:flex;flex-direction:column;gap:8px"},itens):el("div",{class:"alerta ok"},el("b",{},"Nenhum alerta: clientes com registro recente, prazos em dia e processos com providência.")));
 
