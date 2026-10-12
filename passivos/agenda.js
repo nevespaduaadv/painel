@@ -33,6 +33,11 @@ function visiveis(){
 }
 function abrir(ev){
   if(ev.origem==="tarefa"&&ev.tarefa_id){window.PP_TAREFAS?.abrir(ev.tarefa_id);return}
+  if(ev.lead_id){
+    const body=el("div",{class:"form"},el("div",{class:"f full"},el("div",{class:"note"},`${fmtQuando(ev)}${ev.colaborador_nome?" · "+ev.colaborador_nome:""}`),ev.descricao?el("div",{class:"help",style:"white-space:pre-wrap;margin-top:8px"},ev.descricao.slice(0,1500)):null,el("div",{class:"help",style:"margin-top:10px"},"Reunião marcada no CRM — para mudar data/hora, altere o campo \"Reunião\" na ficha do lead.")));
+    modal(ev.titulo,body,async()=>{},el("a",{class:"btn",href:"#leads/"+ev.lead_id,onclick:()=>{$("#modalHost").replaceChildren()}},"Abrir o lead"));
+    $("#modalHost button.btn.primary")?.remove();return;
+  }
   if(ev.origem==="google"){
     const body=el("div",{class:"form"},el("div",{class:"f full"},el("div",{class:"note"},`${fmtQuando(ev)}${ev.colaborador_nome?" · "+ev.colaborador_nome:""}`),ev.local?el("div",{},"📍 "+ev.local):null,ev.descricao?el("div",{class:"help",style:"white-space:pre-wrap;margin-top:8px"},ev.descricao.slice(0,1500)):null,el("div",{class:"help",style:"margin-top:10px"},"Evento criado no Google Calendar — edite por lá; a alteração chega aqui na próxima sincronização.")));
     modal(ev.titulo,body,async()=>{},ev.link?el("a",{class:"btn",href:ev.link,target:"_blank",rel:"noopener"},"Abrir no Google"):null);
