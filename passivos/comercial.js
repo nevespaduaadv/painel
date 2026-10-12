@@ -149,9 +149,7 @@ async function gerarSemanas(silencioso){
 
 /* ---------- estilo e registro ---------- */
 document.head.append(el("style",{},`
-.cm-niv{border-color:var(--line);color:var(--fg)}.cm-niv[aria-selected="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
-.cm-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:1000px){.cm-niv{border-color:var(--line);color:var(--fg)}.cm-niv[aria-selected="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
-.cm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cm-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:1000px){.cm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .cm-bar{position:relative;height:6px;background:var(--line);border-radius:3px;margin-top:8px;overflow:visible}.cm-bar i{display:block;height:100%;border-radius:3px}.cm-bar b{position:absolute;top:-3px;width:2px;height:12px;background:var(--gold)}.cm-bar.lg{height:10px;flex:1;margin:0}
 .cm-grid{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin:16px 0}@media(max-width:900px){.cm-grid{grid-template-columns:1fr}}
 .cm-svg{width:100%;height:auto}.cm-l{font-size:13px;fill:var(--muted)}.cm-n{font-size:12px;fill:var(--fg);font-variant-numeric:tabular-nums}

@@ -211,3 +211,11 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Modo cliente/token: sidebar e busca escondidas; topo mostra "Neves Pádua Advocacia · Minha área".
 - Mockup de referência: `docs/mockup-shell.html`.
 - Próximos: componentes base (tabela padrão, drawer de ficha), "Meu painel" inicial por perfil, migração das telas.
+
+## §29 — PR 21: componentes base e visual "moderno"
+- Tipografia: Inter em todo o app; Cormorant só na marca e no nome do cliente (`.display`). Rótulos em minúsculas (KPIs, formulários, tabelas, timeline).
+- Cards com sombra suave, cantos 10px, bordas mais claras; botões 8px; foco dourado nos campos.
+- `tabela({cols,rows,onRow,acts,vazio,foot})` e `btnIco(k,title,onclick)` (ícones `ICO`) globais em `painel.html`; ações de linha aparecem ao passar o mouse (`.hover-acts`).
+- Clientes: a lista lateral virou página de tabela (filtro, KPIs, situação, responsável); a ficha ocupa a largura toda com "← Clientes".
+- Abas internas (`.wrap .tabs`, `.modal .tabs`) viram controle segmentado; estilos da sidebar escopados em `.sb`.
+- Ficha do cliente: campos endereço, representante, CPF e qualificação (usados nas peças).

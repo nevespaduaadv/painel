@@ -100,8 +100,10 @@ function openFichaForm(c){
         dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),
         hist=el("textarea",{placeholder:"O que aconteceu com a empresa: expansão, queda de faturamento, inadimplência, execuções… em poucas linhas."},c.historia||""),sit=el("textarea",{placeholder:"Opera? Fatura? Em que conta recebe? Negativado?"},c.situacao_atual||""),
         neg=tri(c.negativado),maq=tri(c.usa_maquininha),cons=tri(c.tem_consorcio),outros=inp("text",c.outros_cnpjs||""),ass=inp("text",c.assuntos_interesse||""),disp=inp("text",c.disponibilidade||""),obs=el("textarea",{},c.observacoes_onboarding||""),
-        res=inp("number",c.reservaAcumulada||0,{step:"100"});
+        res=inp("number",c.reservaAcumulada||0,{step:"100"}),
+        ender=inp("text",c.endereco||"",{placeholder:"Rua, nº, bairro, cidade/UF, CEP"}),rep=inp("text",c.representante||""),repcpf=inp("text",c.representante_cpf||"",{placeholder:"000.000.000-00"}),repq=inp("text",c.representante_qualificacao||"",{placeholder:"brasileiro, casado, empresário"});
   const body=el("div",{class:"form"},field("f-nome","Razão social / nome",nome),field("f-fant","Nome fantasia",fant),field("f-tipo","Tipo",tipo),field("f-cnpj","CNPJ / CPF",cnpj),field("f-cpf","CPF do titular / sócio",cpf),
+    el("div",{class:"f full"},el("label",{for:"f-ender"},"Endereço completo (usado nas peças)"),Object.assign(ender,{id:"f-ender"})),field("f-rep","Representante legal",rep),field("f-repcpf","CPF do representante",repcpf),field("f-repq","Qualificação do representante",repq,"Nacionalidade, estado civil, profissão — entra na qualificação da peça."),
     field("f-cid","Cidade",cidade),field("f-uf","UF",uf),field("f-seg","Segmento",seg),field("f-fat","Faturamento mensal (R$)",fat),field("f-func","Funcionários",func),
     field("f-resp","Responsável no escritório",resp),field("f-closer","Closer",closer),field("f-origem","Origem",origem.wrap),field("f-plano","Plano / serviço",plano.wrap),field("f-status","Status",status),
     field("f-dfech","Data do fechamento",dfech),field("f-donb","Data do onboarding",donb),field("f-prox","Próxima reunião",prox),field("f-res","Reserva acumulada (R$)",res),
@@ -109,7 +111,7 @@ function openFichaForm(c){
     field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs));
   modal("Ficha do cliente",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
-    const cols={nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
+    const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
       faturamento_mensal:fat.value===""?null:+fat.value,funcionarios:func.value===""?null:+func.value,closer:closer.value.trim()||null,origem:origem.input.value.trim()||null,plano:plano.input.value.trim()||null,status:status.value,
       data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
       negativado:triVal(neg),usa_maquininha:triVal(maq),tem_consorcio:triVal(cons),outros_cnpjs:outros.value.trim()||null,assuntos_interesse:ass.value.trim()||null,disponibilidade:disp.value.trim()||null,observacoes_onboarding:obs.value.trim()||null};
