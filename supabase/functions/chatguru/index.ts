@@ -356,7 +356,9 @@ async function coletarGrowth(opts: { dias?: number; inicio?: string; fim?: strin
     const dias: string[] = []; for (let d = new Date(fim + "T00:00:00Z"); diaISO(d) >= inicio && dias.length < 30; d.setUTCDate(d.getUTCDate() - 1)) dias.push(diaISO(d));
     for (const d of dias) {
       try {
-        const t = await graph(`${ig}/insights`, { metric: "profile_views,accounts_engaged,total_interactions,website_clicks", period: "day", metric_type: "total_value", since: d, until: d }, token);
+        // total_value só aceita janela em timestamp Unix (00:00 → 00:00 do dia seguinte, horário de Brasília)
+        const ini = Math.floor(new Date(d + "T03:00:00Z").getTime() / 1000), fimTs = ini + 86400;
+        const t = await graph(`${ig}/insights`, { metric: "profile_views,accounts_engaged,total_interactions,website_clicks", period: "day", metric_type: "total_value", since: String(ini), until: String(fimTs) }, token);
         for (const m of (t.data as Dict[]) ?? []) (porDia[d] ??= { data: d })[String(m.name)] = (m.total_value as Dict | undefined)?.value ?? null;
       } catch (e) { avisos.push(`IG ${d}: ${e instanceof Error ? e.message : e}`); break; }
     }
