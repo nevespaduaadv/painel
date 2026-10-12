@@ -88,7 +88,7 @@ insert into public.teses_revisionais (codigo, nome, grupo, verificacao, fundamen
    'alto', 'Capitalização diária sem taxa diária informada vem sendo tratada como nula. Quantificar o efeito exige perícia sobre a evolução do saldo.', 20),
   ('taxa_divergente', 'Taxa efetivamente aplicada diverge da contratada', 'encargos', 'auto',
    'Art. 6º, III, e art. 46 CDC; arts. 113 e 422 CC; Res. CMN 4.881/2020 (CET)',
-   'Auto: a partir do valor liberado, do prazo e da parcela informada, calcula a taxa implícita (TIR) e compara com a mensal do contrato. Divergência acima de 0,05 p.p. para cima é indício de cobrança diversa (base para exibição de extratos e perícia).',
+   'Auto: a partir do valor liberado, do prazo e da parcela informada, calcula a taxa implícita (TIR) e compara com a mensal do contrato. Divergência acima de 0,10 p.p. para cima é indício de cobrança diversa (entre 0,05 e 0,10 p.p. costuma ser contagem de dias do 1º período) (base para exibição de extratos e perícia).',
    'medio', null, 30),
   ('cet', 'Custo Efetivo Total ausente ou divergente', 'encargos', 'auto_manual',
    'Res. CMN 4.881/2020 (antes 3.517/2007); art. 52 CDC',

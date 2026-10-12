@@ -105,7 +105,7 @@ function calcular(e,media,selic){
   if(r.acimaTeto)st.juros_media="constatada";
   st.capitalizacao=r.capSituacao==="presume"||r.capSituacao==="acima_equivalente"?(e.clausulaCap==="sim"?"nao_aplica":"indicio"):r.capSituacao==="proporcional"||r.capSituacao==="sem_anual"?(e.clausulaCap==="sim"?"nao_aplica":"indicio"):"verificar";
   if(e.capDiaria==="sim")st.capitalizacao="indicio";
-  st.taxa_divergente=r.tirDif!=null?(r.tirDif>0.05?"constatada":"nao_aplica"):"verificar";
+  st.taxa_divergente=r.tirDif!=null?(r.tirDif>0.10?"constatada":r.tirDif>0.05?"indicio":"nao_aplica"):"verificar";
   st.cet=r.cetSituacao==="abaixo_taxa"?"constatada":r.cetSituacao==="ausente"?"indicio":"nao_aplica";
   st.mora_juros=mj==null?"verificar":r.moraJurosAcima?"constatada":"nao_aplica";
   st.mora_multa=mu==null?"verificar":r.multaAcima?"constatada":"nao_aplica";
@@ -204,7 +204,7 @@ function renderResultado(r){
   const linhas=[];
   if(r.contratada){const cen=[["Contratada ("+(e.sistema==="sac"?"SAC":"Price")+")",r.contratada],["Sem capitalização (juros simples sobre saldo, SAC)",r.semCapitalizacao],r.pelaMedia?[`Pela média BACEN (${pc(r.media,2)} a.m.)`,r.pelaMedia]:null].filter(Boolean);
     linhas.push(el("table",{class:"tbl"},el("thead",{},el("tr",{},el("th",{},"Cenário"),el("th",{},"1ª parcela"),el("th",{},"Total pago"),el("th",{},"Juros"),el("th",{},"Diferença"))),el("tbody",{},cen.map(([l,x])=>el("tr",{},el("td",{},l),el("td",{class:"num"},brl(x.parcela)),el("td",{class:"num"},brl(x.total)),el("td",{class:"num"},brl(x.juros)),el("td",{class:"num"},x===r.contratada?"—":brl(r.contratada.juros-x.juros)))))));
-    if(r.tir!=null)linhas.push(el("div",{class:"note"},`Taxa implícita da parcela informada (TIR, base ${brl(r.valorBase)}${r.carencia?`, carência ${r.carencia} mês(es)`:""}): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente (confira valor financiado e carência antes de concluir)":"compatível com a contratada"}.`));
+    if(r.tir!=null)linhas.push(el("div",{class:"note"},`Taxa implícita da parcela informada (TIR, base ${brl(r.valorBase)}${r.carencia?`, carência ${r.carencia} mês(es)`:""}): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.10?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente (confira valor financiado e carência antes de concluir)":r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p. — diferença pequena, compatível com contagem de dias do 1º período; confirmar pelos extratos":"compatível com a contratada"}.`));
     if(r.encargosFinanciados)linhas.push(el("div",{class:"note"},`Encargos financiados no principal: ${brl(r.encargosFinanciados)} — os juros incidem também sobre IOF/tarifas (base de juros ${brl(r.valorBase)}).`));
   }else if(r.rotativo){linhas.push(el("div",{class:"note"},`Rotativo: juros de ${brl(r.rotativo.jurosMes)}/mês sobre ${brl(num(e.valor))} (${brl(r.rotativo.juros12)} em 12 meses)${r.rotativo.jurosMesMedia!=null?` · pela média seriam ${brl(r.rotativo.jurosMesMedia)}/mês (${brl(r.rotativo.juros12Media)} em 12 meses)`:""}.`))}
   else linhas.push(el("div",{class:"note"},"Informe valor, prazo e taxa mensal para simular as parcelas."));
