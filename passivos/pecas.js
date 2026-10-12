@@ -19,7 +19,7 @@ const CAMPOS=[["cliente.nome","Razão social"],["cliente.cnpj","CNPJ"],["cliente
   ["bacen.serie","Série SGS"],["bacen.nome","Nome da série"],["bacen.mes","Mês de referência"],["bacen.media_mensal","Média mensal"],["bacen.media_anual","Média anual"],["bacen.razao","Razão contratada ÷ média"],
   ["calc.juros_contratados","Juros totais contratados"],["calc.juros_media","Juros pela média"],["calc.dif_media","Diferença vs média"],["calc.dif_capitalizacao","Efeito da capitalização"],["calc.total_contratado","Total pago contratado"],["calc.total_media","Total pela média"],["calc.parcela_media","Parcela pela média"],["calc.duodecuplo","12× a taxa mensal"],["calc.equivalente","Taxa anual equivalente"],["calc.tir","Taxa implícita (TIR)"],["calc.tarifas_total","Tarifas totais"],["calc.repeticao","Repetição potencial"],["calc.iof_esperado","IOF esperado"],
   ["tarifas.tac","TAC"],["tarifas.tec","TEC"],["tarifas.cadastro","Tarifa de cadastro"],["tarifas.avaliacao","Tarifa de avaliação"],["tarifas.registro","Registro"],["tarifas.seguro","Seguro prestamista"],["tarifas.iof","IOF"],["mora.juros","Juros de mora"],["mora.multa","Multa"],
-  ["escritorio.nome","Escritório"],["escritorio.cnpj","CNPJ do escritório"],["escritorio.endereco","Endereço do escritório"],["escritorio.cidade","Cidade do escritório"],["escritorio.uf","UF do escritório"],["advogado.nome","Advogado(a)"],["advogado.oab","OAB"],["hoje","Data de hoje"],["comarca","Comarca"],["valor_causa","Valor da causa"],["recomendacao","Recomendação (parecer)"],
+  ["processo","Nº do processo"],["contrato.numero","Nº do contrato"],["valor_executado","Valor executado / cobrado"],["banco.cnpj","CNPJ do banco"],["banco.endereco","Endereço do banco"],["escritorio.nome","Escritório"],["escritorio.cnpj","CNPJ do escritório"],["escritorio.endereco","Endereço do escritório"],["escritorio.cidade","Cidade do escritório"],["escritorio.uf","UF do escritório"],["advogado.nome","Advogado(a)"],["advogado.oab","OAB"],["hoje","Data de hoje"],["comarca","Comarca"],["valor_causa","Valor da causa"],["recomendacao","Recomendação (parecer)"],
   ["NOS","Parte do cliente (Autora / Embargante / Ré) — use com artigo: a {{NOS}}, da {{NOS}}"],["ELES","Parte do banco (Réu / Embargado / Autor) — o {{ELES}}, do {{ELES}}"],["calc.valor_expurgado","Valor financiado sem tarifas/seguro indevidos"],["BLOCOS:fatos","Blocos: fatos das teses"],["BLOCOS:fundamentos","Blocos: fundamentação por tese"],["BLOCOS:pedidos","Blocos: pedidos"],["BLOCOS:provas","Blocos: provas"],["BLOCOS:parecer","Blocos: parecer ao cliente"]];
 
 async function carregar(force){
@@ -45,6 +45,7 @@ function campos(ctx){
     "bacen.serie":e.serie?String(e.serie):null,"bacen.nome":r.serieNome,"bacen.mes":r.mes?r.mes.slice(5,7)+"/"+r.mes.slice(0,4):null,"bacen.media_mensal":pct(r.media),"bacen.media_anual":pct(r.mediaAA),"bacen.razao":r.razao!=null?r.razao.toLocaleString("pt-BR",{maximumFractionDigits:2}):null,
     "calc.juros_contratados":brl(r.contratada?.juros),"calc.juros_media":brl(r.pelaMedia?.juros),"calc.dif_media":brl(r.difMedia),"calc.dif_capitalizacao":brl(r.difCapitalizacao),"calc.total_contratado":brl(r.contratada?.total),"calc.total_media":brl(r.pelaMedia?.total),"calc.parcela_media":brl(r.pelaMedia?.parcela),"calc.duodecuplo":pct(r.duodecuplo),"calc.equivalente":pct(r.equivalente),"calc.tir":pct(r.tir,3),"calc.tarifas_total":brl(r.tarifas?Object.values(r.tarifas).reduce((a,b)=>a+b,0):null),"calc.repeticao":brl(r.repeticaoPotencial),"calc.iof_esperado":brl(r.iofEsperado),
     "tarifas.tac":brl(r.tarifas?.tac),"tarifas.tec":brl(r.tarifas?.tec),"tarifas.cadastro":brl(r.tarifas?.cadastro),"tarifas.avaliacao":brl(r.tarifas?.avaliacao),"tarifas.registro":brl(r.tarifas?.registro),"tarifas.seguro":brl(r.tarifas?.seguro),"tarifas.iof":brl(r.tarifas?.iof),"mora.juros":pct(e.moraJuros),"mora.multa":pct(e.multa),
+    "processo":extra.processo,"contrato.numero":extra.numeroContrato,"valor_executado":extra.valorExecutado,"banco.cnpj":extra.bancoCnpj,"banco.endereco":extra.bancoEndereco,
     "escritorio.nome":esc.nome,"escritorio.cnpj":esc.cnpj,"escritorio.endereco":esc.endereco,"escritorio.cidade":esc.cidade,"escritorio.uf":esc.uf,"advogado.nome":adv.nome,"advogado.oab":adv.oab,"hoje":hojeExtenso(),"comarca":extra.comarca,"valor_causa":extra.valorCausa,"recomendacao":extra.recomendacao};
   return v;
 }
@@ -129,29 +130,32 @@ async function abrir(ctx){
   const modelo=sel(Object.fromEntries(P.modelos.filter(m=>m.ativo).map(m=>[m.id,m.nome])),P.modelos[0]?.id||"");
   const secOpc=el("div",{class:"pc-teses"});const secChecks=new Map();
   const montarOpcionais=()=>{secOpc.replaceChildren();secChecks.clear();const m=P.modelos.find(x=>x.id===modelo.value);(m?.secoes||[]).filter(s=>s.opcional).forEach(s=>{const cb=inp("checkbox","",{});cb.checked=s.padrao!==false;secChecks.set(s.chave,cb);secOpc.append(el("label",{class:"pc-tese"},cb,el("span",{},s.titulo||s.chave)))});};
-  const comarca=inp("text",c.cidade?`${c.cidade}/${c.uf||""}`.replace(/\/$/,""):"",{placeholder:"Comarca"});
+  const comarca=inp("text",(ent.peca&&ent.peca.comarca)||(c.cidade?`${c.cidade}/${c.uf||""}`.replace(/\/$/,""):""),{placeholder:"Comarca"});
   const vc=inp("text",res.difMedia>0?BRL(res.difMedia):"",{placeholder:"R$"});
+  const ex=ent.peca||{};const proc=inp("text",ex.processo||"",{placeholder:"0000000-00.0000.0.00.0000"}),ncon=inp("text",ex.numeroContrato||"",{placeholder:"nº da cédula/contrato"}),vex=inp("text",ex.valorExecutado||"",{placeholder:"R$ (valor executado ou cobrado)"}),bcnpj=inp("text",ex.bancoCnpj||"",{placeholder:"00.000.000/0001-00"}),bend=inp("text",ex.bancoEndereco||"",{placeholder:"sede do banco"});
   const reco=el("textarea",{rows:"3"},recomendacaoPadrao(teses));
   const lista=el("div",{class:"pc-teses"});
   const ST={constatada:["e3","Constatada"],indicio:["e2","Indício"],verificar:["g","Verificar"],nao_aplica:["e1","Não se aplica"]};
   const checks=teses.filter(t=>t.status!=="nao_aplica").map(t=>{const cb=inp("checkbox","",{});cb.checked=t.status==="constatada"||t.status==="indicio";const bloco=P.blocos.find(b=>b.tese===t.codigo);return {t,cb,row:el("label",{class:"pc-tese"},cb,el("span",{class:"pill "+ST[t.status][0]},ST[t.status][1]),el("span",{},t.nome),bloco?.rascunho?el("span",{class:"pill g",title:"Bloco ainda não revisado pelo escritório"},"rascunho"):null,!bloco?el("span",{class:"note"},"sem bloco"):null)}});
   checks.forEach(x=>lista.append(x.row));
   const campoVC=field("pc-vc","Valor da causa",vc),campoCom=field("pc-com","Comarca",comarca),campoReco=field("pc-reco","Recomendação ao cliente",reco);
+  const campoProc=field("pc-proc","Nº do processo",proc),campoNcon=field("pc-ncon","Nº do contrato",ncon),campoVex=field("pc-vex","Valor executado / cobrado",vex),campoBcnpj=field("pc-bcnpj","CNPJ do banco",bcnpj),campoBend=field("pc-bend","Endereço do banco",bend);
   const descr=el("div",{class:"note"});
-  const ajustar=()=>{const m=P.modelos.find(x=>x.id===modelo.value);const parecer=m?.tipo==="parecer";campoVC.hidden=parecer;campoCom.hidden=parecer;campoReco.hidden=!parecer;descr.textContent=m?.descricao||"";montarOpcionais()};modelo.onchange=ajustar;
-  const body=el("div",{class:"form"},field("pc-mod","Tipo de peça",modelo),el("div",{class:"f full"},descr),campoCom,campoVC,campoReco,el("div",{class:"f full"},el("label",{},"Seções opcionais"),secOpc),el("div",{class:"f full"},el("label",{},"Teses incluídas na peça"),lista),
+  const ajustar=()=>{const m=P.modelos.find(x=>x.id===modelo.value);const parecer=m?.tipo==="parecer";campoVC.hidden=parecer;campoCom.hidden=parecer;campoReco.hidden=!parecer;campoProc.hidden=parecer||m?.tipo==="inicial";campoVex.hidden=parecer||m?.tipo==="inicial";campoBcnpj.hidden=parecer;campoBend.hidden=parecer;descr.textContent=m?.descricao||"";montarOpcionais()};modelo.onchange=ajustar;
+  const body=el("div",{class:"form"},field("pc-mod","Tipo de peça",modelo),el("div",{class:"f full"},descr),campoCom,campoProc,campoNcon,campoVex,campoVC,campoBcnpj,campoBend,campoReco,el("div",{class:"f full"},el("label",{},"Seções opcionais"),secOpc),el("div",{class:"f full"},el("label",{},"Teses incluídas na peça"),lista),
     el("div",{class:"f full note"},"Campos sem valor saem destacados em amarelo («assim») para preenchimento. Blocos marcados como rascunho ainda não foram revisados pelo escritório — ajuste em Jurídico › Modelos de peças."));
   ajustar();
   modal("Gerar peça (.docx)",body,async()=>{
     const m=P.modelos.find(x=>x.id===modelo.value);if(!m)throw new Error("Escolha o modelo");
     const escolhidas=checks.filter(x=>x.cb.checked).map(x=>x.t);
-    const v=campos({k,c,ent,res,partes:m.partes,extra:{comarca:comarca.value.trim()||null,valorCausa:vc.value.trim()||null,recomendacao:reco.value.trim()||null}});
+    ent.peca={processo:proc.value.trim()||null,numeroContrato:ncon.value.trim()||null,valorExecutado:vex.value.trim()||null,bancoCnpj:bcnpj.value.trim()||null,bancoEndereco:bend.value.trim()||null,comarca:comarca.value.trim()||null,valorCausa:vc.value.trim()||null};
+    const v=campos({k,c,ent,res,partes:m.partes,extra:{...ent.peca,recomendacao:reco.value.trim()||null}});
     const ativas=new Set([...secChecks.entries()].filter(([k,cb])=>cb.checked).map(([k])=>k));
     const itens=montar(m,P.blocos,escolhidas,v,ativas);
     const nome=`${slug({parecer:"parecer",embargos:"embargos-execucao",monitoria:"embargos-monitorios",contestacao:"contestacao",inicial:"inicial-revisional"}[m.tipo]||m.tipo)}-${slug(c.nome).slice(0,40)}-${slug(k.banco)}.docx`;
     await gerarDocx(itens,nome);
     SB.from("pecas_geradas").insert({revisao_id:rev?.id||null,cliente_id:k.clienteId,modelo_id:m.id,teses:escolhidas.map(t=>t.codigo),arquivo:nome}).then(()=>{});
-    toast("Peça gerada: "+nome);
+    toast("Peça gerada: "+nome+" — salve a revisão para guardar os dados da peça");
   });
   const btn=$("#modalHost .btn.primary");if(btn)btn.textContent="Gerar .docx";
 }
