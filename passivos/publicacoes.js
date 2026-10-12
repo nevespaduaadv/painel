@@ -76,7 +76,8 @@ function atribuir(p){
   titulo.oninput=()=>{titulo.dataset.auto="0"};tipo.onchange=sug;sug();
   const body=el("div",{class:"form"},
     el("div",{class:"f full note"},`Publicação de ${fmtD(parseD(p.data_disponibilizacao))} · ${p.numero_processo||"sem número"}${p.cliente_nome?" · "+p.cliente_nome:" · sem cliente na base"}${proc?"":" · processo não vinculado (a tarefa fica sem processo)"}`),
-    field("at-tipo","Tipo",tipo),field("at-resp","Para quem",resp),field("at-tit","Título da tarefa",titulo),field("at-prazo","Prazo",prazo),
+    field("at-tipo","Tipo",tipo),field("at-resp","Para quem",resp),field("at-tit","Título da tarefa",titulo),field("at-prazo","Prazo (vencimento)",prazo),
+    window.PP_PRAZOS?window.PP_PRAZOS.campo({alvo:prazo,base:p.data_disponibilizacao,uf:window.PP_PRAZOS.ufDoCnj(p.numero_processo),dias:15,tipo:"uteis"}):null,
     el("div",{class:"f",style:"justify-content:center"},el("label",{style:"display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px"},fatal,"Prazo fatal")),field("at-pri","Prioridade",pri),
     field("at-desc","Instruções / comentário",desc,`Quem recebe vê isto na tarefa e é avisado no sino${meu?" como vindo de "+meu.nome:""}.`));
   modal("Atribuir tarefa a partir da publicação",body,async()=>{

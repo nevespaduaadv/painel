@@ -140,7 +140,8 @@ function openTarefaForm(t={}){
     pro.replaceChildren(el("option",{value:""},"— sem vínculo —"),...T.processos.filter(p=>p.cliente_id===cid||p.id===t.processo_id).map(p=>el("option",{value:p.id,selected:p.id===t.processo_id?"":null},(p.numero_cnj||"(sem número)")+(p.parte_contraria?" · "+p.parte_contraria:""))));};
   cli.onchange=vincular;vincular();
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"tf-tit"},"Título"),Object.assign(titulo,{id:"tf-tit"})),field("tf-cli","Cliente",cli),field("tf-resp","Responsável",resp),field("tf-nuc","Núcleo",nuc),
-    field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),fatal.wrap,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
+    field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),fatal.wrap,
+    window.PP_PRAZOS?(()=>{const d=el("details",{class:"f full"},el("summary",{style:"cursor:pointer;color:var(--muted);font-size:13px"},"Calcular prazo a partir de uma publicação/intimação…"));d.addEventListener("toggle",()=>{if(d.open&&!d.dataset.ok){d.dataset.ok="1";const pr=T.processos.find(x=>x.id===pro.value);d.append(window.PP_PRAZOS.campo({alvo:prazo,base:hojeISO(),uf:window.PP_PRAZOS.ufDoCnj(pr?.numero_cnj),dias:15}))}});return d})():null,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
     field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."));
   if(t.id){
     const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));const com=el("textarea",{rows:2,placeholder:"Comentar (ex.: liguei para o cliente, aguardando documentos)"});

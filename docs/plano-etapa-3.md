@@ -240,3 +240,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - **Captura de intimações por certificado** (eproc/e-SAJ TJSP primeiro): A1 no Vault, 2FA pelo Autenticador, regra "abrir × só listar" a definir; depende da importação acima.
 - Calculadora de planos de pagamento (superendividamento, Lei 14.181/2021).
 - Busca global por número de processo; prazos processuais calculados (dias úteis/feriados); agenda; resumo diário via WhatsApp; leitura de intimação por IA; leitura de PDF de contrato na Revisional; financeiro (honorários); portal do cliente com documentos/assinatura; relatórios de produtividade.
+
+## §34 — PR 24: prazos processuais calculados (0037)
+- Tabelas `feriados` (nacional/forense/estadual/municipal, 2026–2027 semeados; SP 09/07; comarcas São Paulo e Franca) e `suspensoes_prazo` (recesso 20/12–20/01). Admin edita direto; UI de feriados fica para depois.
+- `passivos/prazos.js`: `PP_PRAZOS.calcular({base,dias,tipo:'uteis'|'corridos',uf,comarca})` — publicação = 1º dia útil após a disponibilização; exclui o dia do começo, inclui o do vencimento; úteis pulam fds/feriados/suspensão; corridos prorrogam vencimento não útil. UF lida do CNJ (justiça estadual).
+- UI: campo "Contagem do prazo" no Atribuir (publicações) com vencimento preenchido e explicação; no formulário de tarefa, "Calcular prazo a partir de uma publicação…".
+- Testes: sexta 09/10 → 04/11 (12/10 + Finados); 07/10 → 30/10; recesso 15/12 → 11/02/2027.
