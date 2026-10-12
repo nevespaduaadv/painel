@@ -256,3 +256,10 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 ## §36 — PR 26: Timeline × andamento processual (0039)
 - Andamentos (tribunal) não são mais copiados para a timeline (gatilhos removidos, cópias automáticas apagadas); ficam só na aba Processos.
 - O que a equipe faz nos processos entra na timeline pelas tarefas (gatilho em `tarefa_eventos`): "Tarefa aberta … para X · prazo", "Tarefa concluída … por Y", "Y sobre 'tarefa': comentário", cancelada. Tipo `tarefa`, `entradas_timeline.tarefa_id`, invisível ao cliente por padrão (toggle continua). Backfill dos eventos desde 0034.
+
+## §37 — Fila desta semana: Growth na Gestão (skill head-of-growth)
+1. Leads: colunas `campaign_id/adset_id/ad_id` (Meta) gravadas pelo webhook do ChatGuru/formulário; qualificação mapeada nas fases (Qualificado = MQL; Perdido na fase SDR com motivo = desqualificado SDR).
+2. Snapshots diários do Windsor.ai (Meta Ads, Instagram, GA4, GBP, Search Console) em tabelas próprias + funil das nossas tabelas de leads.
+3. Tela Gestão → Growth: funil, CPL/CPQL/custo por reunião, ranking de criativos, antes × agora.
+4. Relatórios Daily/Weekly/Monthly com as regras da skill via API da Anthropic (chave no Vault), salvos em `growth_relatorios`; Weekly por WhatsApp para as sócias.
+Pendências de decisão: chave Windsor.ai; orçamento da API Anthropic; data da migração do CRM (GHL → painel).
