@@ -485,6 +485,7 @@ const ICONES={
   processos:'<path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5M8 13h8M8 17h5"/>',
   revisional:'<path d="M12 3v18M5 7l7-4 7 4M3 13l2-6 2 6a2 2 0 0 1-4 0zM17 13l2-6 2 6a2 2 0 0 1-4 0z"/>',
   pecas:'<path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6M9 13h7M9 17h7"/>',
+  superendividamento:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
   monitoramento:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   publicacoes:'<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>',
   conhecimento:'<path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 0 2 2h13"/>',
@@ -600,7 +601,7 @@ function tabela({cols,rows,onRow,vazio="Nada por aqui.",acts,foot}){
   if(foot)w.append(el("div",{class:"tbl-foot"},foot));
   return w;
 }
-const ICO={abrir:'<path d="M5 12h14M13 6l6 6-6 6"/>',editar:'<path d="M4 20h4l10-10-4-4L4 16z"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',revisional:'<path d="M12 3v18M5 7l7-4 7 4"/>',mais:'<path d="M12 5v14M5 12h14"/>'};
+const ICO={abrir:'<path d="M5 12h14M13 6l6 6-6 6"/>',lixeira:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',editar:'<path d="M4 20h4l10-10-4-4L4 16z"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',revisional:'<path d="M12 3v18M5 7l7-4 7 4"/>',mais:'<path d="M12 5v14M5 12h14"/>'};
 const btnIco=(k,title,onclick,cls="")=>el("button",{class:"btn sm icon "+cls,title,"aria-label":title,onclick,html:`<svg viewBox="0 0 24 24">${ICO[k]||ICO.abrir}</svg>`});
 function renderList(){
   const host=$("#clientList");host.replaceChildren();

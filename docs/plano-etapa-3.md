@@ -267,3 +267,8 @@ Pendências de decisão: chave Windsor.ai; orçamento da API Anthropic; data da 
 ## §38 — Resumo diário pelo Discord (0040)
 - `colaboradores.discord_user_id` + `canal_resumo` (discord | whatsapp | ambos; padrão discord). Segredo `DISCORD_BOT_TOKEN` no Vault (`chatguru_segredo_definir`). Edge Function: DM via bot (`POST /users/@me/channels` + `/channels/{id}/messages`), negrito convertido; `resumos_enviados.canal`.
 - Setup do bot (uma vez): Discord Developer Portal → New Application → Bot → copiar token → OAuth2 URL Generator (scope `bot`, sem permissões especiais) → convidar para o servidor do escritório. Cada pessoa copia o próprio ID de usuário (modo desenvolvedor) para a ficha.
+
+## §39 — PR 27: calculadora de superendividamento (0041)
+- `planos_superendividamento` + `v_planos_superendividamento`; tela Jurídico → Superendividamento (`superendividamento.js`): devedor (da base ou fora), renda, dívidas por credor (tipo, saldo, parcela, consignado), % renda disponível / mínimo existencial (piso Decreto 11.150 só alerta), prazo ≤ 60, carência, juros.
+- Motor: cenário "prazo cheio" (PMT; juros 0 = saldo ÷ n — bate com o Jusfy: 383,33 / 250 / 133,33) e "o que cabe na renda" (meses necessários); desconto necessário para fechar em 60; rateio proporcional; cronograma; alertas (mínimo < piso, parcela > disponível, > 60 meses, consignado > 35%).
+- Documentos .docx no timbrado (via `PP_PECAS.gerarDocx`, agora com tabelas): relatório do cálculo, parecer ao cliente, petição de juntada do plano no processo (art. 104-A §1º). Texto próprio; modelo do escritório pode substituir depois.

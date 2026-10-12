@@ -92,7 +92,7 @@ function montar(modelo,blocos,teses,v,secoesAtivas){
 // ---------- .docx ----------
 async function gerarDocx(itens,nomeArquivo){
   const D=await carregarDocx();
-  const {Document,Packer,Paragraph,TextRun,AlignmentType}=D;
+  const {Document,Packer,Paragraph,TextRun,AlignmentType,Table,TableRow,TableCell,WidthType,BorderStyle}=D;
   const runs=t=>{const parts=String(t).split(/(«[^»]*»)/);return parts.filter(Boolean).map(p=>/^«.*»$/.test(p)?new TextRun({text:p,highlight:"yellow",font:"Times New Roman",size:24}):new TextRun({text:p,font:"Times New Roman",size:24}))};
   const par=(it)=>{
     if(it.tipo==="titulo")return new Paragraph({children:[new TextRun({text:it.texto,bold:true,font:"Times New Roman",size:24})],alignment:AlignmentType.LEFT,spacing:{before:360,after:200,line:360}});
@@ -101,6 +101,14 @@ async function gerarDocx(itens,nomeArquivo){
     if(it.tipo==="centro")return new Paragraph({children:runs(it.texto),alignment:AlignmentType.CENTER,spacing:{after:200,line:360}});
     if(it.tipo==="citacao")return new Paragraph({children:runs(it.texto).map(r=>r),alignment:AlignmentType.JUSTIFIED,indent:{left:2268},spacing:{after:160,line:276},style:undefined});
     if(it.tipo==="item")return new Paragraph({children:runs(it.texto),alignment:AlignmentType.JUSTIFIED,indent:{left:720,hanging:360},spacing:{after:120,line:360}});
+    if(it.tipo==="tabela"){ // {cabecalho:[...], linhas:[[...]], larguras:[%...], num:[idx...]}
+      const b={style:BorderStyle.SINGLE,size:4,color:"BBBBBB"},borders={top:b,bottom:b,left:b,right:b};
+      const cel=(t,cab,i)=>new TableCell({borders,width:it.larguras?{size:it.larguras[i],type:WidthType.PERCENTAGE}:undefined,shading:cab?{fill:"EFEBE2"}:undefined,margins:{top:60,bottom:60,left:100,right:100},
+        children:[new Paragraph({children:[new TextRun({text:String(t??""),bold:!!cab,font:"Times New Roman",size:20})],alignment:(it.num||[]).includes(i)&&!cab?AlignmentType.RIGHT:AlignmentType.LEFT,spacing:{after:0,line:240}})]});
+      const rows=[new TableRow({tableHeader:true,children:it.cabecalho.map((c,i)=>cel(c,true,i))}),...it.linhas.map(l=>new TableRow({children:l.map((c,i)=>cel(c,false,i))}))];
+      return new Table({rows,width:{size:100,type:WidthType.PERCENTAGE}});
+    }
+    if(it.tipo==="espaco")return new Paragraph({children:[],spacing:{after:120}});
     return new Paragraph({children:runs(it.texto),alignment:AlignmentType.JUSTIFIED,indent:{firstLine:1134},spacing:{after:200,line:360}});
   };
   const doc=new Document({styles:{default:{document:{run:{font:"Times New Roman",size:24}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1701,bottom:1134,left:1701,right:1134}}},children:itens.map(par)}]});
@@ -216,7 +224,7 @@ function renderCampos(v){
 
 // ---------- integração ----------
 {const _r=render;render=function(){_r();const vp=$("#view-pecas");if(!vp)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="pecas")S.tab="clientes";vp.hidden=S.tab!=="pecas";if(S.tab==="pecas")renderPecas()}}
-window.PP_PECAS={abrir,recarregar:()=>carregar(true)};
+window.PP_PECAS={abrir,recarregar:()=>carregar(true),gerarDocx,escritorio:()=>P.escritorio};
 const css=document.createElement("style");css.textContent=`
 .pc-teses{display:flex;flex-direction:column;gap:6px}.pc-tese{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}.pc-tese input{width:16px;height:16px;accent-color:var(--gold)}
 .pc-secoes{display:flex;flex-direction:column;gap:12px}.pc-secao{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}.pc-secao-h{display:flex;justify-content:space-between;align-items:center}.pc-secao textarea{width:100%;font-family:inherit;font-size:13px}`;
