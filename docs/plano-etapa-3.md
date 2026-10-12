@@ -246,3 +246,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - `passivos/prazos.js`: `PP_PRAZOS.calcular({base,dias,tipo:'uteis'|'corridos',uf,comarca})` — publicação = 1º dia útil após a disponibilização; exclui o dia do começo, inclui o do vencimento; úteis pulam fds/feriados/suspensão; corridos prorrogam vencimento não útil. UF lida do CNJ (justiça estadual).
 - UI: campo "Contagem do prazo" no Atribuir (publicações) com vencimento preenchido e explicação; no formulário de tarefa, "Calcular prazo a partir de uma publicação…".
 - Testes: sexta 09/10 → 04/11 (12/10 + Finados); 07/10 → 30/10; recesso 15/12 → 11/02/2027.
+
+## §35 — PR 25: resumo diário no WhatsApp (0038)
+- `colaboradores.whatsapp` + `resumo_diario` (ficha do colaborador). `resumo_diario_texto(colab)` monta a mensagem (atrasados, vence hoje, próximos 7 dias, tarefas de lead, notificações não lidas, link do painel); `meu_resumo_diario()` para o botão "Resumo no WhatsApp" do Meu painel.
+- Edge Function `chatguru`: rota `/resumo` (Bearer = token das automações; `resumo_diario_lote` → `message_send`/`chat_add` → `resumo_diario_registrar` em `resumos_enviados`) e ação `resumo` em `/enviar` (JWT; envia o próprio agora).
+- Agendamento: `select public.configurar_resumo_diario(8);` → pg_cron `resumo-diario-np` às 8h BRT seg–sex, reaproveitando URL/token do job `automacoes-np`. Não reenvia a quem já recebeu com sucesso no dia.
+- Deploy da função: colar `supabase/functions/chatguru/index.ts` no editor da função no dashboard (Verify JWT desligado), como no PR 14c.

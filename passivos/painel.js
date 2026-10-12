@@ -40,7 +40,7 @@ function renderPainel(){
   const h=new Date().getHours(),sauda=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
   const escopo=el("div",{class:"tabs"},[["minhas","Minhas"],["equipe","Equipe"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(D.escopo===k),onclick:()=>{D.escopo=k;try{localStorage.setItem("pp-painel-escopo",k)}catch(_){}render()}},l)));
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),el("h1",{},`${sauda}${nome?", "+nome:""}`),el("div",{class:"sub"},"O que precisa da sua atenção hoje.")),
-    el("div",{class:"actions"},escopo,el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
+    el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu WhatsApp, o mesmo resumo que chega às 8h",onclick:enviarResumo},"Resumo no WhatsApp"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const meu=meuColab();const minhas=z=>D.escopo==="equipe"||!meu||z.responsavel_id===meu.id;
   const prazos=D.prazos.filter(minhas);
@@ -65,6 +65,12 @@ function renderPainel(){
     D.eventos.length?el("ul",{class:"tl",style:"margin:14px 18px 14px 24px"},D.eventos.map(e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);return el("li",{},el("div",{class:"d"},fmtDT(e.criado_em)),el("div",{style:"font-size:13.5px"},el("b",{},e.autor_nome||"Alguém")," ",EVENTO[e.tipo]||e.tipo," ",e.tipo==="prazo_alterado"?`${e.de||"—"} para ${e.para||"—"}`:e.tipo==="reatribuida"?`de ${e.de||"—"} para ${e.para||"—"}`:"",t?el("button",{class:"btn sm",style:"margin-left:6px",onclick:()=>window.PP_TAREFAS?.abrir(t.id)},t.titulo.slice(0,40)):"",e.nota?el("div",{class:"note",style:"margin-top:2px"},"“"+e.nota.slice(0,120)+"”"):null))})):el("div",{class:"empty"},"Sem movimentação ainda.")));
   duas.append(col);
   const st=document.createElement("style");st.textContent="@media(max-width:1000px){#view-painel .duas{grid-template-columns:1fr!important}}";duas.classList.add("duas");v.append(st,duas);
+}
+async function enviarResumo(){
+  try{const {data:{session}}=await SB.auth.getSession();if(!session)throw new Error("Faça login de novo");toast("Enviando…");
+    const r=await fetch(SB_URL+"/functions/v1/chatguru/enviar",{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+session.access_token},body:JSON.stringify({acao:"resumo"})});
+    const j=await r.json().catch(()=>({ok:false,erro:"Resposta inválida"}));if(!r.ok||j.ok===false)throw new Error(j.erro||("HTTP "+r.status));toast("Resumo enviado para o seu WhatsApp")}
+  catch(e){toast("Não foi possível enviar: "+e.message)}
 }
 let rt=null;
 function tempoReal(){const ch=SB.channel("painel");ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rt);rt=setTimeout(()=>{D.ok=false;if(S.tab==="painel")garantir()},500)});ch.subscribe()}

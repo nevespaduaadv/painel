@@ -195,6 +195,19 @@ async function enviar(req: Request): Promise<Response> {
   const corpo = (await req.json().catch(() => ({}))) as Dict;
   const acao = corpo.acao;
   if (acao === "testar") { const r = await testarConexao(cg); return json(200, { ok: r.ok, descricao: r.descricao, servidor: new URL(cg.url).hostname }); }
+  if (acao === "resumo") { // meu resumo diário, agora
+    const rt = await rest("rpc/meu_resumo_diario", jwt, { method: "POST", body: "{}" });
+    const texto = rt.ok ? ((await rt.json()) as string | null) : null;
+    if (!texto) return json(400, { ok: false, erro: "Você não tem registro de colaborador." });
+    const rid = await rest("rpc/meu_colaborador", jwt, { method: "POST", body: "{}" });
+    const meuId = rid.ok ? ((await rid.json()) as string | null) : null;
+    const rc = meuId ? await rest(`colaboradores?id=eq.${meuId}&select=id,nome,whatsapp`, service()) : null;
+    const [me] = rc?.ok ? ((await rc.json()) as { id: string; nome: string; whatsapp: string | null }[]) : [];
+    if (!me?.whatsapp) return json(400, { ok: false, erro: "Cadastre seu WhatsApp na ficha de colaborador." });
+    const res = await enviarMensagem(cg, me, texto);
+    if (!res.ok) return json(502, { ok: false, erro: res.erro });
+    return json(200, { ok: true, numero: res.numero });
+  }
   if (acao !== "mensagem" && acao !== "anotacao" && acao !== "localizar") return json(400, { ok: false, erro: "Ação inválida." });
   const leadId = String(corpo.lead_id ?? ""); const texto = String(corpo.texto ?? "").trim();
   if (!UUID.test(leadId)) return json(400, { ok: false, erro: "Lead inválido." });
@@ -239,6 +252,25 @@ async function automacoes(req: Request): Promise<Response> {
   return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length });
 }
 
+interface Resumo { colaborador_id: string; nome: string; whatsapp: string | null; texto: string }
+async function resumo(req: Request): Promise<Response> {
+  const cg = await credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+  const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
+  if (!token) return json(401, { ok: false, erro: "Token ausente." });
+  const corpo = (await req.json().catch(() => ({}))) as Dict;
+  const rpc = (f: string, args: Dict) => rest(`rpc/${f}`, service(), { method: "POST", body: JSON.stringify(args) });
+  const lote = await rpc("resumo_diario_lote", { token, forcar_colab: corpo.colaborador_id ?? null });
+  if (!lote.ok) { const t = await lote.text(); return json(/token inv/i.test(t) ? 401 : 502, { ok: false, erro: t }); }
+  const itens = (await lote.json()) as Resumo[];
+  const resultados: Dict[] = [];
+  for (const it of itens) {
+    try { const r = await enviarMensagem(cg, { nome: it.nome, whatsapp: it.whatsapp }, it.texto); resultados.push({ colaborador_id: it.colaborador_id, ok: r.ok, erro: r.ok ? null : r.erro, numero: r.ok ? r.numero : null, texto: it.texto }); }
+    catch (e) { resultados.push({ colaborador_id: it.colaborador_id, ok: false, erro: e instanceof Error ? e.message : String(e), texto: it.texto }); }
+  }
+  if (resultados.length) { const reg = await rpc("resumo_diario_registrar", { token, resultados }); if (!reg.ok) return json(502, { ok: false, erro: `Enviado, mas não registrado: ${await reg.text()}` }); }
+  return json(200, { ok: true, enviados: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => !r.ok).map((r) => ({ colaborador_id: r.colaborador_id, erro: r.erro })) });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info" } });
   const url = new URL(req.url);
@@ -248,6 +280,7 @@ Deno.serve(async (req) => {
     if (rota === "webhook") return await webhook(req, url);
     if (rota === "enviar") return await enviar(req);
     if (rota === "automacoes") return await automacoes(req);
+    if (rota === "resumo") return await resumo(req);
     if (rota === "diag") { // só com o token do webhook; não expõe valores
       const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
       const tk = url.searchParams.get("token") ?? "";
