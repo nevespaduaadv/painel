@@ -368,7 +368,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
-    if(equipe())aplicarHash();
+    if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
     resolve();
@@ -1093,21 +1093,21 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="carteira.js?v=mv4lgs00"></script>
-<script src="tarefas.js?v=mv4lgs00"></script>
-<script src="equipe.js?v=mv4lgs00"></script>
-<script src="rh.js?v=mv4lgs00"></script>
-<script src="dnd.js?v=mv4lgs00"></script>
-<script src="ficha.js?v=mv4lgs00"></script>
-<script src="fluxo.js?v=mv4lgs00"></script>
-<script src="publicacoes.js?v=mv4lgs00"></script>
-<script src="autenticador.js?v=mv4lgs00"></script>
-<script src="marketing.js?v=mv4lgs00"></script>
-<script src="comercial.js?v=mv4lgs00"></script>
-<script src="leads.js?v=mv4lgs00"></script>
-<script src="revisional.js?v=mv4lgs00"></script>
-<script src="pecas.js?v=mv4lgs00"></script>
-<script src="documentos.js?v=mv4lgs00"></script>
-<script src="conhecimento.js?v=mv4lgs00"></script>
+<script src="carteira.js?v=mv4llofr"></script>
+<script src="tarefas.js?v=mv4llofr"></script>
+<script src="equipe.js?v=mv4llofr"></script>
+<script src="rh.js?v=mv4llofr"></script>
+<script src="dnd.js?v=mv4llofr"></script>
+<script src="ficha.js?v=mv4llofr"></script>
+<script src="fluxo.js?v=mv4llofr"></script>
+<script src="publicacoes.js?v=mv4llofr"></script>
+<script src="autenticador.js?v=mv4llofr"></script>
+<script src="marketing.js?v=mv4llofr"></script>
+<script src="comercial.js?v=mv4llofr"></script>
+<script src="leads.js?v=mv4llofr"></script>
+<script src="revisional.js?v=mv4llofr"></script>
+<script src="pecas.js?v=mv4llofr"></script>
+<script src="documentos.js?v=mv4llofr"></script>
+<script src="conhecimento.js?v=mv4llofr"></script>
 </body>
 </html>
