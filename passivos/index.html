@@ -305,6 +305,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-historico" hidden class="main"></div>
   <div id="view-regras" hidden class="main"></div>
   <div id="view-calibracao" hidden class="main"></div>
+  <div id="view-painel" hidden class="main"></div>
   <div id="view-usuarios" hidden class="main"></div>
   <div id="view-tarefas" hidden class="main"></div>
   <div id="view-horas" hidden class="main"></div>
@@ -451,7 +452,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
+    window.PP_ROTAS.push("painel","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -640,7 +641,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
-const NAV=[{tab:"clientes",label:"Clientes"},
+const NAV=[{tab:"painel",label:"Meu painel",cls:"edit-only"},{tab:"clientes",label:"Clientes"},
   {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"pecas",label:"Modelos de peças"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
   {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
@@ -667,7 +668,8 @@ const ICONES={
   equipe:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   horas:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   usuarios:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
-  gestao:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  painel:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  gestao:'<path d="M4 19V9M10 19V5M16 19v-8M22 19H2"/><circle cx="4" cy="6" r="1.5"/>',
   portal:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'
 };
 const icone=k=>{const d=ICONES[k]||'<circle cx="12" cy="12" r="3"/>';const s=document.createElementNS(SVGNS,"svg");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("aria-hidden","true");s.innerHTML=d;return s};
@@ -1272,22 +1274,23 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="carteira.js?v=mv4pk7n6"></script>
-<script src="tarefas.js?v=mv4pk7n6"></script>
-<script src="notificacoes.js?v=mv4pk7n6"></script>
-<script src="equipe.js?v=mv4pk7n6"></script>
-<script src="rh.js?v=mv4pk7n6"></script>
-<script src="dnd.js?v=mv4pk7n6"></script>
-<script src="ficha.js?v=mv4pk7n6"></script>
-<script src="fluxo.js?v=mv4pk7n6"></script>
-<script src="publicacoes.js?v=mv4pk7n6"></script>
-<script src="autenticador.js?v=mv4pk7n6"></script>
-<script src="marketing.js?v=mv4pk7n6"></script>
-<script src="comercial.js?v=mv4pk7n6"></script>
-<script src="leads.js?v=mv4pk7n6"></script>
-<script src="revisional.js?v=mv4pk7n6"></script>
-<script src="pecas.js?v=mv4pk7n6"></script>
-<script src="documentos.js?v=mv4pk7n6"></script>
-<script src="conhecimento.js?v=mv4pk7n6"></script>
+<script src="carteira.js?v=mv4pnzpq"></script>
+<script src="tarefas.js?v=mv4pnzpq"></script>
+<script src="notificacoes.js?v=mv4pnzpq"></script>
+<script src="painel.js?v=mv4pnzpq"></script>
+<script src="equipe.js?v=mv4pnzpq"></script>
+<script src="rh.js?v=mv4pnzpq"></script>
+<script src="dnd.js?v=mv4pnzpq"></script>
+<script src="ficha.js?v=mv4pnzpq"></script>
+<script src="fluxo.js?v=mv4pnzpq"></script>
+<script src="publicacoes.js?v=mv4pnzpq"></script>
+<script src="autenticador.js?v=mv4pnzpq"></script>
+<script src="marketing.js?v=mv4pnzpq"></script>
+<script src="comercial.js?v=mv4pnzpq"></script>
+<script src="leads.js?v=mv4pnzpq"></script>
+<script src="revisional.js?v=mv4pnzpq"></script>
+<script src="pecas.js?v=mv4pnzpq"></script>
+<script src="documentos.js?v=mv4pnzpq"></script>
+<script src="conhecimento.js?v=mv4pnzpq"></script>
 </body>
 </html>

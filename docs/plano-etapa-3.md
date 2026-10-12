@@ -219,3 +219,8 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Clientes: a lista lateral virou página de tabela (filtro, KPIs, situação, responsável); a ficha ocupa a largura toda com "← Clientes".
 - Abas internas (`.wrap .tabs`, `.modal .tabs`) viram controle segmentado; estilos da sidebar escopados em `.sb`.
 - Ficha do cliente: campos endereço, representante, CPF e qualificação (usados nas peças).
+
+## §30 — PR 22: Meu painel (tela inicial da equipe)
+- `passivos/painel.js`, aba `painel` (primeira do menu, só equipe; vira padrão quando não há hash nem aba salva).
+- KPIs clicáveis (tarefas abertas, atrasadas, fatais em 7 dias, carteira, leads atrasados), escopo Minhas/Equipe (persiste), "Vence até 7 dias" e "Próximos 30 dias" a partir de `v_prazos` (tarefas, processos, negociações), "Atividade recente" de `tarefa_eventos`.
+- Clique no prazo abre a tarefa (`PP_TAREFAS.abrir`) ou a aba do cliente (processos/negociações). `PP_TAREFAS.nova()` para o botão "+ Tarefa".
