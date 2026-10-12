@@ -234,3 +234,9 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - O app passou a ser gerado em `index.html` (raiz): `https://nevespaduaadv.github.io/painel/#painel`, `#clientes`, `#clientes/<id>/<aba>`, `#processos`… O antigo Portal (cards) foi removido; `passivos/index.html` só redireciona (preserva o hash) para links antigos. `cliente/?t=…` continua.
 - Scripts ficam em `passivos/*.js` (referenciados como `passivos/x.js`); timbrado em `passivos/modelos/`.
 - "Clientes" no menu abre a lista (tabela com filtro) e limpa a seleção; não há mais seleção automática do primeiro cliente.
+
+## §33 — Fila (decisão pendente da Maria Júlia)
+- **Importar processos do ADVBox** (530; ~78% TJSP; maioria superendividamento PF) via API/exportação, criando clientes PF simples — aguarda decisão sobre o que fazer com a carteira de superendividamento.
+- **Captura de intimações por certificado** (eproc/e-SAJ TJSP primeiro): A1 no Vault, 2FA pelo Autenticador, regra "abrir × só listar" a definir; depende da importação acima.
+- Calculadora de planos de pagamento (superendividamento, Lei 14.181/2021).
+- Busca global por número de processo; prazos processuais calculados (dias úteis/feriados); agenda; resumo diário via WhatsApp; leitura de intimação por IA; leitura de PDF de contrato na Revisional; financeiro (honorários); portal do cliente com documentos/assinatura; relatórios de produtividade.
