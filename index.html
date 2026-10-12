@@ -326,6 +326,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-superendividamento" hidden class="main"></div>
   <div id="view-growth" hidden class="main"></div>
   <div id="view-visao" hidden class="main"></div>
+  <div id="view-feriados" hidden class="main"></div>
   <div id="view-usuarios" hidden class="main"></div>
   <div id="view-tarefas" hidden class="main"></div>
   <div id="view-horas" hidden class="main"></div>
@@ -476,7 +477,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     if((S.tab==="visao"&&PP.perfil.papel!=="admin")||(S.tab==="growth"&&!PP.podeGrowth))S.tab="clientes";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
+    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -666,7 +667,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"painel",label:"Meu painel",cls:"edit-only"},{tab:"clientes",label:"Clientes"},
-  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"processos",label:"Processos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"superendividamento",label:"Superendividamento"},{tab:"pecas",label:"Modelos de peças"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
+  {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[{tab:"tarefas",label:"Tarefas e prazos"},{tab:"processos",label:"Processos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"superendividamento",label:"Superendividamento"},{tab:"pecas",label:"Modelos de peças"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"feriados",label:"Feriados e prazos"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
   {grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"growth-only"}]}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
@@ -697,6 +698,7 @@ const ICONES={
   painel:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   gestao:'<path d="M4 19V9M10 19V5M16 19v-8M22 19H2"/><circle cx="4" cy="6" r="1.5"/>',
   growth:'<path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/>',
+  feriados:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>',
   visao:'<path d="M4 19V9M10 19V5M16 19v-8M22 19H2"/><circle cx="4" cy="6" r="1.5"/>',
   portal:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'
 };
@@ -1307,28 +1309,29 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="passivos/carteira.js?v=mv5d7fg7"></script>
-<script src="passivos/tarefas.js?v=mv5d7fg7"></script>
-<script src="passivos/prazos.js?v=mv5d7fg7"></script>
-<script src="passivos/notificacoes.js?v=mv5d7fg7"></script>
-<script src="passivos/painel.js?v=mv5d7fg7"></script>
-<script src="passivos/equipe.js?v=mv5d7fg7"></script>
-<script src="passivos/rh.js?v=mv5d7fg7"></script>
-<script src="passivos/dnd.js?v=mv5d7fg7"></script>
-<script src="passivos/ficha.js?v=mv5d7fg7"></script>
-<script src="passivos/fluxo.js?v=mv5d7fg7"></script>
-<script src="passivos/publicacoes.js?v=mv5d7fg7"></script>
-<script src="passivos/processos.js?v=mv5d7fg7"></script>
-<script src="passivos/autenticador.js?v=mv5d7fg7"></script>
-<script src="passivos/marketing.js?v=mv5d7fg7"></script>
-<script src="passivos/comercial.js?v=mv5d7fg7"></script>
-<script src="passivos/growth.js?v=mv5d7fg7"></script>
-<script src="passivos/gestao.js?v=mv5d7fg7"></script>
-<script src="passivos/leads.js?v=mv5d7fg7"></script>
-<script src="passivos/revisional.js?v=mv5d7fg7"></script>
-<script src="passivos/pecas.js?v=mv5d7fg7"></script>
-<script src="passivos/superendividamento.js?v=mv5d7fg7"></script>
-<script src="passivos/documentos.js?v=mv5d7fg7"></script>
-<script src="passivos/conhecimento.js?v=mv5d7fg7"></script>
+<script src="passivos/carteira.js?v=mv5e9cz5"></script>
+<script src="passivos/tarefas.js?v=mv5e9cz5"></script>
+<script src="passivos/prazos.js?v=mv5e9cz5"></script>
+<script src="passivos/feriados.js?v=mv5e9cz5"></script>
+<script src="passivos/notificacoes.js?v=mv5e9cz5"></script>
+<script src="passivos/painel.js?v=mv5e9cz5"></script>
+<script src="passivos/equipe.js?v=mv5e9cz5"></script>
+<script src="passivos/rh.js?v=mv5e9cz5"></script>
+<script src="passivos/dnd.js?v=mv5e9cz5"></script>
+<script src="passivos/ficha.js?v=mv5e9cz5"></script>
+<script src="passivos/fluxo.js?v=mv5e9cz5"></script>
+<script src="passivos/publicacoes.js?v=mv5e9cz5"></script>
+<script src="passivos/processos.js?v=mv5e9cz5"></script>
+<script src="passivos/autenticador.js?v=mv5e9cz5"></script>
+<script src="passivos/marketing.js?v=mv5e9cz5"></script>
+<script src="passivos/comercial.js?v=mv5e9cz5"></script>
+<script src="passivos/growth.js?v=mv5e9cz5"></script>
+<script src="passivos/gestao.js?v=mv5e9cz5"></script>
+<script src="passivos/leads.js?v=mv5e9cz5"></script>
+<script src="passivos/revisional.js?v=mv5e9cz5"></script>
+<script src="passivos/pecas.js?v=mv5e9cz5"></script>
+<script src="passivos/superendividamento.js?v=mv5e9cz5"></script>
+<script src="passivos/documentos.js?v=mv5e9cz5"></script>
+<script src="passivos/conhecimento.js?v=mv5e9cz5"></script>
 </body>
 </html>

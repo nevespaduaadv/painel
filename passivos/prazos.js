@@ -71,6 +71,6 @@ function campo({alvo,base,uf=null,comarca=null,dias=15,tipo="uteis",baseEhPublic
   if(Z.ok&&dBase.value)setTimeout(recalc,0);else carregar().then(()=>{if(dBase.value)recalc()});
   return wrap;
 }
-window.PP_PRAZOS={calcular,campo,ehUtil,ufDoCnj,pronto:carregar};
+window.PP_PRAZOS={calcular,campo,ehUtil,ufDoCnj,pronto:carregar,recarregar:()=>{Z.carregando=null;Z.ok=false;return carregar()}};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe())carregar()});
 })();
