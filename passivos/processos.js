@@ -62,7 +62,7 @@ function renderProcessos(){
 let rt=null;
 function tempoReal(){const ch=SB.channel("processos-lista");for(const t of ["processos","andamentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{clearTimeout(rt);rt=setTimeout(()=>{P.ok=false;if(P.sel)carregarAndamentos(P.sel);if(S.tab==="processos")garantir()},500)});ch.subscribe()}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^processos\/([0-9a-f-]{36})$/i.exec(h);if(m){P.sel=m[1];carregarAndamentos(m[1])}return _h.apply(this,arguments)}}
-window.PP_PROCESSOS={recarregar:()=>{P.ok=false;garantir()},abrir:id=>{P.sel=id;carregarAndamentos(id);S.tab="processos";render()}};
+window.PP_PROCESSOS={lista:()=>{garantir();return P.lista},recarregar:()=>{P.ok=false;garantir()},abrir:id=>{P.sel=id;carregarAndamentos(id);S.tab="processos";render()}};
 {const _r=render;render=function(){_r();const v=$("#view-processos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="processos")S.tab="clientes";v.hidden=S.tab!=="processos";if(S.tab==="processos")renderProcessos()}}
-window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe())tempoReal()});
+window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal();setTimeout(garantir,1500)}});
 })();

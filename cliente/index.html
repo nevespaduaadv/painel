@@ -285,7 +285,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 <header class="top">
   <button class="ham" id="btnSb" title="Menu" aria-label="Abrir ou recolher o menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="area" id="brandArea">Clientes</div>
-  <div class="busca edit-only" id="busca"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="buscaGlobal" placeholder="Buscar cliente, contrato ou lead…  ( / )" aria-label="Busca global" autocomplete="off"></div>
+  <div class="busca edit-only" id="busca"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="buscaGlobal" placeholder="Buscar cliente, CNPJ, processo ou lead…  ( / )" aria-label="Busca global" autocomplete="off"></div>
   <div class="sp"></div>
   <button class="ic" id="btnTema" title="Tema claro/escuro" aria-label="Alternar tema"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   <label class="switch edit-only"><input type="checkbox" id="viewClient"> Visão do cliente</label>
@@ -623,11 +623,14 @@ function renderNav(){
     const cls=(S.clientes||[]).filter(c=>norm(c.nome).includes(q)||norm(c.cnpj).includes(q)||norm(c.nome_fantasia).includes(q)).slice(0,6);
     const kts=(S.contratos||[]).filter(k=>norm(k.banco).includes(q)||norm(k.numero).includes(q)).slice(0,5);
     const lds=(window.PP_LEADS?.lista?.()||[]).filter(l=>norm(l.nome).includes(q)||norm(l.empresa).includes(q)||norm(l.telefone).includes(q)).slice(0,5);
-    if(!cls.length&&!kts.length&&!lds.length)return;
+    const qd=q.replace(/\D/g,"");
+    const prs=(window.PP_PROCESSOS?.lista?.()||[]).filter(p=>(qd.length>=4&&String(p.numero_cnj||"").replace(/\D/g,"").includes(qd))||norm(p.parte_contraria).includes(q)||norm(p.cliente_nome).includes(q)&&q.length>=3).slice(0,6);
+    if(!cls.length&&!kts.length&&!lds.length&&!prs.length)return;
     res=el("div",{class:"res",role:"listbox"});
     const grupo=(t,items)=>{if(!items.length)return;res.append(el("div",{class:"grp-h"},t));items.forEach(i=>res.append(i))};
     grupo("Clientes",cls.map(c=>el("button",{role:"option",onclick:()=>ir("#clientes/"+encodeURIComponent(c.id))},c.nome,el("small",{},[c.cnpj,c.cidade].filter(Boolean).join(" · ")))));
     grupo("Contratos",kts.map(k=>{const c=(S.clientes||[]).find(x=>x.id===k.clienteId);return el("button",{role:"option",onclick:()=>ir("#clientes/"+encodeURIComponent(k.clienteId)+"/contratos")},(k.banco||"Banco")+" · "+(typeof PRODUTOS!=="undefined"&&PRODUTOS[k.produto]||k.produto||""),el("small",{},[c?.nome,k.numero].filter(Boolean).join(" · ")))}));
+    grupo("Processos",prs.map(p=>el("button",{role:"option",onclick:()=>{if(p.cliente_id&&window.PP_CARTEIRA){fechar();inp.value="";window.PP_CARTEIRA.abrirProcesso(p.cliente_id,p.id)}else ir("#processos/"+p.id)}},(p.numero_cnj||"(sem número)")+(p.tipo_acao?" · "+p.tipo_acao:""),el("small",{},[p.cliente_nome||"fora da base",p.parte_contraria?"× "+p.parte_contraria:null,p.tribunal].filter(Boolean).join(" · ")))));
     grupo("Leads",lds.map(l=>el("button",{role:"option",onclick:()=>ir("#leads/"+l.id)},l.nome||l.empresa||"Lead",el("small",{},[l.empresa,l.telefone].filter(Boolean).join(" · ")))));
     box.append(res);
   };
@@ -1152,7 +1155,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mv4qmoh1"></script>
-<script src="../passivos/ficha.js?v=mv4qmoh1"></script>
+<script src="../passivos/carteira.js?v=mv4r1c6p"></script>
+<script src="../passivos/ficha.js?v=mv4r1c6p"></script>
 </body>
 </html>
