@@ -208,6 +208,9 @@ async function enviar(req: Request): Promise<Response> {
     if (!okAlgum) return json(502, { ok: false, erro: rs.map((r) => `${r.canal}: ${r.erro}`).join(" · ") });
     return json(200, { ok: true, canais: rs.filter((r) => r.ok).map((r) => r.canal), avisos: rs.filter((r) => !r.ok).map((r) => `${r.canal}: ${r.erro}`) });
   }
+  if (acao === "agenda") { // sincronizar a agenda agora (equipe); as RPCs aceitam o papel service_role sem token
+    try { return json(200, await sincronizarAgenda("", txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+  }
   if (acao === "growth") { // atualizar os dados de Growth agora (admin)
     const adm = await rest("rpc/sou_admin", jwt, { method: "POST", body: "{}" });
     if (!adm.ok || (await adm.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Só administradores atualizam o Growth." });
@@ -394,6 +397,111 @@ async function growth(req: Request): Promise<Response> {
   catch (e) { const erro = e instanceof Error ? e.message : String(e); await rest("rpc/growth_gravar", service(), { method: "POST", body: JSON.stringify({ log: { ok: false, erro } }) }); return json(502, { ok: false, erro }); }
 }
 
+// ---------- Agenda ↔ Google Calendar (conta de serviço com delegação de domínio; JSON em GOOGLE_SA_JSON no Vault) ----------
+const GCAL = "https://www.googleapis.com/calendar/v3";
+const b64url = (b: ArrayBuffer | Uint8Array | string) => { const bytes = typeof b === "string" ? new TextEncoder().encode(b) : new Uint8Array(b); let s = ""; for (const x of bytes) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const tokensGoogle = new Map<string, { token: string; exp: number }>();
+async function tokenGoogle(sub: string | null): Promise<string> {
+  const chave = sub ?? "@sa"; const c = tokensGoogle.get(chave); if (c && c.exp > Date.now() + 60_000) return c.token;
+  const raw = await segredo("GOOGLE_SA_JSON"); if (!raw) throw new Error("GOOGLE_SA_JSON não configurado no Vault.");
+  const sa = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string };
+  const agora = Math.floor(Date.now() / 1000);
+  const claims: Dict = { iss: sa.client_email, scope: "https://www.googleapis.com/auth/calendar", aud: sa.token_uri ?? "https://oauth2.googleapis.com/token", iat: agora, exp: agora + 3600 };
+  if (sub) claims.sub = sub;
+  const pem = sa.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (ch) => ch.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const cabecalho = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" })), corpo = b64url(JSON.stringify(claims));
+  const assinatura = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(`${cabecalho}.${corpo}`));
+  const jwt = `${cabecalho}.${corpo}.${b64url(assinatura)}`;
+  const r = await fetch(claims.aud as string, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }), signal: AbortSignal.timeout(20_000) });
+  const j = (await r.json().catch(() => ({}))) as Dict;
+  if (!r.ok || !j.access_token) throw new Error(`Google não emitiu token${sub ? " para " + sub : ""}: ${String(j.error_description ?? j.error ?? r.status).slice(0, 160)}`);
+  tokensGoogle.set(chave, { token: String(j.access_token), exp: Date.now() + Number(j.expires_in ?? 3600) * 1000 });
+  return String(j.access_token);
+}
+// token para a agenda de um e-mail: tenta impersonar (Workspace); se não der, usa a própria conta de serviço (agenda compartilhada com ela)
+async function tokenParaAgenda(email: string): Promise<{ token: string; modo: string }> {
+  try { return { token: await tokenGoogle(email), modo: "delegacao" }; } catch (e) { const t = await tokenGoogle(null); return { token: t, modo: `compartilhada (${e instanceof Error ? e.message.slice(0, 80) : e})` }; }
+}
+async function gcal(token: string, metodo: string, path: string, body?: unknown, params?: Record<string, string>): Promise<{ status: number; json: Dict }> {
+  const u = new URL(`${GCAL}/${path}`); for (const [k, v] of Object.entries(params ?? {})) u.searchParams.set(k, v);
+  const r = await fetch(u, { method: metodo, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) });
+  const json = (r.status === 204 ? {} : await r.json().catch(() => ({}))) as Dict;
+  return { status: r.status, json };
+}
+const TZ = "America/Sao_Paulo";
+const diaLocal = (iso: string) => new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10); // BRT sem horário de verão
+function corpoEvento(e: Dict): Dict {
+  const inteiro = !!e.dia_inteiro;
+  return { summary: e.titulo, location: e.local ?? undefined, description: e.descricao ?? undefined, status: e.cancelado ? "cancelled" : "confirmed",
+    start: inteiro ? { date: diaLocal(String(e.inicio)) } : { dateTime: e.inicio, timeZone: TZ }, end: inteiro ? { date: diaLocal(String(e.fim)) } : { dateTime: e.fim, timeZone: TZ },
+    extendedProperties: { private: { painel_id: String(e.id) } } };
+}
+function eventoDoGoogle(g: Dict): Dict | null {
+  if (g.status === "cancelled") return { id: g.id, status: "cancelled" };
+  const s = (g.start ?? {}) as Dict, f = (g.end ?? {}) as Dict; const inteiro = !!s.date;
+  const inicio = inteiro ? `${s.date}T00:00:00-03:00` : s.dateTime, fim = inteiro ? `${f.date}T00:00:00-03:00` : f.dateTime;
+  if (!inicio || !fim) return null;
+  return { id: g.id, titulo: g.summary ?? "", inicio, fim, dia_inteiro: inteiro, local: g.location ?? null, descricao: g.description ?? null, link: g.htmlLink ?? null, etag: g.etag ?? null };
+}
+async function sincronizarAgenda(token: string, apenasColab?: string): Promise<Dict> {
+  const rpc = (f: string, args: Dict) => rest(`rpc/${f}`, service(), { method: "POST", body: JSON.stringify(args) });
+  const lote = await rpc("agenda_lote", { token }); if (!lote.ok) throw new Error(`agenda_lote ${lote.status}: ${(await lote.text()).slice(0, 200)}`);
+  const colabs = (await lote.json()) as Dict[]; const resumo: Dict[] = [];
+  for (const c of colabs) {
+    if (apenasColab && c.colaborador_id !== apenasColab) continue;
+    const cal = String(c.calendar_id); const r: Dict = { colaborador: c.nome, calendar: cal, enviados: 0, recebidos: 0, erros: [] as string[] };
+    let gt: { token: string; modo: string };
+    try { gt = await tokenParaAgenda(cal); r.modo = gt.modo; } catch (e) { r.erros = [e instanceof Error ? e.message : String(e)]; await rpc("agenda_gravar_google", { token, p_colab: c.colaborador_id, p_calendar: cal, eventos: [], p_sync_token: null, p_erro: (r.erros as string[])[0] }); resumo.push(r); continue; }
+    // 1) painel → Google
+    const marcados: Dict[] = [];
+    for (const e of (c.pendentes as Dict[]) ?? []) {
+      try {
+        const corpo = corpoEvento(e); let res;
+        if (e.google_event_id) {
+          // ids do Google vêm da própria agenda (google_calendar_id); se o evento foi criado em outra agenda, cria de novo nesta
+          const calEv = String(e.google_calendar_id ?? cal);
+          res = await gcal(gt.token, e.cancelado ? "DELETE" : "PATCH", `calendars/${encodeURIComponent(calEv)}/events/${encodeURIComponent(String(e.google_event_id))}`, e.cancelado ? undefined : corpo);
+          if (res.status === 404 || res.status === 410) { if (e.cancelado) { marcados.push({ id: e.id, ok: true }); continue; } res = await gcal(gt.token, "POST", `calendars/${encodeURIComponent(cal)}/events`, corpo); }
+          else if (res.status < 300) { marcados.push({ id: e.id, ok: true, google_event_id: e.google_event_id, google_calendar_id: calEv, etag: res.json.etag ?? null }); continue; }
+        } else {
+          if (e.cancelado) { marcados.push({ id: e.id, ok: true }); continue; }
+          res = await gcal(gt.token, "POST", `calendars/${encodeURIComponent(cal)}/events`, corpo);
+        }
+        if (res.status < 300 && res.json.id) { marcados.push({ id: e.id, ok: true, google_event_id: res.json.id, google_calendar_id: cal, etag: res.json.etag ?? null }); r.enviados = (r.enviados as number) + 1; }
+        else (r.erros as string[]).push(`${e.titulo}: Google ${res.status} ${String((res.json.error as Dict | undefined)?.message ?? "").slice(0, 100)}`);
+      } catch (err) { (r.erros as string[]).push(`${e.titulo}: ${err instanceof Error ? err.message : err}`); }
+    }
+    if (marcados.length) await rpc("agenda_marcar_enviados", { token, itens: marcados });
+    // 2) Google → painel (incremental com syncToken; completo na primeira vez ou se o token expirou)
+    let syncToken: string | null = (c.sync_token as string | null) ?? null; let pagina: string | null = null; const recebidos: Dict[] = []; let novoSync: string | null = null; let erroPull: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      const params: Record<string, string> = { maxResults: "250", singleEvents: "true", showDeleted: "true" };
+      if (pagina) params.pageToken = pagina; else if (syncToken) params.syncToken = syncToken; else { params.timeMin = new Date(Date.now() - 30 * 864e5).toISOString(); params.timeMax = new Date(Date.now() + 120 * 864e5).toISOString(); }
+      const res = await gcal(gt.token, "GET", `calendars/${encodeURIComponent(cal)}/events`, undefined, params);
+      if (res.status === 410 && syncToken) { syncToken = null; pagina = null; continue; } // token expirado → completo
+      if (res.status >= 300) { erroPull = `Google ${res.status} ${String((res.json.error as Dict | undefined)?.message ?? "").slice(0, 120)}`; break; }
+      for (const g of (res.json.items as Dict[]) ?? []) { if ((((g.extendedProperties as Dict)?.private as Dict)?.painel_id)) continue; const ev = eventoDoGoogle(g); if (ev) recebidos.push(ev); } // os do painel já estão cá
+      pagina = (res.json.nextPageToken as string) ?? null; novoSync = (res.json.nextSyncToken as string) ?? novoSync;
+      if (!pagina) break;
+    }
+    const grav = await rpc("agenda_gravar_google", { token, p_colab: c.colaborador_id, p_calendar: cal, eventos: recebidos, p_sync_token: novoSync, p_erro: erroPull ?? ((r.erros as string[])[0] ?? null) });
+    if (!grav.ok) (r.erros as string[]).push(`gravar: ${(await grav.text()).slice(0, 120)}`);
+    r.recebidos = recebidos.length; if (erroPull) (r.erros as string[]).push(erroPull);
+    resumo.push(r);
+  }
+  return { ok: true, colaboradores: resumo };
+}
+async function agenda(req: Request): Promise<Response> {
+  const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
+  if (!token) return json(401, { ok: false, erro: "Token ausente." });
+  const v = await rest("rpc/automacoes_token_valido", service(), { method: "POST", body: JSON.stringify({ token }) });
+  if (!v.ok || (await v.json().catch(() => null)) !== true) return json(401, { ok: false, erro: "Token inválido." });
+  const corpo = (await req.json().catch(() => ({}))) as Dict;
+  try { return json(200, await sincronizarAgenda(token, txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info" } });
   const url = new URL(req.url);
@@ -405,6 +513,7 @@ Deno.serve(async (req) => {
     if (rota === "automacoes") return await automacoes(req);
     if (rota === "resumo") return await resumo(req);
     if (rota === "growth") return await growth(req);
+    if (rota === "agenda") return await agenda(req);
     if (rota === "diag") { // só com o token do webhook; não expõe valores
       const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
       const tk = url.searchParams.get("token") ?? "";
