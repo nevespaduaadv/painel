@@ -4,7 +4,7 @@
    e o cliente Supabase (SB, PP, equipe). Expõe window.PP_MOD = {timeline, processos, contagens}. */
 (()=>{
 "use strict";
-const TIPOS={solicitacao_documentos:"Solicitação de documentos",requerimento_bacen:"Requerimento ao Bacen",analise_contrato:"Análise de contrato",parecer_tecnico:"Parecer técnico",contato_banco:"Contato com jurídico do banco",proposta_acordo:"Proposta de acordo",reuniao_cliente:"Reunião com cliente",ata:"Ata",protocolo:"Protocolo",mudanca_estagio:"Mudança de estágio",acordo_fechado:"Acordo fechado",andamento:"Andamento processual",outro:"Outro"};
+const TIPOS={solicitacao_documentos:"Solicitação de documentos",requerimento_bacen:"Requerimento ao Bacen",analise_contrato:"Análise de contrato",parecer_tecnico:"Parecer técnico",contato_banco:"Contato com jurídico do banco",proposta_acordo:"Proposta de acordo",reuniao_cliente:"Reunião com cliente",ata:"Ata",protocolo:"Protocolo",mudanca_estagio:"Mudança de estágio",acordo_fechado:"Acordo fechado",tarefa:"Tarefa",andamento:"Andamento processual",outro:"Outro"};
 const TIPOS_MANUAIS=Object.fromEntries(Object.entries(TIPOS).filter(([k])=>!["mudanca_estagio","acordo_fechado","andamento"].includes(k)));
 const POLOS={passivo:"Passivo (cliente é réu/executado)",ativo:"Ativo (cliente é autor)"};
 const STATUS_PROC={ativo:"Ativo",suspenso:"Suspenso",encerrado:"Encerrado"};
@@ -100,7 +100,7 @@ async function enviarAnexos(entradaId,cid,files){
 /* ---------- Timeline ---------- */
 function renderTimeline(c,host){
   const cliente=readOnly();
-  host.append(el("div",{class:"section-h"},el("h2",{},cliente?"Andamento do trabalho":"Timeline"),
+  host.append(el("div",{class:"section-h"},el("div",{},el("h2",{},cliente?"Andamento do trabalho":"Timeline"),cliente?null:el("div",{class:"note"},"Atuação do escritório, inclusive tarefas abertas/concluídas nos processos. Andamentos do tribunal ficam na aba Processos.")),
     el("div",{class:"actions"},
       cliente?null:Object.assign(sel({"":"Todos os tipos",...TIPOS},M.filtroTipo),{onchange:e=>{M.filtroTipo=e.target.value;render()}}),
       cliente?null:(()=>{const k=check("Só o que o cliente vê",M.soVisiveis);k.input.onchange=()=>{M.soVisiveis=k.input.checked;render()};k.wrap.className="";return k.wrap})(),
@@ -122,6 +122,7 @@ function renderTimeline(c,host){
       el("div",{class:"d"},fmtD(parseD(e.data))," ",el("span",{class:"pill "+(e.automatica?"c":"g")},TIPOS[e.tipo]||e.tipo),cliente?null:el("span",{class:"pill "+(e.visivel_cliente?"e1":"e2"),style:"margin-left:6px"},e.visivel_cliente?"Visível ao cliente":"Interno")),
       el("div",{style:"white-space:pre-wrap"},e.descricao),
       meta?el("div",{class:"note"},meta):null,
+      e.tarefa_id&&!cliente?el("div",{style:"margin-top:4px"},el("button",{class:"btn sm",onclick:()=>window.PP_TAREFAS?.abrir(e.tarefa_id)},"Abrir tarefa")):null,
       (e.links||[]).length||anexos.length?el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"},
         (e.links||[]).map(l=>el("a",{class:"btn sm",href:l.url,target:"_blank",rel:"noopener"},"↗ "+(l.titulo||l.url))),
         anexos.map(a=>el("button",{class:"btn sm",onclick:()=>abrirAnexo(a)},"📎 "+a.nome))):null,

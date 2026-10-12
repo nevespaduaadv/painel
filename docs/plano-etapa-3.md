@@ -252,3 +252,7 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 - Edge Function `chatguru`: rota `/resumo` (Bearer = token das automações; `resumo_diario_lote` → `message_send`/`chat_add` → `resumo_diario_registrar` em `resumos_enviados`) e ação `resumo` em `/enviar` (JWT; envia o próprio agora).
 - Agendamento: `select public.configurar_resumo_diario(8);` → pg_cron `resumo-diario-np` às 8h BRT seg–sex, reaproveitando URL/token do job `automacoes-np`. Não reenvia a quem já recebeu com sucesso no dia.
 - Deploy da função: colar `supabase/functions/chatguru/index.ts` no editor da função no dashboard (Verify JWT desligado), como no PR 14c.
+
+## §36 — PR 26: Timeline × andamento processual (0039)
+- Andamentos (tribunal) não são mais copiados para a timeline (gatilhos removidos, cópias automáticas apagadas); ficam só na aba Processos.
+- O que a equipe faz nos processos entra na timeline pelas tarefas (gatilho em `tarefa_eventos`): "Tarefa aberta … para X · prazo", "Tarefa concluída … por Y", "Y sobre 'tarefa': comentário", cancelada. Tipo `tarefa`, `entradas_timeline.tarefa_id`, invisível ao cliente por padrão (toggle continua). Backfill dos eventos desde 0034.
