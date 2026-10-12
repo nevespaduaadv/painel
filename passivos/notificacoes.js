@@ -52,9 +52,9 @@ function montar(){
   document.addEventListener("click",fechar);
   const st=document.createElement("style");st.textContent=`
 .ntf-wrap{position:relative}
-.ntf-btn{position:relative;width:32px;height:32px;border-radius:999px;border:1px solid #3B5074;background:transparent;color:#D7D2C6;display:grid;place-items:center;cursor:pointer}
-.ntf-btn:hover{background:rgba(255,255,255,.08)}
-.ntf-badge{position:absolute;top:-5px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--crit);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;border:2px solid var(--navy)}
+.ntf-btn{position:relative;width:34px;height:34px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.ntf-btn:hover{background:var(--surface-2)}
+.ntf-badge{position:absolute;top:-5px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--crit);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;border:2px solid var(--surface)}
 .ntf-pop{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,92vw);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.28);z-index:40;overflow:hidden;font-size:13.5px}
 .ntf-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
 .ntf-vazio{padding:18px 14px;color:var(--muted)}

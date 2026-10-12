@@ -26,11 +26,15 @@ html = html.replace('</style>', `
 .login .f input{padding:10px 12px}
 .login .err{color:var(--crit);font-size:13px;min-height:18px}
 .login .btn.primary{width:100%;padding:11px}
-.modo-cliente .side,.modo-cliente .tabs,.modo-cliente .switch{display:none!important}
+.modo-cliente .side,.modo-cliente .sb,.modo-cliente .sb-overlay,.modo-cliente .switch,.modo-cliente #btnSb,.modo-cliente .busca{display:none!important}
+.modo-cliente .app{grid-template-columns:1fr}
 .modo-cliente .grid{grid-template-columns:1fr}
+.modo-cliente .top .area::before{content:"Neves Pádua Advocacia";display:block;font-family:var(--body);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .nao-admin .admin-only{display:none!important}
-.userbox{display:flex;align-items:center;gap:10px;color:#D7D2C6;font-size:13px}
-.userbox .btn{background:transparent;color:#D7D2C6;border-color:#3B5074;padding:5px 10px;font-size:13px;text-decoration:none}
+.userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
+.userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}
+.userbox #userName{font-weight:600;color:var(--fg);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:600px){.userbox #userName,.userbox a.btn{display:none}}
 .pendente{text-align:center;padding:48px 20px;color:var(--muted)}
 .pendente h2{color:var(--fg);margin-bottom:8px}
 </style>`);
@@ -43,7 +47,7 @@ must('<div id="view-calibracao" hidden class="main"></div>');
 must('/*NAV_JURIDICO*/');
 html = html.replace('/*NAV_JURIDICO*/', '{tab:"tarefas",label:"Tarefas e prazos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"pecas",label:"Modelos de peças"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},');
 must('/*NAV_GRUPOS*/');
-html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento (Comercial)",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento (Marketing)",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento (Financeiro)",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}');
+html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{link:"../gestao/",label:"Gestão",cls:"edit-only"}');
 html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>\n  <div id="view-marketing" hidden class="main"></div>\n  <div id="view-comercial" hidden class="main"></div>\n  <div id="view-leads" hidden class="main"></div>\n  <div id="view-revisional" hidden class="main"></div>\n  <div id="view-pecas" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
