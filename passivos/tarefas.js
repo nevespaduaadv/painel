@@ -52,13 +52,14 @@ function filtrar(lista,f){
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
   const done=el("input",{type:"checkbox",title:"Concluir",style:"width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex:none;margin-top:3px"});done.checked=t.status==="concluida";
-  done.onchange=async()=>{const {error}=await SB.from("tarefas").update({status:done.checked?"concluida":"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=!done.checked}else toast(done.checked?"Tarefa concluída":"Tarefa reaberta")};
+  done.onchange=async()=>{const {error}=await SB.from("tarefas").update({status:done.checked?"concluida":"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=!done.checked;return}toast(done.checked?"Tarefa concluída":"Tarefa reaberta");if(done.checked)comentarConclusao(t)};
   const prazo=t.prazo?el("span",{class:"pill "+(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g")},fmtD(parseD(t.prazo)),t.prazo_fatal?" · FATAL":"",t.faixa==="atrasada"?` · ${-t.dias_para_prazo}d atrás`:t.faixa==="hoje"?" · hoje":t.dias_para_prazo<=30?` · em ${t.dias_para_prazo}d`:""):el("span",{class:"note"},"sem prazo");
   const meta=[mostrarCliente?t.cliente_nome:null,t.responsavel_nome,NUCLEOS[t.nucleo],t.numero_cnj?"Proc. "+t.numero_cnj:null,t.horas_apontadas>0?horasFmt(t.horas_apontadas)+" apontadas":null].filter(Boolean).join(" · ");
+  const trilha=[t.criado_por_nome?`aberta por ${t.criado_por_nome} em ${fmtDT(t.created_at)}`:t.created_at?`aberta em ${fmtDT(t.created_at)}`:null,t.status==="concluida"&&t.concluida_em?`concluída${t.concluida_por_nome?" por "+t.concluida_por_nome:""} em ${fmtDT(t.concluida_em)}`:null].filter(Boolean).join(" · ");
   return el("div",{class:"row",style:"cursor:default;align-items:flex-start"},
     el("div",{style:"display:flex;gap:10px;align-items:flex-start;min-width:0;flex:1"},done,
       el("div",{style:"min-width:0"},el("div",{class:"n",style:t.status==="concluida"||t.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px"},"Alta"):null,t.titulo),
-        el("div",{class:"s"},meta),t.descricao?el("div",{class:"s",style:"white-space:pre-wrap;margin-top:2px"},t.descricao):null)),
+        el("div",{class:"s"},meta),trilha?el("div",{class:"s",style:"color:var(--faint);font-size:12px"},trilha):null,t.descricao?el("div",{class:"s",style:"white-space:pre-wrap;margin-top:2px"},t.descricao):null)),
     el("div",{style:"display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end"},prazo,
       t.status==="em_andamento"?el("span",{class:"pill c"},"Em andamento"):null,
       el("button",{class:"btn sm",onclick:()=>openHorasForm({tarefa:t})},"+ Horas"),
@@ -76,6 +77,7 @@ function listaAgrupada(lista,opts){
 }
 function renderTarefas(){
   const v=$("#view-tarefas");v.replaceChildren();
+  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>openTarefaForm(t),0)}
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Escritório"),el("h1",{},"Tarefas e prazos"),el("div",{class:"sub"},"Prazos fatais em vermelho. Quem executa, lança na hora.")),
     el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])},"CSV"),el("button",{class:"btn primary",onclick:()=>openTarefaForm({})},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -100,6 +102,33 @@ function renderTarefasCliente(c,host){
   const fechadas=ts.filter(t=>t.status==="concluida"||t.status==="cancelada");
   if(fechadas.length){const d=el("details",{},el("summary",{style:"cursor:pointer;color:var(--muted)"},`Ver ${fechadas.length} concluída${fechadas.length===1?"":"s"}/cancelada${fechadas.length===1?"":"s"}`),el("div",{class:"card list",style:"margin-top:8px"},fechadas.map(t=>linhaTarefa(t,{mostrarCliente:false}))));host.append(d)}
 }
+const EVENTO={criada:"abriu a tarefa",reatribuida:"passou a tarefa",prazo_alterado:"alterou o prazo",status:"mudou o status",concluida:"concluiu",reaberta:"reabriu",cancelada:"cancelou",comentario:"comentou",editada:"editou título/descrição/prioridade"};
+const fmtDT=v=>{if(!v)return"";const d=new Date(v);return fmtD(d)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+function linhaEvento(e){
+  const quem=e.autor_nome||"Alguém";
+  let txt=`${quem} ${EVENTO[e.tipo]||e.tipo}`;
+  if(e.tipo==="criada"&&e.para)txt+=` para ${e.para}`;
+  else if(e.tipo==="reatribuida")txt+=` de ${e.de||"—"} para ${e.para||"—"}`;
+  else if(e.tipo==="prazo_alterado")txt+=` de ${e.de||"sem prazo"} para ${e.para||"sem prazo"}`;
+  else if(e.tipo==="status")txt+=` de ${STATUS[e.de]||e.de} para ${STATUS[e.para]||e.para}`;
+  return el("li",{},el("div",{class:"d"},fmtDT(e.criado_em)),el("div",{},txt,e.nota?el("div",{style:"white-space:pre-wrap;margin-top:2px;padding:6px 10px;background:var(--surface-2);border-radius:6px"},e.nota):null));
+}
+async function historico(id,host){
+  const {data,error}=await SB.from("tarefa_eventos").select("*").eq("tarefa_id",id).order("criado_em",{ascending:true});
+  host.replaceChildren();
+  if(error){host.append(el("div",{class:"note"},"Histórico indisponível"));return}
+  if(!data.length){host.append(el("div",{class:"note"},"Sem registros ainda."));return}
+  host.append(el("ul",{class:"tl",style:"margin:0"},data.map(linhaEvento)));
+}
+async function comentar(id,texto){
+  const {error}=await SB.from("tarefa_eventos").insert({tarefa_id:id,tipo:"comentario",nota:texto,autor:PP.perfil?.id,autor_nome:meuColab()?.nome||PP.perfil?.nome||null});
+  if(error)throw new Error("Não foi possível registrar o comentário");
+}
+function comentarConclusao(t){
+  const ta=el("textarea",{placeholder:"Ex.: petição protocolada; aguardando intimação.",rows:3});
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito? (opcional — fica no histórico da tarefa e quem abriu é avisado)"),ta));
+  modal("Tarefa concluída: "+t.titulo,body,async()=>{if(ta.value.trim())await comentar(t.id,ta.value.trim())});
+}
 function openTarefaForm(t={}){
   const meu=meuColab();
   const titulo=inp("text",t.titulo||"",{placeholder:"Ex.: Protocolar embargos à execução"}),desc=el("textarea",{},t.descricao||""),cli=selCliente(t.cliente_id),
@@ -113,6 +142,12 @@ function openTarefaForm(t={}){
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"tf-tit"},"Título"),Object.assign(titulo,{id:"tf-tit"})),field("tf-cli","Cliente",cli),field("tf-resp","Responsável",resp),field("tf-nuc","Núcleo",nuc),
     field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),fatal.wrap,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
     field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."));
+  if(t.id){
+    const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));const com=el("textarea",{rows:2,placeholder:"Comentar (ex.: liguei para o cliente, aguardando documentos)"});
+    const btnCom=el("button",{class:"btn sm",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Comentário registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Comentar");
+    body.append(el("div",{class:"f full",style:"margin-top:6px"},el("label",{},"Histórico"),el("div",{class:"help"},[t.criado_por_nome?`Aberta por ${t.criado_por_nome} em ${fmtDT(t.created_at)}.`:null,t.concluida_em?`Concluída${t.concluida_por_nome?" por "+t.concluida_por_nome:""} em ${fmtDT(t.concluida_em)}.`:null].filter(Boolean).join(" ")),hist,el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin-top:6px"},com,btnCom)));
+    historico(t.id,hist);
+  }
   const extra=t.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir esta tarefa?"))return;const {error}=await SB.from("tarefas").delete().eq("id",t.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível excluir":"Tarefa excluída")}},"Excluir"):null;
   modal(t.id?"Editar tarefa":"Nova tarefa",body,async()=>{
     if(!titulo.value.trim())throw new Error("Informe o título");
@@ -210,5 +245,7 @@ window.PP_MOD.tarefas=renderTarefasCliente;
   if(!eq&&(S.tab==="tarefas"||S.tab==="horas"))S.tab="clientes";
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas")renderHoras();}}
+{const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
+window.PP_TAREFAS={abrir:id=>{T.abrir=id;S.tab="tarefas";if(T.ok)render();else garantir()}};
 window.__PP_LOGIN.then(()=>{if(equipe())tempoReal()});
 })();
