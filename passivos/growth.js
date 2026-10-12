@@ -164,6 +164,7 @@ function renderGrowth(){
   const sel=el("select",{onchange:e=>{G.dias=+e.target.value;try{localStorage.setItem("pp-growth-dias",G.dias)}catch(_){}render()}},[7,14,30,60,90].map(n=>el("option",{value:n,selected:G.dias===n?"":null},`últimos ${n} dias`)));
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Growth"),el("div",{class:"sub"},"Meta Ads × CRM × Instagram — aquisição, qualidade comercial e decisão.")),
     el("div",{class:"actions"},sel,ehAdmin()?el("button",{class:"btn",title:"Busca os últimos 3 dias no Meta e no Instagram agora (a coleta automática roda às 06h40)",onclick:()=>atualizarAgora(3)},"Atualizar agora"):null)));
+  if(!PP.podeGrowth&&!ehAdmin()){v.append(el("div",{class:"card",style:"padding:18px"},el("b",{},"Sem acesso ao Growth."),el("div",{class:"note"},"Peça a um administrador para marcar 'Growth' no seu usuário (Equipe → Usuários)."))); return}
   if(G.erro){v.append(el("div",{class:"card",style:"padding:18px"},el("b",{},"Não foi possível carregar o Growth."),el("div",{class:"note"},G.erro),el("button",{class:"btn",style:"margin-top:10px",onclick:()=>{G.erro=null;carregar()}},"Tentar de novo")));return}
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const pr=periodos();

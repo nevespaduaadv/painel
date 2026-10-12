@@ -36,6 +36,7 @@ html = html.replace('</style>', `
 .modo-cliente .grid{grid-template-columns:1fr}
 .modo-cliente .top .area::before{content:"Neves Pádua Advocacia";display:block;font-family:var(--body);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .nao-admin .admin-only{display:none!important}
+.sem-growth .growth-only{display:none!important}
 .userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
 .userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}
 .userbox #userName{font-weight:600;color:var(--fg);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -54,7 +55,7 @@ html = html.replace('const NAV=[{tab:"clientes",label:"Clientes"},', 'const NAV=
 must('/*NAV_JURIDICO*/');
 html = html.replace('/*NAV_JURIDICO*/', '{tab:"tarefas",label:"Tarefas e prazos"},{tab:"processos",label:"Processos"},{tab:"negociacoes",label:"Negociações"},{tab:"revisional",label:"Revisional de contratos"},{tab:"superendividamento",label:"Superendividamento"},{tab:"pecas",label:"Modelos de peças"},{tab:"monitoramento",label:"Monitoramento"},{tab:"publicacoes",label:"Publicações (DJEN)"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)"},');
 must('/*NAV_GRUPOS*/');
-html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only",itens:[{tab:"visao",label:"Visão geral"},{tab:"growth",label:"Growth"}]}');
+html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only",itens:[{tab:"leads",label:"Leads (CRM)"},{tab:"comercial",label:"Metas do mês"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only",itens:[{tab:"marketing",label:"Pautas de conteúdo"},{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only",itens:[{tab:"conhecimento",label:"Base de conhecimento",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only",itens:[{tab:"equipe",label:"Colaboradores"},{tab:"horas",label:"Horas"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"growth-only"}]}');
 html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-painel" hidden class="main"></div>\n  <div id="view-processos" hidden class="main"></div>\n  <div id="view-superendividamento" hidden class="main"></div>\n  <div id="view-growth" hidden class="main"></div>\n  <div id="view-visao" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>\n  <div id="view-marketing" hidden class="main"></div>\n  <div id="view-comercial" hidden class="main"></div>\n  <div id="view-leads" hidden class="main"></div>\n  <div id="view-revisional" hidden class="main"></div>\n  <div id="view-pecas" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
@@ -226,6 +227,8 @@ window.__PP_LOGIN = new Promise(resolve=>{
     }
     if(PP.perfil.papel==="cliente"){document.body.classList.add("modo-cliente");S.clientView=true;S.sel=PP.perfil.cliente_id;S.tab="clientes"}
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
+    PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
+    if((S.tab==="visao"&&PP.perfil.papel!=="admin")||(S.tab==="growth"&&!PP.podeGrowth))S.tab="clientes";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
@@ -255,13 +258,15 @@ async function renderUsuarios(){
   if(error){v.append(el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
   const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",robo:"Robô (só pautas de marketing)",pendente:"Pendente (sem acesso)"};
   const clientes=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
-  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},""))),
+  const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},"Acessos extras"),el("th",{},""))),
     el("tbody",{},ps.map(p=>{
       const nome=inp("text",p.nome||"");
       const papel=sel(PAPEIS,p.papel);
       const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");
+      const chkGrowth=el("input",{type:"checkbox",checked:(p.acessos||[]).includes("growth")?"":null});
       const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
-        const upd={nome:nome.value.trim(),papel:papel.value,cliente_id:papel.value==="cliente"?(cli.value||null):null};
+        const acessos=(p.acessos||[]).filter(a=>a!=="growth");if(chkGrowth.checked)acessos.push("growth");
+        const upd={nome:nome.value.trim(),papel:papel.value,cliente_id:papel.value==="cliente"?(cli.value||null):null,acessos};
         if(papel.value==="cliente"&&!cli.value){toast("Escolha a empresa do cliente");return}
         const {error}=await SB.from("perfis").update(upd).eq("id",p.id);
         if(error){toast("Não foi possível salvar");return}
@@ -269,7 +274,7 @@ async function renderUsuarios(){
         if(upd.papel==="admin"||upd.papel==="colaborador"){const {error:e2}=await SB.from("colaboradores").upsert({perfil_id:p.id,nome:upd.nome||p.email},{onConflict:"perfil_id"});if(e2)console.warn(e2)}
         toast("Usuário salvo");
       }},"Salvar");
-      return el("tr",{},el("td",{},p.email||"—"),el("td",{},nome),el("td",{},papel),el("td",{},cli),el("td",{},salvar));
+      return el("tr",{},el("td",{},p.email||"—"),el("td",{},nome),el("td",{},papel),el("td",{},cli),el("td",{},el("label",{class:"switch",title:"Vê Gestão → Growth (Meta Ads, Instagram e funil comercial). Admins sempre veem."},chkGrowth," Growth")),el("td",{},salvar));
     })));
   v.append(el("div",{class:"card section"},el("div",{class:"tbl"},tb)));
 }
