@@ -164,7 +164,7 @@ function recalcular(){V.res=calcular(V.ent,V.media,V.selic);const out=$("#rv-out
 function renderCalculadora(v){
   const k=V.contrato,e=V.ent,r=V.res||{};const c=S.clientes.find(x=>x.id===k.clienteId);
   v.append(el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Jurídico · Revisional"),el("h1",{},`${c?.nome||"Cliente"} — ${k.banco||"Banco"}`),el("p",{class:"note"},`${PRODUTOS[k.produto]||k.produto||""} · ${GARANTIAS[k.garantia]||""} · valor original ${BRL(+k.valorOriginal||0)}${k.dataContrato?" · contratado em "+k.dataContrato.split("-").reverse().join("/"):""}`)),
-    el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>{V.contrato=null;V.rev=null;render()}},"← Revisões"),el("button",{class:"btn",onclick:()=>{S.tab="clientes";S.sel=k.clienteId;S.sub="contratos";render()}},"Abrir cliente"),el("button",{class:"btn",onclick:parecer},"Parecer preliminar"),el("button",{class:"btn primary",onclick:()=>salvar(false)},"Salvar"),el("button",{class:"btn gold",onclick:()=>salvar(true)},"Concluir revisão"))));
+    el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>{V.contrato=null;V.rev=null;render()}},"← Revisões"),el("button",{class:"btn",onclick:()=>{S.tab="clientes";S.sel=k.clienteId;S.sub="contratos";render()}},"Abrir cliente"),el("button",{class:"btn",onclick:parecer},"Parecer (imprimir)"),window.PP_PECAS?el("button",{class:"btn",onclick:()=>PP_PECAS.abrir(contextoPeca())},"Gerar peça (.docx)"):null,el("button",{class:"btn primary",onclick:()=>salvar(false)},"Salvar"),el("button",{class:"btn gold",onclick:()=>salvar(true)},"Concluir revisão"))));
   v.append(renderEntradas());
   v.append(el("div",{id:"rv-out",style:"display:contents"},renderResultado(r),renderTeses(r)));
   v.append(el("div",{class:"disclaimer"},"A comparação com a taxa média é um indicador inicial, não uma conclusão (Tema 27/STJ; Tema 1.378/STJ pendente). Para cliente PJ, o CDC só se aplica com vulnerabilidade demonstrada. A quantificação de capitalização e excesso depende de perícia contábil sobre a evolução do saldo."));
@@ -280,7 +280,8 @@ ${ver.length?`<h2>4. Pontos que dependem de documentos</h2><ul>${ver.map(li).joi
 // ---------- integração com o painel ----------
 {const _r=render;render=function(){_r();const vr=$("#view-revisional");if(!vr)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="revisional")S.tab="clientes";vr.hidden=S.tab!=="revisional";if(S.tab==="revisional")renderRevisional()}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^revisional\/(.+)$/i.exec(h);if(m){V.abrirContrato=decodeURIComponent(m[1]);if(V.ok){abrirContrato(V.abrirContrato);V.abrirContrato=null}}return _h.apply(this,arguments)}}
-window.PP_REVISIONAL={abrir:abrirContrato};
+function contextoPeca(){const r=V.res||{};return {k:V.contrato,ent:V.ent,res:r,rev:V.rev,teses:V.teses.map(t=>({...t,status:statusDe(t,r),nota:(V.teseStatus[t.codigo]||{}).nota||null}))}}
+window.PP_REVISIONAL={abrir:abrirContrato,contexto:contextoPeca,teses:()=>V.teses};
 const css=document.createElement("style");css.textContent=`
 .rv-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:1000px){.rv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rv-teses{display:flex;flex-direction:column;gap:8px}.rv-tese{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:var(--surface)}
