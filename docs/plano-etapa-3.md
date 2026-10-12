@@ -263,3 +263,7 @@ Extraído pelo navegador (busca global `/search`, `lawsuits/history/<id>` e `/fi
 3. Tela Gestão → Growth: funil, CPL/CPQL/custo por reunião, ranking de criativos, antes × agora.
 4. Relatórios Daily/Weekly/Monthly com as regras da skill via API da Anthropic (chave no Vault), salvos em `growth_relatorios`; Weekly por WhatsApp para as sócias.
 Pendências de decisão: chave Windsor.ai; orçamento da API Anthropic; data da migração do CRM (GHL → painel).
+
+## §38 — Resumo diário pelo Discord (0040)
+- `colaboradores.discord_user_id` + `canal_resumo` (discord | whatsapp | ambos; padrão discord). Segredo `DISCORD_BOT_TOKEN` no Vault (`chatguru_segredo_definir`). Edge Function: DM via bot (`POST /users/@me/channels` + `/channels/{id}/messages`), negrito convertido; `resumos_enviados.canal`.
+- Setup do bot (uma vez): Discord Developer Portal → New Application → Bot → copiar token → OAuth2 URL Generator (scope `bot`, sem permissões especiais) → convidar para o servidor do escritório. Cada pessoa copia o próprio ID de usuário (modo desenvolvedor) para a ficha.

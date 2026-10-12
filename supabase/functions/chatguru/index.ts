@@ -187,28 +187,28 @@ async function webhook(req: Request, url: URL): Promise<Response> {
 }
 
 async function enviar(req: Request): Promise<Response> {
-  const cg = await credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+  const cg = await credenciais();
   const jwt = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
   if (!jwt) return json(401, { ok: false, erro: "Faça login no painel." });
   const eq = await rest("rpc/sou_equipe", jwt, { method: "POST", body: "{}" });
   if (!eq.ok || (await eq.json().catch(() => null)) !== true) return json(401, { ok: false, erro: "Sessão expirada ou usuário sem acesso." });
   const corpo = (await req.json().catch(() => ({}))) as Dict;
   const acao = corpo.acao;
-  if (acao === "testar") { const r = await testarConexao(cg); return json(200, { ok: r.ok, descricao: r.descricao, servidor: new URL(cg.url).hostname }); }
+  if (acao === "testar") { if (typeof cg === "string") return json(500, { ok: false, erro: cg }); const r = await testarConexao(cg); return json(200, { ok: r.ok, descricao: r.descricao, servidor: new URL(cg.url).hostname }); }
   if (acao === "resumo") { // meu resumo diário, agora
     const rt = await rest("rpc/meu_resumo_diario", jwt, { method: "POST", body: "{}" });
     const texto = rt.ok ? ((await rt.json()) as string | null) : null;
     if (!texto) return json(400, { ok: false, erro: "Você não tem registro de colaborador." });
-    const rid = await rest("rpc/meu_colaborador", jwt, { method: "POST", body: "{}" });
-    const meuId = rid.ok ? ((await rid.json()) as string | null) : null;
-    const rc = meuId ? await rest(`colaboradores?id=eq.${meuId}&select=id,nome,whatsapp`, service()) : null;
-    const [me] = rc?.ok ? ((await rc.json()) as { id: string; nome: string; whatsapp: string | null }[]) : [];
-    if (!me?.whatsapp) return json(400, { ok: false, erro: "Cadastre seu WhatsApp na ficha de colaborador." });
-    const res = await enviarMensagem(cg, me, texto);
-    if (!res.ok) return json(502, { ok: false, erro: res.erro });
-    return json(200, { ok: true, numero: res.numero });
+    const rd = await rest("rpc/meu_resumo_destinos", jwt, { method: "POST", body: "{}" });
+    const me = rd.ok ? ((await rd.json()) as { id: string; nome: string; whatsapp: string | null; discord_user_id: string | null; canal: string } | null) : null;
+    if (!me) return json(400, { ok: false, erro: "Você não tem registro de colaborador." });
+    const rs = await enviarResumoPara(cg, me, texto);
+    const okAlgum = rs.some((r) => r.ok);
+    if (!okAlgum) return json(502, { ok: false, erro: rs.map((r) => `${r.canal}: ${r.erro}`).join(" · ") });
+    return json(200, { ok: true, canais: rs.filter((r) => r.ok).map((r) => r.canal), avisos: rs.filter((r) => !r.ok).map((r) => `${r.canal}: ${r.erro}`) });
   }
   if (acao !== "mensagem" && acao !== "anotacao" && acao !== "localizar") return json(400, { ok: false, erro: "Ação inválida." });
+  if (typeof cg === "string") return json(500, { ok: false, erro: cg });
   const leadId = String(corpo.lead_id ?? ""); const texto = String(corpo.texto ?? "").trim();
   if (!UUID.test(leadId)) return json(400, { ok: false, erro: "Lead inválido." });
   const rl = await rest(`leads?id=eq.${leadId}&select=id,nome,whatsapp,link_chat`, jwt);
@@ -216,7 +216,7 @@ async function enviar(req: Request): Promise<Response> {
   if (!lead) return json(404, { ok: false, erro: "Lead não encontrado." });
   if (acao === "localizar") {
     if (lead.link_chat) return json(200, { ok: true, como: "chat", link: lead.link_chat });
-    const r = await localizarChat(cg, lead.whatsapp, `${(await segredo("PAINEL_URL")) || "https://nevespaduaadv.github.io/painel"}/passivos/#leads/${lead.id}`);
+    const r = await localizarChat(cg, lead.whatsapp, `${(await segredo("PAINEL_URL")) || "https://nevespaduaadv.github.io/painel"}/#leads/${lead.id}`);
     if (r.como === "chat") { const link = linkDoChat(cg, r.chatId); await rest(`leads?id=eq.${lead.id}`, jwt, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ link_chat: link, chatguru_chat_id: r.chatId }) }); return json(200, { ok: true, como: "chat", link }); }
     if (r.como === "sem_campo") return json(200, { ok: true, como: "lista", link: linkDoChat(cg, null), numero: r.numero });
     return json(200, { ok: true, como: "sem_conversa" });
@@ -252,9 +252,40 @@ async function automacoes(req: Request): Promise<Response> {
   return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length });
 }
 
-interface Resumo { colaborador_id: string; nome: string; whatsapp: string | null; texto: string }
+// ---------- Discord: DM via bot (token DISCORD_BOT_TOKEN no Vault). O usuário precisa estar num servidor em comum com o bot. ----------
+const DISCORD = "https://discord.com/api/v10";
+const paraDiscord = (t: string) => t.replace(/\*([^*\n]+)\*/g, "**$1**"); // negrito do WhatsApp (*x*) → Discord (**x**)
+async function enviarDiscordDM(userId: string, texto: string): Promise<{ ok: true; canalId: string } | { ok: false; erro: string }> {
+  const token = await segredo("DISCORD_BOT_TOKEN");
+  if (!token) return { ok: false, erro: "DISCORD_BOT_TOKEN não configurado no Vault." };
+  const h = { Authorization: `Bot ${token}`, "Content-Type": "application/json" };
+  const c = await fetch(`${DISCORD}/users/@me/channels`, { method: "POST", headers: h, body: JSON.stringify({ recipient_id: userId }), signal: AbortSignal.timeout(15_000) });
+  if (!c.ok) return { ok: false, erro: `Discord não abriu a DM (${c.status}): ${(await c.text()).slice(0, 200)}` };
+  const canal = (await c.json()) as { id: string };
+  const partes = paraDiscord(texto).match(/[\s\S]{1,1900}(?:\n|$)/g) ?? [texto];
+  for (const parte of partes) {
+    const m = await fetch(`${DISCORD}/channels/${canal.id}/messages`, { method: "POST", headers: h, body: JSON.stringify({ content: parte }), signal: AbortSignal.timeout(15_000) });
+    if (!m.ok) return { ok: false, erro: `Discord recusou a mensagem (${m.status}): ${(await m.text()).slice(0, 200)}` };
+  }
+  return { ok: true, canalId: canal.id };
+}
+async function enviarResumoPara(cg: Cred | string, it: { nome: string; whatsapp: string | null; discord_user_id: string | null; canal: string }, texto: string): Promise<Dict[]> {
+  const out: Dict[] = [];
+  if ((it.canal === "discord" || it.canal === "ambos") && it.discord_user_id) {
+    const r = await enviarDiscordDM(it.discord_user_id, texto);
+    out.push({ canal: "discord", ok: r.ok, erro: r.ok ? null : r.erro, numero: it.discord_user_id });
+  }
+  if ((it.canal === "whatsapp" || it.canal === "ambos") && it.whatsapp) {
+    if (typeof cg === "string") out.push({ canal: "whatsapp", ok: false, erro: cg, numero: it.whatsapp });
+    else { const r = await enviarMensagem(cg, { nome: it.nome, whatsapp: it.whatsapp }, texto); out.push({ canal: "whatsapp", ok: r.ok, erro: r.ok ? null : r.erro, numero: r.ok ? r.numero : it.whatsapp }); }
+  }
+  if (!out.length) out.push({ canal: it.canal, ok: false, erro: "Sem destino configurado para o canal escolhido." });
+  return out;
+}
+
+interface Resumo { colaborador_id: string; nome: string; whatsapp: string | null; discord_user_id: string | null; canal: string; texto: string }
 async function resumo(req: Request): Promise<Response> {
-  const cg = await credenciais(); if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+  const cg = await credenciais(); // string = ChatGuru não configurado (só afeta quem usa WhatsApp)
   const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
   if (!token) return json(401, { ok: false, erro: "Token ausente." });
   const corpo = (await req.json().catch(() => ({}))) as Dict;
@@ -264,8 +295,8 @@ async function resumo(req: Request): Promise<Response> {
   const itens = (await lote.json()) as Resumo[];
   const resultados: Dict[] = [];
   for (const it of itens) {
-    try { const r = await enviarMensagem(cg, { nome: it.nome, whatsapp: it.whatsapp }, it.texto); resultados.push({ colaborador_id: it.colaborador_id, ok: r.ok, erro: r.ok ? null : r.erro, numero: r.ok ? r.numero : null, texto: it.texto }); }
-    catch (e) { resultados.push({ colaborador_id: it.colaborador_id, ok: false, erro: e instanceof Error ? e.message : String(e), texto: it.texto }); }
+    try { for (const r of await enviarResumoPara(cg, it, it.texto)) resultados.push({ colaborador_id: it.colaborador_id, ...r, texto: it.texto }); }
+    catch (e) { resultados.push({ colaborador_id: it.colaborador_id, canal: it.canal, ok: false, erro: e instanceof Error ? e.message : String(e), texto: it.texto }); }
   }
   if (resultados.length) { const reg = await rpc("resumo_diario_registrar", { token, resultados }); if (!reg.ok) return json(502, { ok: false, erro: `Enviado, mas não registrado: ${await reg.text()}` }); }
   return json(200, { ok: true, enviados: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => !r.ok).map((r) => ({ colaborador_id: r.colaborador_id, erro: r.erro })) });

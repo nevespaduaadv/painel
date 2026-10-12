@@ -40,7 +40,7 @@ function renderPainel(){
   const h=new Date().getHours(),sauda=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
   const escopo=el("div",{class:"tabs"},[["minhas","Minhas"],["equipe","Equipe"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(D.escopo===k),onclick:()=>{D.escopo=k;try{localStorage.setItem("pp-painel-escopo",k)}catch(_){}render()}},l)));
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),el("h1",{},`${sauda}${nome?", "+nome:""}`),el("div",{class:"sub"},"O que precisa da sua atenção hoje.")),
-    el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu WhatsApp, o mesmo resumo que chega às 8h",onclick:enviarResumo},"Resumo no WhatsApp"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
+    el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu Discord/WhatsApp (conforme a sua ficha), o mesmo resumo que chega às 8h",onclick:enviarResumo},"Receber resumo agora"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const meu=meuColab();const minhas=z=>D.escopo==="equipe"||!meu||z.responsavel_id===meu.id;
   const prazos=D.prazos.filter(minhas);
@@ -69,7 +69,7 @@ function renderPainel(){
 async function enviarResumo(){
   try{const {data:{session}}=await SB.auth.getSession();if(!session)throw new Error("Faça login de novo");toast("Enviando…");
     const r=await fetch(SB_URL+"/functions/v1/chatguru/enviar",{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+session.access_token},body:JSON.stringify({acao:"resumo"})});
-    const j=await r.json().catch(()=>({ok:false,erro:"Resposta inválida"}));if(!r.ok||j.ok===false)throw new Error(j.erro||("HTTP "+r.status));toast("Resumo enviado para o seu WhatsApp")}
+    const j=await r.json().catch(()=>({ok:false,erro:"Resposta inválida"}));if(!r.ok||j.ok===false)throw new Error(j.erro||("HTTP "+r.status));toast("Resumo enviado por "+(j.canais||[]).join(" e ")+(j.avisos?.length?" · "+j.avisos.join(" · "):""))}
   catch(e){toast("Não foi possível enviar: "+e.message)}
 }
 let rt=null;
