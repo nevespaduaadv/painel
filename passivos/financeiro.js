@@ -20,9 +20,13 @@ async function edge(body){
 async function carregar(){
   if(F.carregando)return;F.carregando=true;
   try{
-    const [c,m,s,e]=await Promise.all([SB.from("v_cobrancas").select("*").order("vencimento",{ascending:false}).limit(2000),SB.from("v_financeiro_mes").select("*").order("mes",{ascending:false}).limit(14),
+    const desde=new Date(Date.now()-120*864e5).toISOString().slice(0,10);
+    const pag=async(q)=>{const out=[];for(let i=0;i<10;i++){const {data,error}=await q.range(i*1000,i*1000+999);if(error)throw error;out.push(...(data||[]));if((data||[]).length<1000)break}return out};
+    const [ab,pg,m,s,e]=await Promise.all([pag(SB.from("v_cobrancas").select("*").in("status",["pendente","atrasada"]).order("vencimento",{ascending:true})),
+      pag(SB.from("v_cobrancas").select("*").in("status",["paga","estornada","cancelada"]).gte("vencimento",desde).order("vencimento",{ascending:false})),
+      SB.from("v_financeiro_mes").select("*").eq("mes",mesAtual()).maybeSingle(),
       SB.from("asaas_sincronizacoes").select("*").order("id",{ascending:false}).limit(1).maybeSingle(),SB.from("escritorio").select("dados").eq("id","financeiro").maybeSingle()]);
-    if(c.error)throw c.error;F.rows=c.data||[];F.mes=m.data||[];F.sinc=s.data||null;F.cfg=e.data?.dados||{};F.ok=true;
+    F.rows=[...ab,...pg];F.mes=m.data?[m.data]:[];F.sinc=s.data||null;F.cfg=e.data?.dados||{};F.ok=true;
   }catch(e){console.warn("financeiro",e);toast("Não foi possível carregar o financeiro")}
   finally{F.carregando=false}
   render();
@@ -49,7 +53,7 @@ function renderFinanceiro(){
   v.append(el("div",{class:"card",style:"display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between"},regua.wrap,
     el("div",{class:"note"},F.sinc?`Última sincronização: ${new Date(F.sinc.inicio).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})} · ${F.sinc.ok?`${F.sinc.cobrancas} cobrança(s), ${F.sinc.clientes} cliente(s) vinculados`:"erro: "+(F.sinc.erro||"")}`:"Ainda não sincronizado com o Asaas.")));
   // filtros
-  const fs=sel({abertas:"Em aberto e atrasadas",atrasada:"Só atrasadas",pendente:"Só em aberto",paga:"Pagas",todas:"Todas"},F.fStatus);fs.onchange=()=>{F.fStatus=fs.value;render()};
+  const fs=sel({abertas:"Em aberto e atrasadas",atrasada:"Só atrasadas",pendente:"Só em aberto",paga:"Pagas (últimos 120 dias)",todas:"Todas (abertas + 120 dias)"},F.fStatus);fs.onchange=()=>{F.fStatus=fs.value;render()};
   const clis=[...new Map(F.rows.filter(r=>r.cliente_id).map(r=>[r.cliente_id,r.cliente_nome||r.cliente_id])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const fc=sel({"":"Todos os clientes",sem:"— sem cliente vinculado —",...Object.fromEntries(clis)},F.fCli);fc.onchange=()=>{F.fCli=fc.value;render()};
   const ft=sel({"":"Todos os tipos",...TIPO},F.fTipo);ft.onchange=()=>{F.fTipo=ft.value;render()};
@@ -59,11 +63,12 @@ function renderFinanceiro(){
   if(F.fCli==="sem")rows=rows.filter(r=>!r.cliente_id);else if(F.fCli)rows=rows.filter(r=>r.cliente_id===F.fCli);
   if(F.fTipo)rows=rows.filter(r=>r.tipo===F.fTipo);
   if(F.q){const t=F.q.toLowerCase();rows=rows.filter(r=>(r.descricao||"").toLowerCase().includes(t)||(r.cliente_nome||"").toLowerCase().includes(t))}
-  rows.sort((a,b)=>(a.vencimento||"").localeCompare(b.vencimento||""));
+  rows.sort((a,b)=>(a.status==="atrasada"?0:1)-(b.status==="atrasada"?0:1)||(a.vencimento||"").localeCompare(b.vencimento||""));
+  const LIM=400;const total=rows.length;rows=rows.slice(0,LIM);
   const semCli=F.rows.filter(r=>!r.cliente_id&&["pendente","atrasada"].includes(r.status)).length;
   if(semCli)v.append(el("div",{class:"note",style:"color:var(--warn);margin-bottom:8px"},`${semCli} cobrança(s) do Asaas sem cliente vinculado — o vínculo é automático pelo CNPJ/CPF da ficha; confira o CNPJ do cliente ou vincule pelo botão na linha.`));
   v.append(el("div",{class:"card",style:"padding:0;overflow:auto"},el("table",{class:"tbl"},el("thead",{},el("tr",{},...["Vencimento","Cliente","Descrição","Tipo","Valor","Status","Pago em","",""].map(h=>el("th",{},h)))),
-    el("tbody",{},rows.length?rows.map(linha):el("tr",{},el("td",{colspan:"9",class:"note"},"Nenhuma cobrança neste filtro."))))));
+    el("tbody",{},rows.length?rows.map(linha):el("tr",{},el("td",{colspan:"9",class:"note"},"Nenhuma cobrança neste filtro."))))),total>LIM?el("div",{class:"note",style:"margin-top:6px"},`Mostrando ${LIM} de ${total} — use os filtros para refinar.`):null);
 }
 function linha(r){
   const st=ST[r.status]||[r.status,"c"];
