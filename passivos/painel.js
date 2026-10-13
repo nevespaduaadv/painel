@@ -13,7 +13,7 @@ async function carregar(){
       SB.from("v_prazos").select("*").order("prazo"),
       SB.from("v_tarefas").select("id,titulo,status,prazo,prazo_fatal,responsavel_id,responsavel_nome,cliente_nome,faixa,created_by").in("status",["aberta","em_andamento"]),
       SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo"),
-      SB.from("tarefa_eventos").select("*").order("criado_em",{ascending:false}).limit(12),
+      SB.from("tarefa_eventos").select("*").order("criado_em",{ascending:false}).limit(80),
       SB.from("v_leads").select("id,nome,empresa,status,atraso,tarefas_vencidas,proprietario_id,fase_nome").eq("status","Aberto")]);
     if(p.error)throw p.error;
     D.prazos=p.data||[];D.tarefas=t.data||[];D.colab=c.data||[];D.eventos=e.data||[];D.leads=l.error?null:(l.data||[]);D.ok=true;
@@ -62,8 +62,13 @@ function renderPainel(){
   const col=el("div",{style:"display:flex;flex-direction:column;gap:18px"});
   const prox=prazos.filter(z=>z.faixa==="d15"||z.faixa==="d30");
   col.append(cardPrazos(prox,"Próximos 30 dias","Nada entre 8 e 30 dias."));
-  col.append(el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Atividade recente")),
-    D.eventos.length?el("ul",{class:"tl",style:"margin:14px 18px 14px 24px"},D.eventos.map(e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);return el("li",{},el("div",{class:"d"},fmtDT(e.criado_em)),el("div",{style:"font-size:13.5px"},el("b",{},e.autor_nome||"Alguém")," ",EVENTO[e.tipo]||e.tipo," ",e.tipo==="prazo_alterado"?`${e.de||"—"} para ${e.para||"—"}`:e.tipo==="reatribuida"?`de ${e.de||"—"} para ${e.para||"—"}`:"",t?el("button",{class:"btn sm",style:"margin-left:6px",onclick:()=>window.PP_TAREFAS?.abrir(t.id)},t.titulo.slice(0,40)):"",e.nota?el("div",{class:"note",style:"margin-top:2px"},"“"+e.nota.slice(0,120)+"”"):null))})):el("div",{class:"empty"},"Sem movimentação ainda.")));
+  const SETORES={"":"Todos",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo"};const SETOR_DE={juridico:"juridico",acordos:"juridico",acompanhamento_pj:"juridico",comercial:"comercial",marketing:"marketing",administrativo:"administrativo",pos_vendas:"comercial",rh:"administrativo",socios:"administrativo"};
+  const escAtv=PP.escopoTarefas?.()||{tudo:true};D.atvSetor=D.atvSetor??(()=>{try{return localStorage.getItem("pp-painel-atv")||""}catch(_){return ""}})();
+  const atvOk=e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);if(escAtv.tudo)return !D.atvSetor||(t&&SETOR_DE[t.nucleo]===D.atvSetor);if(!t)return false;const minha=(meu&&t.responsavel_id===meu.id)||t.created_by===PP.perfil?.id||e.autor===PP.perfil?.id;return minha||(escAtv.nucleos||[]).includes(t.nucleo)};
+  const eventosVis=D.eventos.filter(atvOk).slice(0,12);
+  const setorTabs=escAtv.tudo?el("div",{class:"tabs",style:"font-size:12px"},Object.entries(SETORES).map(([k,l])=>el("button",{class:"tab","aria-selected":String(D.atvSetor===k),onclick:()=>{D.atvSetor=k;try{localStorage.setItem("pp-painel-atv",k)}catch(_){}render()}},l))):null;
+  col.append(el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px"},el("h2",{},"Atividade recente"),setorTabs||el("span",{class:"note"},escAtv.nucleos?"suas e do jurídico":"só as suas")),
+    eventosVis.length?el("ul",{class:"tl",style:"margin:14px 18px 14px 24px"},eventosVis.map(e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);return el("li",{},el("div",{class:"d"},fmtDT(e.criado_em)),el("div",{style:"font-size:13.5px"},el("b",{},e.autor_nome||"Alguém")," ",EVENTO[e.tipo]||e.tipo," ",e.tipo==="prazo_alterado"?`${e.de||"—"} para ${e.para||"—"}`:e.tipo==="reatribuida"?`de ${e.de||"—"} para ${e.para||"—"}`:"",t?el("button",{class:"btn sm",style:"margin-left:6px",onclick:()=>window.PP_TAREFAS?.abrir(t.id)},t.titulo.slice(0,40)):"",e.nota?el("div",{class:"note",style:"margin-top:2px"},"“"+e.nota.slice(0,120)+"”"):null))})):el("div",{class:"empty"},"Sem movimentação ainda.")));
   duas.append(col);
   const st=document.createElement("style");st.textContent="@media(max-width:1000px){#view-painel .duas{grid-template-columns:1fr!important}}";duas.classList.add("duas");v.append(st,duas);
 }
