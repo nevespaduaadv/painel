@@ -38,11 +38,12 @@ function renderPainel(){
   const v=$("#view-painel");v.replaceChildren();
   const nome=(PP.perfil?.nome||"").split(" ").slice(0,2).join(" ");
   const h=new Date().getHours(),sauda=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
-  const escopo=el("div",{class:"tabs"},[["minhas","Minhas"],["equipe","Equipe"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(D.escopo===k),onclick:()=>{D.escopo=k;try{localStorage.setItem("pp-painel-escopo",k)}catch(_){}render()}},l)));
+  const esc=PP.escopoTarefas?.()||{tudo:true};if(!esc.tudo&&!esc.nucleos)D.escopo="minhas";
+  const escopo=(esc.tudo||esc.nucleos)?el("div",{class:"tabs"},[["minhas","Minhas"],["equipe",esc.tudo?"Equipe":"Jurídico"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(D.escopo===k),onclick:()=>{D.escopo=k;try{localStorage.setItem("pp-painel-escopo",k)}catch(_){}render()}},l))):null;
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),el("h1",{},`${sauda}${nome?", "+nome:""}`),el("div",{class:"sub"},"O que precisa da sua atenção hoje.")),
     el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu Discord/WhatsApp (conforme a sua ficha), o mesmo resumo que chega às 8h",onclick:enviarResumo},"Receber resumo agora"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
-  const meu=meuColab();const minhas=z=>D.escopo==="equipe"||!meu||z.responsavel_id===meu.id;
+  const meu=meuColab();const minhas=z=>D.escopo==="equipe"?(esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id)):(!meu||z.responsavel_id===meu.id);
   const prazos=D.prazos.filter(minhas);
   const atrasadas=prazos.filter(z=>z.faixa==="atrasada"),hoje=prazos.filter(z=>z.faixa==="hoje"),d7=prazos.filter(z=>z.faixa==="d7"),fatais=prazos.filter(z=>z.prazo_fatal&&["atrasada","hoje","d7"].includes(z.faixa));
   const tarefas=D.tarefas.filter(minhas);
@@ -51,7 +52,7 @@ function renderPainel(){
   const K=(l,val,h,cls,onclick)=>el("button",{class:"card kpi",style:"text-align:left;cursor:pointer;border-color:var(--line)",onclick},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},String(val)),el("div",{class:"h"},h));
   const irTab=t=>()=>{S.tab=t;try{localStorage.setItem("pp-tab",t)}catch(_){}render()};
   v.append(el("div",{class:"kpis"},
-    K("Tarefas abertas",tarefas.length,D.escopo==="equipe"?"de toda a equipe":"atribuídas a você","",irTab("tarefas")),
+    K("Tarefas abertas",tarefas.length,D.escopo==="equipe"?(esc.tudo?"de toda a equipe":"do jurídico"):"atribuídas a você","",irTab("tarefas")),
     K("Atrasadas",atrasadas.length,"prazo já passou",atrasadas.length?"crit":"",irTab("tarefas")),
     K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas")),
     (PP.temAcesso?.("clientes")??true)?K("Carteira",BRL(saldo),`${ativos.length} contratos · ${(S.clientes||[]).length} clientes`,"",irTab("clientes")):null,

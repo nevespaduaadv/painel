@@ -240,6 +240,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
     PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth"];PP.TAB_AREA={clientes:"clientes",historico:"juridico",regras:"juridico",calibracao:"juridico",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"juridico",pecas:"juridico",monitoramento:"juridico",publicacoes:"juridico",autenticador:"juridico",leads:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin"};
+    PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
     PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;return (PP.perfil.acessos||[]).includes(a)};
     for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth"}[a]))document.body.classList.add("sem-"+a);
     if(!PP.temAcesso(S.tab))S.tab="painel";
@@ -277,7 +278,7 @@ async function renderUsuarios(){
       const nome=inp("text",p.nome||"");
       const papel=sel(PAPEIS,p.papel);
       const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");
-      const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth"};
+      const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",tarefas_equipe:"Tarefas da equipe (controle do jurídico)"};
       const chks=Object.fromEntries(Object.keys(AREAS).map(a=>[a,el("input",{type:"checkbox",checked:(p.acessos||[]).includes(a)?"":null})]));
       const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
         const acessos=Object.keys(AREAS).filter(a=>chks[a].checked);
