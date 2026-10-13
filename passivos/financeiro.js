@@ -11,6 +11,7 @@ const FORMA={UNDEFINED:"Boleto ou Pix (cliente escolhe)",BOLETO:"Boleto",PIX:"Pi
 const R$=v=>(v==null||isNaN(v))?"—":(+v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const hojeISO=()=>new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
 const mesAtual=()=>hojeISO().slice(0,7);
+const check=(label,checked)=>{const i=el("input",{type:"checkbox",style:"width:16px;height:16px;flex:none;margin:0;accent-color:var(--gold)"});i.checked=!!checked;return {wrap:el("label",{style:"display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg);cursor:pointer"},i,label),input:i}};
 async function edge(body){
   const {data:{session}}=await SB.auth.getSession();if(!session)throw new Error("Faça login de novo");
   const r=await fetch(SB_URL+"/functions/v1/chatguru/enviar",{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+session.access_token},body:JSON.stringify(body)});
@@ -45,7 +46,7 @@ function renderFinanceiro(){
   const regua=check("Régua de cobrança por WhatsApp (3 dias antes, no dia, +1, +5, +10 → tarefa para o administrativo)",!!F.cfg.regua_whatsapp);
   regua.input.disabled=PP.perfil?.papel!=="admin";
   regua.input.onchange=async()=>{const {error}=await SB.from("escritorio").update({dados:{...F.cfg,regua_whatsapp:regua.input.checked}}).eq("id","financeiro");if(error){toast("Não foi possível salvar");regua.input.checked=!regua.input.checked;return}F.cfg.regua_whatsapp=regua.input.checked;toast(regua.input.checked?"Régua ligada — roda todo dia às 9h10":"Régua desligada")};
-  v.append(el("div",{class:"card",style:"display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between"},regua,
+  v.append(el("div",{class:"card",style:"display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between"},regua.wrap,
     el("div",{class:"note"},F.sinc?`Última sincronização: ${new Date(F.sinc.inicio).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})} · ${F.sinc.ok?`${F.sinc.cobrancas} cobrança(s), ${F.sinc.clientes} cliente(s) vinculados`:"erro: "+(F.sinc.erro||"")}`:"Ainda não sincronizado com o Asaas.")));
   // filtros
   const fs=sel({abertas:"Em aberto e atrasadas",atrasada:"Só atrasadas",pendente:"Só em aberto",paga:"Pagas",todas:"Todas"},F.fStatus);fs.onchange=()=>{F.fStatus=fs.value;render()};
