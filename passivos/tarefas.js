@@ -82,7 +82,7 @@ function renderTarefas(){
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Escritório"),el("h1",{},"Tarefas e prazos"),el("div",{class:"sub"},"Prazos fatais em vermelho. Quem executa, lança na hora.")),
     el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])},"CSV"),el("button",{class:"btn primary",onclick:()=>openTarefaForm({})},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
-  const abertas=T.tarefas.filter(t=>t.status==="aberta"||t.status==="em_andamento");
+  const abertas=T.tarefas.filter(t=>escopoOk(t)&&(t.status==="aberta"||t.status==="em_andamento"));
   const n=k=>abertas.filter(t=>t.faixa===k).length;
   const fat=abertas.filter(t=>t.prazo_fatal&&["atrasada","hoje","d7"].includes(t.faixa)).length;
   const K=(l,val,h,cls)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v num",style:cls?`color:var(--${cls})`:""},String(val)),el("div",{class:"h"},h));
