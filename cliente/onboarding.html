@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Onboarding — Neves Pádua Advocacia</title>
+<style>
+@font-face{font-family:"General Sans";font-weight:400;font-display:swap;src:url(../passivos/fontes/general-sans-400.woff2) format("woff2")}
+@font-face{font-family:"General Sans";font-weight:500;font-display:swap;src:url(../passivos/fontes/general-sans-500.woff2) format("woff2")}
+:root{--navy:#2A2E31;--navy-2:#202426;--gold:#A69D84;--gold-soft:#EAD8B4;--bg:#EFF0EA;--surface:#fff;--surface-2:#F5F6F2;--line:#DFE2DA;--fg:#1F2224;--muted:#5E6460;--faint:#8A908B;--ok:#2F7A4F;--crit:#B3412F;--body:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1D1F;--surface:#24282A;--surface-2:#2C3133;--line:#383E41;--fg:#ECEDE8;--muted:#AEB4AE;--faint:#858B86;--gold:#C2B693;--gold-soft:#3E3828}}
+:root[data-theme="dark"]{--bg:#1A1D1F;--surface:#24282A;--surface-2:#2C3133;--line:#383E41;--fg:#ECEDE8;--muted:#AEB4AE;--faint:#858B86;--gold:#C2B693;--gold-soft:#3E3828}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.top{background:var(--navy);color:#fff;padding:18px 16px}
+.top .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.top img{height:34px}
+.top .eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-soft);font-weight:500}
+.wrap{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:26px;font-weight:500;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+h2{font-size:17px;font-weight:500;margin:28px 0 4px;padding-top:18px;border-top:1px solid var(--line)}
+h2:first-of-type{border-top:0;padding-top:0;margin-top:8px}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 20px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05)}
+.f{margin:16px 0}
+.f label{display:block;font-weight:500;margin-bottom:6px}
+.f .help{color:var(--faint);font-size:13.5px;margin:-2px 0 8px}
+textarea,input[type=text]{width:100%;font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;resize:vertical}
+textarea{min-height:84px}
+textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold)}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg label{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer;background:var(--surface-2);font-weight:400;margin:0}
+.seg input{accent-color:var(--navy)}
+.seg label:has(input:checked){border-color:var(--navy);background:var(--navy);color:#fff}
+.btn{font:inherit;font-weight:500;border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:10px;padding:12px 20px;cursor:pointer}
+.btn.sec{background:transparent;color:var(--fg);border-color:var(--line)}
+.btn:disabled{opacity:.55;cursor:default}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:24px}
+.note{color:var(--muted);font-size:13.5px}
+.err{color:var(--crit);font-weight:500}
+.ok{display:inline-block;background:var(--gold-soft);color:#4A3F22;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:500}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+.day{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface-2)}
+.day b{display:block;font-weight:500;margin-bottom:6px}
+.slot{display:block;width:100%;font:inherit;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px;margin:4px 0;cursor:pointer}
+.slot:hover,.slot.sel{border-color:var(--navy);background:var(--navy);color:#fff}
+.conf{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.conf .big{font-size:22px;font-weight:500}
+.steps{display:flex;gap:6px;margin:0 0 18px}
+.steps span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps span.on{background:var(--gold)}
+.lgpd{font-size:12.5px;color:var(--faint);margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><img src="../passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><div><div class="eyebrow">Neves Pádua Advocacia</div><div style="font-weight:500">Onboarding do cliente</div></div></div></div>
+<div class="wrap">
+  <div id="carregando" class="card"><div class="note">Carregando…</div></div>
+
+  <div id="invalido" class="card" hidden><h1>Link inválido</h1><p class="sub">Este link está incompleto ou foi substituído. Peça ao escritório o link de acesso pelo WhatsApp.</p></div>
+
+  <div id="form" class="card" hidden>
+    <div class="steps"><span class="on"></span><span></span></div>
+    <h1>Formulário de mapeamento</h1>
+    <p class="sub">Olá, <b id="f-nome"></b>! Com estas respostas preparamos a sua primeira reunião de estratégia. Leva cerca de 10 minutos. Pode responder de forma resumida — o que faltar a gente completa na reunião.</p>
+
+    <h2>1. Bens e patrimônio</h2>
+    <div class="f"><label for="veiculos">Veículos (da empresa ou dos sócios)</label><div class="help">Modelo/ano e se está alienado (financiado) a algum banco.</div><textarea id="veiculos" placeholder="Ex.: Fiat Strada 2021, alienada ao Bradesco; Hilux 2018 quitada"></textarea></div>
+    <div class="f"><label for="imoveis">Imóveis</label><div class="help">Se está financiado, dado em garantia, ou se é bem de família (onde a família mora).</div><textarea id="imoveis" placeholder="Ex.: casa onde moramos (bem de família); galpão da empresa, em garantia no Sicoob"></textarea></div>
+    <div class="f"><label>Maquinário, equipamentos ou outros ativos relevantes?</label><div class="seg" data-sn="maquinario_tem"><label><input type="radio" name="maquinario_tem" value="sim">Sim</label><label><input type="radio" name="maquinario_tem" value="nao">Não</label></div></div>
+    <div class="f" data-dep="maquinario_tem=sim"><label for="maquinario">Quais? E algum está dado em garantia?</label><textarea id="maquinario" placeholder="Ex.: 2 tratores (um em garantia no Banco do Brasil), câmara fria"></textarea></div>
+
+    <h2>2. Contratos e dívidas</h2>
+    <div class="f"><label for="contratos">Liste os contratos e dívidas</label><div class="help">Banco, tipo, valor aproximado e se está no CNPJ ou no CPF. Ex.: 2 capital de giro Sicoob no CNPJ; 1 consignado no CPF.</div><textarea id="contratos" required></textarea></div>
+    <div class="f"><label for="situacao">Situação de cada um</label><div class="help">Em dia, em atraso (desde quando), negociado, ou se já virou processo judicial.</div><textarea id="situacao"></textarea></div>
+    <div class="f"><label for="garantia">Existe garantia (aval, imóvel, veículo, recebíveis)? Em qual contrato?</label><textarea id="garantia"></textarea></div>
+    <div class="f"><label>A empresa usa maquininha de cartão?</label><div class="seg"><label><input type="radio" name="maquininha" value="sim">Sim</label><label><input type="radio" name="maquininha" value="nao">Não</label></div></div>
+    <div class="f" data-dep="maquininha=sim"><label for="maquininha_qual">Qual(is)?</label><input type="text" id="maquininha_qual" placeholder="Ex.: Stone, Rede, PagSeguro"></div>
+    <div class="f"><label>Possuem consórcio?</label><div class="seg"><label><input type="radio" name="consorcio" value="sim">Sim</label><label><input type="radio" name="consorcio" value="nao">Não</label></div></div>
+    <div class="f"><label>Existem outros CNPJs (seus, de familiares ou de sócios)?</label><div class="seg"><label><input type="radio" name="outros_cnpjs" value="sim">Sim</label><label><input type="radio" name="outros_cnpjs" value="nao">Não</label></div></div>
+    <div class="f" data-dep="outros_cnpjs=sim"><label for="outros_cnpjs_quais">Quais e qual a atividade de cada um?</label><textarea id="outros_cnpjs_quais"></textarea></div>
+
+    <h2>3. Situação atual</h2>
+    <div class="f"><label>Existe ação judicial em seu nome ou no nome da empresa?</label><div class="seg"><label><input type="radio" name="acao_judicial" value="sim">Sim</label><label><input type="radio" name="acao_judicial" value="nao">Não</label><label><input type="radio" name="acao_judicial" value="nao_sei">Não sei</label></div></div>
+    <div class="f"><label>Está negativado (Serasa, SPC, protesto)?</label><div class="seg"><label><input type="radio" name="negativado" value="sim">Sim</label><label><input type="radio" name="negativado" value="nao">Não</label><label><input type="radio" name="negativado" value="nao_sei">Não sei</label></div></div>
+    <div class="f"><label for="assuntos">O que você gostaria de discutir na reunião?</label><textarea id="assuntos"></textarea></div>
+    <div class="f"><label for="disponibilidade">Melhores dias e horários para reuniões</label><input type="text" id="disponibilidade" placeholder="Ex.: terças e quintas de manhã"></div>
+    <div class="f"><label for="extra">Mais alguma coisa?</label><div class="help">Qualquer detalhe sobre a sua situação pode ser relevante.</div><textarea id="extra"></textarea></div>
+
+    <div class="actions"><button class="btn" id="enviar">Enviar e escolher o horário da reunião →</button><span class="note" id="f-msg"></span></div>
+    <div class="lgpd">Seus dados são tratados pela Neves Pádua Advocacia exclusivamente para a prestação dos serviços contratados, nos termos da Lei 13.709/2018 (LGPD), com sigilo profissional (Lei 8.906/94). Não informe senhas ou dados de acesso bancário.</div>
+  </div>
+
+  <div id="agendar" class="card" hidden>
+    <div class="steps"><span class="on"></span><span class="on"></span></div>
+    <h1>Escolha o horário da sua reunião de onboarding</h1>
+    <p class="sub">Reunião online de 1 hora com <b id="a-resp"></b>. Os horários abaixo já respeitam o tempo que precisamos para preparar a sua estratégia.</p>
+    <div id="a-atual" class="conf" hidden></div>
+    <div id="dias" class="days"></div>
+    <div class="actions"><button class="btn" id="confirmar" disabled>Confirmar horário</button><span class="note" id="a-msg"></span></div>
+  </div>
+
+  <div id="pronto" class="card" hidden>
+    <div class="steps"><span class="on"></span><span class="on"></span></div>
+    <h1>Tudo certo!</h1>
+    <div class="conf"><div><div class="ok">Reunião confirmada</div><div class="big" id="p-quando"></div><div class="note" id="p-resp"></div><div class="note" id="p-link"></div></div></div>
+    <p class="sub" style="margin-top:16px">Você vai receber a confirmação e os lembretes pelo WhatsApp. Na reunião apresentamos a estratégia inicial e alinhamos os próximos 30 dias.</p>
+    <div class="actions"><button class="btn sec" id="remarcar">Preciso remarcar</button></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SB = window.supabase.createClient("https://ksdwzljfjfucjevdqxvx.supabase.co", "sb_publishable_tt__gxUjGaujzylisID0KQ_qaeaU1-l");
+const $ = s => document.querySelector(s);
+const T = new URLSearchParams(location.search).get("t");
+const TZ = "America/Sao_Paulo";
+const fmtQuando = iso => { const d = new Date(iso); return d.toLocaleDateString("pt-BR",{timeZone:TZ,weekday:"long",day:"2-digit",month:"long"}) + " às " + d.toLocaleTimeString("pt-BR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"}); };
+let CTX = null, escolhido = null;
+const show = id => { for (const s of ["carregando","invalido","form","agendar","pronto"]) $("#"+s).hidden = s !== id; window.scrollTo({top:0}); };
+const KEY = "onb-rascunho-" + (T||"").slice(0,8);
+
+async function carregar(){
+  if(!T){ show("invalido"); return; }
+  const {data,error} = await SB.rpc("onboarding_contexto",{t:T});
+  if(error||!data){ show("invalido"); return; }
+  CTX = data;
+  $("#f-nome").textContent = data.nome || "";
+  if (data.reuniao && new Date(data.reuniao.inicio) > new Date() && location.hash !== "#agendar") { mostrarPronto(data.reuniao, data.responsavel); return; }
+  if (data.respondido_em || location.hash === "#agendar") { await abrirAgenda(); return; }
+  restaurar(); deps(); show("form");
+}
+/* ---------- formulário ---------- */
+const campos = ["veiculos","imoveis","maquinario","contratos","situacao","garantia","maquininha_qual","outros_cnpjs_quais","assuntos","disponibilidade","extra"];
+const radios = ["maquinario_tem","maquininha","consorcio","outros_cnpjs","acao_judicial","negativado"];
+function respostas(){
+  const r = {};
+  for (const c of campos) r[c] = ($("#"+c).value||"").trim();
+  for (const n of radios) { const el = document.querySelector(`input[name=${n}]:checked`); r[n] = el ? el.value : ""; }
+  if (r.maquininha === "sim" && r.maquininha_qual) r.maquininha_detalhe = r.maquininha_qual;
+  if (r.maquinario_tem === "sim") r.quais_ativos = r.maquinario;
+  return r;
+}
+function deps(){ for (const el of document.querySelectorAll("[data-dep]")) { const [n,v] = el.dataset.dep.split("="); const c = document.querySelector(`input[name=${n}]:checked`); el.hidden = !(c && c.value === v); } }
+document.addEventListener("change", e => { deps(); salvar(); });
+document.addEventListener("input", salvar);
+function salvar(){ try { localStorage.setItem(KEY, JSON.stringify(respostas())); } catch(_){} }
+function restaurar(){ try { const r = JSON.parse(localStorage.getItem(KEY)||"null"); if(!r) return; for (const c of campos) if (r[c]) $("#"+c).value = r[c]; for (const n of radios) if (r[n]) { const el = document.querySelector(`input[name=${n}][value=${r[n]}]`); if (el) el.checked = true; } deps(); } catch(_){} }
+$("#enviar").onclick = async () => {
+  const r = respostas();
+  if (!r.contratos) { $("#f-msg").textContent = "Preencha ao menos a lista de contratos e dívidas."; $("#f-msg").className = "note err"; $("#contratos").focus(); return; }
+  $("#enviar").disabled = true; $("#f-msg").className = "note"; $("#f-msg").textContent = "Enviando…";
+  const {error} = await SB.rpc("onboarding_responder",{t:T, r});
+  if (error) { $("#enviar").disabled = false; $("#f-msg").className = "note err"; $("#f-msg").textContent = "Não foi possível enviar: " + (error.message||""); return; }
+  try { localStorage.removeItem(KEY); } catch(_){}
+  await abrirAgenda();
+};
+/* ---------- agenda ---------- */
+async function abrirAgenda(){
+  show("agendar"); escolhido = null; $("#confirmar").disabled = true; $("#a-msg").textContent = "";
+  const at = $("#a-atual"); if (CTX.reuniao && new Date(CTX.reuniao.inicio) > new Date()) { at.hidden = false; at.innerHTML = `<div><div class="note">Horário atual</div><div class="big">${fmtQuando(CTX.reuniao.inicio)}</div><div class="note">Escolha outro horário abaixo para remarcar.</div></div>`; } else at.hidden = true;
+  const {data,error} = await SB.rpc("onboarding_horarios",{t:T});
+  const dias = $("#dias"); dias.replaceChildren();
+  if (error||!data) { $("#a-msg").textContent = "Não foi possível carregar os horários. Tente de novo em instantes."; $("#a-msg").className = "note err"; return; }
+  $("#a-resp").textContent = data.responsavel || "nossa equipe";
+  const porDia = {}; for (const h of data.horarios) (porDia[h.dia] ||= []).push(h);
+  if (!Object.keys(porDia).length) { dias.textContent = "Nenhum horário livre nos próximos dias — fale com a gente pelo WhatsApp que marcamos manualmente."; return; }
+  for (const [dia, hs] of Object.entries(porDia)) {
+    const d = new Date(dia + "T12:00:00-03:00");
+    const box = document.createElement("div"); box.className = "day";
+    const b = document.createElement("b"); b.textContent = d.toLocaleDateString("pt-BR",{timeZone:TZ,weekday:"short",day:"2-digit",month:"2-digit"}).replace(".",""); box.append(b);
+    for (const h of hs) { const s = document.createElement("button"); s.className = "slot"; s.textContent = h.hora; s.onclick = () => { for (const x of dias.querySelectorAll(".slot.sel")) x.classList.remove("sel"); s.classList.add("sel"); escolhido = h; $("#confirmar").disabled = false; $("#confirmar").textContent = "Confirmar " + d.toLocaleDateString("pt-BR",{timeZone:TZ,day:"2-digit",month:"2-digit"}) + " às " + h.hora; }; box.append(s); }
+    dias.append(box);
+  }
+}
+$("#confirmar").onclick = async () => {
+  if (!escolhido) return;
+  $("#confirmar").disabled = true; $("#a-msg").className = "note"; $("#a-msg").textContent = "Confirmando…";
+  const {data,error} = await SB.rpc("onboarding_agendar",{t:T, p_inicio: escolhido.inicio});
+  if (error||!data) { $("#a-msg").className = "note err"; $("#a-msg").textContent = (error && /dispon/i.test(error.message)) ? "Esse horário acabou de ser ocupado. Escolha outro." : "Não foi possível agendar: " + (error ? error.message : ""); await abrirAgenda(); return; }
+  CTX.reuniao = { inicio: data.inicio, link: null }; CTX.responsavel = data.responsavel;
+  mostrarPronto(CTX.reuniao, data.responsavel);
+};
+function mostrarPronto(r, resp){
+  show("pronto"); location.hash = "";
+  $("#p-quando").textContent = fmtQuando(r.inicio);
+  $("#p-resp").textContent = resp ? "com " + resp : "";
+  $("#p-link").innerHTML = r.link ? `Link da reunião: <a href="${r.link}" target="_blank" rel="noopener">${r.link}</a>` : "O link da chamada chega pelo WhatsApp antes do horário.";
+}
+$("#remarcar").onclick = () => { location.hash = "#agendar"; abrirAgenda(); };
+carregar();
+</script>
+</body>
+</html>

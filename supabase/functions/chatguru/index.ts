@@ -249,7 +249,8 @@ async function automacoes(req: Request): Promise<Response> {
   const reserva = await rpc("automacoes_reservar", { token, limite: 5 });
   if (!reserva.ok) { const t = await reserva.text(); return json(/token inv/i.test(t) ? 401 : 502, { ok: false, erro: t }); }
   const passos = (await reserva.json()) as Passo[];
-  if (!passos.length) return json(200, { ok: true, processados: 0 });
+  const fila = await mensagensClientes(cg, rpc, token); // fila de WhatsApp para clientes (onboarding etc.), no mesmo ciclo
+  if (!passos.length) return json(200, { ok: true, processados: 0, mensagens: fila });
   const inicio = Date.now(); const resultados: Dict[] = [];
   for (const p of passos) {
     if (Date.now() - inicio > 35_000) { resultados.push({ id: p.id, liberar: true }); continue; }
@@ -259,7 +260,23 @@ async function automacoes(req: Request): Promise<Response> {
   }
   const reg = await rpc("automacoes_registrar", { token, resultados });
   if (!reg.ok) return json(502, { ok: false, erro: `Não foi possível registrar o resultado: ${await reg.text()}` });
-  return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length });
+  return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length, mensagens: fila });
+}
+// fila de mensagens para clientes (tabela mensagens_fila, 0052): o banco monta o texto e respeita o horário comercial
+interface Msg { id: number; nome: string; numero: string; texto: string | null }
+async function mensagensClientes(cg: Cred, rpc: (f: string, a: Dict) => Promise<Response>, token: string): Promise<Dict> {
+  const r = await rpc("mensagens_reservar", { token, limite: 5 });
+  if (!r.ok) return { ok: false, erro: (await r.text()).slice(0, 200) };
+  const itens = (await r.json()) as Msg[];
+  if (!itens.length) return { ok: true, processadas: 0 };
+  const resultados: Dict[] = [];
+  for (const m of itens) {
+    if (!m.texto) { resultados.push({ id: m.id, ok: false, erro: "Modelo de mensagem não encontrado." }); continue; }
+    try { const e = await enviarMensagem(cg, { nome: m.nome, whatsapp: m.numero }, m.texto); resultados.push(e.ok ? { id: m.id, ok: true, descricao: `${e.como} ${e.numero}` } : { id: m.id, ok: false, erro: e.erro }); }
+    catch (e) { const tempo = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError"); resultados.push({ id: m.id, ok: false, temporario: true, erro: tempo ? "O ChatGuru não respondeu a tempo." : `Falha de conexão: ${e instanceof Error ? e.message : String(e)}` }); }
+  }
+  const reg = await rpc("mensagens_registrar", { token, resultados });
+  return { ok: reg.ok, processadas: resultados.length, enviadas: resultados.filter((x) => x.ok).length, erros: resultados.filter((x) => x.ok === false).length };
 }
 
 // ---------- Discord: DM via bot (token DISCORD_BOT_TOKEN no Vault). O usuário precisa estar num servidor em comum com o bot. ----------

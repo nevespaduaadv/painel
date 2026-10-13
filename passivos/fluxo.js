@@ -78,6 +78,34 @@ function openFluxoForm(c){
   });
 }
 
+/* ---------- Ficha: card do onboarding (0052) ---------- */
+const ONB_PERG={veiculos:"Veículos",imoveis:"Imóveis",maquinario_tem:"Maquinário/ativos relevantes?",maquinario:"Quais / garantia",contratos:"Contratos e dívidas",situacao:"Situação de cada um",garantia:"Garantias",maquininha:"Maquininha?",maquininha_qual:"Qual maquininha",consorcio:"Consórcio?",outros_cnpjs:"Outros CNPJs?",outros_cnpjs_quais:"Quais CNPJs / atividade",acao_judicial:"Ação judicial?",negativado:"Negativado?",assuntos:"Assuntos para a reunião",disponibilidade:"Disponibilidade",extra:"Mais detalhes"};
+const ONB_ST={pendente:["Agendada","g"],processando:["Enviando","g"],enviada:["Enviada","e1"],erro:["Erro","e3"],cancelada:["Cancelada","c"]};
+function cardOnboarding(c){
+  const card=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Onboarding"),el("div",{class:"note"},"Boas-vindas, formulário de mapeamento e agendamento da R1 — automáticos pelo WhatsApp."))),el("div",{class:"note"},"Carregando…"));
+  (async()=>{
+    const {data:o,error}=await SB.from("v_onboarding_cliente").select("*").eq("cliente_id",c.id).maybeSingle();
+    if(error||!o){card.lastChild.textContent="Não foi possível carregar.";return}
+    const link=new URL("cliente/onboarding.html?t="+o.onboarding_token,document.baseURI).href;
+    const reun=o.reuniao;const fmtDT=iso=>new Date(iso).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",dateStyle:"short",timeStyle:"short"});
+    const kvs=el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"},
+      el("div",{class:"kv"},el("div",{class:"k"},"Boas-vindas + formulário"),el("div",{class:"v"},o.onboarding_enviado_em?"enviado "+fmtDT(o.onboarding_enviado_em):el("span",{class:"note"},"não enviado"))),
+      el("div",{class:"kv"},el("div",{class:"k"},"Formulário"),el("div",{class:"v"},o.formulario_em?[el("span",{class:"pill e1"},"respondido "+fmtDT(o.formulario_em)),o.conferido_em?" · conferido":""]:el("span",{class:"note"},"aguardando o cliente"))),
+      el("div",{class:"kv"},el("div",{class:"k"},"Reunião R1"),el("div",{class:"v"},reun?[fmtDT(reun.inicio)+(reun.colaborador?" · "+reun.colaborador:""),reun.link&&!String(reun.link).startsWith("#")?el("div",{class:"note"},el("a",{href:reun.link,target:"_blank",rel:"noopener",style:"color:var(--info)"},"link da chamada")):el("div",{class:"note"},"sem link da chamada — preencha no compromisso da Agenda")]:el("span",{class:"note"},"não agendada"))));
+    const msgs=(o.mensagens||[]).slice(0,6).map(m=>el("div",{class:"note",style:"display:flex;gap:8px;align-items:center"},el("span",{class:"pill "+(ONB_ST[m.status]||["",""])[1],style:"min-width:72px;text-align:center"},(ONB_ST[m.status]||[m.status])[0]),el("span",{},(m.titulo||m.modelo)+" · "+fmtDT(m.enviar_em)+(m.status==="erro"&&m.resultado?" — "+m.resultado:"")),
+      m.status==="pendente"?el("button",{class:"btn sm",style:"margin-left:auto",onclick:async()=>{await SB.from("mensagens_fila").update({status:"cancelada",resultado:"Cancelada pela equipe"}).eq("id",m.id);toast("Cancelada");recarregarFicha()}},"Cancelar"):null));
+    const acts=el("div",{class:"actions edit-only",style:"display:flex;gap:6px;flex-wrap:wrap"},
+      el("button",{class:"btn sm",onclick:()=>{navigator.clipboard?.writeText(link);toast("Link do formulário copiado")}},"Copiar link do formulário"),
+      el("button",{class:"btn sm",onclick:()=>{navigator.clipboard?.writeText(link+"#agendar");toast("Link da agenda copiado")}},"Copiar link da agenda"),
+      el("button",{class:"btn sm primary",onclick:async()=>{if(!window.confirm(o.onboarding_enviado_em?"Reenviar as boas-vindas com o link do formulário agora?":"Enviar as boas-vindas com o link do formulário agora?"))return;const {error}=await SB.rpc("onboarding_enviar_boas_vindas",{p_cliente:c.id,p_em:new Date().toISOString()});if(error){toast("Não foi possível enfileirar");return}toast("Mensagem agendada para envio");recarregarFicha()}},o.onboarding_enviado_em?"Reenviar boas-vindas":"Enviar boas-vindas"),
+      o.respostas?el("button",{class:"btn sm",onclick:()=>{const body=el("div",{},Object.entries(ONB_PERG).filter(([k])=>o.respostas[k]).map(([k,l])=>el("div",{class:"kv",style:"margin-bottom:8px"},el("div",{class:"k"},l),el("div",{class:"v",style:"white-space:pre-wrap"},String(o.respostas[k])))));
+        modal("Formulário de mapeamento — respostas do cliente",body,async()=>{await SB.from("onboarding_respostas").update({conferido_em:new Date().toISOString()}).eq("cliente_id",c.id).is("conferido_em",null);toast("Marcado como conferido");recarregarFicha()})}},"Ver respostas"+(o.conferido_em?"":" · conferir")):null);
+    card.replaceChildren(card.firstChild,kvs,msgs.length?el("div",{style:"display:grid;gap:4px"},el("div",{class:"k"},"Mensagens WhatsApp"),...msgs):el("div",{class:"note"},"Nenhuma mensagem na fila."),acts);
+  })();
+  return card;
+}
+const recarregarFicha=()=>{try{notificar("clientes")}catch(_){}};
+
 /* ---------- Negociações ---------- */
 function negCard(n,compacto){
   const parada=n.dias_parada>15&&n.etapa!=="concluido";
@@ -197,7 +225,7 @@ function openMonForm(cid,m){
 /* ---------- Integração ---------- */
 window.PP_MOD=window.PP_MOD||{};
 window.PP_MOD.negociacoes=renderNegCliente;
-{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly())return;garantir();const card=cardFluxo(c);const first=host.children[0];if(first&&first.nextSibling)host.insertBefore(card,first.nextSibling);else host.append(card)}}
+{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly())return;garantir();const card=cardFluxo(c);const first=host.children[0];if(first&&first.nextSibling)host.insertBefore(card,first.nextSibling);else host.append(card);card.after(cardOnboarding(c))}}
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};if(!readOnly()&&X.ok)r.negociacoes=X.neg.filter(n=>n.cliente_id===c.id&&n.etapa!=="concluido").length;return r}}
 {const _r=render;render=function(){_r();const vn=$("#view-negociacoes"),vm=$("#view-monitoramento");if(!vn)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&(S.tab==="negociacoes"||S.tab==="monitoramento"))S.tab="clientes";vn.hidden=S.tab!=="negociacoes";vm.hidden=S.tab!=="monitoramento";if(S.tab==="negociacoes")renderNegociacoes();if(S.tab==="monitoramento")renderMonitoramento()}}
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("fluxo");for(const t of ["negociacoes","monitoramentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
