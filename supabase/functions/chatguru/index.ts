@@ -211,6 +211,7 @@ async function enviar(req: Request): Promise<Response> {
   if (acao === "agenda") { // sincronizar a agenda agora (equipe); as RPCs aceitam o papel service_role sem token
     try { return json(200, await sincronizarAgenda("", txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
   }
+  if (typeof acao === "string" && acao.startsWith("asaas_")) return await asaasAcao(acao, corpo, jwt);
   if (acao === "growth") { // atualizar os dados de Growth agora (admin)
     const adm = await rest("rpc/sou_admin", jwt, { method: "POST", body: "{}" });
     if (!adm.ok || (await adm.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Só administradores atualizam o Growth." });
@@ -519,6 +520,119 @@ async function agenda(req: Request): Promise<Response> {
   try { return json(200, await sincronizarAgenda(token, txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
 }
 
+// ---------- Asaas (financeiro): ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN, ASAAS_AMBIENTE no Vault ----------
+async function asaasBase(): Promise<{ url: string; key: string } | string> {
+  const key = await segredo("ASAAS_API_KEY");
+  if (!key) return "Falta configurar ASAAS_API_KEY no Vault.";
+  const amb = (await segredo("ASAAS_AMBIENTE")) || "producao";
+  return { url: amb === "sandbox" ? "https://api-sandbox.asaas.com/v3" : "https://api.asaas.com/v3", key };
+}
+async function asaas(c: { url: string; key: string }, path: string, init: { method?: string; body?: Dict } = {}): Promise<{ ok: boolean; status: number; dados: Dict }> {
+  const r = await fetch(`${c.url}/${path}`, { method: init.method ?? "GET", headers: { access_token: c.key, "Content-Type": "application/json", "User-Agent": "PainelNevesPadua/1.0" }, body: init.body ? JSON.stringify(init.body) : undefined, signal: AbortSignal.timeout(25_000) });
+  const dados = (await r.json().catch(() => ({}))) as Dict;
+  return { ok: r.ok, status: r.status, dados };
+}
+const asaasErro = (d: Dict) => { const e = (d.errors as { description?: string }[] | undefined)?.map((x) => x.description).filter(Boolean).join(" · "); return e || "erro do Asaas"; };
+async function asaasListar(c: { url: string; key: string }, path: string, params: Record<string, string>): Promise<Dict[]> {
+  const out: Dict[] = []; let offset = 0;
+  for (let i = 0; i < 60; i++) {
+    const q = new URLSearchParams({ ...params, limit: "100", offset: String(offset) });
+    const r = await asaas(c, `${path}?${q}`);
+    if (!r.ok) throw new Error(`Asaas ${path} (${r.status}): ${asaasErro(r.dados)}`);
+    const data = (r.dados.data as Dict[] | undefined) ?? [];
+    out.push(...data); offset += data.length;
+    if (!r.dados.hasMore || !data.length) break;
+  }
+  return out;
+}
+// sincroniza clientes + cobranças (dias = janela por data de criação/vencimento; 0 = tudo)
+async function asaasSincronizar(dias: number, por: string | null): Promise<Dict> {
+  const c = await asaasBase(); if (typeof c === "string") throw new Error(c);
+  const rpc = (f: string, args: Dict) => rest(`rpc/${f}`, service(), { method: "POST", body: JSON.stringify(args) });
+  try {
+    const clientes = await asaasListar(c, "customers", {});
+    const desde = new Date(Date.now() - Math.max(1, dias) * 86400_000).toISOString().slice(0, 10);
+    const p1 = dias > 0 ? await asaasListar(c, "payments", { "dateCreated[ge]": desde }) : await asaasListar(c, "payments", {});
+    const p2 = dias > 0 ? await asaasListar(c, "payments", { "dueDate[ge]": desde }) : [];
+    const vistos = new Set<string>(); const cobrancas: Dict[] = [];
+    for (const p of [...p1, ...p2]) { const id = String(p.id); if (!vistos.has(id)) { vistos.add(id); cobrancas.push(p); } }
+    const g = await rpc("asaas_sincronizar_gravar", { token: "", clientes, cobrancas, p_erro: null, p_por: por });
+    if (!g.ok) throw new Error(`Não foi possível gravar: ${(await g.text()).slice(0, 200)}`);
+    return { ok: true, ...(await g.json() as Dict) };
+  } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e);
+    await rpc("asaas_sincronizar_gravar", { token: "", clientes: [], cobrancas: [], p_erro: erro, p_por: por });
+    throw e;
+  }
+}
+async function asaasRota(req: Request, url: URL): Promise<Response> {
+  if (url.pathname.endsWith("/webhook")) { // Asaas → sistema (cabeçalho asaas-access-token)
+    const esperado = await segredo("ASAAS_WEBHOOK_TOKEN");
+    const tk = req.headers.get("asaas-access-token") ?? "";
+    if (!esperado || !igual(tk, esperado)) return json(401, { ok: false, erro: "Token do webhook inválido." });
+    const corpo = (await req.json().catch(() => null)) as Dict | null;
+    if (!corpo) return json(400, { ok: false, erro: "Corpo inválido." });
+    const r = await rest("rpc/asaas_webhook_gravar", service(), { method: "POST", body: JSON.stringify({ corpo }) });
+    if (!r.ok) return json(500, { ok: false, erro: (await r.text()).slice(0, 200) });
+    return json(200, await r.json());
+  }
+  // cron → sincronização (token das automações)
+  const token = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
+  if (!token) return json(401, { ok: false, erro: "Token ausente." });
+  const v = await rest("rpc/automacoes_token_valido", service(), { method: "POST", body: JSON.stringify({ token }) });
+  if (!v.ok || (await v.json().catch(() => null)) !== true) return json(401, { ok: false, erro: "Token inválido." });
+  const corpo = (await req.json().catch(() => ({}))) as Dict;
+  try { return json(200, await asaasSincronizar(Number(corpo.dias ?? 60), null)); }
+  catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+}
+// ações do painel (sessão do usuário; permissão conferida no banco por pode_financeiro)
+async function asaasAcao(acao: string, corpo: Dict, jwt: string): Promise<Response> {
+  const pf = await rest("rpc/pode_financeiro", jwt, { method: "POST", body: "{}" });
+  if (!pf.ok || (await pf.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Sem permissão para o financeiro." });
+  const c = await asaasBase(); if (typeof c === "string") return json(500, { ok: false, erro: c });
+  if (acao === "asaas_testar") { const r = await asaas(c, "myAccount"); return r.ok ? json(200, { ok: true, conta: { nome: r.dados.name, email: r.dados.email, cnpj: r.dados.cpfCnpj }, ambiente: c.url.includes("sandbox") ? "sandbox" : "produção" }) : json(502, { ok: false, erro: `Asaas recusou (${r.status}): ${asaasErro(r.dados)}` }); }
+  if (acao === "asaas_sincronizar") {
+    try { return json(200, await asaasSincronizar(Number(corpo.dias ?? 0), null)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+  }
+  if (acao === "asaas_cobrar") {
+    const clienteId = String(corpo.cliente_id ?? ""); const tipo = String(corpo.tipo ?? "outro"); const valor = Number(corpo.valor); const venc = String(corpo.vencimento ?? "");
+    const forma = ["BOLETO", "PIX", "UNDEFINED", "CREDIT_CARD"].includes(String(corpo.forma)) ? String(corpo.forma) : "UNDEFINED";
+    const parcelas = Math.max(1, Math.min(60, Number(corpo.parcelas ?? 1) || 1)); const descricao = String(corpo.descricao ?? "").trim();
+    if (!clienteId || !(valor > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(venc)) return json(400, { ok: false, erro: "Informe cliente, valor e vencimento." });
+    const rd = await rest("rpc/asaas_dados_cliente", jwt, { method: "POST", body: JSON.stringify({ p_cliente: clienteId }) });
+    const d = rd.ok ? ((await rd.json()) as Dict | null) : null;
+    if (!d) return json(404, { ok: false, erro: "Cliente não encontrado." });
+    let customer = txt(d.asaas_id);
+    if (!customer) { // procura pelo CPF/CNPJ; senão cria
+      if (!d.cpf_cnpj) return json(400, { ok: false, erro: "O cliente precisa ter CNPJ/CPF na ficha para ser cadastrado no Asaas." });
+      const busca = await asaas(c, `customers?cpfCnpj=${d.cpf_cnpj}`);
+      let cust = ((busca.dados.data as Dict[] | undefined) ?? [])[0];
+      if (!cust) {
+        const cr = await asaas(c, "customers", { method: "POST", body: { name: d.nome, cpfCnpj: d.cpf_cnpj, email: d.email ?? undefined, mobilePhone: d.telefone ?? undefined, externalReference: clienteId, notificationDisabled: corpo.sem_notificacao_asaas === true } });
+        if (!cr.ok) return json(502, { ok: false, erro: `Asaas não criou o cliente: ${asaasErro(cr.dados)}` });
+        cust = cr.dados;
+      }
+      customer = String(cust.id);
+      await rest("rpc/asaas_cliente_gravar", jwt, { method: "POST", body: JSON.stringify({ p_cliente: clienteId, p_asaas: cust }) });
+    }
+    const body: Dict = { customer, billingType: forma, dueDate: venc, description: descricao || undefined, externalReference: `${clienteId}|${tipo}` };
+    if (parcelas > 1) { body.installmentCount = parcelas; body.totalValue = valor; } else body.value = valor;
+    const pr = await asaas(c, "payments", { method: "POST", body });
+    if (!pr.ok) return json(502, { ok: false, erro: `Asaas não criou a cobrança: ${asaasErro(pr.dados)}` });
+    let pagamentos: Dict[] = [pr.dados];
+    if (parcelas > 1 && pr.dados.installment) { const li = await asaas(c, `installments/${pr.dados.installment}/payments?limit=100`); if (li.ok && Array.isArray(li.dados.data)) pagamentos = li.dados.data as Dict[]; }
+    const g = await rest("rpc/asaas_cobranca_gravar", jwt, { method: "POST", body: JSON.stringify({ p_cliente: clienteId, p_tipo: tipo, p_contrato: txt(corpo.contrato_id), p_acordo: txt(corpo.acordo_id), p_pagamentos: pagamentos }) });
+    if (!g.ok) return json(200, { ok: true, aviso: "Cobrança criada no Asaas, mas não foi gravada no sistema: " + (await g.text()).slice(0, 160), pagamentos: pagamentos.length });
+    return json(200, { ok: true, pagamentos: pagamentos.length, link: txt(pagamentos[0].invoiceUrl) });
+  }
+  if (acao === "asaas_pix") { // copia-e-cola do Pix de uma cobrança
+    const id = String(corpo.asaas_id ?? ""); if (!/^pay_\w+$/.test(id)) return json(400, { ok: false, erro: "Cobrança inválida." });
+    const r = await asaas(c, `payments/${id}/pixQrCode`);
+    return r.ok ? json(200, { ok: true, payload: r.dados.payload, imagem: r.dados.encodedImage, expira: r.dados.expirationDate }) : json(502, { ok: false, erro: asaasErro(r.dados) });
+  }
+  return json(400, { ok: false, erro: "Ação inválida." });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info" } });
   const url = new URL(req.url);
@@ -531,6 +645,7 @@ Deno.serve(async (req) => {
     if (rota === "resumo") return await resumo(req);
     if (rota === "growth") return await growth(req);
     if (rota === "agenda") return await agenda(req);
+    if (rota === "asaas" || rota === "asaas/webhook") return await asaasRota(req, url);
     if (rota === "diag") { // só com o token do webhook; não expõe valores
       const esperado = await segredo("CHATGURU_WEBHOOK_TOKEN");
       const tk = url.searchParams.get("token") ?? "";
