@@ -124,7 +124,7 @@ function negCard(n,compacto){
 function renderNegociacoes(){
   const v=$("#view-negociacoes");v.replaceChildren();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acordos"),el("h1",{},"Negociações"),el("div",{class:"sub"},"Kanban do setor de acordos: uma negociação por banco/contrato, da abertura ao acordo concluído. Clique no card para editar; arraste entre as colunas (ou use o seletor) para mudar a etapa.")),
-    el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>openNegForm(null,{})},"+ Negociação"))));
+    el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>irPara("historico"),title:"Acordos já fechados: base para a projeção de desconto"},"Base de acordos"),PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("regras")},"Regras de projeção"):null,PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("calibracao")},"Calibração"):null,el("button",{class:"btn primary",onclick:()=>openNegForm(null,{})},"+ Negociação"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const fc=sel({"":"Todos os clientes",...Object.fromEntries([...new Set(X.neg.map(n=>n.cliente_id))].map(id=>[id,nomeCli(id)]).sort((a,b)=>a[1].localeCompare(b[1])))},X.fCli);fc.onchange=()=>{X.fCli=fc.value;render()};
   const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(X.colabs.filter(c=>c.ativo).map(c=>[c.id,c.nome]))},X.fResp);fr.onchange=()=>{X.fResp=fr.value;render()};
