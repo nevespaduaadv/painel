@@ -50,7 +50,7 @@ function renderFeriados(){
   const anos=[...new Set([F.ano,...F.feriados.map(f=>+f.data.slice(0,4)),...F.susp.map(s=>+s.inicio.slice(0,4))])].sort();
   const selAno=sel(Object.fromEntries(anos.map(a=>[a,a])),String(F.ano));selAno.onchange=()=>{F.ano=+selAno.value;render()};
   const selUf=sel(Object.fromEntries(UFS.map(u=>[u,u||"Todas as UFs"])),F.uf);selUf.onchange=()=>{F.uf=selUf.value;render()};
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Feriados e prazos"),el("div",{class:"sub"},"Dias sem expediente forense e suspensões de prazo usados na contagem de prazos (CPC 219/220/224).")),
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Agenda"),el("h1",{},"Feriados e prazos"),el("div",{class:"sub"},"Dias sem expediente forense e suspensões de prazo usados na contagem de prazos (CPC 219/220/224).")),
     el("div",{class:"actions"},selAno,selUf,ehAdmin()?el("button",{class:"btn",onclick:()=>formSusp({})},"+ Suspensão"):null,ehAdmin()?el("button",{class:"btn primary",onclick:()=>formFeriado({})},"+ Feriado"):null)));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const tabs=el("div",{class:"tabs"},[["feriados","Feriados"],["susp","Suspensões de prazo"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(F.tab===k),onclick:()=>{F.tab=k;render()}},l)));

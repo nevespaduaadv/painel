@@ -4,6 +4,8 @@
 "use strict";
 const K={lista:[],ok:false,carregando:false,sel:null,art:null,versoes:[],busca:"",resultados:null,resultadosDocs:null,editando:false,tema:"",area:""};
 const AREAS={juridico:"Jurídico",comercial:"Comercial",financeiro:"Financeiro",administrativo:"Administrativo",marketing:"Marketing",geral:"Geral"};
+const podeArea=a=>{const p=PP.perfil||{};if(p.papel==="admin")return true;const ac=p.acessos||[];if(a==="geral")return true;if(a==="administrativo")return ac.includes("financeiro")||ac.includes("equipe");return ac.includes(a)};
+const AREAS_MINHAS=()=>Object.fromEntries(Object.entries(AREAS).filter(([k])=>podeArea(k)));
 const DOCS=()=>window.PP_DOCS;
 const ROTA_ART=()=>"#conhecimento"+(K.sel?"/"+K.sel:K.area?"/area:"+K.area:"");
 window.PP_KB={get area(){return K.area}};
@@ -101,7 +103,7 @@ async function buscar(){
 }
 function renderEditor(main){
   const a=K.art;const temas=[...new Set(K.lista.map(c=>c.tema))];
-  const tit=inp("text",a.titulo),area=el("select",{},Object.entries(AREAS).map(([v,l])=>el("option",{value:v,selected:(a.area||"juridico")===v?"":null},l))),tema=inp("text",a.tema,{list:"temas-dl"}),dl=el("datalist",{id:"temas-dl"},temas.map(t=>el("option",{value:t}))),res=inp("text",a.resumo||"",{placeholder:"Uma linha que aparece na lista e na busca"}),tags=inp("text",(a.tags||[]).join(", "),{placeholder:"separadas por vírgula"}),pub=el("select",{},el("option",{value:"true",selected:a.publicado?"":null},"Publicado"),el("option",{value:"false",selected:a.publicado?null:""},"Rascunho"));
+  const tit=inp("text",a.titulo),area=el("select",{},Object.entries(AREAS_MINHAS()).map(([v,l])=>el("option",{value:v,selected:(a.area||"juridico")===v?"":null},l))),tema=inp("text",a.tema,{list:"temas-dl"}),dl=el("datalist",{id:"temas-dl"},temas.map(t=>el("option",{value:t}))),res=inp("text",a.resumo||"",{placeholder:"Uma linha que aparece na lista e na busca"}),tags=inp("text",(a.tags||[]).join(", "),{placeholder:"separadas por vírgula"}),pub=el("select",{},el("option",{value:"true",selected:a.publicado?"":null},"Publicado"),el("option",{value:"false",selected:a.publicado?null:""},"Rascunho"));
   const ta=el("textarea",{style:"min-height:60vh;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5"},a.corpo_md||"");
   const prev=el("div",{class:"card section",style:"min-height:60vh;overflow:auto"});let tp;const atualizar=()=>{clearTimeout(tp);tp=setTimeout(()=>renderMd(ta.value,prev),400)};ta.oninput=atualizar;atualizar();
   const salvar=async()=>{

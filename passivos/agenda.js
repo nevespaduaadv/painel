@@ -2,7 +2,7 @@
    e eventos vindos do Google Calendar de cada colaborador (0047). Eventos do Google são somente leitura aqui (abrem no Google). */
 (()=>{
 "use strict";
-const A={ok:false,carregando:false,eventos:[],colab:[],modo:"semana",ref:hojeLocal(),quem:"minha",ini:null,fim:null};
+const A={ok:false,carregando:false,eventos:[],colab:[],feriados:[],modo:"semana",ref:hojeLocal(),quem:"minha",ini:null,fim:null};
 try{A.quem=localStorage.getItem("pp-agenda-quem")||"minha";A.modo=localStorage.getItem("pp-agenda-modo")||"semana"}catch(_){}
 function hojeLocal(){const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
 const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
@@ -17,9 +17,10 @@ function intervalo(){const ini=A.modo==="semana"?segunda(A.ref):new Date(A.ref);
 async function carregar(){
   if(A.carregando)return;A.carregando=true;
   try{const {ini,fim}=intervalo();const de=addD(ini,-7),ate=addD(fim,7);
-    const [e,c]=await Promise.all([SB.from("v_agenda").select("*").gte("inicio",de.toISOString()).lt("inicio",ate.toISOString()).eq("cancelado",false).order("inicio"),
-      A.colab.length?Promise.resolve({data:A.colab}):SB.from("colaboradores").select("id,perfil_id,nome,apelido,email,nucleo,ativo,agenda_sync,google_calendar_id,agenda_sync_em,agenda_sync_erro").order("nome")]);
-    if(e.error)throw e.error;A.eventos=e.data||[];A.colab=c.data||[];A.ini=de;A.fim=ate;A.ok=true}
+    const [e,c,f]=await Promise.all([SB.from("v_agenda").select("*").gte("inicio",de.toISOString()).lt("inicio",ate.toISOString()).eq("cancelado",false).order("inicio"),
+      A.colab.length?Promise.resolve({data:A.colab}):SB.from("colaboradores").select("id,perfil_id,nome,apelido,email,nucleo,ativo,agenda_sync,google_calendar_id,agenda_sync_em,agenda_sync_erro").order("nome"),
+      SB.from("feriados").select("data,nome,tipo,uf,comarca,ativo").gte("data",iso(de)).lt("data",iso(ate))]);
+    if(e.error)throw e.error;A.eventos=e.data||[];A.colab=c.data||[];A.feriados=(f.data||[]).filter(x=>x.ativo!==false);A.ini=de;A.fim=ate;A.ok=true}
   catch(err){console.warn("agenda",err);toast("Não foi possível carregar a agenda")}
   finally{A.carregando=false}
   if(S.tab==="agenda")render();
@@ -84,15 +85,18 @@ function renderAgenda(){
   const modo=el("div",{class:"tabs"},[["semana","Semana"],["dia","Dia"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(A.modo===k),onclick:()=>{A.modo=k;try{localStorage.setItem("pp-agenda-modo",k)}catch(_){}render()}},l)));
   const quem=sel({minha:"Minha agenda",equipe:"Toda a equipe",...Object.fromEntries(A.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},A.quem);quem.onchange=()=>{A.quem=quem.value;try{localStorage.setItem("pp-agenda-quem",A.quem)}catch(_){}render()};
   const meu=meuColab();const sync=meu?.agenda_sync?el("span",{class:"note",title:meu.agenda_sync_erro||""},meu.agenda_sync_erro?"⚠️ Google: "+meu.agenda_sync_erro.slice(0,60):meu.agenda_sync_em?"Google sincronizado "+new Date(meu.agenda_sync_em).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Google: aguardando 1ª sincronização"):el("span",{class:"note"},"Google Calendar desligado para você (Equipe → Colaboradores)");
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Agenda"),el("div",{class:"sub"},"Audiências, reuniões, perícias e prazos — do painel e do Google Calendar de cada pessoa.")),
-    el("div",{class:"actions"},quem,modo,el("button",{class:"btn",onclick:sincronizarAgora,title:"Envia os compromissos pendentes ao Google e busca o que mudou lá (automático a cada 15 min)"},"Sincronizar"),el("button",{class:"btn primary",onclick:()=>formEvento({})},"+ Compromisso"))));
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Agenda"),el("h1",{},"Agenda"),el("div",{class:"sub"},"Audiências, reuniões, perícias e prazos — do painel e do Google Calendar de cada pessoa. Feriados aparecem no cabeçalho do dia: nacional = folga; estadual, municipal e forense = trabalhamos, mas contam para prazos.")),
+    el("div",{class:"actions"},quem,modo,el("button",{class:"btn",onclick:sincronizarAgora,title:"Envia os compromissos pendentes ao Google e busca o que mudou lá (automático a cada 15 min)"},"Sincronizar"),el("button",{class:"btn",onclick:()=>irPara("feriados"),title:"Cadastro de feriados e suspensões de prazo"},"Feriados e prazos"),el("button",{class:"btn primary",onclick:()=>formEvento({})},"+ Compromisso"))));
   v.append(el("div",{style:"display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"},nav,sync));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const evs=visiveis();
   const dias=[];for(let d=new Date(ini);d<fim;d=addD(d,1))dias.push(d);
   const porDia=d=>{const k=iso(d);return evs.filter(e=>{const s=new Date(e.inicio);return e.dia_inteiro?iso(s)<=k&&iso(addD(new Date(e.fim),-1))>=k:iso(s)===k})};
   const H0=7,H1=20;const grade=el("div",{class:"ag-grade",style:`grid-template-columns:52px repeat(${dias.length},1fr)`});
-  grade.append(el("div",{class:"ag-c"}));dias.forEach(d=>grade.append(el("div",{class:"ag-c ag-h"+(iso(d)===iso(hojeLocal())?" hoje":"")},el("div",{class:"ag-dow"},DIAS[(d.getDay()+6)%7]),el("div",{class:"ag-dn"},String(d.getDate())))));
+  const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
+  const marcaFeriado=d=>{const fs=feriadosDe(d);if(!fs.length)return null;const nac=fs.find(f=>f.tipo==="nacional");const f=nac||fs[0];
+    return el("div",{class:"ag-fer"+(nac?" nac":""),title:fs.map(x=>`${x.nome} (${x.tipo}${x.uf?" "+x.uf:""}${x.comarca?" · "+x.comarca:""})`).join("\n")+(nac?"\nFeriado nacional: folga no escritório":"\nTrabalhamos normalmente; conta para prazos forenses")},(nac?"🏖 ":"⚖ ")+f.nome)};
+  grade.append(el("div",{class:"ag-c"}));dias.forEach(d=>grade.append(el("div",{class:"ag-c ag-h"+(iso(d)===iso(hojeLocal())?" hoje":"")+(feriadosDe(d).some(f=>f.tipo==="nacional")?" folga":"")},el("div",{class:"ag-dow"},DIAS[(d.getDay()+6)%7]),el("div",{class:"ag-dn"},String(d.getDate())),marcaFeriado(d))));
   grade.append(el("div",{class:"ag-c ag-lbl"},"dia"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-inteiro",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),9,0)})}});porDia(d).filter(e=>e.dia_inteiro).forEach(e=>cel.append(chip(e)));grade.append(cel)});
   for(let h=H0;h<H1;h++){grade.append(el("div",{class:"ag-c ag-lbl"},String(h).padStart(2,"0")+"h"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-slot",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0)})}});porDia(d).filter(e=>!e.dia_inteiro&&new Date(e.inicio).getHours()===h).forEach(e=>cel.append(chip(e,true)));grade.append(cel)})}
   const fora=evs.filter(e=>!e.dia_inteiro&&(new Date(e.inicio).getHours()<H0||new Date(e.inicio).getHours()>=H1)&&dias.some(d=>iso(d)===iso(new Date(e.inicio))));
@@ -111,6 +115,7 @@ const css=document.createElement("style");css.textContent=`
 .ag-grade{display:grid;min-width:720px;font-size:12.5px}.ag-c{border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-height:38px;padding:2px 3px;display:flex;flex-direction:column;gap:2px}
 .ag-h{text-align:center;padding:8px 2px;background:var(--surface-2)}.ag-h.hoje .ag-dn{background:var(--btn-primary);color:#fff;border-radius:999px;display:inline-block;width:26px;line-height:26px}
 .ag-dow{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.ag-dn{font-weight:600;font-size:15px}
+.ag-fer{font-size:10.5px;line-height:1.2;margin-top:3px;padding:2px 5px;border-radius:6px;background:var(--surface);border:1px dashed var(--muted);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.ag-fer.nac{background:color-mix(in srgb,var(--crit) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--crit) 40%,transparent);color:var(--crit)}.ag-h.folga{background:color-mix(in srgb,var(--crit) 6%,var(--surface-2))}
 .ag-lbl{color:var(--muted);font-size:11px;justify-content:flex-start;align-items:flex-end;padding-right:6px;background:var(--surface-2)}
 .ag-inteiro{background:color-mix(in srgb,var(--surface-2) 50%,transparent);min-height:30px}.ag-slot{cursor:pointer;min-height:40px}.ag-slot:hover{background:color-mix(in srgb,var(--btn-primary) 5%,transparent)}
 .ag-ev{border:0;border-left:3px solid var(--c);background:color-mix(in srgb,var(--c) 13%,var(--surface));color:var(--fg);text-align:left;border-radius:6px;padding:3px 6px;font:inherit;font-size:12px;cursor:pointer;line-height:1.25;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
