@@ -54,8 +54,8 @@ function renderPainel(){
     K("Tarefas abertas",tarefas.length,D.escopo==="equipe"?"de toda a equipe":"atribuídas a você","",irTab("tarefas")),
     K("Atrasadas",atrasadas.length,"prazo já passou",atrasadas.length?"crit":"",irTab("tarefas")),
     K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas")),
-    K("Carteira",BRL(saldo),`${ativos.length} contratos · ${(S.clientes||[]).length} clientes`,"",irTab("clientes")),
-    leadsAtras==null?null:K("Leads atrasados",leadsAtras,`de ${D.leads.length} abertos`,leadsAtras?"warn":"",irTab("leads"))));
+    (PP.temAcesso?.("clientes")??true)?K("Carteira",BRL(saldo),`${ativos.length} contratos · ${(S.clientes||[]).length} clientes`,"",irTab("clientes")):null,
+    (leadsAtras==null||!(PP.temAcesso?.("leads")??true))?null:K("Leads atrasados",leadsAtras,`de ${D.leads.length} abertos`,leadsAtras?"warn":"",irTab("leads"))));
   const duas=el("div",{style:"display:grid;grid-template-columns:1.5fr 1fr;gap:18px"});
   duas.append(cardPrazos([...atrasadas,...hoje,...d7],"Vence até 7 dias","Nada vencendo nos próximos 7 dias."));
   const col=el("div",{style:"display:flex;flex-direction:column;gap:18px"});
