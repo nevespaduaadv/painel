@@ -481,7 +481,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
     if((S.tab==="visao"&&PP.perfil.papel!=="admin")||(S.tab==="growth"&&!PP.podeGrowth)||(S.tab==="financeiro"&&!PP.podeFinanceiro))S.tab="clientes";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
+    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -1315,31 +1315,31 @@ async function renderUsuarios(){
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
 </script>
-<script src="passivos/carteira.js?v=mv708f16"></script>
-<script src="passivos/tarefas.js?v=mv708f16"></script>
-<script src="passivos/prazos.js?v=mv708f16"></script>
-<script src="passivos/feriados.js?v=mv708f16"></script>
-<script src="passivos/agenda.js?v=mv708f16"></script>
-<script src="passivos/notificacoes.js?v=mv708f16"></script>
-<script src="passivos/painel.js?v=mv708f16"></script>
-<script src="passivos/equipe.js?v=mv708f16"></script>
-<script src="passivos/rh.js?v=mv708f16"></script>
-<script src="passivos/dnd.js?v=mv708f16"></script>
-<script src="passivos/ficha.js?v=mv708f16"></script>
-<script src="passivos/fluxo.js?v=mv708f16"></script>
-<script src="passivos/publicacoes.js?v=mv708f16"></script>
-<script src="passivos/processos.js?v=mv708f16"></script>
-<script src="passivos/autenticador.js?v=mv708f16"></script>
-<script src="passivos/marketing.js?v=mv708f16"></script>
-<script src="passivos/comercial.js?v=mv708f16"></script>
-<script src="passivos/growth.js?v=mv708f16"></script>
-<script src="passivos/financeiro.js?v=mv708f16"></script>
-<script src="passivos/gestao.js?v=mv708f16"></script>
-<script src="passivos/leads.js?v=mv708f16"></script>
-<script src="passivos/revisional.js?v=mv708f16"></script>
-<script src="passivos/pecas.js?v=mv708f16"></script>
-<script src="passivos/superendividamento.js?v=mv708f16"></script>
-<script src="passivos/documentos.js?v=mv708f16"></script>
-<script src="passivos/conhecimento.js?v=mv708f16"></script>
+<script src="passivos/carteira.js?v=mv70l21q"></script>
+<script src="passivos/tarefas.js?v=mv70l21q"></script>
+<script src="passivos/prazos.js?v=mv70l21q"></script>
+<script src="passivos/feriados.js?v=mv70l21q"></script>
+<script src="passivos/agenda.js?v=mv70l21q"></script>
+<script src="passivos/notificacoes.js?v=mv70l21q"></script>
+<script src="passivos/painel.js?v=mv70l21q"></script>
+<script src="passivos/equipe.js?v=mv70l21q"></script>
+<script src="passivos/rh.js?v=mv70l21q"></script>
+<script src="passivos/dnd.js?v=mv70l21q"></script>
+<script src="passivos/ficha.js?v=mv70l21q"></script>
+<script src="passivos/fluxo.js?v=mv70l21q"></script>
+<script src="passivos/publicacoes.js?v=mv70l21q"></script>
+<script src="passivos/processos.js?v=mv70l21q"></script>
+<script src="passivos/autenticador.js?v=mv70l21q"></script>
+<script src="passivos/marketing.js?v=mv70l21q"></script>
+<script src="passivos/comercial.js?v=mv70l21q"></script>
+<script src="passivos/growth.js?v=mv70l21q"></script>
+<script src="passivos/financeiro.js?v=mv70l21q"></script>
+<script src="passivos/gestao.js?v=mv70l21q"></script>
+<script src="passivos/leads.js?v=mv70l21q"></script>
+<script src="passivos/revisional.js?v=mv70l21q"></script>
+<script src="passivos/pecas.js?v=mv70l21q"></script>
+<script src="passivos/superendividamento.js?v=mv70l21q"></script>
+<script src="passivos/documentos.js?v=mv70l21q"></script>
+<script src="passivos/conhecimento.js?v=mv70l21q"></script>
 </body>
 </html>

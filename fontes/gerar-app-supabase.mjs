@@ -232,7 +232,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
     if((S.tab==="visao"&&PP.perfil.papel!=="admin")||(S.tab==="growth"&&!PP.podeGrowth)||(S.tab==="financeiro"&&!PP.podeFinanceiro))S.tab="clientes";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
-    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas");
+    window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
