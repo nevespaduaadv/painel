@@ -7,6 +7,7 @@ const ETAPAS=["Contrato fechado / entrada paga","Cadastro no ADVBOX","Formulári
 const NEG_ETAPAS=[["iniciar","Iniciar acompanhamento"],["extrajudicial","Negociação extrajudicial"],["pos_judicializacao","Acordo após judicialização"],["minuta","Elaboração de minuta"],["formalizado","Acordo formalizado"],["pagamento_pendente","Pagamento pendente"],["concluido","Concluído"]];
 const NEG_LABEL=Object.fromEntries(NEG_ETAPAS);
 const TEMP={frio:"Frio",morno:"Morno",quente:"Quente"},TEMP_CLS={frio:"c",morno:"e2",quente:"e3"};
+const DIRECIONAMENTO={acordos:"Acordos (extrajudicial)",juridico:"Jurídico PJ (peça)",ambos:"Acordos + Jurídico"};
 const RESERVA={nao_iniciado:"Não iniciado",apresentado:"Apresentado ao cliente",em_construcao:"Em construção",formada:"Reserva formada — pronto p/ negociar"};
 const REGUA={bronze:"Bronze (2x/mês)",prata:"Prata (1x/mês)",ouro:"Ouro (por marco)"};
 const SERVICO={gestao_passivos:"Gestão de Passivos PJ",consultoria:"Consultoria",outro:"Outro"};
@@ -47,7 +48,8 @@ function cardFluxo(c){
       el("div",{class:"actions edit-only"},et!=null&&et<10?el("button",{class:"btn sm",onclick:()=>avancar(c)},"Avançar etapa →"):null,el("button",{class:"btn sm primary",onclick:()=>openFluxoForm(c)},"Editar fluxo"))),
     steps,
     el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},c.status&&c.status!=="ativo"?el("span",{class:"pill e2"},STATUS[c.status]):null,flag("Dívida em atraso",c.tem_divida_atraso,"e3"),flag("Honorários em dia",c.adimplente,"e1"),flag("Processos",c.possui_processos,"e2"),
-      c.projeto_reserva?el("span",{class:"pill "+(c.projeto_reserva==="formada"?"e1":"g")},"Reserva: "+RESERVA[c.projeto_reserva]):null,c.regua?el("span",{class:"pill g"},"Régua "+REGUA[c.regua].split(" ")[0]):null,c.servico?el("span",{class:"pill c"},SERVICO[c.servico]):null),
+      c.projeto_reserva?el("span",{class:"pill "+(c.projeto_reserva==="formada"?"e1":"g")},"Reserva: "+RESERVA[c.projeto_reserva]):null,c.regua?el("span",{class:"pill g"},"Régua "+REGUA[c.regua].split(" ")[0]):null,c.servico?el("span",{class:"pill c"},SERVICO[c.servico]):null,
+      flag("Registrato na pasta",c.registrato_ok,"e1"),c.direcionamento?el("span",{class:"pill e1",title:c.direcionamento_em?"direcionado em "+fmtD(parseD(c.direcionamento_em)):""},"→ "+DIRECIONAMENTO[c.direcionamento]):null),
     c.tipos_dividas?el("div",{class:"note"},el("b",{},"Dívidas mapeadas: "),c.tipos_dividas):null,
     el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"},
       el("div",{class:"kv"},el("div",{class:"k"},"Negociações abertas"),el("div",{class:"v"},X.ok?(abertas.length?el("a",{href:"#",style:"color:var(--info)",onclick:e=>{e.preventDefault();S.sub="negociacoes";render()}},`${abertas.length} · ${abertas.map(n=>NEG_LABEL[n.etapa]).filter((v,i,a)=>a.indexOf(v)===i).join(", ")}`):"nenhuma"):"…")),
@@ -64,11 +66,13 @@ async function avancar(c){
 function openFluxoForm(c){
   const et=sel({"":"—",...Object.fromEntries(ETAPAS.map((l,i)=>[String(i),`${i} · ${l}`]))},c.etapa_fluxo==null?"":String(c.etapa_fluxo)),st=sel(STATUS,c.status||"ativo"),div=tri(c.tem_divida_atraso),adi=tri(c.adimplente),pro=tri(c.possui_processos),
         res=sel({"":"—",...RESERVA},c.projeto_reserva||""),reg=sel({"":"—",...REGUA},c.regua||""),srv=sel({"":"—",...SERVICO},c.servico||""),tip=el("textarea",{placeholder:"Ex.: 3 créditos rurais Sicredi CPF; 1 capital de giro Sicoob CNPJ…"},c.tipos_dividas||""),
-        onb=colabSel(c.responsavel_onboarding_id,"— responsável pelo onboarding —"),url=inp("url",c.notion_url||"",{placeholder:"https://www.notion.so/…"});
+        onb=colabSel(c.responsavel_onboarding_id,"— responsável pelo onboarding —"),url=inp("url",c.notion_url||"",{placeholder:"https://www.notion.so/…"}),
+        dir=sel({"":"— ainda não direcionado —",...DIRECIONAMENTO},c.direcionamento||""),regok=tri(c.registrato_ok);
   const body=el("div",{class:"form"},field("fl-et","Etapa do fluxo PJ",et,"Só avance quando a etapa anterior estiver 100% cumprida."),field("fl-st","Status",st),field("fl-div","Tem dívida em atraso?",div,"Sim → abre automaticamente o acompanhamento no setor de acordos."),field("fl-adi","Honorários em dia?",adi),field("fl-pro","Possui processos ajuizados?",pro),
-    field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip));
+    field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip),
+    field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),field("fl-dir","Direcionamento",dir,"Ao escolher, o sistema abre a tarefa no núcleo certo (Acordos e/ou Jurídico PJ) e garante a negociação. Só muda de novo se você alterar."));
   modal("Fluxo do cliente PJ",body,async()=>{
-    const cols={etapa_fluxo:et.value===""?null:+et.value,status:st.value,tem_divida_atraso:triVal(div),adimplente:triVal(adi),possui_processos:triVal(pro),projeto_reserva:res.value||null,regua:reg.value||null,servico:srv.value||null,tipos_dividas:tip.value.trim()||null,responsavel_onboarding_id:onb.value||null,notion_url:url.value.trim()||null};
+    const cols={etapa_fluxo:et.value===""?null:+et.value,status:st.value,tem_divida_atraso:triVal(div),adimplente:triVal(adi),possui_processos:triVal(pro),projeto_reserva:res.value||null,regua:reg.value||null,servico:srv.value||null,tipos_dividas:tip.value.trim()||null,responsavel_onboarding_id:onb.value||null,notion_url:url.value.trim()||null,registrato_ok:triVal(regok),direcionamento:dir.value||null};
     const {error}=await SB.from("clientes").update(cols).eq("id",c.id);if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Fluxo salvo");notificar("clientes");recarregar();
   });
@@ -140,15 +144,19 @@ function openNegForm(c,n){
   const konSel=()=>{const ks=S.contratos.filter(k=>k.clienteId===cli.value);return sel({"":"— sem vínculo com contrato —",...Object.fromEntries(ks.map(k=>[k.id,shortName(k)]))},n.contrato_id||"")};
   let kon=konSel();const konWrap=el("div",{},kon);cli.onchange=()=>{kon=konSel();konWrap.replaceChildren(kon)};
   kon.onchange=()=>{const k=S.contratos.find(x=>x.id===kon.value);if(k&&!banco.value)banco.value=k.banco||"";if(k&&!vc.value&&k.saldoAtual)vc.value=k.saldoAtual};
+  const pex=inp("number",n.percentual_exito??"",{step:"1",min:"0",max:"100",placeholder:"ex.: 20"}),alcHint=el("div",{class:"note"});
+  const calcAlc=()=>{const vc=+vc_.value||0,va=+va_.value||0,p=+pex.value||0,a=+alc.value||0;if(!va){alcHint.textContent="Alçada = quanto o cliente pode desembolsar no total: valor do acordo + honorários de êxito.";return}
+    const ex=p&&vc>va?(vc-va)*p/100:0,tot=va+ex;alcHint.textContent=`Desembolso total do cliente: ${BRL(tot)} (acordo ${BRL(va)}${ex?` + êxito ${BRL(ex)}`:""})`+(a?tot>a?` · ACIMA da alçada em ${BRL(tot-a)}`:` · dentro da alçada (sobra ${BRL(a-tot)})`:"");alcHint.style.color=a&&tot>a?"var(--crit)":"";};
+  const vc_=vc,va_=va;[vc,va,alc,pex].forEach(i=>i.oninput=calcAlc);setTimeout(calcAlc,0);
   const body=el("div",{class:"form"},field("ng-cli","Cliente",cli),el("div",{class:"f"},el("label",{},"Contrato relacionado"),konWrap),field("ng-tit","Título",tit),el("div",{class:"f"},el("label",{for:"ng-banco"},"Banco"),el("div",{},Object.assign(banco,{id:"ng-banco"}),bdl)),
     field("ng-et","Etapa",et),field("ng-temp","Temperatura",temp),el("div",{class:"f"},el("label",{for:"ng-sit"},"Situação processual"),el("div",{},Object.assign(sit,{id:"ng-sit"}),sdl)),field("ng-npr","Nº do processo",npr),field("ng-resp","Responsável",resp),field("ng-adv","Escritório adverso / contato",adv),
-    field("ng-vc","Valor cobrado (R$)",vc),field("ng-va","Valor do acordo (R$)",va),field("ng-alc","Alçada autorizada pelo cliente (R$)",alc),field("ng-da","Data do acordo",da),field("ng-pz","Prazo",pz),field("ng-ag","Aguardando",ag),field("ng-pp","Próximo passo",pp),field("ng-obs","Observações",obs));
+    field("ng-vc","Valor cobrado (R$)",vc),field("ng-va","Valor do acordo (R$)",va),field("ng-pex","Honorários de êxito (%)",pex,"Sobre a economia obtida (cobrado − acordo)."),el("div",{class:"f"},el("label",{for:"ng-alc"},"Alçada autorizada pelo cliente (R$)"),el("div",{},Object.assign(alc,{id:"ng-alc"}),alcHint)),field("ng-da","Data do acordo",da),field("ng-pz","Prazo",pz),field("ng-ag","Aguardando",ag),field("ng-pp","Próximo passo",pp),field("ng-obs","Observações",obs));
   const extra=n.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir esta negociação?"))return;await SB.from("negociacoes").delete().eq("id",n.id);$("#modalHost").replaceChildren();toast("Negociação excluída");recarregar()}},"Excluir"):null;
   modal(n.id?"Editar negociação":"Nova negociação",body,async()=>{
     if(!cli.value)throw new Error("Escolha o cliente");
     const titulo=tit.value.trim()||[nomeCli(cli.value),banco.value.trim()].filter(Boolean).join(" | ");
     const row={cliente_id:cli.value,contrato_id:kon.value||null,titulo,banco:banco.value.trim()||null,etapa:et.value,temperatura:temp.value||null,situacao_processual:sit.value.trim()||null,numero_processo:npr.value.trim()||null,responsavel_id:resp.value||null,adverso_contato:adv.value.trim()||null,
-      valor_cobrado:vc.value===""?null:+vc.value,valor_acordo:va.value===""?null:+va.value,alcada_autorizada:alc.value===""?null:+alc.value,data_acordo:da.value||null,prazo:pz.value||null,aguardando:ag.value.trim()||null,proximo_passo:pp.value.trim()||null,observacoes:obs.value.trim()||null};
+      valor_cobrado:vc.value===""?null:+vc.value,valor_acordo:va.value===""?null:+va.value,alcada_autorizada:alc.value===""?null:+alc.value,percentual_exito:pex.value===""?null:+pex.value,data_acordo:da.value||null,prazo:pz.value||null,aguardando:ag.value.trim()||null,proximo_passo:pp.value.trim()||null,observacoes:obs.value.trim()||null};
     const {error}=n.id?await SB.from("negociacoes").update(row).eq("id",n.id):await SB.from("negociacoes").insert(row);if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Negociação salva");recarregar();
   },extra);
