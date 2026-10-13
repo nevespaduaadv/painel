@@ -85,6 +85,7 @@ async function carregarDados(){
     equipe:SB.from("v_equipe_resumo").select("*").eq("ativo",true).order("nome"),
     semRegistro:SB.from("v_clientes_sem_registro").select("*").order("dias_sem_registro",{ascending:false}),
     pont:SB.from("v_tarefas_pontualidade").select("*"),
+    fin:SB.rpc("financeiro_resumo"),
   };
   const res=await Promise.all(Object.entries(qs).map(async([k,q])=>{const {data,error}=await q;if(error)console.warn(k,error);return [k,data]}));
   for(const [k,v] of res)D[k]=v;
@@ -148,6 +149,23 @@ function renderConteudo(){
   if((D.semProv||[]).length)ju.append(el("div",{class:"card chart"},el("h3",{},"Processos sem providência"),tabelaG([
     {t:"Processo",f:r=>r.numero_cnj||"(sem nº)"},{t:"Cliente",f:r=>r.cliente_nome},{t:"Ação",f:r=>r.tipo_acao||"—"},{t:"Fase",f:r=>r.fase||"—"},{t:"Responsável",f:r=>r.responsavel_nome||"—"},{t:"Dias sem andamento",r:1,f:r=>String(r.dias_sem_andamento)}],D.semProv)));
 
+  /* Financeiro (Asaas) */
+  const fs=host.querySelector("#s-financeiro");if(fs){fs.replaceChildren();const f=D.fin;
+    if(f){fs.append(el("h2",{},"Financeiro (Asaas)"));
+      const R=v=>(+v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});const varM=f.recebido_mes_ant>0?(f.recebido_mes/f.recebido_mes_ant-1):null;
+      fs.append(el("div",{class:"kpis"},kpiG("Recebido no mês",R(f.recebido_mes),varM==null?"sem base no mês anterior":`${varM>=0?"+":""}${pct(varM)} vs. mês anterior (${R(f.recebido_mes_ant)})`),
+        kpiG("A vencer até o fim do mês",R(f.a_vencer_mes),"cobranças em aberto"),kpiG("Em atraso",R(f.atrasado),`${f.atrasado_n} cobrança(s) · ${f.atrasado_clientes} cliente(s)`,f.atrasado_n?"crit":""),
+        kpiG("Previsão 90 dias",R(+f.previsao_30+ +f.previsao_60+ +f.previsao_90),`30d ${R(f.previsao_30)} · 60d ${R(f.previsao_60)} · 90d ${R(f.previsao_90)}`)));
+      const meses=f.meses||[];const mx=Math.max(1,...meses.map(m=>Math.max(+m.recebido,+m.previsto)));const hoje=new Date(Date.now()-3*3600e3).toISOString().slice(0,7);
+      const barras=el("div",{style:"display:grid;grid-template-columns:repeat("+meses.length+",1fr);gap:8px;align-items:end;height:140px"},meses.map(m=>{const rec=+m.recebido,prev=+m.previsto,atr=+m.atrasado;
+        return el("div",{style:"display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;text-align:center;font-size:11px;color:var(--muted)",title:`${m.mes}: recebido ${R(rec)} · previsto ${R(prev)} · atrasado ${R(atr)}`},
+          el("div",{style:`height:${Math.round(100*Math.max(rec,prev)/mx)}%;position:relative;background:${m.mes>hoje?"var(--line)":"var(--gold-soft)"};border-radius:4px;overflow:hidden`},el("div",{style:`position:absolute;bottom:0;left:0;right:0;height:${Math.max(rec,prev)>0?Math.round(100*rec/Math.max(rec,prev)):0}%;background:var(--gold)`}),atr?el("div",{style:`position:absolute;top:0;left:0;right:0;height:${Math.round(100*atr/Math.max(rec,prev,atr))}%;background:var(--crit);opacity:.5`}):null),
+          el("div",{},m.mes.slice(5)+"/"+m.mes.slice(2,4)))}));
+      const inad=(f.inadimplentes||[]).slice(0,8);
+      fs.append(el("div",{class:"row2"},el("div",{class:"card chart"},el("h3",{},"Recebido × previsto por mês"),el("div",{class:"sub"},"Dourado = recebido · claro = previsto (em aberto) · vermelho = em atraso"),barras),
+        el("div",{class:"card chart"},el("h3",{},"Maiores atrasos"),el("div",{class:"sub"},"Clientes com cobranças vencidas (Asaas)"),inad.length?el("div",{},inad.map(x=>el("div",{style:"display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:13px"},
+          x.no_sistema?el("a",{href:"#clientes/"+x.cliente_id,style:"color:var(--info)",onclick:e=>{e.preventDefault();S.sel=x.cliente_id;S.tab="clientes";S.sub="geral";render()}},x.nome):el("span",{},x.nome+" (fora do sistema)"),el("span",{class:"num"},`${R(x.valor)} · ${x.n}× · ${x.dias}d`)))):el("div",{class:"empty"},"Nenhuma cobrança em atraso."))));
+    }}
   /* Equipe */
   const eq=host.querySelector("#s-equipe");eq.replaceChildren(el("h2",{},"Equipe e produtividade"));
   const hc=agrupar(D.horasColab,"colaborador_nome","horas"),ht=agrupar(D.horasTipo,"tipo_atividade","horas"),hcl=agrupar(D.horasCli,"cliente_nome","horas"),tt=agrupar(D.tlMes,"tipo","entradas");
@@ -182,7 +200,7 @@ function renderVisao(){
     el("div",{class:"actions"},sel,el("button",{class:"btn",onclick:()=>{V.ok=false;atualizar()}},"Atualizar"))));
   if(V.erro){v.append(el("div",{class:"card",style:"padding:18px"},el("b",{},"Não foi possível carregar."),el("div",{class:"note"},V.erro)));return}
   if(!V.ok){if(!V.carregando)atualizar();v.append(el("div",{class:"note"},"Carregando…"));return}
-  for(const id of ["s-alertas","s-carteira","s-juridico","s-equipe"])v.append(el("section",{class:"sec",id}));
+  for(const id of ["s-alertas","s-carteira","s-juridico","s-financeiro","s-equipe"])v.append(el("section",{class:"sec",id}));
   renderConteudo();
   v.append(el("div",{class:"note",style:"border-top:1px solid var(--line);padding-top:12px"},"Fonte: views SQL do Supabase (as mesmas que o Power BI / Looker podem ler). Estágios conforme Res. CMN 4.966/2021."));
 }
