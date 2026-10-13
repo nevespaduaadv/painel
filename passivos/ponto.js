@@ -24,7 +24,7 @@ async function bater(tipo){
   if(error){toast(error.message||"Não foi possível registrar");return}
   toast(`${TIPO[data.tipo]} registrada às ${hm(data.momento)}`);PT.ok=false;carregarMeu();
 }
-/* card no Meu painel (só quem registra ponto) */
+/* card em Meu perfil (só quem registra ponto) */
 function cardPainel(){
   const me=meuColab();if(!me||!me.registra_ponto)return null;
   if(!PT.ok&&!PT.carregando)carregarMeu();
@@ -86,7 +86,7 @@ function exportar(){
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}));a.download=`ponto-${PT.mes||mesISO()}.csv`;a.click();
 }
 {const _r=render;render=function(){_r();const v=$("#view-ponto");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="ponto")S.tab="clientes";v.hidden=S.tab!=="ponto";if(S.tab==="ponto")renderPonto();
-  if(S.tab==="painel"&&eq){const vp=$("#view-painel");const old=vp?.querySelector(".pt-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head){const av=vp.querySelector(".av-painel");(av||head).after(c)}}}}
+  if(S.tab==="perfil"&&eq){const vp=$("#view-perfil");const old=vp?.querySelector(".pt-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}
 window.PP_PONTO={invalidar(){PT.ok=false;render()}};
-window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){window.PP_EQUIPE?.recarregar?.();SB.channel("ponto").on("postgres_changes",{event:"*",schema:"public",table:"pontos"},()=>{PT.ok=false;if(["painel","ponto"].includes(S.tab))render()}).subscribe()}});
+window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){window.PP_EQUIPE?.recarregar?.();SB.channel("ponto").on("postgres_changes",{event:"*",schema:"public",table:"pontos"},()=>{PT.ok=false;if(["perfil","ponto"].includes(S.tab))render()}).subscribe()}});
 })();
