@@ -251,7 +251,8 @@ async function automacoes(req: Request): Promise<Response> {
   if (!reserva.ok) { const t = await reserva.text(); return json(/token inv/i.test(t) ? 401 : 502, { ok: false, erro: t }); }
   const passos = (await reserva.json()) as Passo[];
   const fila = await mensagensClientes(cg, rpc, token); // fila de WhatsApp para clientes (onboarding etc.), no mesmo ciclo
-  if (!passos.length) return json(200, { ok: true, processados: 0, mensagens: fila });
+  const discord = await pontéDiscord(rpc, token); // chat interno ↔ Discord e avisos (0061)
+  if (!passos.length) return json(200, { ok: true, processados: 0, mensagens: fila, discord });
   const inicio = Date.now(); const resultados: Dict[] = [];
   for (const p of passos) {
     if (Date.now() - inicio > 35_000) { resultados.push({ id: p.id, liberar: true }); continue; }
@@ -261,7 +262,50 @@ async function automacoes(req: Request): Promise<Response> {
   }
   const reg = await rpc("automacoes_registrar", { token, resultados });
   if (!reg.ok) return json(502, { ok: false, erro: `Não foi possível registrar o resultado: ${await reg.text()}` });
-  return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length, mensagens: fila });
+  return json(200, { ok: true, processados: resultados.length, feitos: resultados.filter((r) => r.ok).length, erros: resultados.filter((r) => r.ok === false).length, mensagens: fila, discord });
+}
+// ---------- Discord: fila de envio (chat/avisos → canal) e importação (canal → chat), token DISCORD_BOT_TOKEN ----------
+async function pontéDiscord(rpc: (f: string, a: Dict) => Promise<Response>, token: string): Promise<Dict> {
+  const bot = await segredo("DISCORD_BOT_TOKEN");
+  if (!bot) return { ok: false, erro: "DISCORD_BOT_TOKEN não configurado." };
+  const h = { Authorization: `Bot ${bot}`, "Content-Type": "application/json" };
+  const out: Dict = {}; let enviadas = 0, erros = 0, importadas = 0;
+  // 1) envio
+  const r = await rpc("discord_fila_reservar", { token, limite: 10 });
+  if (r.ok) {
+    const itens = (await r.json()) as { id: number; canal: string; texto: string }[];
+    const res: Dict[] = [];
+    for (const it of itens) {
+      try {
+        const m = await fetch(`${DISCORD}/channels/${it.canal}/messages`, { method: "POST", headers: h, body: JSON.stringify({ content: it.texto.slice(0, 1990), allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(15_000) });
+        if (m.ok) { res.push({ id: it.id, ok: true, descricao: `canal ${it.canal}` }); enviadas++; }
+        else { const t = (await m.text()).slice(0, 200); res.push({ id: it.id, ok: false, temporario: m.status === 429 || m.status >= 500, erro: `Discord ${m.status}: ${t}` }); erros++; }
+      } catch (e) { res.push({ id: it.id, ok: false, temporario: true, erro: e instanceof Error ? e.message : String(e) }); erros++; }
+    }
+    if (res.length) await rpc("discord_fila_registrar", { token, resultados: res });
+  }
+  // 2) importação dos canais espelhados
+  const c = await rpc("discord_canais_ponte", { token });
+  if (c.ok) {
+    const canais = (await c.json()) as { canal_id: string; discord_canal: string; ultimo_id: string | null }[];
+    for (const ch of canais) {
+      try {
+        const q = new URLSearchParams({ limit: "50", ...(ch.ultimo_id ? { after: ch.ultimo_id } : {}) });
+        const g = await fetch(`${DISCORD}/channels/${ch.discord_canal}/messages?${q}`, { headers: h, signal: AbortSignal.timeout(15_000) });
+        if (!g.ok) { out[`canal_${ch.discord_canal}`] = `Discord ${g.status}`; continue; }
+        const msgs = ((await g.json()) as Dict[]).sort((a, b) => (BigInt(String(a.id)) < BigInt(String(b.id)) ? -1 : 1));
+        if (!msgs.length) continue;
+        const ultimo = String(msgs[msgs.length - 1].id);
+        const novas = msgs.filter((m) => !(m.author as Dict)?.bot && typeof m.content === "string" && m.content.trim()).map((m) => {
+          const a = m.author as Dict; const anexos = ((m.attachments as Dict[]) ?? []).map((x) => x.url).filter(Boolean);
+          return { id: String(m.id), autor_discord_id: String(a?.id ?? ""), autor_nome: String((m.member as Dict)?.nick ?? a?.global_name ?? a?.username ?? "Discord"), texto: [m.content, ...anexos].join("\n"), em: m.timestamp };
+        });
+        const imp = await rpc("discord_importar", { token, p_canal: ch.canal_id, mensagens: novas, p_ultimo: ultimo });
+        if (imp.ok) importadas += novas.length;
+      } catch (e) { out[`canal_${ch.discord_canal}`] = e instanceof Error ? e.message : String(e); }
+    }
+  }
+  return { ...out, enviadas, erros, importadas };
 }
 // fila de mensagens para clientes (tabela mensagens_fila, 0052): o banco monta o texto e respeita o horário comercial
 interface Msg { id: number; nome: string; numero: string; texto: string | null }
