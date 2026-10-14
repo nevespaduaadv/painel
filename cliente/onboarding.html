@@ -102,6 +102,12 @@ textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;bord
     <div class="actions"><button class="btn" id="confirmar" disabled>Confirmar horário</button><span class="note" id="a-msg"></span></div>
   </div>
 
+  <div id="aguardando" class="card" hidden>
+    <div class="steps"><span class="on"></span><span></span></div>
+    <h1>Formulário recebido — obrigado!</h1>
+    <p class="sub">O agendamento da sua reunião de onboarding é liberado assim que confirmarmos o pagamento da entrada. Você recebe o link pelo WhatsApp automaticamente. Se já pagou, não precisa fazer nada: a confirmação costuma levar até 1 dia útil.</p>
+  </div>
+
   <div id="pronto" class="card" hidden>
     <div class="steps"><span class="on"></span><span class="on"></span></div>
     <h1>Tudo certo!</h1>
@@ -118,7 +124,7 @@ const T = new URLSearchParams(location.search).get("t");
 const TZ = "America/Sao_Paulo";
 const fmtQuando = iso => { const d = new Date(iso); return d.toLocaleDateString("pt-BR",{timeZone:TZ,weekday:"long",day:"2-digit",month:"long"}) + " às " + d.toLocaleTimeString("pt-BR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"}); };
 let CTX = null, escolhido = null;
-const show = id => { for (const s of ["carregando","invalido","form","agendar","pronto"]) $("#"+s).hidden = s !== id; window.scrollTo({top:0}); };
+const show = id => { for (const s of ["carregando","invalido","form","agendar","aguardando","pronto"]) $("#"+s).hidden = s !== id; window.scrollTo({top:0}); };
 const KEY = "onb-rascunho-" + (T||"").slice(0,8);
 
 async function carregar(){
@@ -128,7 +134,7 @@ async function carregar(){
   CTX = data;
   $("#f-nome").textContent = data.nome || "";
   if (data.reuniao && new Date(data.reuniao.inicio) > new Date() && location.hash !== "#agendar") { mostrarPronto(data.reuniao, data.responsavel); return; }
-  if (data.respondido_em || location.hash === "#agendar") { await abrirAgenda(); return; }
+  if (data.respondido_em || location.hash === "#agendar") { if (!data.entrada_ok) { show("aguardando"); return; } await abrirAgenda(); return; }
   restaurar(); deps(); show("form");
 }
 /* ---------- formulário ---------- */
@@ -154,6 +160,7 @@ $("#enviar").onclick = async () => {
   const {error} = await SB.rpc("onboarding_responder",{t:T, r});
   if (error) { $("#enviar").disabled = false; $("#f-msg").className = "note err"; $("#f-msg").textContent = "Não foi possível enviar: " + (error.message||""); return; }
   try { localStorage.removeItem(KEY); } catch(_){}
+  if (CTX && !CTX.entrada_ok) { show("aguardando"); return; }
   await abrirAgenda();
 };
 /* ---------- agenda ---------- */

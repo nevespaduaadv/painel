@@ -47,7 +47,7 @@ function renderPublicacoes(){
         el("td",{},el("div",{},p.tribunal||"—"),el("div",{class:"note"},p.orgao||"")),
         el("td",{class:"note"},(p.destinatarios||[]).map(d=>d.nome).filter(Boolean).slice(0,3).join(", ")||"—"),
         el("td",{style:"max-width:380px"},el("div",{class:"note",style:"font-weight:400;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden"},p.resumo||"—")),
-        el("td",{},p.tarefa_id?el("span",{class:"pill "+(p.tarefa_status==="concluida"?"e1":"e2")},p.tarefa_status==="concluida"?"analisada":"a analisar"+(p.tarefa_prazo?" · "+fmtD(parseD(p.tarefa_prazo)):"")):"—",
+        el("td",{},p.tarefa_id?el("button",{class:"pill "+(p.tarefa_status==="concluida"?"e1":"e2"),style:"cursor:pointer;border:0;font:inherit",title:"Abrir a tarefa",onclick:()=>window.PP_TAREFAS?.abrir(p.tarefa_id)},p.tarefa_status==="concluida"?"analisada":"a analisar"+(p.tarefa_prazo?" · "+fmtD(parseD(p.tarefa_prazo)):"")):"—",
           +(p.tarefas_atribuidas||0)?el("div",{class:"note",style:"margin-top:3px"},+(p.tarefas_atribuidas_abertas||0)?"→ "+p.atribuidas_para:`${p.tarefas_atribuidas} tarefa(s) concluída(s)`):null),
         el("td",{},el("div",{style:"display:flex;gap:4px;flex-wrap:wrap"},el("button",{class:"btn sm",onclick:()=>abrir(p)},"Ler"),el("button",{class:"btn sm primary",onclick:()=>atribuir(p)},"Atribuir"),p.sem_vinculo?el("button",{class:"btn sm",onclick:()=>vincular(p)},"Vincular"):null,
           el("button",{class:"btn sm",onclick:()=>marcar(p,{lida:!p.lida})},p.lida?"Não lida":"Lida"),p.sem_vinculo?el("button",{class:"btn sm",onclick:()=>marcar(p,{ignorada:true,lida:true})},"Ignorar"):p.ignorada?el("button",{class:"btn sm",onclick:()=>marcar(p,{ignorada:false})},"Reativar"):null))))))));
