@@ -181,7 +181,7 @@ function openTarefa(t){
     el("button",{class:"btn",onclick:()=>openHorasForm({tarefa:t})},"+ Lançar horas"),
     el("button",{class:"btn",onclick:()=>openTarefaForm(t)},"Editar"));
   const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));
-  const com=el("textarea",{rows:2,placeholder:"Comentar — use @ para avisar alguém (ex.: @Natasha o banco respondeu, veja o e-mail)"});
+  const com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:"Comentar — use @ para avisar alguém (ex.: @Natasha o banco respondeu, veja o e-mail). Ctrl+Enter envia."});
   const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Comentário registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Comentar");
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))btnCom.click()});
   mencoes(com);
