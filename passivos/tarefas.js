@@ -59,12 +59,11 @@ function linhaTarefa(t,{mostrarCliente=true}={}){
   const trilha=[t.criado_por_nome?`aberta por ${t.criado_por_nome} em ${fmtDT(t.created_at)}`:t.created_at?`aberta em ${fmtDT(t.created_at)}`:null,t.status==="concluida"&&t.concluida_em?`concluída${t.concluida_por_nome?" por "+t.concluida_por_nome:""} em ${fmtDT(t.concluida_em)}`:null].filter(Boolean).join(" · ");
   return el("div",{class:"row",style:"cursor:default;align-items:flex-start"},
     el("div",{style:"display:flex;gap:10px;align-items:flex-start;min-width:0;flex:1"},done,
-      el("div",{style:"min-width:0"},el("div",{class:"n",style:t.status==="concluida"||t.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px"},"Alta"):null,t.titulo),
+      el("div",{style:"min-width:0;cursor:pointer",title:"Abrir a tarefa",onclick:()=>openTarefa(t)},el("div",{class:"n",style:t.status==="concluida"||t.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px"},"Alta"):null,t.titulo),
         el("div",{class:"s"},meta),trilha?el("div",{class:"s",style:"color:var(--faint);font-size:12px"},trilha):null,t.descricao?el("div",{class:"s",style:"white-space:pre-wrap;margin-top:2px"},t.descricao):null)),
     el("div",{style:"display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end"},prazo,
       t.status==="em_andamento"?el("span",{class:"pill c"},"Em andamento"):null,
-      el("button",{class:"btn sm",onclick:()=>openHorasForm({tarefa:t})},"+ Horas"),
-      el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar")));
+      el("button",{class:"btn sm primary",onclick:()=>openTarefa(t)},"Abrir")));
 }
 function listaAgrupada(lista,opts){
   const host=el("div",{style:"display:flex;flex-direction:column;gap:14px"});
@@ -78,7 +77,7 @@ function listaAgrupada(lista,opts){
 }
 function renderTarefas(){
   const v=$("#view-tarefas");v.replaceChildren();
-  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>openTarefaForm(t),0)}
+  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>openTarefa(t),0)}
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Escritório"),el("h1",{},"Tarefas e prazos"),el("div",{class:"sub"},"Prazos fatais em vermelho. Quem executa, lança na hora.")),
     el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])},"CSV"),el("button",{class:"btn primary",onclick:()=>openTarefaForm({})},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -142,6 +141,62 @@ function comentarConclusao(t){
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito? (opcional — fica no histórico da tarefa e quem abriu é avisado)"),ta));
   modal("Tarefa concluída: "+t.titulo,body,async()=>{if(ta.value.trim())await comentar(t.id,ta.value.trim())});
 }
+/* ---------- Tela da tarefa: o que fazer, para quem passar, o que já aconteceu ---------- */
+async function mudarStatus(t,status,nota){
+  const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);if(error)throw new Error("Não foi possível atualizar");
+  if(nota)await comentar(t.id,nota);
+}
+function passarPara(t,recarregar){
+  const meu=meuColab();const para=selColab(t.responsavel_id);const nota=el("textarea",{rows:3,placeholder:"O que a pessoa precisa saber para continuar? (ex.: já liguei para o banco, falta protocolar; prazo fatal 20/10)"});
+  const body=el("div",{class:"form"},field("pp-para","Passar para",para),el("div",{class:"f full"},el("label",{},"Recado para quem recebe"),nota,el("div",{class:"help"},"Quem recebe é avisado no sino e vê este recado no histórico da tarefa. Você continua podendo acompanhar.")));
+  modal("Passar a tarefa: "+t.titulo,body,async()=>{
+    if(!para.value)throw new Error("Escolha para quem passar");if(para.value===t.responsavel_id)throw new Error("Essa pessoa já é a responsável");
+    const {error}=await SB.from("tarefas").update({responsavel_id:para.value,status:t.status==="concluida"?"aberta":t.status}).eq("id",t.id);if(error)throw new Error("Não foi possível passar a tarefa");
+    const quem=nomeColab(para.value);await comentar(t.id,`Passei para ${quem}${meu?" (de "+meu.nome.split(" ")[0]+")":""}.`+(nota.value.trim()?"\n"+nota.value.trim():""));
+    toast("Tarefa passada para "+quem);setTimeout(recarregar,300);
+  });
+}
+function openTarefa(t){
+  const meu=meuColab();const aberta=t.status==="aberta"||t.status==="em_andamento";
+  const host=$("#modalHost");host.replaceChildren();const close=()=>host.replaceChildren();
+  const reabrirTela=()=>{T.ok=false;carregar().then(()=>{const n=T.tarefas.find(x=>x.id===t.id);if(n)openTarefa(n);else close()})};
+  const prazoTxt=t.prazo?fmtD(parseD(t.prazo))+(t.hora?" às "+String(t.hora).slice(0,5):"")+(t.faixa==="atrasada"?` · ${-t.dias_para_prazo} dia(s) atrasada`:t.faixa==="hoje"?" · vence hoje":t.dias_para_prazo!=null&&t.dias_para_prazo<=30?` · em ${t.dias_para_prazo} dia(s)`:""):"sem prazo";
+  const pill=(cls,txt)=>el("span",{class:"pill "+cls},txt);
+  const cab=el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"},
+    pill(t.status==="concluida"?"g":t.status==="em_andamento"?"c":t.status==="cancelada"?"":"e2",STATUS[t.status]||t.status),t.prioridade===1?pill("e3","Prioridade alta"):null,t.prazo_fatal?pill("e3","PRAZO FATAL"):null,
+    pill(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g","Prazo: "+prazoTxt));
+  const meta=el("div",{class:"tf-meta"},
+    el("div",{},el("b",{},"Responsável"),el("div",{},t.responsavel_nome||"— ninguém —")),
+    el("div",{},el("b",{},"Cliente"),el("div",{},t.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(t.cliente_id),onclick:close},t.cliente_nome||t.cliente_id):"—")),
+    el("div",{},el("b",{},"Núcleo"),el("div",{},NUCLEOS[t.nucleo]||"—")),
+    t.numero_cnj?el("div",{},el("b",{},"Processo"),el("div",{},t.numero_cnj)):null,
+    el("div",{},el("b",{},"Horas lançadas"),el("div",{},horasFmt(t.horas_apontadas||0))),
+    el("div",{},el("b",{},"Aberta"),el("div",{},[t.criado_por_nome?"por "+t.criado_por_nome:null,t.created_at?"em "+fmtDT(t.created_at):null].filter(Boolean).join(" ")||"—")));
+  const desc=t.descricao?el("div",{class:"tf-desc"},t.descricao):el("div",{class:"note"},"Sem descrição.");
+  const acoes=el("div",{class:"tf-acoes"},
+    aberta?el("button",{class:"btn primary",onclick:async()=>{const ta=el("textarea",{placeholder:"Ex.: petição protocolada; aguardando intimação.",rows:3});const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito? (fica no histórico; quem abriu a tarefa é avisado)"),ta));
+      modal("Concluir: "+t.titulo,body,async()=>{await mudarStatus(t,"concluida",ta.value.trim()||null);toast("Tarefa concluída");setTimeout(reabrirTela,300)})}},"✓ Concluir"):el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}},"Reabrir"),
+    t.status==="aberta"?el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"em_andamento");toast("Marcada como em andamento");reabrirTela()}catch(e){toast(e.message)}}},"▶ Em andamento"):null,
+    aberta?el("button",{class:"btn",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
+    el("button",{class:"btn",onclick:()=>openHorasForm({tarefa:t})},"+ Lançar horas"),
+    el("button",{class:"btn",onclick:()=>openTarefaForm(t)},"Editar"));
+  const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));
+  const com=el("textarea",{rows:2,placeholder:"Comentar — use @ para avisar alguém (ex.: @Natasha o banco respondeu, veja o e-mail)"});
+  const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Comentário registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Comentar");
+  com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))btnCom.click()});
+  mencoes(com);
+  const body=el("div",{class:"tf"},cab,meta,desc,acoes,
+    el("div",{class:"tf-h"},"Histórico e comentários"),el("div",{class:"help",style:"margin-bottom:6px"},"Tudo que aconteceu nesta tarefa, em ordem. Quem é mencionado com @ recebe aviso no sino."),hist,
+    el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin-top:8px"},com,btnCom));
+  const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px"},el("h2",{style:t.status==="concluida"?"text-decoration:line-through;color:var(--muted)":""},t.titulo),body,
+    el("div",{class:"actions"},el("button",{class:"btn",onclick:close},"Fechar")));
+  host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
+  historico(t.id,hist);
+}
+document.head.append(el("style",{},`.tf-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px;font-size:13px;margin:6px 0 10px}.tf-meta b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.tf-desc{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:13.5px;line-height:1.45;max-height:260px;overflow:auto}
+.tf-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tf-h{font-weight:600;margin-top:4px}`));
 function openTarefaForm(t={}){
   const meu=meuColab();
   const titulo=inp("text",t.titulo||"",{placeholder:"Ex.: Protocolar embargos à execução"}),desc=el("textarea",{},t.descricao||""),cli=selCliente(t.cliente_id),
