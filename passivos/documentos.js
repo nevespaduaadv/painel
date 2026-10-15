@@ -46,10 +46,10 @@ function render(){if(typeof window.render==="function")window.render()}
 function renderDocs(main){
   const ok=garantir();
   const ultima=D.lista.reduce((m,d)=>d.updated_at>m?d.updated_at:m,"");
-  main.append(el("div",{class:"crumbs"},el("button",{onclick:()=>{window.PP_DOCS.voltar?.()}},"Base de conhecimento"),el("span",{class:"sep"},"›"),el("span",{},"Documentos base (Drive)")));
+  main.append(el("div",{class:"crumbs"},el("button",{onclick:()=>{window.PP_DOCS.voltar?.()}},"Base de conhecimento"),el("span",{class:"sep"},"›"),el("span",{},"Documentos base")));
   main.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico · Google Drive"),el("h1",{},"Documentos base"),
-      el("div",{class:"sub"},"Modelos de peças, tópicos, jurisprudência, planilhas e materiais da pasta JURÍDICO. Os arquivos continuam no Drive — aqui você encontra, descreve e marca os mais usados. ",ultima?"Índice sincronizado em "+new Date(ultima).toLocaleDateString("pt-BR")+".":"")),
-    el("div",{class:"actions"},el("a",{class:"btn sm",href:PASTA_RAIZ_URL,target:"_blank",rel:"noopener"},"Abrir pasta no Drive"),PP.perfil?.papel==="admin"?el("button",{class:"btn sm",onclick:importar},"Importar índice (JSON)"):null,el("button",{class:"btn sm primary",onclick:()=>editar(null)},"+ Adicionar link"))));
+      el("div",{class:"sub"},"Modelos de peças, tópicos, jurisprudência, planilhas e materiais da pasta JURÍDICO. Arquivos do Drive abrem em preview aqui mesmo; manuais, POPs e materiais de leitura podem ser enviados para dentro do sistema (⬆). ",ultima?"Índice sincronizado em "+new Date(ultima).toLocaleDateString("pt-BR")+".":"")),
+    el("div",{class:"actions"},el("a",{class:"btn sm",href:PASTA_RAIZ_URL,target:"_blank",rel:"noopener"},"Abrir pasta no Drive"),PP.perfil?.papel==="admin"?el("button",{class:"btn sm",onclick:importar},"Importar índice (JSON)"):null,el("button",{class:"btn sm",onclick:()=>editar(null)},"+ Adicionar link"),el("button",{class:"btn sm primary",onclick:enviar},"⬆ Enviar arquivo"))));
   if(!ok){main.append(el("div",{class:"note"},"Carregando documentos…"));return}
   const {urlPorCaminho,caminhos}=pastas();
   // filtros
@@ -76,7 +76,7 @@ function renderDocs(main){
 }
 function linha(d){
   const ehPasta=d.tipo==="folder";
-  const meta=[ehPasta?"pasta (conteúdo não indexado)":d.tipo.toUpperCase(),fmtTam(d.tamanho),d.modificado_em?"modificado "+fmtData(d.modificado_em):null,d.origem==="link"?"link adicionado":null].filter(Boolean).join(" · ");
+  const meta=[ehPasta?"pasta (conteúdo não indexado)":d.tipo.toUpperCase(),fmtTam(d.tamanho),d.modificado_em?"modificado "+fmtData(d.modificado_em):null,d.origem==="link"?"link adicionado":d.origem==="arquivo"?"no sistema":null].filter(Boolean).join(" · ");
   return el("div",{class:"row docs-row"},
     el("div",{style:"font-size:18px;text-align:center"},icone(d)),
     el("div",{style:"min-width:0"},el("div",{class:"n",style:"white-space:normal"},d.destaque?"★ ":"",semExt(d.titulo)),
@@ -85,13 +85,14 @@ function linha(d){
     el("div",{class:"actions docs-acoes"},
       el("button",{class:"btn sm",title:d.destaque?"Tirar destaque":"Marcar como destaque",onclick:()=>destaque(d)},d.destaque?"★":"☆"),
       el("button",{class:"btn sm",onclick:()=>editar(d)},"Editar"),
-      el("a",{class:"btn sm primary",href:d.url,target:"_blank",rel:"noopener"},"Abrir")));
+      ehPasta||(d.origem==="link"&&!previewUrl(d))?el("a",{class:"btn sm primary",href:d.url,target:"_blank",rel:"noopener"},"Abrir"):el("button",{class:"btn sm primary",onclick:()=>abrirDoc(d)},"Abrir")));
 }
 async function destaque(d){
   const {error}=await SB.from("documentos_base").update({destaque:!d.destaque}).eq("id",d.id);
   if(error){toast("Não foi possível salvar");return}d.destaque=!d.destaque;render();
 }
 function editar(d){
+  if(d&&d.origem==="arquivo")return enviar(d);
   const novo=!d;const ehLink=novo||d.origem==="link";
   const {caminhos}=pastas();
   const tit=inp("text",d?.titulo||"",{placeholder:"Nome do documento"}),url=inp("url",d?.url||"",{placeholder:"https://drive.google.com/…",readonly:ehLink?null:""}),
@@ -138,9 +139,91 @@ function importar(){
   });
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Importar";
 }
+
+/* ---------- Abrir dentro do sistema ---------- */
+const EXT=t=>(t||"").toLowerCase();
+function driveId(d){if(d.drive_id)return d.drive_id;const m=(d.url||"").match(/\/d\/([A-Za-z0-9_-]{15,})/)||(d.url||"").match(/[?&]id=([A-Za-z0-9_-]{15,})/);return m?m[1]:null}
+function previewUrl(d){
+  const id=driveId(d);if(!id)return null;const m=d.mime||"";
+  if(m.includes("google-apps.document")||/docs\.google\.com\/document/.test(d.url||""))return `https://docs.google.com/document/d/${id}/preview`;
+  if(m.includes("google-apps.spreadsheet")||/docs\.google\.com\/spreadsheets/.test(d.url||""))return `https://docs.google.com/spreadsheets/d/${id}/preview`;
+  if(m.includes("google-apps.presentation")||/docs\.google\.com\/presentation/.test(d.url||""))return `https://docs.google.com/presentation/d/${id}/preview`;
+  return `https://drive.google.com/file/d/${id}/preview`;
+}
+const carregarLib=(src,glob)=>new Promise((res,rej)=>{if(window[glob])return res(window[glob]);const s=document.createElement("script");s.src=src;s.onload=()=>res(window[glob]);s.onerror=rej;document.head.append(s)});
+async function urlAssinada(d,baixar){
+  const {data,error}=await SB.storage.from("conhecimento").createSignedUrl(d.caminho_storage,3600,baixar?{download:d.titulo}:undefined);
+  if(error)throw error;return data.signedUrl;
+}
+async function abrirDoc(d){
+  const box=el("div",{class:"doc-viewer"},el("div",{class:"note"},"Carregando…"));
+  const acoes=el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"});
+  modal(semExt(d.titulo),el("div",{},el("div",{class:"note",style:"margin-bottom:8px"},[d.caminho||null,d.tipo?d.tipo.toUpperCase():null,d.origem==="arquivo"?"guardado no sistema":"Google Drive"].filter(Boolean).join(" · ")),acoes,box),async()=>{});
+  const host=$("#modalHost .card");if(host){host.classList.add("doc-modal");$("#modalHost button.btn.primary")?.remove()}
+  try{
+    if(d.origem==="arquivo"){
+      const url=await urlAssinada(d,false);const ext=EXT(d.tipo);
+      acoes.append(el("a",{class:"btn sm",href:await urlAssinada(d,true)},"⬇ Baixar"),el("a",{class:"btn sm",href:url,target:"_blank",rel:"noopener"},"Abrir em nova aba"));
+      if(ext==="pdf")box.replaceChildren(el("iframe",{src:url+"#view=FitH",title:d.titulo}));
+      else if(/^(png|jpe?g|gif|webp)$/.test(ext))box.replaceChildren(el("img",{src:url,alt:d.titulo,style:"max-width:100%"}));
+      else if(/^docx?$/.test(ext)){
+        await carregarLib("https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js","mammoth");
+        const ab=await (await fetch(url)).arrayBuffer();const r=await window.mammoth.convertToHtml({arrayBuffer:ab});
+        const div=el("div",{class:"md doc-html"});div.innerHTML=r.value.replace(/<script[\s\S]*?<\/script>/gi,"").replace(/ on\w+="[^"]*"/gi,"");box.replaceChildren(div);
+      }
+      else if(/^(xlsx|xlsm|csv)$/.test(ext)){
+        await carregarLib("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js","XLSX");
+        const ab=await (await fetch(url)).arrayBuffer();const wb=window.XLSX.read(ab,{type:"array"});
+        const wrap=el("div",{class:"doc-html"});
+        for(const n of wb.SheetNames.slice(0,6)){const t=el("div",{});t.innerHTML=window.XLSX.utils.sheet_to_html(wb.Sheets[n],{header:"",footer:""}).replace(/<script[\s\S]*?<\/script>/gi,"");wrap.append(el("h3",{},n),t)}
+        box.replaceChildren(wrap);
+      }
+      else box.replaceChildren(el("div",{class:"note"},"Este tipo de arquivo não abre aqui — use ⬇ Baixar."));
+    } else {
+      const pv=previewUrl(d);
+      acoes.append(el("a",{class:"btn sm",href:d.url,target:"_blank",rel:"noopener"},"Abrir no Drive"));
+      if(pv)box.replaceChildren(el("iframe",{src:pv,title:d.titulo,allow:"autoplay"}),el("div",{class:"note",style:"margin-top:6px"},"Se aparecer “acesso negado”, entre na conta Google do escritório neste navegador ou use “Abrir no Drive”."));
+      else box.replaceChildren(el("div",{class:"note"},"Sem preview para este link — use “Abrir no Drive”."));
+    }
+  }catch(e){console.warn("abrirDoc",e);box.replaceChildren(el("div",{class:"note"},"Não foi possível abrir: "+(e.message||e)))}
+}
+
+/* ---------- Enviar arquivo para o sistema ---------- */
+const AREAS_KB={juridico:"Jurídico",comercial:"Comercial",financeiro:"Financeiro",administrativo:"Administrativo",marketing:"Marketing",geral:"Geral"};
+const podeAreaKb=a=>{const p=PP.perfil||{};if(p.papel==="admin")return true;const ac=p.acessos||[];if(a==="geral")return true;if(a==="administrativo")return ac.includes("financeiro")||ac.includes("equipe");return ac.includes(a)};
+function enviar(d){
+  const novo=!d;const {caminhos}=pastas();
+  const f=inp("file","",{accept:".pdf,.docx,.doc,.xlsx,.xlsm,.csv,.png,.jpg,.jpeg,.pptx"});
+  const tit=inp("text",d?.titulo||"",{placeholder:"Título (se vazio, usa o nome do arquivo)"}),
+    area=el("select",{},Object.entries(AREAS_KB).filter(([k])=>podeAreaKb(k)).map(([v,l])=>el("option",{value:v,selected:(d?.area||"juridico")===v?"":null},l))),
+    cam=inp("text",d?.caminho||D.pasta||"",{list:"docs-cam2",placeholder:"Pasta/tema (ex.: Manuais / Atendimento)"}),dl=el("datalist",{id:"docs-cam2"},caminhos.filter(Boolean).map(c=>el("option",{value:c}))),
+    desc=el("textarea",{rows:"3",placeholder:"O que é, quando usar."},d?.descricao||""),tags=inp("text",(d?.tags||[]).join(", "),{placeholder:"separadas por vírgula"}),
+    dest=el("select",{},el("option",{value:"false",selected:d?.destaque?null:""},"Normal"),el("option",{value:"true",selected:d?.destaque?"":null},"★ Destaque")),prog=el("div",{class:"note"});
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"doc-file"},novo?"Arquivo":"Substituir arquivo (opcional)"),Object.assign(f,{id:"doc-file"}),el("div",{class:"help"},"Até 50 MB. PDF, Word e planilhas abrem dentro do sistema; o acesso segue a área escolhida.")),
+    field("doc-tit2","Título",tit),field("doc-area2","Área",area),el("div",{class:"f full"},el("label",{for:"doc-cam2"},"Pasta/tema"),el("div",{},Object.assign(cam,{id:"doc-cam2"}),dl)),
+    el("div",{class:"f full"},el("label",{for:"doc-desc2"},"Descrição"),Object.assign(desc,{id:"doc-desc2"})),field("doc-tags2","Tags",tags),field("doc-dest2","Destaque",dest),el("div",{class:"f full"},prog));
+  modal(novo?"Enviar arquivo para a base":"Editar arquivo",body,async()=>{
+    const file=f.files?.[0];if(novo&&!file)throw new Error("Escolha o arquivo");
+    if(file&&file.size>52428800)throw new Error("Arquivo acima de 50 MB");
+    const row={titulo:tit.value.trim()||(file?file.name:d.titulo),area:area.value,caminho:cam.value.trim().replace(/\s*\/\s*/g," / "),descricao:desc.value.trim()||null,tags:tags.value.split(",").map(s=>s.trim()).filter(Boolean),destaque:dest.value==="true",origem:"arquivo",url:""};
+    if(file){
+      const ext=(file.name.split(".").pop()||"").toLowerCase();row.tipo=ext;row.mime=file.type||null;row.tamanho=file.size;row.modificado_em=new Date(file.lastModified).toISOString().slice(0,10);
+      const limpo=file.name.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9._-]+/g,"_").slice(0,80);
+      row.caminho_storage=`${row.area}/${crypto.randomUUID()}-${limpo}`;
+      prog.textContent="Enviando…";
+      const {error:eu}=await SB.storage.from("conhecimento").upload(row.caminho_storage,file,{contentType:file.type||undefined,upsert:false});if(eu)throw eu;
+      if(!novo&&d.caminho_storage){await SB.storage.from("conhecimento").remove([d.caminho_storage])}
+    }
+    const {error}=novo?await SB.from("documentos_base").insert(row):await SB.from("documentos_base").update(row).eq("id",d.id);
+    if(error){if(row.caminho_storage&&file)await SB.storage.from("conhecimento").remove([row.caminho_storage]);throw error}
+    toast(novo?"Arquivo enviado":"Arquivo atualizado");D.ok=false;await carregar();
+  });
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent=novo?"Enviar":"Salvar";
+}
+
 async function buscar(q,lim=12){const {data,error}=await SB.rpc("documentos_base_buscar",{q,lim});return error?[]:(data||[])}
 
-document.head.append(el("style",{},`.docs-filtros{display:grid;grid-template-columns:minmax(200px,2fr) minmax(160px,1.5fr) minmax(120px,1fr) auto;gap:10px;align-items:center;padding:12px}.docs-filtros select,.docs-filtros input{min-width:0;max-width:100%}.docs-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;cursor:default}.docs-row .n{overflow-wrap:anywhere}.docs-acoes{flex-wrap:nowrap}@media (max-width:860px){.docs-filtros{grid-template-columns:1fr}.docs-row{grid-template-columns:28px minmax(0,1fr)}.docs-acoes{grid-column:2;justify-content:flex-start}}`));
-window.PP_DOCS={render:renderDocs,buscar,garantir,get lista(){return D.lista},get total(){return D.lista.filter(d=>d.tipo!=="folder").length},abrirPasta(c){D.pasta=c||"";D.q="";},invalidar(){D.ok=false}};
+document.head.append(el("style",{},`.doc-modal{width:min(1100px,100%)!important}.doc-viewer{min-height:200px}.doc-viewer iframe{width:100%;height:min(78vh,900px);border:1px solid var(--line);border-radius:10px;background:#fff}.doc-html{max-height:78vh;overflow:auto;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.doc-html table{border-collapse:collapse;font-size:12.5px}.doc-html td,.doc-html th{border:1px solid var(--line);padding:3px 6px}.docs-filtros{display:grid;grid-template-columns:minmax(200px,2fr) minmax(160px,1.5fr) minmax(120px,1fr) auto;gap:10px;align-items:center;padding:12px}.docs-filtros select,.docs-filtros input{min-width:0;max-width:100%}.docs-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;cursor:default}.docs-row .n{overflow-wrap:anywhere}.docs-acoes{flex-wrap:nowrap}@media (max-width:860px){.docs-filtros{grid-template-columns:1fr}.docs-row{grid-template-columns:28px minmax(0,1fr)}.docs-acoes{grid-column:2;justify-content:flex-start}}`));
+window.PP_DOCS={render:renderDocs,buscar,garantir,abrir:abrirDoc,get lista(){return D.lista},get total(){return D.lista.filter(d=>d.tipo!=="folder").length},abrirPasta(c){D.pasta=c||"";D.q="";},invalidar(){D.ok=false}};
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("documentos");ch.on("postgres_changes",{event:"*",schema:"public",table:"documentos_base"},()=>{D.ok=false;if(S.tab==="conhecimento")garantir()});ch.subscribe()}});
 })();
