@@ -17,6 +17,7 @@ ruido as (
     when b.eh_copia and exists (select 1 from originais o where o.chave = b.chave) then 'cópia (n)'
     when b.tipo = 'rar' then 'rar'
     when b.titulo like 'INICIAIS 2026%' then 'planilha de controle'
+    when b.titulo like 'Scripts_Boas_Vindas_RCPCC%' then 'script defasado'
     when b.titulo ~* '^(Declara[cç][aã]o de (resid[eê]ncia|Hipossufici[eê]ncia)|PROCURA[CÇ][AÃ]O|Peti[cç][aã]o de ren[uú]ncia|RECIBO HONOR[AÁ]RIOS|SUBSTABELECIMENTO|PROPOSTA DE HOR[AÁ]RIOS)'
          and b.caminho <> 'DIREITO BANCÁRIO / TECNICAS DE ATENDIMENTO' then 'repetido'
   end as motivo
@@ -28,3 +29,10 @@ ruido as (
 )
 select 'ok 0067 — '||count(*)||' itens fora do índice ('||string_agg(motivo||': '||n, ', ')||')' as resultado
 from (select motivo, count(*) n from upd group by motivo) x;
+
+-- Pasta DIREITO BANCÁRIO = material de curso de terceiro (não é procedimento do escritório): marcar na descrição
+-- de quem ainda não tem descrição própria, para a equipe não confundir com POP.
+update public.documentos_base
+   set descricao = 'Material de curso de direito bancário (referência de terceiro) — não é procedimento do escritório. Adaptar ao caso e conferir jurisprudência.'
+ where ativo and origem = 'drive' and (caminho = 'DIREITO BANCÁRIO' or caminho like 'DIREITO BANCÁRIO / %')
+   and tipo <> 'folder' and coalesce(descricao,'') = '';
