@@ -4,6 +4,13 @@
 -- planilha de controle INICIAIS 2026; declarações/procuração/renúncia/recibo/substabelecimento/proposta de horários repetidos
 -- em várias pastas (fica só a cópia de TECNICAS DE ATENDIMENTO).
 
+-- Pasta DIREITO BANCÁRIO = material de curso de terceiro (não é procedimento do escritório): marcar na descrição
+-- de quem ainda não tem descrição própria, para a equipe não confundir com POP.
+update public.documentos_base
+   set descricao = 'Material de curso de direito bancário (referência de terceiro) — não é procedimento do escritório. Adaptar ao caso e conferir jurisprudência.'
+ where ativo and origem = 'drive' and (caminho = 'DIREITO BANCÁRIO' or caminho like 'DIREITO BANCÁRIO / %')
+   and tipo <> 'folder' and coalesce(descricao,'') = '';
+
 with base as (
   select id, caminho, titulo, tipo,
          lower(caminho||'|'||regexp_replace(titulo, '\s*\(\d\)(\.\w+)$', '\1')) as chave,
@@ -29,10 +36,3 @@ ruido as (
 )
 select 'ok 0067 — '||count(*)||' itens fora do índice ('||string_agg(motivo||': '||n, ', ')||')' as resultado
 from (select motivo, count(*) n from upd group by motivo) x;
-
--- Pasta DIREITO BANCÁRIO = material de curso de terceiro (não é procedimento do escritório): marcar na descrição
--- de quem ainda não tem descrição própria, para a equipe não confundir com POP.
-update public.documentos_base
-   set descricao = 'Material de curso de direito bancário (referência de terceiro) — não é procedimento do escritório. Adaptar ao caso e conferir jurisprudência.'
- where ativo and origem = 'drive' and (caminho = 'DIREITO BANCÁRIO' or caminho like 'DIREITO BANCÁRIO / %')
-   and tipo <> 'folder' and coalesce(descricao,'') = '';
