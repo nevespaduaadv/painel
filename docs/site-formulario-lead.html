@@ -16,7 +16,7 @@
     hp.style.cssText = 'position:absolute!important;left:-9999px!important;width:1px;height:1px;opacity:0';
     form.appendChild(hp);
     const valor = (n) => { const el = form.querySelector('[name="' + n + '"]'); if (!el) return ''; return el.type === 'checkbox' ? (el.checked ? 'sim' : '') : String(el.value || '').trim(); };
-    const coletar = () => ({ nome: valor('nome'), telefone: valor('telefone'), email: valor('email'), area: valor('area'), mensagem: valor('mensagem'), consentimento: valor('consentimento'), hp: hp.value, t: Date.now() - t0, pagina: location.pathname });
+    const coletar = () => ({ nome: valor('nome'), telefone: valor('telefone'), email: valor('email'), empresa: valor('empresa'), valorDivida: valor('valorDivida'), situacaoDivida: valor('situacaoDivida'), area: valor('area'), mensagem: valor('mensagem') || valor('descricaoSituacao'), consentimento: valor('consentimento'), hp: hp.value, t: Date.now() - t0, pagina: location.pathname });
     // O script da migração intercepta o submit (abre o WhatsApp com os dados), então o envio ao sistema
     // acontece no próprio submit, em fase de captura, assim que o formulário passa na validação do navegador.
     let ultimo = 0;

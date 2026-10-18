@@ -193,7 +193,7 @@ async function siteFormulario(req: Request): Promise<Response> {
   const origem = req.headers.get("origin") ?? "";
   if (!/^https:\/\/(www\.)?nevespaduaadvocacia\.com\.br$/.test(origem)) return json(403, { ok: false, erro: "Origem não permitida." });
   const bruto = await lerPayload(req);
-  const campos = ["nome", "telefone", "email", "area", "mensagem", "consentimento", "hp", "t", "pagina"];
+  const campos = ["nome", "telefone", "email", "empresa", "valorDivida", "situacaoDivida", "area", "mensagem", "consentimento", "hp", "t", "pagina"];
   const p: Dict = {};
   for (const c of campos) if (bruto[c] !== undefined && bruto[c] !== null) p[c] = String(bruto[c]).slice(0, 2000);
   p._ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
