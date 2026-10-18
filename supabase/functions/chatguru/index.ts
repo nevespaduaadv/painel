@@ -187,6 +187,23 @@ async function webhook(req: Request, url: URL): Promise<Response> {
   return json(200, await r.json()); // erros de conteúdo ficam em webhook_logs; 200 para o ChatGuru não reenviar
 }
 
+// Formulário do site (nevespaduaadvocacia.com.br/contato): o script do site repassa o envio aceito pelo Elementor.
+// Sem segredo (o chamador é o navegador do visitante); a triagem de spam e o limite por IP ficam na rpc site_formulario.
+async function siteFormulario(req: Request): Promise<Response> {
+  const origem = req.headers.get("origin") ?? "";
+  if (!/^https:\/\/(www\.)?nevespaduaadvocacia\.com\.br$/.test(origem)) return json(403, { ok: false, erro: "Origem não permitida." });
+  const bruto = await lerPayload(req);
+  const campos = ["nome", "telefone", "email", "area", "mensagem", "consentimento", "hp", "t", "pagina"];
+  const p: Dict = {};
+  for (const c of campos) if (bruto[c] !== undefined && bruto[c] !== null) p[c] = String(bruto[c]).slice(0, 2000);
+  p._ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
+  p._ua = (req.headers.get("user-agent") ?? "").slice(0, 200);
+  const r = await rest("rpc/site_formulario", service(), { method: "POST", body: JSON.stringify({ p }) });
+  if (!r.ok) return json(502, { ok: false, erro: `Supabase respondeu ${r.status}` });
+  const res = (await r.json()) as Dict;
+  return json(200, { ok: res.ok === true }); // não devolve ids nem motivo ao navegador
+}
+
 async function enviar(req: Request): Promise<Response> {
   const cg = await credenciais();
   const jwt = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
@@ -685,6 +702,7 @@ Deno.serve(async (req) => {
   try {
     if (rota === "webhook") return await webhook(req, url);
     if (rota === "enviar") return await enviar(req);
+    if (rota === "site") return await siteFormulario(req);
     if (rota === "automacoes") return await automacoes(req);
     if (rota === "resumo") return await resumo(req);
     if (rota === "growth") return await growth(req);

@@ -1,0 +1,31 @@
+<!-- Código personalizado do Elementor (Custom Code "Neves Pádua — formulário → sistema", local: fim do body).
+     Repassa cada envio ACEITO pelo formulário do site para a Edge Function do sistema interno,
+     rota /functions/v1/chatguru/site (migração 0069). Honeypot + tempo de preenchimento vão junto para a triagem. -->
+<script id="np-site-lead">
+(() => {
+  'use strict';
+  const DESTINO = 'https://ksdwzljfjfucjevdqxvx.supabase.co/functions/v1/chatguru/site';
+  const t0 = Date.now();
+  const preparar = (form) => {
+    if (form.dataset.npLead) return;
+    form.dataset.npLead = '1';
+    // campo armadilha: visitante não vê; robô preenche
+    const hp = document.createElement('input');
+    hp.type = 'text'; hp.name = 'site_web'; hp.autocomplete = 'off'; hp.tabIndex = -1;
+    hp.setAttribute('aria-hidden', 'true');
+    hp.style.cssText = 'position:absolute!important;left:-9999px!important;width:1px;height:1px;opacity:0';
+    form.appendChild(hp);
+    const valor = (n) => { const el = form.querySelector('[name="' + n + '"]'); if (!el) return ''; return el.type === 'checkbox' ? (el.checked ? 'sim' : '') : String(el.value || '').trim(); };
+    const coletar = () => ({ nome: valor('nome'), telefone: valor('telefone'), email: valor('email'), area: valor('area'), mensagem: valor('mensagem'), consentimento: valor('consentimento'), hp: hp.value, t: Date.now() - t0, pagina: location.pathname });
+    let dados = null, enviado = false;
+    form.addEventListener('submit', () => { dados = coletar(); }, true);
+    new MutationObserver(() => {
+      if (enviado || !form.classList.contains('form-state-success')) return;
+      enviado = true;
+      const d = dados || coletar();
+      fetch(DESTINO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d), keepalive: true }).catch(() => {});
+    }).observe(form, { attributes: true, attributeFilter: ['class'] });
+  };
+  document.querySelectorAll('form[data-element_type="e-form"]').forEach(preparar);
+})();
+</script>
