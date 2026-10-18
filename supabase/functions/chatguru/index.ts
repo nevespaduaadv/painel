@@ -229,6 +229,14 @@ async function enviar(req: Request): Promise<Response> {
     try { return json(200, await sincronizarAgenda("", txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
   }
   if (typeof acao === "string" && acao.startsWith("asaas_")) return await asaasAcao(acao, corpo, jwt);
+  if (acao === "drive_pasta") { // criar/achar a pasta do cliente no Drive (equipe)
+    try { return json(200, { ok: true, ...(await drivePastaCliente(String(corpo.cliente_id ?? ""), String(corpo.nome ?? ""))) }); }
+    catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+  }
+  if (acao === "drive_enviar") { // mandar um arquivo do bucket anexos para a pasta do cliente
+    try { return json(200, { ok: true, ...(await driveEnviarArquivo(String(corpo.cliente_id ?? ""), String(corpo.caminho ?? ""), String(corpo.nome ?? "documento"), String(corpo.mime ?? "application/octet-stream"))) }); }
+    catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
+  }
   if (acao === "growth") { // atualizar os dados de Growth agora (admin)
     const adm = await rest("rpc/sou_admin", jwt, { method: "POST", body: "{}" });
     if (!adm.ok || (await adm.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Só administradores atualizam o Growth." });
@@ -476,16 +484,89 @@ async function growth(req: Request): Promise<Response> {
   catch (e) { const erro = e instanceof Error ? e.message : String(e); await rest("rpc/growth_gravar", service(), { method: "POST", body: JSON.stringify({ log: { ok: false, erro } }) }); return json(502, { ok: false, erro }); }
 }
 
+
+// ---------- Drive: pasta do cliente (CLIENTES / - PESSOA JURÍDICA / <cliente> / DOSSIÊ) e envio de documentos gerados ----------
+const GDRIVE = "https://www.googleapis.com/drive/v3";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+async function cfgFechamento(): Promise<Dict> {
+  const r = await rest("escritorio?id=eq.fechamento&select=dados", service());
+  const [row] = r.ok ? ((await r.json()) as { dados: Dict }[]) : [];
+  return row?.dados ?? {};
+}
+async function gdrive(token: string, metodo: string, path: string, body?: unknown, params?: Record<string, string>): Promise<{ status: number; json: Dict }> {
+  const u = new URL(`${GDRIVE}/${path}`); u.searchParams.set("supportsAllDrives", "true"); for (const [k, v] of Object.entries(params ?? {})) u.searchParams.set(k, v);
+  const r = await fetch(u, { method: metodo, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) });
+  return { status: r.status, json: (await r.json().catch(() => ({}))) as Dict };
+}
+const driveEscapar = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+async function drivePastaFilha(token: string, pai: string, nome: string, criar: boolean): Promise<{ id: string; url: string } | null> {
+  const q = `'${pai}' in parents and name = '${driveEscapar(nome)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const l = await gdrive(token, "GET", "files", undefined, { q, fields: "files(id,name,webViewLink)", includeItemsFromAllDrives: "true", corpora: "allDrives", pageSize: "5" });
+  const achada = ((l.json.files as Dict[] | undefined) ?? [])[0];
+  if (achada) return { id: String(achada.id), url: String(achada.webViewLink ?? `https://drive.google.com/drive/folders/${achada.id}`) };
+  if (!criar) return null;
+  const c = await gdrive(token, "POST", "files", { name: nome, mimeType: "application/vnd.google-apps.folder", parents: [pai] }, { fields: "id,webViewLink" });
+  if (c.status >= 300 || !c.json.id) throw new Error(`Drive não criou a pasta "${nome}": ${String((c.json.error as Dict | undefined)?.message ?? c.status).slice(0, 160)}`);
+  return { id: String(c.json.id), url: String(c.json.webViewLink ?? `https://drive.google.com/drive/folders/${c.json.id}`) };
+}
+// acha "- PESSOA JURÍDICA" (ou o id configurado) — procura em todos os drives compartilhados
+async function drivePastaPJ(token: string, cfg: Dict): Promise<string> {
+  if (txt(cfg.drive_pasta_pj_id)) return String(cfg.drive_pasta_pj_id);
+  const q = `name = '- PESSOA JURÍDICA' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const l = await gdrive(token, "GET", "files", undefined, { q, fields: "files(id,name,parents)", includeItemsFromAllDrives: "true", corpora: "allDrives", pageSize: "5" });
+  const f = ((l.json.files as Dict[] | undefined) ?? [])[0];
+  if (!f) throw new Error("Pasta '- PESSOA JURÍDICA' não encontrada no Drive (informe o id em escritorio('fechamento').drive_pasta_pj_id).");
+  await rest("escritorio?id=eq.fechamento", service(), { method: "PATCH", body: JSON.stringify({ dados: { ...cfg, drive_pasta_pj_id: f.id } }) });
+  return String(f.id);
+}
+async function drivePastaCliente(clienteId: string, nome: string): Promise<{ id: string; url: string; criada: boolean }> {
+  const cfg = await cfgFechamento();
+  const token = await tokenGoogle(txt(cfg.drive_usuario) ?? "contato@nevespaduaadvocacia.com.br", DRIVE_SCOPE);
+  const rc = await rest(`clientes?id=eq.${encodeURIComponent(clienteId)}&select=id,nome,pasta_drive_id,pasta_drive_url`, service());
+  const [cli] = rc.ok ? ((await rc.json()) as Dict[]) : [];
+  if (!cli) throw new Error("Cliente não encontrado.");
+  if (txt(cli.pasta_drive_id)) return { id: String(cli.pasta_drive_id), url: String(cli.pasta_drive_url ?? `https://drive.google.com/drive/folders/${cli.pasta_drive_id}`), criada: false };
+  const pj = await drivePastaPJ(token, cfg);
+  const nomePasta = (nome || String(cli.nome)).toUpperCase().replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+  const pasta = (await drivePastaFilha(token, pj, nomePasta, true))!;
+  for (const sub of ((cfg.drive_subpastas as string[] | undefined) ?? ["DOSSIÊ"])) await drivePastaFilha(token, pasta.id, sub, true);
+  await rest("rpc/cliente_pasta_drive_definir", service(), { method: "POST", body: JSON.stringify({ p_cliente: clienteId, p_id: pasta.id, p_url: pasta.url }) });
+  return { ...pasta, criada: true };
+}
+// envia um arquivo do bucket "anexos" para a pasta do cliente (substitui se já houver um com o mesmo nome)
+async function driveEnviarArquivo(clienteId: string, caminho: string, nomeArquivo: string, mime: string): Promise<{ id: string; url: string }> {
+  const pasta = await drivePastaCliente(clienteId, "");
+  const cfg = await cfgFechamento();
+  const token = await tokenGoogle(txt(cfg.drive_usuario) ?? "contato@nevespaduaadvocacia.com.br", DRIVE_SCOPE);
+  const rf = await fetch(`${env("SUPABASE_URL")}/storage/v1/object/anexos/${caminho.split("/").map(encodeURIComponent).join("/")}`, { headers: cabecalhos(SERVICE) });
+  if (!rf.ok) throw new Error(`Arquivo não encontrado no armazenamento (${rf.status}).`);
+  const bytes = new Uint8Array(await rf.arrayBuffer());
+  const q = `'${pasta.id}' in parents and name = '${driveEscapar(nomeArquivo)}' and trashed = false`;
+  const l = await gdrive(token, "GET", "files", undefined, { q, fields: "files(id)", includeItemsFromAllDrives: "true", corpora: "allDrives", pageSize: "1" });
+  const existente = ((l.json.files as Dict[] | undefined) ?? [])[0];
+  const meta = existente ? { name: nomeArquivo } : { name: nomeArquivo, parents: [pasta.id] };
+  const limite = "np_" + crypto.randomUUID().replace(/-/g, "");
+  const corpo = new Blob([
+    `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${limite}\r\nContent-Type: ${mime}\r\n\r\n`, bytes, `\r\n--${limite}--`,
+  ]);
+  const u = new URL(existente ? `https://www.googleapis.com/upload/drive/v3/files/${existente.id}` : "https://www.googleapis.com/upload/drive/v3/files");
+  u.searchParams.set("uploadType", "multipart"); u.searchParams.set("supportsAllDrives", "true"); u.searchParams.set("fields", "id,webViewLink");
+  const r = await fetch(u, { method: existente ? "PATCH" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${limite}` }, body: corpo, signal: AbortSignal.timeout(60_000) });
+  const j = (await r.json().catch(() => ({}))) as Dict;
+  if (!r.ok || !j.id) throw new Error(`Drive não recebeu o arquivo: ${String((j.error as Dict | undefined)?.message ?? r.status).slice(0, 160)}`);
+  return { id: String(j.id), url: String(j.webViewLink ?? `https://drive.google.com/file/d/${j.id}/view`) };
+}
+
 // ---------- Agenda ↔ Google Calendar (conta de serviço com delegação de domínio; JSON em GOOGLE_SA_JSON no Vault) ----------
 const GCAL = "https://www.googleapis.com/calendar/v3";
 const b64url = (b: ArrayBuffer | Uint8Array | string) => { const bytes = typeof b === "string" ? new TextEncoder().encode(b) : new Uint8Array(b); let s = ""; for (const x of bytes) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
 const tokensGoogle = new Map<string, { token: string; exp: number }>();
-async function tokenGoogle(sub: string | null): Promise<string> {
-  const chave = sub ?? "@sa"; const c = tokensGoogle.get(chave); if (c && c.exp > Date.now() + 60_000) return c.token;
+async function tokenGoogle(sub: string | null, scope = "https://www.googleapis.com/auth/calendar"): Promise<string> {
+  const chave = (sub ?? "@sa") + "|" + scope; const c = tokensGoogle.get(chave); if (c && c.exp > Date.now() + 60_000) return c.token;
   const raw = await segredo("GOOGLE_SA_JSON"); if (!raw) throw new Error("GOOGLE_SA_JSON não configurado no Vault.");
   const sa = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string };
   const agora = Math.floor(Date.now() / 1000);
-  const claims: Dict = { iss: sa.client_email, scope: "https://www.googleapis.com/auth/calendar", aud: sa.token_uri ?? "https://oauth2.googleapis.com/token", iat: agora, exp: agora + 3600 };
+  const claims: Dict = { iss: sa.client_email, scope, aud: sa.token_uri ?? "https://oauth2.googleapis.com/token", iat: agora, exp: agora + 3600 };
   if (sub) claims.sub = sub;
   const pem = sa.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pem), (ch) => ch.charCodeAt(0));
