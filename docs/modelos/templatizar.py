@@ -94,6 +94,7 @@ contrato_inserts = [
     (40, [(N, '{#mensalidade}')], 'after'),
     (40, [(N, '{mensalidade_ext} mensais, a título de acompanhamento contínuo, com vencimento todo dia {dia_ext} de cada mês, a partir do mês subsequente à assinatura do presente contrato;')], 'after'),
     (40, [(N, '{/mensalidade}')], 'after'),
+    (44, [(N, '{#exito}')], 'before'), (48, [(N, '{/exito}')], 'after'),  # parágrafos 2º a 4º só fazem sentido com êxito
 ]
 
 # ---------- Procurações (PJ outorgante + PF representante) ----------
