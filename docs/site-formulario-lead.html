@@ -1,5 +1,5 @@
 <!-- Código personalizado do Elementor (Custom Code "Neves Pádua — formulário → sistema", local: fim do body).
-     Repassa cada envio ACEITO pelo formulário do site para a Edge Function do sistema interno,
+     Repassa cada envio válido do formulário do site (o submit é interceptado pelo script da migração, que abre o WhatsApp) para a Edge Function do sistema interno,
      rota /functions/v1/chatguru/site (migração 0069). Honeypot + tempo de preenchimento vão junto para a triagem. -->
 <script id="np-site-lead">
 (() => {
@@ -17,14 +17,14 @@
     form.appendChild(hp);
     const valor = (n) => { const el = form.querySelector('[name="' + n + '"]'); if (!el) return ''; return el.type === 'checkbox' ? (el.checked ? 'sim' : '') : String(el.value || '').trim(); };
     const coletar = () => ({ nome: valor('nome'), telefone: valor('telefone'), email: valor('email'), area: valor('area'), mensagem: valor('mensagem'), consentimento: valor('consentimento'), hp: hp.value, t: Date.now() - t0, pagina: location.pathname });
-    let dados = null, enviado = false;
-    form.addEventListener('submit', () => { dados = coletar(); }, true);
-    new MutationObserver(() => {
-      if (enviado || !form.classList.contains('form-state-success')) return;
-      enviado = true;
-      const d = dados || coletar();
-      fetch(DESTINO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d), keepalive: true }).catch(() => {});
-    }).observe(form, { attributes: true, attributeFilter: ['class'] });
+    // O script da migração intercepta o submit (abre o WhatsApp com os dados), então o envio ao sistema
+    // acontece no próprio submit, em fase de captura, assim que o formulário passa na validação do navegador.
+    let ultimo = 0;
+    form.addEventListener('submit', () => {
+      if (!form.checkValidity() || Date.now() - ultimo < 15000) return;
+      ultimo = Date.now();
+      fetch(DESTINO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(coletar()), keepalive: true }).catch(() => {});
+    }, true);
   };
   document.querySelectorAll('form[data-element_type="e-form"]').forEach(preparar);
 })();
