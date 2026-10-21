@@ -55,6 +55,10 @@ begin
    where (chave is not null and whatsapp_normalizado = chave)
       or (nullif(btrim(linha ->> 'externo_id'), '') is not null and externo_id = btrim(linha ->> 'externo_id'))
    limit 1;
+  -- sem WhatsApp/ID correspondente: tenta o e-mail (evita duplicar lead que entrou só com e-mail)
+  if existente.id is null and nullif(btrim(linha ->> 'email'), '') is not null then
+    select id, nome into existente from public.leads where lower(email) = lower(btrim(linha ->> 'email')) limit 1;
+  end if;
   d := d || jsonb_build_object('existente_id', existente.id, 'existente_nome', existente.nome);
 
   -- etapa
