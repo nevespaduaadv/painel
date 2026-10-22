@@ -182,6 +182,8 @@ async function webhook(req: Request, url: URL): Promise<Response> {
   const token = url.searchParams.get("token") ?? "";
   if (!esperado || !igual(token, esperado)) return json(401, { ok: false, erro: "Token inválido." });
   const p = await lerPayload(req);
+  // ?origem=equipe → POST disparado por diálogo executado pela equipe (ex.: aplicar tag); não conta como resposta do lead
+  const origem = url.searchParams.get("origem"); if (origem) p._origem = origem;
   const r = await rest("rpc/chatguru_webhook", service(), { method: "POST", body: JSON.stringify({ p }) });
   if (!r.ok) return json(502, { ok: false, erro: `Supabase respondeu ${r.status}: ${await r.text()}` });
   return json(200, await r.json()); // erros de conteúdo ficam em webhook_logs; 200 para o ChatGuru não reenviar
