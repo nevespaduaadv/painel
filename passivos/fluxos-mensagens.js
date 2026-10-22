@@ -15,7 +15,9 @@
   }
 
   // ---------- gestão ----------
-  async function gerir() {
+  async function gerir() { if (window.PP_AUTOMACOES) { window.PP_AUTOMACOES.abrir(); return; }
+    return gerirAntigo(); }
+  async function gerirAntigo() {
     const host = $("#modalHost");
     try { await carregar(); } catch (e) { toast(e.message); return; }
     const close = () => host.replaceChildren();
@@ -108,7 +110,7 @@
     if (!(typeof readOnly === "function" && readOnly())) {
       const s = sel({ "": "Iniciar fluxo…", ...Object.fromEntries(fluxos.map((x) => [x.id, x.nome + (x.gatilho === "manual" ? "" : " (" + ({ entrou_na_fase: "etapa", novo_lead: "lead novo", reuniao_marcada: "reunião" })[x.gatilho] + ")")])) }, "");
       s.onchange = async () => { if (!s.value) return; const { error } = await SB.rpc("lead_fluxo_iniciar", { p_lead: l.id, p_fluxo: s.value }); if (error) { toast(error.message); s.value = ""; return; } toast("Fluxo iniciado"); recarregar(); };
-      box.append(el("div", { class: "actions", style: "margin-top:8px" }, s, pend.length ? el("button", { class: "btn sm", onclick: async () => { if (!confirm("Parar todos os fluxos deste lead e cancelar as mensagens agendadas?")) return; const { error } = await SB.rpc("lead_fluxos_parar", { p_lead: l.id }); if (error) { toast(error.message); return; } toast("Fluxos parados"); recarregar(); } }, "Parar fluxos") : null, PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("comercial") ? el("button", { class: "btn sm", onclick: () => gerir() }, "Gerir fluxos") : null));
+      box.append(el("div", { class: "actions", style: "margin-top:8px" }, s, pend.length ? el("button", { class: "btn sm", onclick: async () => { if (!confirm("Parar todos os fluxos deste lead e cancelar as mensagens agendadas?")) return; const { error } = await SB.rpc("lead_fluxos_parar", { p_lead: l.id }); if (error) { toast(error.message); return; } toast("Fluxos parados"); recarregar(); } }, "Parar fluxos") : null, PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("comercial") ? el("button", { class: "btn sm", onclick: () => gerir() }, "Automações") : null));
     }
     return box;
   }
