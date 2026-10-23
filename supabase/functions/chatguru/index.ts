@@ -186,7 +186,31 @@ async function webhook(req: Request, url: URL): Promise<Response> {
   const origem = url.searchParams.get("origem"); if (origem) p._origem = origem;
   const r = await rest("rpc/chatguru_webhook", service(), { method: "POST", body: JSON.stringify({ p }) });
   if (!r.ok) return json(502, { ok: false, erro: `Supabase respondeu ${r.status}: ${await r.text()}` });
-  return json(200, await r.json()); // erros de conteúdo ficam em webhook_logs; 200 para o ChatGuru não reenviar
+  const res = (await r.json()) as Dict;
+  // Atendimento: mídia recebida → cópia no bucket privado 'atendimento' (a URL do ChatGuru pode expirar)
+  const atd = (res.atd ?? {}) as Dict;
+  if (atd.tem_arquivo === true && typeof atd.mensagem_id === "string" && typeof p.url_arquivo === "string") {
+    try { await atdGuardarArquivo(String(atd.conversa_id), String(atd.mensagem_id), String(p.url_arquivo)); } catch (e) { console.warn("mídia não copiada:", e instanceof Error ? e.message : e); }
+  }
+  return json(200, res); // erros de conteúdo ficam em webhook_logs; 200 para o ChatGuru não reenviar
+}
+
+// baixa a mídia do ChatGuru e grava em atendimento/<conversa>/<mensagem>.<ext>; atualiza a mensagem (service role)
+async function atdGuardarArquivo(conversaId: string, mensagemId: string, urlArquivo: string) {
+  const r = await fetch(urlArquivo, { signal: AbortSignal.timeout(20_000) });
+  if (!r.ok) throw new Error(`download ${r.status}`);
+  const mime = (r.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.byteLength > 50 * 1024 * 1024) throw new Error("arquivo acima de 50 MB");
+  const nomeUrl = decodeURIComponent(new URL(urlArquivo).pathname.split("/").pop() ?? "");
+  const extUrl = /\.([a-z0-9]{2,5})$/i.exec(nomeUrl)?.[1]?.toLowerCase();
+  const extMime: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "video/mp4": "mp4", "application/pdf": "pdf" };
+  const ext = extUrl ?? extMime[mime] ?? "bin";
+  const caminho = `${conversaId}/${mensagemId}.${ext}`;
+  const up = await fetch(`${env("SUPABASE_URL")}/storage/v1/object/atendimento/${caminho}`, { method: "POST", headers: { ...cabecalhos(service()), "Content-Type": mime, "x-upsert": "true" }, body: bytes });
+  if (!up.ok) throw new Error(`upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
+  const pr = await rest(`atd_mensagens?id=eq.${mensagemId}`, service(), { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ arquivo_path: caminho, arquivo_nome: nomeUrl || `arquivo.${ext}`, mime }) });
+  if (!pr.ok) throw new Error(`patch ${pr.status}`);
 }
 
 // Formulário do site (nevespaduaadvocacia.com.br/contato): o script do site repassa o envio aceito pelo Elementor.
@@ -231,6 +255,20 @@ async function enviar(req: Request): Promise<Response> {
     try { return json(200, await sincronizarAgenda("", txt(corpo.colaborador_id) ?? undefined)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
   }
   if (typeof acao === "string" && acao.startsWith("asaas_")) return await asaasAcao(acao, corpo, jwt);
+  if (acao === "atd_enviar") { // Atendimento: resposta da equipe → registra (rpc, JWT do usuário) e envia pelo ChatGuru
+    if (typeof cg === "string") return json(500, { ok: false, erro: cg });
+    const conversaId = String(corpo.conversa_id ?? ""); const texto = String(corpo.texto ?? "").trim();
+    if (!UUID.test(conversaId) || !texto) return json(400, { ok: false, erro: "Conversa e texto são obrigatórios." });
+    const rc = await rest(`atd_conversas?id=eq.${conversaId}&select=id,whatsapp,nome_contato`, jwt);
+    const [conv] = rc.ok ? ((await rc.json()) as { id: string; whatsapp: string | null; nome_contato: string | null }[]) : [];
+    if (!conv) return json(404, { ok: false, erro: "Conversa não encontrada (ou sem acesso)." });
+    const rm = await rest("rpc/atd_mensagem_out", jwt, { method: "POST", body: JSON.stringify({ p_conv: conversaId, p_texto: texto, p_nota: false }) });
+    if (!rm.ok) return json(400, { ok: false, erro: `Não foi possível registrar: ${(await rm.text()).slice(0, 200)}` });
+    const msgId = (await rm.json()) as string;
+    const res = await enviarMensagem(cg, { nome: conv.nome_contato ?? "", whatsapp: conv.whatsapp }, texto);
+    await rest("rpc/atd_marcar_envio", jwt, { method: "POST", body: JSON.stringify({ p_msg: msgId, p_ok: res.ok, p_erro: res.ok ? null : res.erro, p_ref: res.ok ? (res.id ?? null) : null }) });
+    return json(res.ok ? 200 : 502, { ok: res.ok, mensagem_id: msgId, erro: res.ok ? undefined : res.erro });
+  }
   if (acao === "drive_pasta") { // criar/achar a pasta do cliente no Drive (equipe)
     try { return json(200, { ok: true, ...(await drivePastaCliente(String(corpo.cliente_id ?? ""), String(corpo.nome ?? ""))) }); }
     catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
