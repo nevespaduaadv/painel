@@ -248,6 +248,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(!PP.temAcesso("publicacoes"))document.body.classList.add("sem-controle");
     if(!PP.temAcesso(S.tab))S.tab="painel";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
+    await PP.carregarModulos();
     window.PP_ROTAS.push("painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro","perfil","avisos","ponto","estoque","inventario");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
@@ -305,7 +306,37 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
 html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>\n') + '</body>');
-html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : `<script src="passivos/carteira.js${V}"></script>\n<script src="passivos/tarefas.js${V}"></script>\n<script src="passivos/prazos.js${V}"></script>\n<script src="passivos/feriados.js${V}"></script>\n<script src="passivos/agenda.js${V}"></script>\n<script src="passivos/notificacoes.js${V}"></script>\n<script src="passivos/painel.js${V}"></script>\n<script src="passivos/equipe.js${V}"></script>\n<script src="passivos/rh.js${V}"></script>\n<script src="passivos/dnd.js${V}"></script>\n<script src="passivos/ficha.js${V}"></script>\n<script src="passivos/fluxo.js${V}"></script>\n<script src="passivos/publicacoes.js${V}"></script>\n<script src="passivos/processos.js${V}"></script>\n<script src="passivos/autenticador.js${V}"></script>\n<script src="passivos/marketing.js${V}"></script>\n<script src="passivos/comercial.js${V}"></script>\n<script src="passivos/growth.js${V}"></script>\n<script src="passivos/financeiro.js${V}"></script>\n<script src="passivos/central-cobrancas.js${V}"></script>\n<script src="passivos/estoque.js${V}"></script>\n<script src="passivos/inventario.js${V}"></script>\n<script src="passivos/perfil.js${V}"></script>\n<script src="passivos/avisos.js${V}"></script>\n<script src="passivos/ponto.js${V}"></script>\n<script src="passivos/chat.js${V}"></script>\n<script src="passivos/gestao.js${V}"></script>\n<script src="passivos/leads.js${V}"></script>\n<script src="passivos/leads-importar.js${V}"></script>\n<script src="passivos/fluxos-mensagens.js${V}"></script>\n<script src="passivos/automacoes.js${V}"></script>\n<script src="passivos/docx-contrato.js${V}"></script>\n<script src="passivos/fechamento.js${V}"></script>\n<script src="passivos/revisional.js${V}"></script>\n<script src="passivos/pecas.js${V}"></script>\n<script src="passivos/superendividamento.js${V}"></script>\n<script src="passivos/documentos.js${V}"></script>\n<script src="passivos/conhecimento.js${V}"></script>\n</body>`);
+// Módulos da equipe: lista ordenada (a ordem importa — ficha depende de carteira/tarefas, conhecimento de documentos,
+// fechamento de docx-contrato…). Cada módulo diz a quais áreas pertence; o carregador (PP.carregarModulos) só baixa
+// os de "core" + as áreas da pessoa (admin = todas; cliente = só carteira e ficha).
+const MODULOS = [
+  ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
+  ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
+  ['publicacoes','juridico'],['processos','juridico'],['autenticador','juridico','clientes'],['marketing','marketing'],
+  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],
+  ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['chat','core'],
+  ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
+  ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico'],
+  ['superendividamento','juridico'],['documentos','core'],['conhecimento','core'],
+];
+const loader = `<script>
+PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();
+PP.carregarModulos=async function(extra){
+  const p=PP.perfil||{};const areas=new Set(extra||[]);
+  if(p.papel==="cliente")areas.add("cliente");
+  else{areas.add("core");if(p.papel==="admin"){["clientes","juridico","comercial","marketing","financeiro","equipe","growth","admin"].forEach(a=>areas.add(a))}else (p.acessos||[]).forEach(a=>areas.add(a))}
+  // baixa em paralelo, executa na ordem da lista (async=false)
+  const esperas=[];
+  for(const [nome,...tags] of PP.MODULOS){
+    if(PP.modulosCarregados.has(nome)||!tags.some(t=>areas.has(t)))continue;
+    PP.modulosCarregados.add(nome);
+    esperas.push(new Promise((ok)=>{const s=document.createElement("script");s.src="passivos/"+nome+".js"+PP.MODULOS_V;s.async=false;s.onload=ok;s.onerror=()=>{console.warn("módulo não carregou:",nome);ok()};document.body.appendChild(s)}));
+  }
+  await Promise.all(esperas);
+};
+</script>
+`;
+html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : loader + '</body>');
 if(modo==='token'){
   html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
