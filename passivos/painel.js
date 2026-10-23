@@ -122,7 +122,7 @@ async function enviarResumo(){
   catch(e){toast("Não foi possível enviar: "+e.message)}
 }
 let rt=null;
-function tempoReal(){const ch=SB.channel("painel");ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rt);rt=setTimeout(()=>{D.ok=false;if(S.tab==="painel")garantir()},500)});ch.subscribe()}
+function tempoReal(){const ch=SB.channel("painel-tarefas");ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rt);rt=setTimeout(()=>{D.ok=false;if(S.tab==="painel")garantir()},500)});ch.subscribe()}
 {const _r=render;render=function(){_r();const v=$("#view-painel");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="painel")S.tab="clientes";v.hidden=S.tab!=="painel";if(S.tab==="painel")renderPainel()}}
 window.PP_PAINEL={recarregar:()=>{D.ok=false;garantir()}};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal();let salvo=null;try{salvo=localStorage.getItem("pp-tab")}catch(_){}if(!location.hash&&!salvo){S.tab="painel";render()}}});
