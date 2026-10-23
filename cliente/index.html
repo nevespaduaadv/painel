@@ -332,6 +332,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-regras" hidden class="main"></div>
   <div id="view-calibracao" hidden class="main"></div>
   <div id="view-painel" hidden class="main"></div>
+  <div id="view-atendimento" hidden class="main"></div>
   <div id="view-automacoes" hidden class="main"></div>
   <div id="view-processos" hidden class="main"></div>
   <div id="view-superendividamento" hidden class="main"></div>
@@ -586,13 +587,13 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"painel",label:"Meu painel",cls:"edit-only"},{tab:"tarefas",label:"Tarefas e prazos",cls:"edit-only"},{tab:"agenda",label:"Agenda",cls:"edit-only"},{tab:"perfil",label:"Meu perfil",cls:"edit-only"},{tab:"avisos",label:"Avisos",cls:"edit-only"},{tab:"clientes",label:"Clientes",cls:"area-clientes"},
   {grupo:"juridico",label:"Jurídico",cls:"edit-only area-juridico",itens:[{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-juridico"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},]},
-  {grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"leads",label:"Leads (CRM)",cls:"area-comercial"},{tab:"automacoes",label:"Automações",cls:"area-comercial"},{tab:"comercial",label:"Metas do mês",cls:"area-comercial"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:[{tab:"financeiro",label:"Cobranças (Asaas)",cls:"area-financeiro"},{tab:"estoque",label:"Estoque",cls:"area-financeiro"},{tab:"inventario",label:"Inventário",cls:"area-financeiro"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-financeiro",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",label:"Colaboradores",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto",cls:"area-equipe"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"}]}];
+  {grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"leads",label:"Leads (CRM)",cls:"area-comercial"},{tab:"automacoes",label:"Automações",cls:"area-comercial"},{tab:"comercial",label:"Metas do mês",cls:"area-comercial"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"atendimento",label:"Atendimento",cls:"edit-only area-atendimento",itens:[{tab:"atendimento",label:"Conversas (WhatsApp)",cls:"area-atendimento"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:[{tab:"financeiro",label:"Cobranças (Asaas)",cls:"area-financeiro"},{tab:"estoque",label:"Estoque",cls:"area-financeiro"},{tab:"inventario",label:"Inventário",cls:"area-financeiro"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-financeiro",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",label:"Colaboradores",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto",cls:"area-equipe"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"}]}];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
 function irPara(tab){if(tab==="clientes"&&!readOnly()){S.sel=null;S.q=""}S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}fecharSb();render()}
 function fecharSb(){$("#app")?.classList.remove("sb-aberta")}
 /* Ícones do menu (traço, 24×24) por aba/grupo */
-const ICONES={
+const ICONES={atendimento:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
   clientes:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3"/>',
   tarefas:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
   negociacoes:'<path d="M4 6h16M4 12h10M4 18h7"/>',
@@ -1198,7 +1199,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mvl36ah0"></script>
-<script src="../passivos/ficha.js?v=mvl36ah0"></script>
+<script src="../passivos/carteira.js?v=mvl9hitf"></script>
+<script src="../passivos/ficha.js?v=mvl9hitf"></script>
 </body>
 </html>
