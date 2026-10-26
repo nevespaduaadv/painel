@@ -42,6 +42,8 @@ html = html.replace('</style>', `
 .sem-controle .controle-only{display:none!important}
 .sem-clientes .area-clientes{display:none!important}
 .sem-juridico .area-juridico{display:none!important}
+.sem-superendividamento .area-superendividamento{display:none!important}
+.sem-atendimento .area-atendimento{display:none!important}
 .sem-comercial .area-comercial{display:none!important}
 .sem-marketing .area-marketing{display:none!important}
 .sem-financeiro .area-financeiro{display:none!important}
@@ -63,9 +65,10 @@ must('<div id="view-calibracao" hidden class="main"></div>');
 must('const NAV=[{tab:"clientes",label:"Clientes"},');
 html = html.replace('const NAV=[{tab:"clientes",label:"Clientes"},', 'const NAV=[{tab:"painel",label:"Meu painel",cls:"edit-only"},{tab:"tarefas",label:"Tarefas e prazos",cls:"edit-only"},{tab:"agenda",label:"Agenda",cls:"edit-only"},{tab:"perfil",label:"Meu perfil",cls:"edit-only"},{tab:"avisos",label:"Avisos",cls:"edit-only"},{tab:"clientes",label:"Clientes",cls:"area-clientes"},');
 must('/*NAV_JURIDICO*/');
+html = html.replace('{tab:"historico",label:"Base de acordos"}', '{tab:"historico",label:"Base de acordos",cls:"area-juridico"}');
 html = html.replace('{grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[', '{grupo:"juridico",label:"Jurídico",cls:"edit-only area-juridico",itens:[');
 html = html.replace('{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}', '');
-html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-juridico"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},');
+html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},');
 must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
 must('/*NAV_GRUPOS*/');
@@ -243,10 +246,10 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
-    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento"];PP.TAB_AREA={clientes:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"juridico",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin"};
+    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
-    PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");return (PP.perfil.acessos||[]).includes(a)};
-    for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento"}[a]))document.body.classList.add("sem-"+a);
+    PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
+    for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
     if(!PP.temAcesso("publicacoes"))document.body.classList.add("sem-controle");
     if(!PP.temAcesso(S.tab))S.tab="painel";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
@@ -284,7 +287,7 @@ async function renderUsuarios(){
       const nome=inp("text",p.nome||"");
       const papel=sel(PAPEIS,p.papel);
       const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");
-      const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento (WhatsApp)",tarefas_equipe:"Controle do jurídico (tarefas da equipe, Publicações DJEN)"};
+      const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento (WhatsApp)",superendividamento:"Superendividamento (só a calculadora)",tarefas_equipe:"Controle do jurídico (tarefas da equipe, Publicações DJEN)"};
       const chks=Object.fromEntries(Object.keys(AREAS).map(a=>[a,el("input",{type:"checkbox",checked:(p.acessos||[]).includes(a)?"":null})]));
       const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
         const acessos=Object.keys(AREAS).filter(a=>chks[a].checked);
@@ -318,15 +321,15 @@ const MODULOS = [
   ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
-  ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico'],
-  ['superendividamento','juridico'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],
+  ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
-  else{areas.add("core");if(p.papel==="admin"){["clientes","juridico","comercial","marketing","financeiro","equipe","growth","admin","atendimento"].forEach(a=>areas.add(a))}else (p.acessos||[]).forEach(a=>areas.add(a))}
+  else{areas.add("core");if(p.papel==="admin"){["clientes","juridico","comercial","marketing","financeiro","equipe","growth","admin","atendimento","superendividamento"].forEach(a=>areas.add(a))}else (p.acessos||[]).forEach(a=>areas.add(a))}
   // baixa em paralelo, executa na ordem da lista (async=false)
   const esperas=[];
   for(const [nome,...tags] of PP.MODULOS){
