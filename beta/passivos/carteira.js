@@ -171,7 +171,7 @@ function renderProcessos(c,host){
   const ordem=[...M.processos].sort((a,b)=>(a.status==="encerrado")-(b.status==="encerrado")||(a.proximo_prazo||"9999").localeCompare(b.proximo_prazo||"9999"));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Último andamento"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
     el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{M.procSel=M.procSel===p.id?null:p.id;render()}},
-      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
+      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p.pasta_numero)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
       el("td",{},p.tipo_acao||"—",p.polo?el("div",{class:"note"},p.polo==="ativo"?"polo ativo":"polo passivo"):null),
       el("td",{},[p.tribunal,p.vara].filter(Boolean).join(" · ")||"—"),el("td",{},p.parte_contraria||"—"),
       el("td",{},p.banco||nomeContrato(p.contrato_id)||"—",p.contrato_id&&p.banco?el("div",{class:"note"},nomeContrato(p.contrato_id)):null),
@@ -189,6 +189,7 @@ function detalheProcesso(c,p){
       el("div",{class:"actions edit-only"},el("button",{class:"btn sm",onclick:()=>openProcessoForm(c,p)},"Editar processo"),el("button",{class:"btn sm primary",onclick:()=>openAndamentoForm(p)},"+ Andamento"))),
     p.observacoes&&!cliente?el("div",{class:"note",style:"white-space:pre-wrap"},p.observacoes):null,
     el("h3",{style:"font-size:17px"},`Andamentos (${ands.length})`));
+  if(!cliente&&window.PP_PASTAS?.secaoProcesso)box.insertBefore(window.PP_PASTAS.secaoProcesso(p,()=>carregarCliente(c.id,true)),box.children[2]||null);
   if(!ands.length)box.append(el("div",{class:"note"},"Nenhum andamento registrado."));
   else box.append(el("ul",{class:"tl"},ands.map(a=>el("li",{},
     el("div",{class:"d"},fmtD(parseD(a.data)),a.tipo?" · "+a.tipo:"",cliente?null:el("span",{class:"pill "+(a.visivel_cliente?"e1":"e2"),style:"margin-left:6px"},a.visivel_cliente?"Visível ao cliente":"Interno"),a.fonte&&a.fonte!=="manual"?el("span",{class:"pill c",style:"margin-left:6px"},a.fonte):null),
@@ -209,10 +210,12 @@ function openProcessoForm(c,p={}){
   const body=el("div",{class:"form"},field("p-cli","Cliente",cli,"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."),field("p-cnj","Número CNJ",cnj),field("p-acao","Tipo de ação",acao.wrap),field("p-trib","Tribunal",trib),field("p-vara","Vara / comarca",vara),
     field("p-parte","Parte contrária",parte),field("p-polo","Polo do cliente",polo),field("p-con","Contrato relacionado",kon),field("p-banco","Banco relacionado",banco.wrap),
     field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),field("p-prazo","Próximo prazo",prazo),fatal.wrap,field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
+  const extras=window.PP_PASTAS?.camposForm?.(p,c);if(extras)body.append(extras.wrap);
   const extra=p.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este processo e todos os andamentos?"))return;const {error}=await SB.from("processos").delete().eq("id",p.id);$("#modalHost").replaceChildren();M.procSel=null;toast(error?"Não foi possível excluir":"Processo excluído")}},"Excluir"):null;
   modal(p.id?"Editar processo":"Novo processo",body,async()=>{
     if(!cnj.value.trim()&&!acao.input.value.trim())throw new Error("Informe o número CNJ ou o tipo de ação");
-    const row={cliente_id:cli.value||null,numero_cnj:cnj.value.trim()||null,tipo_acao:acao.input.value.trim()||null,tribunal:trib.value.trim()||null,vara:vara.value.trim()||null,parte_contraria:parte.value.trim()||null,polo:polo.value,contrato_id:kon.value||null,banco:banco.input.value.trim()||null,fase:fase.input.value.trim()||null,valor_causa:valor.value===""?null:+valor.value,proximo_prazo:prazo.value||null,prazo_fatal:fatal.input.checked,responsavel_id:resp.value||null,status:status.value,visivel_cliente:vis.input.checked,observacoes:obs.value.trim()||null};
+    const row={cliente_id:cli.value||null,numero_cnj:cnj.value.trim()||null,tipo_acao:acao.input.value.trim()||null,tribunal:trib.value.trim()||null,vara:vara.value.trim()||null,parte_contraria:parte.value.trim()||null,polo:polo.value,contrato_id:kon.value||null,banco:banco.input.value.trim()||null,fase:fase.input.value.trim()||null,valor_causa:valor.value===""?null:+valor.value,proximo_prazo:prazo.value||null,prazo_fatal:fatal.input.checked,responsavel_id:resp.value||null,status:status.value,visivel_cliente:vis.input.checked,observacoes:obs.value.trim()||null,...(extras?extras.valores():{})};
+    window.PP_PASTAS?.validar?.(row);
     const q=p.id?SB.from("processos").update(row).eq("id",p.id):SB.from("processos").insert(row).select("id").single();
     const {data,error}=await q;if(error)throw new Error(error.code==="23505"?"Já existe um processo com este número CNJ":"Não foi possível salvar");
     if(p.id&&cli.value!==(c.id||"")){await SB.from("tarefas").update({cliente_id:cli.value||null}).eq("processo_id",p.id);if(cli.value)await SB.from("entradas_timeline").update({cliente_id:cli.value}).eq("processo_id",p.id);M.procSel=null;toast(cli.value?"Processo movido para outro cliente":"Processo desvinculado do cliente");if(cli.value){S.sel=cli.value;S.sub="processos";S.tab="clientes"}else{S.tab="processos"}window.PP_PROCESSOS?.recarregar?.();render();return}
@@ -220,7 +223,7 @@ function openProcessoForm(c,p={}){
     if(data?.id)M.procSel=data.id;toast("Processo salvo");window.PP_PROCESSOS?.recarregar?.();
   },extra);
 }
-window.PP_CARTEIRA={openProcessoForm,openAndamentoForm:(p,a)=>openAndamentoForm(p,a),abrirProcesso:(cid,pid)=>{S.sel=cid;S.sub="processos";S.tab="clientes";M.procSel=pid;render()}};
+window.PP_CARTEIRA={processosDoCliente:cid=>(cid&&M.cid===cid?M.processos:[]),openProcessoForm,openAndamentoForm:(p,a)=>openAndamentoForm(p,a),abrirProcesso:(cid,pid)=>{S.sel=cid;S.sub="processos";S.tab="clientes";M.procSel=pid;render()}};
 function openAndamentoForm(p,a={}){
   const data=inp("date",a.data||hojeISO()),tipo=datalistInput("a-tipo",a.tipo||"",TIPOS_AND),desc=el("textarea",{placeholder:"Resumo do andamento e o que ele exige do escritório."},a.descricao||""),vis=check("Visível ao cliente",a.visivel_cliente,"O andamento também entra na timeline do cliente com esta mesma visibilidade.");
   const body=el("div",{class:"form"},field("a-data","Data",data),field("a-tipo","Tipo",tipo.wrap),field("a-desc","Descrição",desc),vis.wrap);

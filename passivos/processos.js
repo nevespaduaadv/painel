@@ -2,7 +2,7 @@
    Criação/edição e andamentos reaproveitam os formulários de carteira.js (PP_CARTEIRA). Depende de 0035. */
 (()=>{
 "use strict";
-const P={lista:[],ok:false,carregando:false,f:{q:"",cliente:"",status:"ativo",resp:"",semCliente:false},sel:null,ands:[],andsDe:null,colab:[]};
+const P={lista:[],ok:false,carregando:false,f:{q:"",cliente:"",status:"ativo",resp:"",semCliente:false,incompleto:false},sel:null,ands:[],andsDe:null,colab:[]};
 async function carregar(){
   if(P.carregando)return;P.carregando=true;
   try{
@@ -26,18 +26,20 @@ function renderProcessos(){
   const f=P.f;
   const ativos=P.lista.filter(p=>p.status==="ativo");
   const K=(l,val,h,cls)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},String(val)),el("div",{class:"h"},h));
-  const semCli=ativos.filter(p=>!p.cliente_id).length,atras=ativos.filter(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0).length,semProv=ativos.filter(p=>p.sem_providencia).length;
-  v.append(el("div",{class:"kpis"},K("Ativos",ativos.length,`${P.lista.length} no total`),K("Prazo vencido",atras,"próximo prazo já passou",atras?"crit":""),K("Sem providência",semProv,"30 dias sem andamento nem tarefa",semProv?"warn":""),K("Sem cliente na base",semCli,"pessoas fora do cadastro")));
+  const semCli=ativos.filter(p=>!p.cliente_id).length,atras=ativos.filter(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0).length,semProv=ativos.filter(p=>p.sem_providencia).length,incompl=ativos.filter(p=>(p.campos_faltando||[]).length).length;
+  v.append(el("div",{class:"kpis"},K("Ativos",ativos.length,`${P.lista.length} no total`),K("Prazo vencido",atras,"próximo prazo já passou",atras?"crit":""),K("Cadastro incompleto",incompl,"campos obrigatórios em branco",incompl?"warn":""),K("Sem providência",semProv,"30 dias sem andamento nem tarefa",semProv?"warn":""),K("Sem cliente na base",semCli,"pessoas fora do cadastro")));
   const q=el("input",{class:"search",placeholder:"Nº CNJ, parte, banco, cliente…",value:f.q,oninput:e=>{f.q=e.target.value;render()}});
   const fs=sel({ativo:"Ativos",suspenso:"Suspensos",encerrado:"Encerrados","":"Todos"},f.status);fs.onchange=()=>{f.status=fs.value;render()};
   const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(P.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp);fr.onchange=()=>{f.resp=fr.value;render()};
   const fc=sel({"":"Todos os clientes","__sem":"Só sem cliente",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},f.cliente);fc.onchange=()=>{f.cliente=fc.value;render()};
   const ql=f.q.trim().toLowerCase();
-  const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)
-    &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara].join(" ").toLowerCase().includes(ql)));
-  const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
+  const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)&&(!f.incompleto||(p.campos_faltando||[]).length)
+    &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):""].join(" ").toLowerCase().includes(ql)));
+  const fi=el("label",{class:"switch"},el("input",{type:"checkbox",checked:f.incompleto?"":null,onchange:e=>{f.incompleto=e.target.checked;render()}})," Só cadastro incompleto");
+  const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,fi,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
   card.append(tabela({cols:[
-      {label:"Processo",r:p=>el("div",{},el("span",{class:"t num"},p.numero_cnj||"(sem número)"),el("span",{class:"sub"},[p.tipo_acao,p.tribunal,p.vara].filter(Boolean).join(" · ")))},
+      {label:"Pasta",r:p=>el("div",{},el("b",{},window.PP_PASTAS?.pastaTxt?.(p.pasta_numero)||"—"),(p.campos_faltando||[]).length?el("div",{class:"pill e2",title:"Falta: "+p.campos_faltando.join(", ")},"incompleto"):null,p.qtd_relacionados?el("div",{class:"note"},p.qtd_relacionados+" relacionado(s)"):null)},
+      {label:"Processo",r:p=>el("div",{},el("span",{class:"t num"},p.numero_cnj||"(sem número)"),el("span",{class:"sub"},[p.area,p.tipo_acao,p.tribunal,p.vara].filter(Boolean).join(" · ")))},
       {label:"Cliente",r:p=>p.cliente_id?p.cliente_nome:el("span",{class:"pill g"},"fora da base")},
       {label:"Parte contrária",r:p=>p.parte_contraria||p.banco||"—"},
       {label:"Fase",r:p=>p.fase||"—"},
@@ -54,6 +56,7 @@ function renderProcessos(){
     v.append(el("div",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},p.cliente_nome||"Fora da base"),el("h2",{},p.numero_cnj||"(sem número)"),el("div",{class:"note"},[p.tipo_acao,p.parte_contraria?"× "+p.parte_contraria:null,p.valor_causa?"valor da causa "+BRL(+p.valor_causa):null,p.responsavel_nome?"resp. "+p.responsavel_nome:null].filter(Boolean).join(" · "))),
         el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,p)},"Editar processo"),el("button",{class:"btn sm",onclick:()=>window.PP_TAREFAS?.nova({processo_id:p.id,cliente_id:p.cliente_id||null,titulo:""})},"+ Tarefa"),el("button",{class:"btn sm primary",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p)},"+ Andamento"))),
       p.observacoes?el("div",{class:"note",style:"white-space:pre-wrap"},p.observacoes):null,
+      window.PP_PASTAS?.secaoProcesso?window.PP_PASTAS.secaoProcesso(p,()=>{P.ok=false;garantir()}):null,
       el("h3",{},`Andamentos (${ands.length})`),
       ands.length?el("ul",{class:"tl"},ands.map(a=>el("li",{},el("div",{class:"d"},fmtD(parseD(a.data)),a.tipo?" · "+a.tipo:"",a.fonte&&a.fonte!=="manual"?el("span",{class:"pill c",style:"margin-left:6px"},a.fonte):null),el("div",{style:"white-space:pre-wrap"},a.descricao),
         el("div",{class:"actions",style:"justify-content:flex-start;margin-top:4px"},el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p,a)},"Editar"))))):el("div",{class:"note"},P.andsDe===p.id?"Nenhum andamento registrado.":"Carregando…")));

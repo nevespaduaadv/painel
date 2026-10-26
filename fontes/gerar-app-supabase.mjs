@@ -322,7 +322,7 @@ html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;
 const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
-  ['publicacoes','juridico'],['processos','juridico'],['autenticador','juridico','clientes'],['marketing','marketing'],
+  ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['autenticador','juridico','clientes'],['marketing','marketing'],
   ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
