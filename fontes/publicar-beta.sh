@@ -7,6 +7,7 @@ msg="${1:-Espelho: atualização do beta}"
 git checkout -q beta
 PP_ESPELHO=1 node fontes/gerar-app-supabase.mjs >/dev/null
 rm -rf /tmp/pp-beta-build && cp -r beta /tmp/pp-beta-build
+git checkout -q -- beta 2>/dev/null || true; git clean -fdq beta 2>/dev/null || true
 git checkout -q main
 rm -rf beta && cp -r /tmp/pp-beta-build beta
 git add beta && git commit -q -m "$msg
