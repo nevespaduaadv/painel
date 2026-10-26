@@ -171,7 +171,7 @@ function renderProcessos(c,host){
   const ordem=[...M.processos].sort((a,b)=>(a.status==="encerrado")-(b.status==="encerrado")||(a.proximo_prazo||"9999").localeCompare(b.proximo_prazo||"9999"));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Último andamento"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
     el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{M.procSel=M.procSel===p.id?null:p.id;render()}},
-      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p.pasta_numero)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
+      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
       el("td",{},p.tipo_acao||"—",p.polo?el("div",{class:"note"},p.polo==="ativo"?"polo ativo":"polo passivo"):null),
       el("td",{},[p.tribunal,p.vara].filter(Boolean).join(" · ")||"—"),el("td",{},p.parte_contraria||"—"),
       el("td",{},p.banco||nomeContrato(p.contrato_id)||"—",p.contrato_id&&p.banco?el("div",{class:"note"},nomeContrato(p.contrato_id)):null),

@@ -41,7 +41,7 @@ function renderPublicacoes(){
   for(const [data,ps] of grupos){
     const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},fmtD(parseD(data))),el("span",{class:"note"},`${ps.length} publicaç${ps.length===1?"ão":"ões"}`)));
     sec.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Processo / cliente"),el("th",{},"Tipo"),el("th",{},"Órgão"),el("th",{},"Partes"),el("th",{},"Resumo"),el("th",{},"Tarefa"),el("th",{},""))),
-      el("tbody",{},ps.map(p=>el("tr",{style:p.ignorada?"opacity:.5":(!p.lida?"font-weight:600":"")},
+      el("tbody",{},ps.map(p=>el("tr",{"data-pub-id":String(p.id),style:p.ignorada?"opacity:.5":(!p.lida?"font-weight:600":"")},
         el("td",{},el("div",{class:"num"},p.numero_processo||"—"),p.cliente_id?el("div",{class:"note"},p.cliente_nome):p.processo_id?el("span",{class:"pill g"},"fora da base"):el("span",{class:"pill e2"},"sem processo")),
         el("td",{},el("div",{},p.tipo_documento||p.tipo_comunicacao||"—"),p.tipo_documento&&p.tipo_comunicacao?el("div",{class:"note"},p.tipo_comunicacao):null),
         el("td",{},el("div",{},p.tribunal||"—"),el("div",{class:"note"},p.orgao||"")),
@@ -111,5 +111,6 @@ function buscarPeriodo(){
 /* ---------- Integração ---------- */
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};return r}}
 {const _r=render;render=function(){_r();const vp=$("#view-publicacoes");if(!vp)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="publicacoes")S.tab="clientes";vp.hidden=S.tab!=="publicacoes";if(S.tab==="publicacoes")renderPublicacoes()}}
+window.PP_PUBLICACOES={lista:()=>U.lista,colab:()=>U.colab,recarregar,abrir,atribuir,vincular};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("publicacoes");ch.on("postgres_changes",{event:"*",schema:"public",table:"publicacoes"},()=>{U.ok=false;if(S.tab==="publicacoes")garantir()});ch.subscribe()}});
 })();
