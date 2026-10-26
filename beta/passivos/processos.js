@@ -34,11 +34,11 @@ function renderProcessos(){
   const fc=sel({"":"Todos os clientes","__sem":"Só sem cliente",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},f.cliente);fc.onchange=()=>{f.cliente=fc.value;render()};
   const ql=f.q.trim().toLowerCase();
   const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)&&(!f.incompleto||(p.campos_faltando||[]).length)
-    &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):""].join(" ").toLowerCase().includes(ql)));
+    &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_codigo||(p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):"")].join(" ").toLowerCase().includes(ql)));
   const fi=el("label",{class:"switch"},el("input",{type:"checkbox",checked:f.incompleto?"":null,onchange:e=>{f.incompleto=e.target.checked;render()}})," Só cadastro incompleto");
   const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,fi,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
   card.append(tabela({cols:[
-      {label:"Pasta",r:p=>el("div",{},el("b",{},window.PP_PASTAS?.pastaTxt?.(p.pasta_numero)||"—"),(p.campos_faltando||[]).length?el("div",{class:"pill e2",title:"Falta: "+p.campos_faltando.join(", ")},"incompleto"):null,p.qtd_relacionados?el("div",{class:"note"},p.qtd_relacionados+" relacionado(s)"):null)},
+      {label:"Pasta",r:p=>el("div",{},el("b",{},window.PP_PASTAS?.pastaTxt?.(p)||"—"),(p.campos_faltando||[]).length?el("div",{class:"pill e2",title:"Falta: "+p.campos_faltando.join(", ")},"incompleto"):null,p.qtd_relacionados?el("div",{class:"note"},p.qtd_relacionados+" relacionado(s)"):null)},
       {label:"Processo",r:p=>el("div",{},el("span",{class:"t num"},p.numero_cnj||"(sem número)"),el("span",{class:"sub"},[p.area,p.tipo_acao,p.tribunal,p.vara].filter(Boolean).join(" · ")))},
       {label:"Cliente",r:p=>p.cliente_id?p.cliente_nome:el("span",{class:"pill g"},"fora da base")},
       {label:"Parte contrária",r:p=>p.parte_contraria||p.banco||"—"},

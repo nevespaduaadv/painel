@@ -10,14 +10,16 @@
   const PA = { ok: false, areas: [], campos: [], pastas: [], pastasOk: false, rel: {}, relDe: null, aba: "processos", fPasta: { q: "", status: "ativa" } };
   const admin = () => PP.perfil?.papel === "admin";
   const TIPOS_REL = { cumprimento_sentenca: "Cumprimento de sentença", recurso: "Recurso", execucao: "Execução", embargos: "Embargos", incidente: "Incidente", cautelar: "Cautelar / tutela", conexo: "Processo conexo", outro: "Outro" };
-  const pastaTxt = (n) => n ? "Pasta " + String(n).padStart(5, "0") : "—";
+  // código "AAAA-NNNN" (beta 0003); aceita o número da pasta ou a linha (com pasta_codigo/codigo)
+  const COD = {};
+  const pastaTxt = (n) => { if (!n) return "—"; if (typeof n === "object") { const c = n.pasta_codigo || n.codigo; if (c) COD[n.pasta_numero || n.numero] = c; return c ? "Pasta " + c : pastaTxt(n.pasta_numero || n.numero); } return "Pasta " + (COD[n] || String(n).padStart(5, "0")); };
   const fmt = (iso) => iso ? new Date(iso + (iso.length === 10 ? "T12:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 
   async function carregarCfg() {
     const [a, c] = await Promise.all([SB.from("areas_processo").select("*").order("ordem"), SB.from("processo_campos_obrigatorios").select("*").order("ordem")]);
     PA.areas = a.data || []; PA.campos = c.data || []; PA.ok = true;
   }
-  async function carregarPastas() { const { data } = await SB.from("v_pastas").select("*").order("numero", { ascending: false }); PA.pastas = data || []; PA.pastasOk = true; render(); }
+  async function carregarPastas() { const { data } = await SB.from("v_pastas").select("*").order("numero", { ascending: false }); PA.pastas = data || []; PA.pastasOk = true; for (const x of PA.pastas) if (x.codigo) COD[x.numero] = x.codigo; render(); }
   async function carregarRel(pid) { const { data } = await SB.from("v_processo_relacoes").select("*").eq("processo_id", pid).order("created_at"); PA.rel[pid] = data || []; PA.relDe = pid; render(); }
   const faltando = (row) => PA.campos.filter((c) => c.obrigatorio && (row[c.campo] == null || String(row[c.campo]).trim() === "")).map((c) => c.rotulo);
 
@@ -29,8 +31,8 @@
     const relevante = el("input", { type: "checkbox", checked: p.relevante ? "" : null }), sigiloso = el("input", { type: "checkbox", checked: p.sigiloso ? "" : null });
     // pasta: nova (automática) ou a mesma de outro processo do cliente
     const outros = (window.PP_CARTEIRA?.processosDoCliente?.(c?.id) || []).filter((x) => x.id !== p.id && x.pasta_numero);
-    const pastaOpts = { "": p.id ? pastaTxt(p.pasta_numero) + " (atual)" : "Nova pasta (número automático)" };
-    for (const x of outros) pastaOpts[String(x.pasta_numero)] = pastaTxt(x.pasta_numero) + " — mesma de " + (x.numero_cnj || x.tipo_acao || "processo");
+    const pastaOpts = { "": p.id ? pastaTxt(p) + " (atual)" : "Nova pasta (número automático)" };
+    for (const x of outros) pastaOpts[String(x.pasta_numero)] = pastaTxt(x) + " — mesma de " + (x.numero_cnj || x.tipo_acao || "processo");
     const pasta = sel(pastaOpts, "");
     const wrap = el("div", { class: "form", style: "grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;margin-top:4px" },
       field("p-area", "Área", area), field("p-dist", "Data de distribuição", dist), field("p-rito", "Rito", rito), field("p-assunto", "Assunto", assunto),
@@ -50,15 +52,16 @@
     const rel = PA.rel[p.id] || [];
     const falta = p.campos_faltando || faltando(p);
     const box = el("div", { class: "card", style: "padding:12px 14px;display:flex;flex-direction:column;gap:8px" },
-      el("div", { class: "section-h" }, el("div", {}, el("div", { class: "eyebrow" }, "Arquivo"), el("h3", { style: "font-size:16px" }, pastaTxt(p.pasta_numero), p.pasta_titulo ? el("span", { class: "note" }, " · " + p.pasta_titulo) : null)),
+      el("div", { class: "section-h" }, el("div", {}, el("div", { class: "eyebrow" }, "Arquivo"), el("h3", { style: "font-size:16px" }, pastaTxt(p), p.pasta_titulo ? el("span", { class: "note" }, " · " + p.pasta_titulo) : null)),
         el("div", { class: "actions edit-only" }, el("button", { class: "btn sm", onclick: () => modalRelacionar(p, recarregar) }, "Relacionar processo…"))),
       falta.length ? el("div", { class: "pill e2", style: "align-self:flex-start" }, "Cadastro incompleto: " + falta.join(", ")) : el("div", { class: "pill e1", style: "align-self:flex-start" }, "Cadastro completo"),
       el("div", { class: "note" }, [p.area ? "Área: " + p.area : null, p.data_distribuicao ? "Distribuído em " + fmt(p.data_distribuicao) : null, p.rito ? "Rito: " + p.rito : null, p.relevante ? "⭐ relevante" : null, p.sigiloso ? "🔒 sigiloso" : null].filter(Boolean).join(" · ") || "Sem dados de cabeçalho."),
       el("h4", { style: "margin:4px 0 0" }, `Processos relacionados (${rel.length})`),
       rel.length ? el("ul", { class: "tl" }, rel.map((r) => el("li", {}, el("div", { class: "d" }, (r.sentido === "derivado" ? "↳ " : "↰ ") + (TIPOS_REL[r.tipo] || r.tipo) + (r.sentido === "originario" ? " (este é derivado dele)" : "")),
-        el("div", {}, el("a", { href: "#processos/" + r.relacionado_id, onclick: (ev) => { ev.preventDefault(); window.PP_PROCESSOS?.abrir(r.relacionado_id); } }, r.numero_cnj || r.tipo_acao || "(sem número)"), el("span", { class: "note" }, " · " + [r.tipo_acao, r.fase, pastaTxt(r.pasta_numero)].filter(Boolean).join(" · "))),
+        el("div", {}, el("a", { href: "#processos/" + r.relacionado_id, onclick: (ev) => { ev.preventDefault(); window.PP_PROCESSOS?.abrir(r.relacionado_id); } }, r.numero_cnj || r.tipo_acao || "(sem número)"), el("span", { class: "note" }, " · " + [r.tipo_acao, r.fase, pastaTxt(r)].filter(Boolean).join(" · "))),
         r.observacao ? el("div", { class: "note" }, r.observacao) : null,
         el("div", { class: "actions edit-only", style: "justify-content:flex-start;margin-top:2px" }, el("button", { class: "btn sm", onclick: async () => { if (!confirm("Desfazer este relacionamento? (a pasta não muda)")) return; await SB.from("processo_relacoes").delete().eq("id", r.id); delete PA.rel[p.id]; recarregar?.(); carregarRel(p.id); } }, "Desfazer"))))) : el("div", { class: "note" }, "Nenhum. Use “Relacionar processo…” para vincular cumprimento de sentença, recurso, embargos etc."));
+    if (window.PP_PUB_TRAT?.secaoProcesso) { const wrap = el("div", { style: "display:contents" }, box); window.PP_PUB_TRAT.secaoProcesso(p, wrap); return wrap; }
     return box;
   }
   function modalRelacionar(p, recarregar) {
@@ -67,7 +70,7 @@
     let escolhido = null; const escolhidoTxt = el("div", { class: "note" }, "Escolha o processo a relacionar.");
     const todos = window.PP_PROCESSOS?.lista?.() || [];
     const desenhar = () => { const q = busca.value.trim().toLowerCase(); const cand = todos.filter((x) => x.id !== p.id && (!q || [x.numero_cnj, x.tipo_acao, x.cliente_nome, x.parte_contraria].join(" ").toLowerCase().includes(q))).slice(0, 30);
-      lista.replaceChildren(...cand.map((x) => el("button", { class: "btn sm" + (escolhido === x.id ? " primary" : ""), style: "text-align:left", onclick: () => { escolhido = x.id; escolhidoTxt.textContent = "Relacionar com: " + (x.numero_cnj || x.tipo_acao) + " · " + (x.cliente_nome || "fora da base") + " · " + pastaTxt(x.pasta_numero); desenhar(); } }, (x.numero_cnj || "(sem número)") + " — " + [x.tipo_acao, x.cliente_nome].filter(Boolean).join(" · ")))); };
+      lista.replaceChildren(...cand.map((x) => el("button", { class: "btn sm" + (escolhido === x.id ? " primary" : ""), style: "text-align:left", onclick: () => { escolhido = x.id; escolhidoTxt.textContent = "Relacionar com: " + (x.numero_cnj || x.tipo_acao) + " · " + (x.cliente_nome || "fora da base") + " · " + pastaTxt(x); desenhar(); } }, (x.numero_cnj || "(sem número)") + " — " + [x.tipo_acao, x.cliente_nome].filter(Boolean).join(" · ")))); };
     busca.oninput = desenhar; desenhar();
     const tipo = sel(TIPOS_REL, "cumprimento_sentenca"), sentido = sel({ derivado: "O processo escolhido deriva deste (este é o originário)", originario: "Este processo deriva do escolhido (o escolhido é o originário)" }, "derivado");
     const mesma = el("input", { type: "checkbox", checked: "" }), obs = inp("text", "");
@@ -94,7 +97,7 @@
     const lista = PA.pastas.filter((p) => (!f.status || p.status === f.status) && (!ql || [String(p.numero).padStart(5, "0"), p.titulo, p.cliente_nome, p.processos_txt].join(" ").toLowerCase().includes(ql)));
     const card = el("div", { class: "card" }, el("div", { class: "tbl-tools" }, q, st, el("div", { class: "sp" }), el("span", { class: "note" }, `${lista.length} de ${PA.pastas.length}`)));
     card.append(tabela({ cols: [
-      { label: "Pasta", r: (p) => el("b", {}, pastaTxt(p.numero)) },
+      { label: "Pasta", r: (p) => el("b", {}, pastaTxt(p)) },
       { label: "Título / cliente", r: (p) => el("div", {}, p.titulo || "—", p.cliente_nome ? el("div", { class: "note" }, p.cliente_nome) : null) },
       { label: "Processos", r: (p) => el("div", {}, String(p.qtd_processos) + (p.qtd_ativos !== p.qtd_processos ? ` (${p.qtd_ativos} ativos)` : ""), el("div", { class: "note" }, (p.processos_txt || "").slice(0, 90))) },
       { label: "Abertura", r: (p) => fmt(p.aberta_em) },
@@ -117,7 +120,10 @@
     const areas = el("div", { class: "card section" }, el("h2", {}, "Áreas"), el("div", { class: "note" }, "Lista de áreas do processo (ex.: Bancário PJ, Trabalhista, Tributário). Desative em vez de excluir."),
       el("div", { style: "display:flex;flex-direction:column;gap:4px;margin-top:8px" }, ...PA.areas.map((a) => el("div", { style: "display:flex;gap:8px;align-items:center" }, el("label", { class: "switch", style: "flex:1" }, el("input", { type: "checkbox", checked: a.ativa ? "" : null, onchange: async (ev) => { await SB.from("areas_processo").update({ ativa: ev.target.checked }).eq("id", a.id); a.ativa = ev.target.checked; } }), " " + a.nome)))),
       el("div", { class: "actions", style: "justify-content:flex-start;margin-top:8px" }, novaArea, el("button", { class: "btn sm", onclick: async () => { const n = novaArea.value.trim(); if (!n) return; const { error } = await SB.from("areas_processo").insert({ nome: n, ordem: PA.areas.length + 1 }); if (error) { toast(error.message); return; } await carregarCfg(); render(); } }, "+ Adicionar")));
-    v.append(campos, areas);
+    const prazo = inp("number", "", { min: 0, max: 10, style: "width:80px" }), prazoBox = el("div", { class: "card section" }, el("h2", {}, "Publicações — prazo para tratar"), el("div", { class: "note" }, "Dias úteis, contados da disponibilização no DJEN, para a publicação receber uma providência. Define a tempestividade no relatório."),
+      el("div", { class: "actions", style: "justify-content:flex-start;margin-top:8px" }, prazo, el("span", { class: "note" }, "dia(s) útil(eis)"), el("button", { class: "btn sm", onclick: async () => { const { error } = await SB.from("controladoria_config").upsert({ chave: "publicacao_prazo_dias_uteis", valor: String(Math.max(0, +prazo.value || 0)) }); toast(error ? error.message : "Salvo — vale para as próximas publicações"); } }, "Salvar")));
+    SB.from("controladoria_config").select("valor").eq("chave", "publicacao_prazo_dias_uteis").maybeSingle().then(({ data }) => { prazo.value = data?.valor ?? "1"; });
+    v.append(campos, areas, prazoBox);
   }
 
   // ---------- integração com processos.js (abas + colunas) ----------
