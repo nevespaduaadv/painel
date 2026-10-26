@@ -11,7 +11,7 @@
   "use strict";
   const H = { aba: "semana", ok: false, ativ: [], tabelas: [], colab: [], procs: [], cron: null, cronT: null,
     sem: { data: null, colab: null, lista: [], ok: false },
-    rel: { ini: null, fim: null, colab: "", cli: "", ativ: "", cobr: "", status: "", lista: [], tarefas: [], ok: false },
+    rel: { ini: null, fim: null, colabs: [], clis: [], ativ: "", cobr: "", status: "", lista: [], tarefas: [], ok: false },
     apr: { lista: [], sel: new Set(), ok: false, colab: "" } };
   const admin = () => PP.perfil?.papel === "admin";
   const meu = () => H.colab.find((c) => c.perfil_id === PP.perfil?.id);
@@ -44,7 +44,7 @@
   }
   async function carregarRel() {
     const r = H.rel; let q = SB.from("v_apontamentos").select("*").gte("data", r.ini).lte("data", r.fim).order("data");
-    if (r.colab) q = q.eq("colaborador_id", r.colab); if (r.cli) q = q.eq("cliente_id", r.cli); if (r.ativ) q = q.eq("tipo_atividade", r.ativ); if (r.cobr) q = q.eq("cobravel", r.cobr === "sim"); if (r.status) q = q.eq("status", r.status);
+    if (r.colabs.length) q = q.in("colaborador_id", r.colabs); if (r.clis.length) q = q.in("cliente_id", r.clis); if (r.ativ) q = q.eq("tipo_atividade", r.ativ); if (r.cobr) q = q.eq("cobravel", r.cobr === "sim"); if (r.status) q = q.eq("status", r.status);
     const { data } = await q.limit(5000); r.lista = data || []; r.ok = true; render();
   }
   async function carregarApr() { let q = SB.from("v_apontamentos").select("*").neq("status", "aprovado").order("colaborador_nome").order("data"); if (H.apr.colab) q = q.eq("colaborador_id", H.apr.colab); const { data } = await q.limit(2000); H.apr.lista = data || []; H.apr.ok = true; render(); }
@@ -134,12 +134,31 @@
     v.append(sec);
   }
 
+  // seletor múltiplo (todos / alguns / um) — botão que abre lista de caixas
+  function multiSel(rotuloTodos, itens, selecionados, onChange) {
+    const set = new Set(selecionados); const nomes = () => itens.filter((i) => set.has(i.id)).map((i) => i.nome);
+    const btn = el("button", { class: "btn sm", style: "max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" });
+    const rot = () => { const n = nomes(); btn.textContent = (n.length === 0 ? rotuloTodos : n.length === 1 ? n[0] : n.length <= 2 ? n.join(", ") : `${n.length} selecionados`) + " ▾"; }; rot();
+    const wrap = el("div", { style: "position:relative;display:inline-block" }, btn); let pop = null;
+    const fechar = () => { pop?.remove(); pop = null; document.removeEventListener("mousedown", fora); };
+    const fora = (ev) => { if (!wrap.contains(ev.target)) { fechar(); onChange([...set]); } };
+    btn.onclick = () => { if (pop) { fechar(); onChange([...set]); return; }
+      const q = inp("search", "", { placeholder: "Buscar…", style: "width:100%;margin-bottom:6px" }); const lista = el("div", { style: "max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px" });
+      const desenhar = () => { const ql = q.value.toLowerCase(); lista.replaceChildren(...itens.filter((i) => !ql || i.nome.toLowerCase().includes(ql)).map((i) => { const c = el("input", { type: "checkbox", style: "width:15px;height:15px;margin:0;accent-color:var(--gold)" }); c.checked = set.has(i.id); c.onchange = () => { if (c.checked) set.add(i.id); else set.delete(i.id); rot(); }; return el("label", { style: "display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;padding:3px 4px" }, c, i.nome); })); }; q.oninput = desenhar; desenhar();
+      pop = el("div", { class: "card", style: "position:absolute;z-index:50;top:calc(100% + 4px);left:0;min-width:280px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,.18)" }, q,
+        el("div", { style: "display:flex;gap:6px;margin-bottom:6px" }, el("button", { class: "btn sm", onclick: () => { set.clear(); rot(); desenhar(); } }, "Todos"), el("button", { class: "btn sm", onclick: () => { itens.forEach((i) => set.add(i.id)); rot(); desenhar(); } }, "Marcar todos"), el("button", { class: "btn sm primary", style: "margin-left:auto", onclick: () => { fechar(); onChange([...set]); } }, "Aplicar")),
+        lista, el("div", { class: "note", style: "margin-top:6px" }, "Nenhum marcado = todos."));
+      wrap.append(pop); setTimeout(() => document.addEventListener("mousedown", fora), 0); q.focus(); };
+    return wrap;
+  }
+
   // ---------- Relatórios ----------
   function renderRel(v) {
     const r = H.rel; if (!r.ok) carregarRel();
     const ini = inp("date", r.ini), fim = inp("date", r.fim); const aplicar = () => { r.ini = ini.value; r.fim = fim.value; r.ok = false; render(); };
     const mes = (n) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); r.ini = iso(d); d.setMonth(d.getMonth() + 1); d.setDate(0); r.fim = iso(d); r.ok = false; render(); };
-    const fc = Object.assign(selColab(r.colab, "Todos os colaboradores"), { onchange: (e) => { r.colab = e.target.value; r.ok = false; render(); } }), fcl = Object.assign(selCliente(r.cli, "Todos os clientes"), { onchange: (e) => { r.cli = e.target.value; r.ok = false; render(); } });
+    const fc = multiSel("Todos os colaboradores", H.colab.filter((c) => c.ativo !== false || r.colabs.includes(c.id)).map((c) => ({ id: c.id, nome: c.nome })), r.colabs, (ids) => { if (ids.join() === r.colabs.join()) return; r.colabs = ids; r.ok = false; render(); });
+    const fcl = multiSel("Todos os clientes", [...S.clientes].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => ({ id: c.id, nome: c.nome || c.id })), r.clis, (ids) => { if (ids.join() === r.clis.join()) return; r.clis = ids; r.ok = false; render(); });
     const fa = Object.assign(sel({ "": "Todas as atividades", ...Object.fromEntries(H.ativ.map((a) => [a.codigo, a.nome])) }, r.ativ), { onchange: (e) => { r.ativ = e.target.value; r.ok = false; render(); } });
     const fb = Object.assign(sel({ "": "Cobráveis e não", sim: "Só cobráveis", nao: "Só não cobráveis" }, r.cobr), { onchange: (e) => { r.cobr = e.target.value; r.ok = false; render(); } }), fs = Object.assign(sel({ "": "Qualquer status", aprovado: "Só aprovados", pendente: "Só pendentes", correcao: "Em correção" }, r.status), { onchange: (e) => { r.status = e.target.value; r.ok = false; render(); } });
     v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Período e filtros"), el("div", { class: "actions" }, el("button", { class: "btn sm", onclick: () => mes(0) }, "Mês atual"), el("button", { class: "btn sm", onclick: () => mes(-1) }, "Mês anterior"))),
@@ -163,7 +182,7 @@
     v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Por tarefa"), el("span", { class: "note" }, "tempo gasto em cada tarefa no período")), el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Tarefa"), el("th", {}, "Cliente"), el("th", {}, "Quem"), el("th", { class: "r" }, "Lançamentos"), el("th", { class: "r" }, "Horas"))),
       el("tbody", {}, ...(rowsT.length ? rowsT.map(([id, g]) => el("tr", {}, el("td", {}, el("a", { href: "#tarefas/" + id, onclick: (ev) => { ev.preventDefault(); window.PP_TAREFAS?.abrir(id); } }, g.t || "(sem título)")), el("td", {}, g.c || "—"), el("td", { class: "note" }, [...g.quem].join(", ")), el("td", { class: "r num" }, String(g.n)), el("td", { class: "r num" }, hFmt(g.h)))) : [el("tr", {}, el("td", { colspan: 5, class: "note" }, "Nenhum lançamento vinculado a tarefa"))]))))));
     // detalhado + exportar
-    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Lançamentos"), el("div", { class: "actions" }, el("button", { class: "btn sm", onclick: () => exportarCSV(L) }, "Exportar CSV"), el("button", { class: "btn sm primary", onclick: () => relatorioCliente() }, "Relatório para o cliente…"))),
+    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Lançamentos"), el("div", { class: "actions" }, el("button", { class: "btn sm", onclick: () => exportarCSV(L) }, "Exportar CSV"), r.colabs.length ? el("button", { class: "btn sm primary", onclick: () => relatorioColaborador(L) }, r.colabs.length === 1 ? "Relatório do colaborador…" : "Relatório dos colaboradores…") : null, r.clis.length ? el("button", { class: "btn sm primary", onclick: () => relatorioCliente() }, r.clis.length === 1 ? "Relatório para o cliente…" : "Relatório para os clientes…") : null, !r.colabs.length && !r.clis.length ? el("span", { class: "note" }, "Filtre por colaborador ou cliente para gerar o relatório imprimível") : null)),
       el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Data"), el("th", {}, "Colaborador"), el("th", {}, "Cliente"), el("th", {}, "Atividade"), el("th", {}, "Descrição"), el("th", { class: "r" }, "Horas"), el("th", {}, "Cobrável"), el("th", {}, "Status"), el("th", {}, ""))),
         el("tbody", {}, ...L.slice(0, 500).map((a) => el("tr", {}, el("td", {}, fmt(a.data), a.inicio ? el("div", { class: "note" }, a.inicio.slice(0, 5) + (a.fim ? "–" + a.fim.slice(0, 5) : "")) : null), el("td", {}, a.colaborador_nome), el("td", {}, a.cliente_nome || "—", a.numero_cnj ? el("div", { class: "note" }, a.numero_cnj) : null), el("td", {}, a.atividade_nome, a.tarefa_titulo ? el("div", { class: "note" }, a.tarefa_titulo) : null), el("td", { class: "note" }, a.descricao || ""), el("td", { class: "r num" }, hFmt(a.horas)), el("td", {}, a.cobravel ? "sim" : "não"), el("td", {}, el("span", { class: "pill " + STATUS[a.status][1], title: a.obs_gestor || "" }, STATUS[a.status][0])), el("td", {}, admin() || a.colaborador_id === meu()?.id ? el("button", { class: "btn sm", onclick: () => lancar({ ap: a }) }, "Editar") : null))))))));
   }
@@ -174,7 +193,7 @@
   }
   // relatório imprimível para o cliente (só cobráveis, agrupado por dia)
   function relatorioCliente() {
-    const r = H.rel; const cli = selCliente(r.cli, "— escolha o cliente —"), ini = inp("date", r.ini), fim = inp("date", r.fim), mostrarValor = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }), mostrarQuem = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); mostrarQuem.checked = true;
+    const r = H.rel; const cli = selCliente(r.clis[0] || "", "— escolha o cliente —"), ini = inp("date", r.ini), fim = inp("date", r.fim), mostrarValor = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }), mostrarQuem = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); mostrarQuem.checked = true;
     const body = el("div", { class: "form" }, field("rc-cli", "Cliente", cli), field("rc-ini", "De", ini), field("rc-fim", "Até", fim), el("div", { class: "f full note" }, "Entram só os lançamentos cobráveis. Abre em uma nova aba pronta para imprimir / salvar em PDF."),
       el("div", { class: "f" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, mostrarQuem, "Mostrar quem executou")), el("div", { class: "f" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, mostrarValor, "Mostrar valor por hora e total")));
     modal("Relatório de horas para o cliente", body, async () => {
@@ -198,6 +217,28 @@
       const w = window.open("", "_blank"); if (!w) throw new Error("O navegador bloqueou a janela — permita pop-ups para este site"); w.document.write(html); w.document.close();
     });
     const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Gerar";
+  }
+
+  // relatório imprimível do(s) colaborador(es): resumo, por cliente, por atividade, lançamentos
+  function relatorioColaborador(L) {
+    const r = H.rel; const porColab = new Map(); for (const a of L) { const g = porColab.get(a.colaborador_id) || { nome: a.colaborador_nome, lista: [] }; g.lista.push(a); porColab.set(a.colaborador_id, g); }
+    for (const id of r.colabs) if (!porColab.has(id)) porColab.set(id, { nome: H.colab.find((c) => c.id === id)?.nome || "—", lista: [] });
+    const e = (s) => String(s ?? "").replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+    const agr = (lista, chave) => { const m = new Map(); for (const a of lista) { const k = a[chave] || "—"; const g = m.get(k) || { h: 0, c: 0, n: 0 }; g.h += +a.horas; if (a.cobravel) g.c += +a.horas; g.n++; m.set(k, g); } return [...m.entries()].sort((x, y) => y[1].h - x[1].h); };
+    const tabela = (titulo, rows, tot) => `<h3>${titulo}</h3><table><thead><tr><th>${titulo.replace("Por ", "")}</th><th class=r>Lanç.</th><th class=r>Horas</th><th class=r>Cobráveis</th><th class=r>%</th></tr></thead><tbody>${rows.map(([k, g]) => `<tr><td>${e(k)}</td><td class=r>${g.n}</td><td class=r>${hFmt(g.h)}</td><td class=r>${hFmt(g.c)}</td><td class=r>${tot ? Math.round(100 * g.h / tot) : 0}%</td></tr>`).join("") || "<tr><td colspan=5 class=n>Sem lançamentos</td></tr>"}</tbody></table>`;
+    const blocos = [...porColab.values()].sort((a, b) => a.nome.localeCompare(b.nome)).map((g) => { const tot = g.lista.reduce((x, a) => x + +a.horas, 0), cob = g.lista.filter((a) => a.cobravel).reduce((x, a) => x + +a.horas, 0), dias = new Set(g.lista.map((a) => a.data)).size, pend = g.lista.filter((a) => a.status !== "aprovado").length;
+      return `<section class=colab><h1>${e(g.nome)}</h1><div class=kpis><div><b>${hFmt(tot)}</b><span>horas no período</span></div><div><b>${hFmt(cob)}</b><span>cobráveis (${tot ? Math.round(100 * cob / tot) : 0}%)</span></div><div><b>${hFmt(tot - cob)}</b><span>não cobráveis</span></div><div><b>${dias}</b><span>dias com lançamento</span></div><div><b>${dias ? hFmt(tot / dias) : "—"}</b><span>média por dia</span></div><div><b>${g.lista.length}</b><span>lançamentos${pend ? ` · ${pend} pendente(s)` : ""}</span></div></div>
+        <div class=duas>${tabela("Por cliente", agr(g.lista, "cliente_nome"), tot)}${tabela("Por atividade", agr(g.lista, "atividade_nome"), tot)}</div>
+        <h3>Lançamentos</h3><table><thead><tr><th>Data</th><th>Cliente</th><th>Atividade</th><th>Descrição</th><th class=r>Horas</th><th>Cobr.</th><th>Status</th></tr></thead><tbody>${g.lista.map((a) => `<tr><td>${fmt(a.data)}${a.inicio ? `<div class=n>${a.inicio.slice(0, 5)}${a.fim ? "–" + a.fim.slice(0, 5) : ""}</div>` : ""}</td><td>${e(a.cliente_nome || "—")}${a.numero_cnj ? `<div class=n>${e(a.numero_cnj)}</div>` : ""}</td><td>${e(a.atividade_nome)}${a.tarefa_titulo ? `<div class=n>${e(a.tarefa_titulo)}</div>` : ""}</td><td>${e(a.descricao || "")}</td><td class=r>${hFmt(a.horas)}</td><td>${a.cobravel ? "sim" : "não"}</td><td>${STATUS[a.status][0]}</td></tr>`).join("") || "<tr><td colspan=7 class=n>Sem lançamentos</td></tr>"}</tbody></table></section>`; }).join("");
+    const html = `<!doctype html><html lang=pt-BR><head><meta charset=utf-8><title>Relatório de horas por colaborador</title><style>
+      body{font-family:Georgia,serif;color:#0C1F38;margin:32px 40px;font-size:13px}h1{font-size:20px;margin:0 0 10px}h3{font-family:Arial,sans-serif;font-size:13px;margin:16px 0 6px;color:#0C1F38}
+      .cab{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #B8964A;padding-bottom:12px;margin-bottom:18px}.marca{font-size:16px;font-weight:700;letter-spacing:.04em}.marca small{display:block;font-family:Arial,sans-serif;font-weight:400;font-size:11px;color:#555;letter-spacing:0}
+      .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;font-family:Arial,sans-serif}.kpis div{border:1px solid #e4e4e4;border-radius:8px;padding:8px 10px}.kpis b{display:block;font-size:17px}.kpis span{font-size:11px;color:#666}
+      .duas{display:grid;grid-template-columns:1fr 1fr;gap:16px}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11.5px}th{text-align:left;background:#0C1F38;color:#fff;padding:6px 8px;font-weight:600}td{padding:5px 8px;border-bottom:1px solid #e4e4e4;vertical-align:top}.r{text-align:right;white-space:nowrap}.n{color:#666;font-size:10.5px}
+      section.colab{page-break-after:always}section.colab:last-child{page-break-after:auto}.rod{margin-top:24px;font-family:Arial,sans-serif;font-size:11px;color:#666}@media print{body{margin:14mm 12mm}}</style></head><body>
+      <div class=cab><div class=marca>NEVES PÁDUA ADVOCACIA<small>Relatório de horas por colaborador · uso interno</small></div><div style="text-align:right;font-family:Arial,sans-serif;font-size:12px">Período: ${fmt(r.ini)} a ${fmt(r.fim)}<br>Emitido em ${new Date().toLocaleDateString("pt-BR")}${r.clis.length ? "<br>Filtro de clientes aplicado" : ""}${r.ativ || r.cobr || r.status ? "<br>Outros filtros aplicados" : ""}</div></div>
+      ${blocos}<div class=rod>Gerado pelo sistema interno. Horas pendentes de aprovação estão incluídas e marcadas na coluna Status.</div><script>setTimeout(()=>window.print(),400)</script></body></html>`;
+    const w = window.open("", "_blank"); if (!w) { toast("O navegador bloqueou a janela — permita pop-ups para este site"); return; } w.document.write(html); w.document.close();
   }
 
   // ---------- Aprovação (admin) ----------
