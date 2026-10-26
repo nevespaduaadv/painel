@@ -23,22 +23,62 @@
     return el("div", {}, el("span", { class: "pill " + (d != null && d < 0 ? "e3" : d === 0 ? "e2" : "c") }, "pendente"), el("div", { class: "note" }, d == null ? "" : d < 0 ? `vencido há ${-d} d` : d === 0 ? "tratar hoje" : `até ${fmtDt(p.prazo_tratamento)}`));
   }
 
-  // ---------- tratar ----------
+  // ---------- tratar: ler + vincular + providência (+ tarefa) em um só lugar ----------
   function modalTratar(p) {
-    const prov = sel({ gerou_prazo: "Gerou prazo (crie a tarefa para quem vai cumprir)", nada_a_fazer: "Nada a fazer", ciencia: "Só ciência (sem providência)", encaminhada: "Encaminhar para alguém decidir", duplicidade: "Duplicidade (já tratada em outra publicação)" }, p.providencia || "nada_a_fazer");
-    const para = sel({ "": "— escolha —", ...Object.fromEntries((T.colab.length ? T.colab : (window.PP_PUBLICACOES?.colab?.() || [])).filter((c) => c.ativo !== false).map((c) => [c.id, c.nome])) }, p.encaminhada_para || "");
-    const obs = el("textarea", { rows: 3 }, p.observacao_tratamento || "");
-    const fPara = field("tr-para", "Encaminhar para", para); fPara.hidden = prov.value !== "encaminhada"; prov.onchange = () => { fPara.hidden = prov.value !== "encaminhada"; };
-    const body = el("div", { class: "form" }, el("div", { class: "f full note" }, `Publicação de ${fmtDt(p.data_disponibilizacao)} · ${p.numero_processo || "sem número"}${p.cliente_nome ? " · " + p.cliente_nome : ""} · prazo para tratar: ${fmtDt(p.prazo_tratamento)}`),
-      field("tr-prov", "Providência", prov), fPara, field("tr-obs", "Observação (o que foi feito / por quê)", obs));
+    const PUB = window.PP_PUBLICACOES || {}; const colab = (T.colab.length ? T.colab : (PUB.colab?.() || [])).filter((c) => c.ativo !== false); const procs = PUB.procs?.() || [];
+    const TT = PUB.TIPOS_TAREFA_PUB || { prazo: "Cumprir prazo", manifestar: "Manifestar nos autos", recurso: "Analisar cabimento de recurso", audiencia: "Preparar audiência", cliente: "Comunicar o cliente", diligencia: "Diligência / providência" };
+    const fmtD2 = (iso) => fmtDt(iso);
+    // 1) leitura
+    const texto = el("div", { style: "white-space:pre-wrap;max-height:32vh;overflow:auto;font-size:13.5px;line-height:1.45;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2,transparent)" }, p.texto || "(sem texto)");
+    const cab = el("div", { class: "f full" }, el("div", { class: "note" }, [p.tribunal, p.orgao, p.tipo_comunicacao, p.tipo_documento, p.classe].filter(Boolean).join(" · ")),
+      el("div", { style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:2px" }, el("span", { class: "num", style: "font-weight:700" }, p.numero_processo || "sem número"), p.cliente_nome ? el("span", {}, "Cliente: ", el("b", {}, p.cliente_nome)) : null, el("span", { class: "note" }, "disponibilizada em " + fmtD2(p.data_disponibilizacao) + " · tratar até " + fmtD2(p.prazo_tratamento)), p.link ? el("a", { href: p.link, target: "_blank", rel: "noopener", style: "color:var(--info);font-weight:600" }, "↗ abrir no tribunal") : null),
+      (p.destinatarios || []).length ? el("div", { class: "note" }, "Partes: " + p.destinatarios.map((d) => d.nome + (d.polo ? ` (${d.polo})` : "")).join("; ")) : null, texto);
+    // 2) vínculo com processo (só quando falta)
+    let fVinc = null, selProc = null, selCli = null;
+    if (!p.processo_id) {
+      const opts = { "": "— escolha o processo —" }; for (const x of procs) opts[x.id] = `${x.numero_cnj || "s/ nº"} · ${(S.clientes || []).find((c) => c.id === x.cliente_id)?.nome || "?"}${x.tipo_acao ? " · " + x.tipo_acao : ""}`;
+      selProc = sel(opts, ""); selCli = sel({ "": "— ou crie o processo no cliente —", ...Object.fromEntries([...(S.clientes || [])].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => [c.id, c.nome])) }, "");
+      fVinc = el("div", { class: "f full", style: "border-top:1px solid var(--line);padding-top:10px" }, el("div", { class: "eyebrow" }, "Processo"), el("div", { class: "note" }, "Esta publicação ainda não está ligada a um processo da base. Vincule aqui (ou deixe em branco se for de terceiro — use “duplicidade / não é nosso”)."),
+        el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px" }, selProc, selCli));
+    }
+    // 3) providência
+    const prov = sel({ gerou_prazo: "Gerou prazo → criar tarefa", nada_a_fazer: "Nada a fazer", ciencia: "Só ciência", encaminhada: "Encaminhar para alguém decidir", duplicidade: "Duplicidade / não é nosso (ignorar)" }, p.providencia || "gerou_prazo");
+    const colOpts = { "": "— escolha —", ...Object.fromEntries(colab.map((c) => [c.id, c.nome])) };
+    const para = sel(colOpts, p.encaminhada_para || ""), obs = el("textarea", { rows: 2, placeholder: "Opcional — o que foi feito / por quê" }, p.observacao_tratamento || "");
+    // campos da tarefa (gerou prazo)
+    const meu = colab.find((c) => c.perfil_id === PP.perfil?.id);
+    const tipo = sel(TT, "prazo"), titulo = inp("text", "", { placeholder: "Ex.: Contestar — prazo de 15 dias" }), resp = sel(colOpts, ""), prazo = inp("date", ""), fatal = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }), pri = sel({ "1": "Alta", "2": "Normal", "3": "Baixa" }, "1");
+    const desc = el("textarea", { rows: 3 }, `Publicação de ${fmtD2(p.data_disponibilizacao)} · ${[p.tribunal, p.orgao, p.tipo_documento || p.tipo_comunicacao].filter(Boolean).join(" · ")}\nProcesso ${p.numero_processo || "s/ nº"}${p.cliente_nome ? " · " + p.cliente_nome : ""}\n\n${(p.resumo || "").slice(0, 400)}`);
+    const sug = () => { if (!titulo.value.trim() || titulo.dataset.auto === "1") { titulo.value = `${TT[tipo.value]} — ${p.numero_processo || "publicação"}`; titulo.dataset.auto = "1"; } }; titulo.oninput = () => { titulo.dataset.auto = "0"; }; tipo.onchange = sug; sug();
+    const boxTarefa = el("div", { class: "f full", style: "display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px" },
+      field("tr-tipo", "Tipo", tipo), field("tr-resp", "Para quem", resp), field("tr-tit", "Título da tarefa", titulo), field("tr-prazo", "Prazo (vencimento)", prazo),
+      window.PP_PRAZOS ? window.PP_PRAZOS.campo({ alvo: prazo, base: p.data_disponibilizacao, uf: window.PP_PRAZOS.ufDoCnj(p.numero_processo), dias: 15, tipo: "uteis" }) : null,
+      el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, fatal, "Prazo fatal")), field("tr-pri", "Prioridade", pri),
+      el("div", { style: "grid-column:1/-1" }, field("tr-desc", "Instruções / comentário", desc, `Quem recebe vê isto na tarefa e é avisado no sino${meu ? " como vindo de " + meu.nome : ""}.`)));
+    const fPara = field("tr-para", "Encaminhar para", para);
+    const ajustar = () => { boxTarefa.hidden = prov.value !== "gerou_prazo"; fPara.hidden = prov.value !== "encaminhada"; }; prov.onchange = ajustar; ajustar();
+    const body = el("div", { class: "form" }, cab, fVinc, el("div", { class: "f full", style: "border-top:1px solid var(--line);padding-top:10px" }, el("div", { class: "eyebrow" }, "Providência")), field("tr-prov", "O que fazer com esta publicação", prov), fPara, boxTarefa, field("tr-obs", "Observação", obs));
     modal("Tratar publicação", body, async () => {
-      if (prov.value === "encaminhada" && !para.value) throw new Error("Escolha para quem encaminhar");
-      if (prov.value === "gerou_prazo") { $("#modalHost").replaceChildren(); window.PP_PUBLICACOES?.atribuir?.(p); return; }
-      const { error } = await SB.rpc("publicacao_tratar", { p_id: p.id, p_providencia: prov.value, p_obs: obs.value.trim() || null, p_encaminhar: prov.value === "encaminhada" ? para.value : null });
-      if (error) throw new Error(error.message);
-      toast("Publicação tratada"); recarregar();
+      // vínculo
+      let processo_id = p.processo_id, cliente_id = p.cliente_id;
+      if (!processo_id && selProc?.value) { const { error } = await SB.from("publicacoes").update({ processo_id: selProc.value }).eq("id", p.id); if (error) throw new Error(error.message); processo_id = selProc.value; cliente_id = procs.find((x) => x.id === processo_id)?.cliente_id || null; }
+      else if (!processo_id && selCli?.value) { const { data, error } = await SB.from("processos").insert({ cliente_id: selCli.value, numero_cnj: p.numero_processo || null, tribunal: p.tribunal || null, vara: p.orgao || null, tipo_acao: p.classe || null, polo: "passivo", status: "ativo", visivel_cliente: false, fonte: "djen" }).select("id").single(); if (error) throw new Error(error.code === "23505" ? "Já existe processo com esse número — escolha-o na lista" : "Não foi possível criar o processo"); processo_id = data.id; cliente_id = selCli.value; await SB.from("publicacoes").update({ processo_id }).eq("id", p.id); }
+      if (prov.value === "gerou_prazo") {
+        if (!resp.value) throw new Error("Escolha para quem vai a tarefa"); if (!prazo.value) throw new Error("Informe o prazo da tarefa");
+        const row = { titulo: titulo.value.trim() || TT[tipo.value], descricao: desc.value.trim() || null, cliente_id: cliente_id || null, processo_id: processo_id || null, responsavel_id: resp.value, nucleo: "juridico", prazo: prazo.value, prazo_fatal: fatal.checked, prioridade: +pri.value, status: "aberta", publicacao_id: p.id };
+        const { error } = await SB.from("tarefas").insert(row); if (error) throw new Error("Não foi possível criar a tarefa");
+        if (obs.value.trim()) await SB.from("publicacoes").update({ observacao_tratamento: obs.value.trim() }).eq("id", p.id);
+        toast("Tarefa criada e publicação tratada");
+      } else {
+        if (prov.value === "encaminhada" && !para.value) throw new Error("Escolha para quem encaminhar");
+        const { error } = await SB.rpc("publicacao_tratar", { p_id: p.id, p_providencia: prov.value, p_obs: obs.value.trim() || null, p_encaminhar: prov.value === "encaminhada" ? para.value : null }); if (error) throw new Error(error.message);
+        toast("Publicação tratada");
+      }
+      recarregar();
     });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Registrar";
+    const host = $("#modalHost"); const btn = host?.querySelector("button.btn.primary"); if (btn) btn.textContent = "Registrar";
+    const card = host?.querySelector(".modal > .card"); if (card) card.style.maxWidth = "900px";
+    if (!p.lida) SB.from("publicacoes").update({ lida: true }).eq("id", p.id).then(() => { p.lida = true; });
   }
   async function reabrir(p) { if (!confirm("Reabrir o tratamento desta publicação?")) return; const { error } = await SB.rpc("publicacao_reabrir", { p_id: p.id }); if (error) toast(error.message); else { toast("Reaberta"); recarregar(); } }
   async function modalHistorico(p) {
@@ -95,7 +135,9 @@
         const pub = porId.get(+tr.dataset.pubId) || porId.get(tr.dataset.pubId); if (!pub) return;
         if (T.soPendentes && pub.providencia) { tr.remove(); return; }
         const tdTarefa = tr.children[5]; if (tdTarefa && !tdTarefa.querySelector(".pt-prov")) tdTarefa.prepend(el("div", { class: "pt-prov", style: "margin-bottom:4px" }, pillStatus(pub)));
-        const acts = tr.querySelector("td:last-child > div"); if (acts && !acts.querySelector(".pt-btn")) { acts.prepend(pub.providencia ? el("button", { class: "btn sm pt-btn", onclick: () => modalHistorico(pub) }, "Histórico") : el("button", { class: "btn sm primary pt-btn", onclick: () => modalTratar(pub) }, "Tratar")); if (pub.providencia) acts.append(el("button", { class: "btn sm pt-btn", onclick: () => reabrir(pub) }, "Reabrir")); }
+        const acts = tr.querySelector("td:last-child > div"); if (acts && !acts.querySelector(".pt-btn")) acts.replaceChildren(...(pub.providencia
+          ? [el("button", { class: "btn sm pt-btn", onclick: () => window.PP_PUBLICACOES?.abrir?.(pub) }, "Ler"), el("button", { class: "btn sm pt-btn", onclick: () => modalHistorico(pub) }, "Histórico"), el("button", { class: "btn sm pt-btn", onclick: () => reabrir(pub) }, "Reabrir")]
+          : [el("button", { class: "btn sm primary pt-btn", onclick: () => modalTratar(pub) }, "Tratar")]));
       });
       v.querySelectorAll("section.card.section").forEach((sec) => { if (!sec.querySelector("tbody tr")) sec.remove(); });
     }; }
