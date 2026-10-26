@@ -7,8 +7,9 @@
    rpc processo_relacionar; v_processos (pasta_numero, campos_faltando, qtd_relacionados). Só equipe. */
 (() => {
   "use strict";
-  const PA = { ok: false, areas: [], campos: [], pastas: [], pastasOk: false, rel: {}, relDe: null, aba: "processos", fPasta: { q: "", status: "ativa" } };
+  const PA = { ok: false, areas: [], campos: [], pastas: [], pastasOk: false, porCliente: {}, rel: {}, relDe: null, aba: "processos", fPasta: { q: "", status: "ativa" } };
   const admin = () => PP.perfil?.papel === "admin";
+  const TIPOS_PASTA = { judicial: "Judicial", extrajudicial: "Extrajudicial", consultivo: "Consultivo" };
   const TIPOS_REL = { cumprimento_sentenca: "Cumprimento de sentença", recurso: "Recurso", execucao: "Execução", embargos: "Embargos", incidente: "Incidente", cautelar: "Cautelar / tutela", conexo: "Processo conexo", outro: "Outro" };
   // código "AAAA-NNNN" (beta 0003); aceita o número da pasta ou a linha (com pasta_codigo/codigo)
   const COD = {};
@@ -34,6 +35,7 @@
     const pastaOpts = { "": p.id ? pastaTxt(p) + " (atual)" : "Nova pasta (número automático)" };
     for (const x of outros) pastaOpts[String(x.pasta_numero)] = pastaTxt(x) + " — mesma de " + (x.numero_cnj || x.tipo_acao || "processo");
     const pasta = sel(pastaOpts, "");
+    if (c?.id) pastasDoCliente(c.id).then((ps) => { for (const x of ps) if (x.status === "ativa" && !pastaOpts[String(x.numero)] && x.numero !== p.pasta_numero) pasta.append(el("option", { value: String(x.numero) }, pastaTxt(x) + " — " + (x.titulo || TIPOS_PASTA[x.tipo] || "pasta") + (+x.qtd_processos ? "" : " (sem processo)"))); });
     const wrap = el("div", { class: "form", style: "grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;margin-top:4px" },
       field("p-area", "Área", area), field("p-dist", "Data de distribuição", dist), field("p-rito", "Rito", rito), field("p-assunto", "Assunto", assunto),
       field("p-advc", "Advogado da parte contrária", advc), field("p-risco", "Grau de risco (interno)", risco),
@@ -84,6 +86,46 @@
       });
   }
 
+  // ---------- pastas do cliente (card no topo da sub-aba Processos do cliente) ----------
+  async function pastasDoCliente(cid, forcar) {
+    if (!forcar && PA.porCliente[cid]) return PA.porCliente[cid];
+    const { data } = await SB.from("v_pastas").select("*").eq("cliente_id", cid).order("numero", { ascending: false }); PA.porCliente[cid] = data || []; return PA.porCliente[cid];
+  }
+  function modalAbrirPasta(c) {
+    const titulo = inp("text", "", { placeholder: "Ex.: Itaú — negociação do capital de giro" }), tipo = sel({ extrajudicial: "Extrajudicial (negociação / gestão de passivos)", consultivo: "Consultivo" }, "extrajudicial"), descr = inp("text", "", { placeholder: "Opcional" });
+    const ks = (S.contratos || []).filter((k) => k.clienteId === c.id && !k.pasta_numero); const caixas = ks.map((k) => { const i = el("input", { type: "checkbox", style: "width:15px;height:15px;margin:0;accent-color:var(--gold)" }); return { k, i, lab: el("label", { style: "display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer" }, i, (typeof shortName === "function" ? shortName(k) : k.banco || k.id) + (k.saldoAtual != null ? " · " + BRL(k.saldoAtual) : "")) }; });
+    modal("Abrir pasta para " + c.nome, el("div", { class: "form" }, el("div", { class: "f full note" }, "Pasta sem processo judicial — recebe o próximo número do ano. Se depois surgir um processo, é só cadastrá-lo escolhendo esta pasta."), field("ap-t", "Título", titulo), field("ap-tp", "Tipo", tipo), el("div", { class: "f full" }, field("ap-d", "Descrição", descr)),
+      caixas.length ? el("div", { class: "f full" }, el("label", {}, "Contratos bancários desta pasta"), el("div", { style: "display:flex;flex-direction:column;gap:4px;margin-top:4px" }, ...caixas.map((x) => x.lab))) : null), async () => {
+      const { data, error } = await SB.rpc("pasta_abrir", { p_cliente: c.id, p_titulo: titulo.value.trim() || null, p_tipo: tipo.value, p_descricao: descr.value.trim() || null }); if (error) throw new Error(error.message);
+      const ids = caixas.filter((x) => x.i.checked).map((x) => x.k.id); if (ids.length) { const { error: e2 } = await SB.rpc("pasta_vincular_contratos", { p_pasta: data.numero, p_contratos: ids }); if (e2) throw new Error(e2.message); for (const k of ks) if (ids.includes(k.id)) k.pasta_numero = data.numero; }
+      toast("Pasta " + (data.codigo || data.numero) + " aberta"); PA.pastasOk = false; delete PA.porCliente[c.id]; render();
+    });
+    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Abrir pasta";
+  }
+  function modalContratosPasta(c, pa) {
+    const ks = (S.contratos || []).filter((k) => k.clienteId === c.id); if (!ks.length) { toast("Este cliente não tem contratos cadastrados"); return; }
+    const caixas = ks.map((k) => { const i = el("input", { type: "checkbox", style: "width:15px;height:15px;margin:0;accent-color:var(--gold)" }); i.checked = k.pasta_numero === pa.numero; const outra = k.pasta_numero && k.pasta_numero !== pa.numero; return { k, i, lab: el("label", { style: "display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer" }, i, (typeof shortName === "function" ? shortName(k) : k.banco || k.id), outra ? el("span", { class: "note" }, " (hoje na pasta " + pastaTxt(k.pasta_numero) + ")") : null) }; });
+    modal("Contratos da " + pastaTxt(pa), el("div", { class: "form" }, el("div", { class: "f full note" }, "Marque os contratos bancários que pertencem a esta pasta. Desmarcar tira o contrato da pasta."), el("div", { class: "f full", style: "display:flex;flex-direction:column;gap:4px" }, ...caixas.map((x) => x.lab))), async () => {
+      const entra = caixas.filter((x) => x.i.checked).map((x) => x.k.id), sai = caixas.filter((x) => !x.i.checked && x.k.pasta_numero === pa.numero).map((x) => x.k.id);
+      if (entra.length) { const { error } = await SB.rpc("pasta_vincular_contratos", { p_pasta: pa.numero, p_contratos: entra }); if (error) throw new Error(error.message); }
+      if (sai.length) { const { error } = await SB.rpc("pasta_vincular_contratos", { p_pasta: null, p_contratos: sai }); if (error) throw new Error(error.message); }
+      for (const x of caixas) x.k.pasta_numero = x.i.checked ? pa.numero : (sai.includes(x.k.id) ? null : x.k.pasta_numero);
+      toast("Contratos atualizados"); PA.pastasOk = false; delete PA.porCliente[c.id]; render();
+    });
+  }
+  function cardPastasCliente(c) {
+    const box = el("div", { class: "card", style: "padding:12px 14px;display:flex;flex-direction:column;gap:6px" });
+    const ps = PA.porCliente[c.id]; if (!ps) { pastasDoCliente(c.id).then(() => render()); box.append(el("div", { class: "section-h" }, el("h3", { style: "margin:0;font-size:15px" }, "Pastas"), el("span", { class: "note" }, "carregando…"))); return box; }
+    box.append(el("div", { class: "section-h" }, el("div", {}, el("div", { class: "eyebrow" }, "Arquivo"), el("h3", { style: "margin:0;font-size:15px" }, `Pastas do cliente (${ps.length})`)), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm", onclick: () => modalAbrirPasta(c) }, "+ Abrir pasta sem processo"))));
+    if (!ps.length) box.append(el("div", { class: "note" }, "Nenhuma pasta ainda. Processos cadastrados abrem a pasta sozinhos; para um caso só extrajudicial ou consultivo, abra a pasta aqui."));
+    else box.append(el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Pasta"), el("th", {}, "Título"), el("th", {}, "Tipo"), el("th", {}, "Conteúdo"), el("th", {}, "Status"), el("th", {}, ""))),
+      el("tbody", {}, ...ps.map((pa) => el("tr", {}, el("td", {}, el("b", {}, pastaTxt(pa))), el("td", {}, pa.titulo || "—", pa.descricao ? el("div", { class: "note" }, pa.descricao) : null), el("td", {}, el("span", { class: "pill " + (pa.tipo === "judicial" ? "c" : "e2") }, TIPOS_PASTA[pa.tipo] || pa.tipo)),
+        el("td", {}, +pa.qtd_processos ? el("div", {}, pa.qtd_processos + " processo(s)", el("div", { class: "note" }, (pa.processos_txt || "").slice(0, 80))) : null, +pa.qtd_contratos ? el("div", {}, pa.qtd_contratos + " contrato(s)", el("div", { class: "note" }, (pa.contratos_txt || "").slice(0, 80))) : null, !+pa.qtd_processos && !+pa.qtd_contratos ? el("span", { class: "note" }, "vazia") : null),
+        el("td", {}, el("span", { class: "pill " + (pa.status === "ativa" ? "e1" : "g") }, pa.status)), el("td", {}, el("div", { class: "edit-only", style: "display:flex;gap:4px" }, el("button", { class: "btn sm", onclick: () => modalContratosPasta(c, pa) }, "Contratos…"), el("button", { class: "btn sm", onclick: () => modalPasta(pa) }, "Editar")))))))));
+    return box;
+  }
+  { const _p = window.PP_MOD?.processos; if (_p) window.PP_MOD.processos = (c, host) => { _p(c, host); if (typeof equipe === "function" && equipe()) host.prepend(cardPastasCliente(c)); }; }
+
   // ---------- abas em Jurídico → Processos: Pastas e Configurações ----------
   function abas() {
     const b = (k, l) => el("button", { class: "btn sm" + (PA.aba === k ? " primary" : ""), onclick: () => { PA.aba = k; if (k === "pastas" && !PA.pastasOk) carregarPastas(); render(); } }, l);
@@ -94,12 +136,13 @@
     const f = PA.fPasta; const q = inp("search", f.q); q.placeholder = "Nº da pasta, cliente, processo…"; q.oninput = () => { f.q = q.value; render(); const b = $("#pa-q"); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } }; q.id = "pa-q";
     const st = sel({ ativa: "Ativas", encerrada: "Encerradas", "": "Todas" }, f.status); st.onchange = () => { f.status = st.value; render(); };
     const ql = f.q.trim().toLowerCase();
-    const lista = PA.pastas.filter((p) => (!f.status || p.status === f.status) && (!ql || [String(p.numero).padStart(5, "0"), p.titulo, p.cliente_nome, p.processos_txt].join(" ").toLowerCase().includes(ql)));
+    const lista = PA.pastas.filter((p) => (!f.status || p.status === f.status) && (!ql || [String(p.numero).padStart(5, "0"), p.codigo, p.titulo, p.cliente_nome, p.processos_txt, p.contratos_txt].join(" ").toLowerCase().includes(ql)));
     const card = el("div", { class: "card" }, el("div", { class: "tbl-tools" }, q, st, el("div", { class: "sp" }), el("span", { class: "note" }, `${lista.length} de ${PA.pastas.length}`)));
     card.append(tabela({ cols: [
       { label: "Pasta", r: (p) => el("b", {}, pastaTxt(p)) },
       { label: "Título / cliente", r: (p) => el("div", {}, p.titulo || "—", p.cliente_nome ? el("div", { class: "note" }, p.cliente_nome) : null) },
-      { label: "Processos", r: (p) => el("div", {}, String(p.qtd_processos) + (p.qtd_ativos !== p.qtd_processos ? ` (${p.qtd_ativos} ativos)` : ""), el("div", { class: "note" }, (p.processos_txt || "").slice(0, 90))) },
+      { label: "Tipo", r: (p) => el("span", { class: "pill " + (p.tipo === "judicial" ? "c" : "e2") }, TIPOS_PASTA[p.tipo] || p.tipo || "—") },
+      { label: "Processos / contratos", r: (p) => el("div", {}, +p.qtd_processos ? String(p.qtd_processos) + " processo(s)" + (p.qtd_ativos !== p.qtd_processos ? ` (${p.qtd_ativos} ativos)` : "") : "", +p.qtd_processos ? el("div", { class: "note" }, (p.processos_txt || "").slice(0, 90)) : null, +p.qtd_contratos ? el("div", {}, p.qtd_contratos + " contrato(s): ", el("span", { class: "note" }, (p.contratos_txt || "").slice(0, 90))) : null, !+p.qtd_processos && !+p.qtd_contratos ? el("span", { class: "note" }, "vazia") : null) },
       { label: "Abertura", r: (p) => fmt(p.aberta_em) },
       { label: "Status", r: (p) => el("span", { class: "pill " + (p.status === "ativa" ? "e1" : "g") }, p.status + (p.encerrada_em ? " · " + fmt(p.encerrada_em) : "")) },
       { label: "Arquivo físico", r: (p) => p.caixa_arquivo || "—" }],
@@ -107,10 +150,10 @@
     v.append(card);
   }
   function modalPasta(p) {
-    const titulo = inp("text", p.titulo || ""), status = sel({ ativa: "Ativa", encerrada: "Encerrada" }, p.status), enc = inp("date", p.encerrada_em || ""), tipoEnc = inp("text", p.tipo_encerramento || "", { placeholder: "Ex.: arquivamento, acordo, baixa" }), caixa = inp("text", p.caixa_arquivo || "", { placeholder: "Ex.: Caixa 12 / arquivo morto" }), obs = el("textarea", {}, p.observacoes || "");
-    modal("Pasta " + String(p.numero).padStart(5, "0"), el("div", { class: "form" }, field("pa-t", "Título", titulo), field("pa-s", "Status", status), field("pa-e", "Encerrada em", enc), field("pa-te", "Tipo de encerramento", tipoEnc), field("pa-c", "Localização física", caixa), field("pa-o", "Observações", obs)), async () => {
-      const { error } = await SB.from("pastas").update({ titulo: titulo.value.trim() || null, status: status.value, encerrada_em: status.value === "encerrada" ? (enc.value || new Date().toISOString().slice(0, 10)) : null, tipo_encerramento: tipoEnc.value.trim() || null, caixa_arquivo: caixa.value.trim() || null, observacoes: obs.value.trim() || null, updated_at: new Date().toISOString() }).eq("numero", p.numero);
-      if (error) throw new Error(error.message); toast("Pasta salva"); PA.pastasOk = false; carregarPastas();
+    const titulo = inp("text", p.titulo || ""), tipo = sel(TIPOS_PASTA, p.tipo || "judicial"), descr = inp("text", p.descricao || "", { placeholder: "Resumo do caso (opcional)" }), status = sel({ ativa: "Ativa", encerrada: "Encerrada" }, p.status), enc = inp("date", p.encerrada_em || ""), tipoEnc = inp("text", p.tipo_encerramento || "", { placeholder: "Ex.: arquivamento, acordo, baixa" }), caixa = inp("text", p.caixa_arquivo || "", { placeholder: "Ex.: Caixa 12 / arquivo morto" }), obs = el("textarea", {}, p.observacoes || "");
+    modal(pastaTxt(p), el("div", { class: "form" }, field("pa-t", "Título", titulo), field("pa-tp", "Tipo", tipo), el("div", { class: "f full" }, field("pa-d", "Descrição", descr)), field("pa-s", "Status", status), field("pa-e", "Encerrada em", enc), field("pa-te", "Tipo de encerramento", tipoEnc), field("pa-c", "Localização física", caixa), field("pa-o", "Observações", obs)), async () => {
+      const { error } = await SB.from("pastas").update({ titulo: titulo.value.trim() || null, tipo: tipo.value, descricao: descr.value.trim() || null, status: status.value, encerrada_em: status.value === "encerrada" ? (enc.value || new Date().toISOString().slice(0, 10)) : null, tipo_encerramento: tipoEnc.value.trim() || null, caixa_arquivo: caixa.value.trim() || null, observacoes: obs.value.trim() || null, updated_at: new Date().toISOString() }).eq("numero", p.numero);
+      if (error) throw new Error(error.message); toast("Pasta salva"); PA.pastasOk = false; delete PA.porCliente[p.cliente_id]; carregarPastas();
     });
   }
   function renderConfig(v) {

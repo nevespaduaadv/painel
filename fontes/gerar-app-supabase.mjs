@@ -163,6 +163,7 @@ async function carregar(col){
   }
   return data.map(r=>{const d={id:r.id,...r.dados};
     if(col==="clientes"){for(const [k,v] of Object.entries(r)){if(!["id","dados","token","acesso_por_token","created_by","updated_by"].includes(k)&&v!=null)d[k]=v}} // colunas da ficha (0008)
+    if(col==="contratos"&&r.pasta_numero!=null)d.pasta_numero=r.pasta_numero; // [espelho] pasta do contrato (beta 0005)
     if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
 }
 async function notificar(col){
