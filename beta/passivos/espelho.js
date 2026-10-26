@@ -110,9 +110,8 @@
       if (E.publicacoesN > 0) {
         const pubs = (await SB.from("publicacoes").select("*").order("created_at", { ascending: false }).limit(E.publicacoesN)).data || [];
         const pset = new Set(procIds);
-        try { await gravar("publicacoes", pubs.filter((p) => p.processo_id && pset.has(p.processo_id))); }
-        catch (e) { log("! publicações com processo: " + e.message + " — gravando sem vínculo"); await gravar("publicacoes", pubs.filter((p) => p.processo_id && pset.has(p.processo_id)), ["processo_id"]); }
-        await gravar("publicacoes", pubs.filter((p) => !(p.processo_id && pset.has(p.processo_id))), ["processo_id"]); // processo não copiado → sem vínculo
+        await gravarSeguro("publicacoes", pubs.filter((p) => p.processo_id && pset.has(p.processo_id)), ["processo_id", "andamento_id", "tarefa_id"]);
+        await gravarSeguro("publicacoes", pubs.filter((p) => !(p.processo_id && pset.has(p.processo_id))).map((p) => ({ ...p, processo_id: null })), ["andamento_id", "tarefa_id"]); // processo não copiado → sem vínculo
       }
       for (const t of ["feriados", "suspensoes_prazo", "conteudos", "avisos", "regua_etapas"]) { try { await gravar(t, await todos(SB.from(t).select("*"))); } catch (e) { log("! " + e.message); } }
       // vínculos circulares
