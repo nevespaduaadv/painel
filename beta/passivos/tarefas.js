@@ -178,7 +178,7 @@ function openTarefa(t){
       modal("Concluir: "+t.titulo,body,async()=>{await mudarStatus(t,"concluida",ta.value.trim()||null);toast("Tarefa concluída");setTimeout(reabrirTela,300)})}},"✓ Concluir"):el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}},"Reabrir"),
     t.status==="aberta"?el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"em_andamento");toast("Marcada como em andamento");reabrirTela()}catch(e){toast(e.message)}}},"▶ Em andamento"):null,
     aberta?el("button",{class:"btn",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
-    el("button",{class:"btn",onclick:()=>openHorasForm({tarefa:t})},"+ Lançar horas"),
+    el("button",{class:"btn",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Lançar horas"),window.PP_TS?el("button",{class:"btn",onclick:()=>window.PP_TS.iniciarCron({tarefa:t})},"▶ Cronômetro"):null,
     el("button",{class:"btn",onclick:()=>openTarefaForm(t)},"Editar"));
   const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));
   const com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:"Comentar — use @ para avisar alguém (ex.: @Natasha o banco respondeu, veja o e-mail). Ctrl+Enter envia."});
@@ -314,8 +314,8 @@ window.PP_MOD.tarefas=renderTarefasCliente;
   const eq=typeof equipe==="function"&&equipe();
   if(!eq&&(S.tab==="tarefas"||S.tab==="horas"))S.tab="clientes";
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
-  if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas")renderHoras();}}
+  if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
+window.PP_TAREFAS={lista:()=>T.tarefas,abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
 window.__PP_LOGIN.then(()=>{if(equipe())tempoReal()});
 })();
