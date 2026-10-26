@@ -39,6 +39,11 @@
     }
     log(`✓ ${tabela}: ${n} de ${linhas.length} linha(s) gravadas (o resto já existia)`); return n;
   }
+  // grava e, se um vínculo opcional apontar para algo fora da amostra, regrava sem essas colunas
+  async function gravarSeguro(tabela, linhas, colsOpcionais) {
+    try { return await gravar(tabela, linhas); }
+    catch (e) { if (!/foreign key/i.test(e.message)) throw e; log("! " + tabela + ": vínculo fora da amostra — gravando sem " + colsOpcionais.join("/")); return await gravar(tabela, linhas, colsOpcionais); }
+  }
   async function atualizar(tabela, coluna, pares) {
     for (const l of lotes(pares, 300)) { const { error } = await E.beta.rpc("espelho_atualizar", { p_tabela: tabela, p_coluna: coluna, p_linhas: l }); if (error) throw new Error(`${tabela}.${coluna}: ${error.message}`); }
   }
@@ -66,15 +71,15 @@
       const processos = await porIds("processos", "cliente_id", cliIds); await gravar("processos", processos);
       const procIds = processos.map((p) => p.id);
       await gravar("andamentos", await porIds("andamentos", "processo_id", procIds));
-      const tarefas = await porIds("tarefas", "cliente_id", cliIds); await gravar("tarefas", tarefas);
-      await gravar("entradas_timeline", await porIds("entradas_timeline", "cliente_id", cliIds));
+      const tarefas = await porIds("tarefas", "cliente_id", cliIds); await gravarSeguro("tarefas", tarefas, ["contrato_id", "processo_id"]);
+      await gravarSeguro("entradas_timeline", await porIds("entradas_timeline", "cliente_id", cliIds), ["tarefa_id", "andamento_id", "processo_id", "contrato_id"]);
       await gravar("apontamentos_horas", await porIds("apontamentos_horas", "cliente_id", cliIds));
       await gravar("tarefa_eventos", await porIds("tarefa_eventos", "tarefa_id", tarefas.map((t) => t.id)));
       await gravar("negociacoes", await porIds("negociacoes", "cliente_id", cliIds));
       await gravar("monitoramentos", await porIds("monitoramentos", "cliente_id", cliIds));
       await gravar("revisoes", await porIds("revisoes", "cliente_id", cliIds));
       await gravar("maturacao_alertas", await porIds("maturacao_alertas", "cliente_id", cliIds));
-      await gravar("agenda_eventos", await porIds("agenda_eventos", "cliente_id", cliIds));
+      await gravarSeguro("agenda_eventos", await porIds("agenda_eventos", "cliente_id", cliIds), ["lead_id", "tarefa_id", "processo_id"]);
       if (E.incluirFinanceiro) {
         const cobrancas = await porIds("cobrancas", "cliente_id", cliIds); await gravar("cobrancas", cobrancas);
         await gravar("cobranca_contatos", await porIds("cobranca_contatos", "cobranca_id", cobrancas.map((c) => c.id)));
@@ -90,7 +95,7 @@
         await gravar("leads", leads, ["cliente_id"]);
         const leadIds = leads.map((l) => l.id);
         for (const t of ["lead_tags", "observacoes", "historico_fases", "lead_tarefas"]) { try { await gravar(t, await porIds(t, "lead_id", leadIds)); } catch (e) { log("! " + e.message); } }
-        await gravar("fechamentos", await porIds("fechamentos", "cliente_id", cliIds));
+        await gravarSeguro("fechamentos", await porIds("fechamentos", "cliente_id", cliIds), ["lead_id"]);
         await gravar("fluxos_mensagens", await todos(SB.from("fluxos_mensagens").select("*")));
         await gravar("cadencias", await todos(SB.from("cadencias").select("*")));
         await gravar("cadencia_passos", await todos(SB.from("cadencia_passos").select("*")));
@@ -98,7 +103,7 @@
       if (E.incluirAtendimento) {
         const convs = await todos(SB.from("atd_conversas").select("*").order("ultima_msg_em", { ascending: false }).limit(200));
         await gravar("atd_filas", await todos(SB.from("atd_filas").select("*")));
-        await gravar("atd_conversas", convs);
+        await gravarSeguro("atd_conversas", convs, ["lead_id", "cliente_id"]);
         await gravar("atd_mensagens", await porIds("atd_mensagens", "conversa_id", convs.map((c) => c.id)));
         await gravar("atd_eventos", await porIds("atd_eventos", "conversa_id", convs.map((c) => c.id)));
       }
