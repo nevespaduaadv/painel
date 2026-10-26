@@ -925,7 +925,7 @@ begin
 end $$;
 revoke all on function public.configurar_growth(integer, integer) from public, anon, authenticated;
 
-select public.configurar_growth(6, 40) as resultado;
+-- [espelho] select public.configurar_growth(6, 40) as resultado;
 
 
 -- ===== 0045_acessos_gestao.sql =====
@@ -1243,7 +1243,7 @@ begin
   return 'Agenda sincronizando a cada ' || minutos || ' min em ' || endpoint;
 end $$;
 revoke all on function public.configurar_agenda(integer) from public, anon, authenticated;
-select public.configurar_agenda(15) as resultado;
+-- [espelho] select public.configurar_agenda(15) as resultado;
 
 
 -- ===== 0048_leads_meta_ids.sql =====

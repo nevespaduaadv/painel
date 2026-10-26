@@ -154,7 +154,7 @@ begin
   return t;
 end $$;
 
-select public.configurar_agenda_lembretes(5) as resultado;
+-- [espelho] select public.configurar_agenda_lembretes(5) as resultado;
 
 
 -- ===== 0051_acordos_maturacao_pos_acordo.sql =====
@@ -358,7 +358,7 @@ end $$;
 drop trigger if exists clientes_direcionar on public.clientes;
 create trigger clientes_direcionar before insert or update of direcionamento on public.clientes for each row execute procedure public.clientes_direcionar();
 
-select public.configurar_regua_maturacao(6) as resultado;
+-- [espelho] select public.configurar_regua_maturacao(6) as resultado;
 
 
 -- ===== 0052_onboarding_cliente.sql =====
@@ -1215,7 +1215,7 @@ select to_char(coalesce(c.pago_em, c.vencimento), 'YYYY-MM') as mes,
 from public.cobrancas c where c.status in ('pendente','atrasada','paga')
 group by 1;
 
-select public.configurar_regua_cobranca(9) as regua, public.configurar_asaas_sincronizacao(5) as sincronizacao;
+-- [espelho] select public.configurar_regua_cobranca(9) as regua, public.configurar_asaas_sincronizacao(5) as sincronizacao;
 
 
 -- ===== 0056_acessos_por_area.sql =====
