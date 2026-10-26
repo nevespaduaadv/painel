@@ -3,9 +3,12 @@
 import fs from 'fs';
 import path from 'path';
 const base = path.dirname(new URL(import.meta.url).pathname);
-const out = process.argv[2] || path.join(base,'..','index.html');
-const SUPABASE_URL = 'https://ksdwzljfjfucjevdqxvx.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_tt__gxUjGaujzylisID0KQ_qaeaU1-l';
+// Espelho (beta): PP_ESPELHO=1 gera só o painel da equipe apontando para o projeto Supabase beta, em <raiz>/beta/
+// (chaves publicáveis; o banco beta é uma cópia de teste — ver docs/beta/esquema-espelho.sql).
+const ESPELHO = process.env.PP_ESPELHO === '1';
+const out = process.argv[2] || path.join(base,'..', ESPELHO ? 'beta' : '', 'index.html');
+const SUPABASE_URL = ESPELHO ? 'https://ooynicwexxqqccihjiah.supabase.co' : 'https://ksdwzljfjfucjevdqxvx.supabase.co';
+const SUPABASE_KEY = ESPELHO ? 'sb_publishable_dn6ljhAAaV3TxnAyXQB5TA_0DdvGl-W' : 'sb_publishable_tt__gxUjGaujzylisID0KQ_qaeaU1-l';
 const outToken = path.join(base,'..','cliente','index.html');
 
 // Gera o painel em dois modos: 'login' (passivos/, equipe e clientes com usuário) e 'token' (cliente/?t=…, sem login,
@@ -70,6 +73,7 @@ html = html.replace('{tab:"historico",label:"Base de acordos"}', '{tab:"historic
 html = html.replace('{grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[', '{grupo:"juridico",label:"Jurídico",cls:"edit-only grp-juridico",itens:[');
 html = html.replace('{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}', '');
 html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},');
+if(ESPELHO){ must('<title>Sistema interno — Neves Pádua Advocacia</title>'); html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>ESPELHO (beta) — Neves Pádua Advocacia</title>'); html = html.replace('</style>', '.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}</style>',1); html = html.replace('<body', '<body data-espelho="1"',1); html = html.replace('</body>', '<div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div></body>'); }
 must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
 must('/*NAV_GRUPOS*/');
@@ -352,4 +356,10 @@ return html;
 }
 
 fs.mkdirSync(path.dirname(out),{recursive:true}); fs.writeFileSync(out, gerar('login')); console.log('ok', out);
-fs.mkdirSync(path.dirname(outToken),{recursive:true}); fs.writeFileSync(outToken, gerar('token')); console.log('ok', outToken);
+if(!ESPELHO){ fs.mkdirSync(path.dirname(outToken),{recursive:true}); fs.writeFileSync(outToken, gerar('token')); console.log('ok', outToken); }
+else { // copia os módulos, fontes e imagens para beta/passivos
+  const src = path.join(base,'..','passivos'), dst = path.join(path.dirname(out),'passivos');
+  fs.rmSync(dst,{recursive:true,force:true}); fs.mkdirSync(dst,{recursive:true});
+  for (const f of fs.readdirSync(src)) { const p = path.join(src,f); if (fs.statSync(p).isDirectory()) fs.cpSync(p, path.join(dst,f), {recursive:true}); else if (f.endsWith('.js')) fs.copyFileSync(p, path.join(dst,f)); }
+  console.log('ok', dst);
+}
