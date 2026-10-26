@@ -43,6 +43,7 @@ html = html.replace('</style>', `
 .sem-clientes .area-clientes{display:none!important}
 .sem-juridico .area-juridico{display:none!important}
 .sem-superendividamento .area-superendividamento{display:none!important}
+.sem-juridico.sem-superendividamento .grp-juridico{display:none!important}
 .sem-atendimento .area-atendimento{display:none!important}
 .sem-comercial .area-comercial{display:none!important}
 .sem-marketing .area-marketing{display:none!important}
@@ -66,7 +67,7 @@ must('const NAV=[{tab:"clientes",label:"Clientes"},');
 html = html.replace('const NAV=[{tab:"clientes",label:"Clientes"},', 'const NAV=[{tab:"painel",label:"Meu painel",cls:"edit-only"},{tab:"tarefas",label:"Tarefas e prazos",cls:"edit-only"},{tab:"agenda",label:"Agenda",cls:"edit-only"},{tab:"perfil",label:"Meu perfil",cls:"edit-only"},{tab:"avisos",label:"Avisos",cls:"edit-only"},{tab:"clientes",label:"Clientes",cls:"area-clientes"},');
 must('/*NAV_JURIDICO*/');
 html = html.replace('{tab:"historico",label:"Base de acordos"}', '{tab:"historico",label:"Base de acordos",cls:"area-juridico"}');
-html = html.replace('{grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[', '{grupo:"juridico",label:"Jurídico",cls:"edit-only area-juridico",itens:[');
+html = html.replace('{grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[', '{grupo:"juridico",label:"Jurídico",cls:"edit-only grp-juridico",itens:[');
 html = html.replace('{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}', '');
 html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},');
 must('const ICONES={');
