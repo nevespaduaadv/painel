@@ -292,6 +292,20 @@
     ({ semana: renderSemana, rel: renderRel, apr: renderApr, cfg: renderCfg })[H.aba](v);
   }
   { const _r = render; render = function () { _r(); if (S.tab === "horas") renderHoras(); }; }
-  window.PP_TS = { lancar, iniciarCron, invalidar: inval };
+  // API para a ficha da tarefa: iniciar/pausar sem modal; o cronômetro vive no servidor (ts_cronometros)
+  async function cronAtual() { if (!H.ok) await carregarBase(); else { const m = meu(); const { data } = await SB.from("ts_cronometros").select("*").eq("colaborador_id", m?.id || "00000000-0000-0000-0000-000000000000").maybeSingle(); H.cron = data || null; } return H.cron; }
+  async function iniciarDireto(t) {
+    if (!H.ok) await carregarBase(); if (!meu()) throw new Error("Seu usuário não está vinculado a um colaborador (Usuários → salvar perfil).");
+    const { data, error } = await SB.rpc("ts_cronometro_iniciar", { p_cliente: t.cliente_id || null, p_tarefa: t.id, p_processo: t.processo_id || null, p_atividade: "outro", p_descricao: t.titulo || null }); if (error) throw new Error(error.message);
+    H.cron = data; inval(); return data;
+  }
+  async function pararDireto({ descricao, atividade, cobravel, descartar } = {}) {
+    const { data, error } = await SB.rpc("ts_cronometro_parar", { p_descricao: descricao || null, p_descartar: !!descartar }); if (error) throw new Error(error.message);
+    clearInterval(H.cronT); H.cron = null; inval();
+    if (data && (atividade || cobravel != null)) { const upd = {}; if (atividade) upd.tipo_atividade = atividade; if (cobravel != null) upd.cobravel = cobravel; await SB.from("apontamentos_horas").update(upd).eq("id", data.id); }
+    return data;
+  }
+  const atividades = async () => { if (!H.ok) await carregarBase(); return H.ativ.filter((a) => a.ativa); };
+  window.PP_TS = { lancar, iniciarCron, invalidar: inval, cronAtual, iniciarDireto, pararDireto, atividades, meu: () => meu() };
   window.__PP_LOGIN?.then(() => { if (typeof equipe === "function" && equipe()) { const ch = SB.channel("timesheet"); ch.on("postgres_changes", { event: "*", schema: "public", table: "apontamentos_horas" }, () => { inval(); if (S.tab === "horas") render(); }); ch.on("postgres_changes", { event: "*", schema: "public", table: "ts_cronometros" }, () => { H.ok = false; if (S.tab === "horas") render(); }); ch.subscribe(); } });
 })();
