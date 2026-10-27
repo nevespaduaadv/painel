@@ -3,7 +3,7 @@
 (()=>{
 "use strict";
 const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo",rh:"RH",socios:"Sócios"};
-const STATUS={aberta:"Aberta",em_andamento:"Em andamento",concluida:"Concluída",cancelada:"Cancelada"};
+const STATUS={aberta:"A fazer",em_andamento:"Fazendo",concluida:"Feita",cancelada:"Cancelada"};
 const PRIORIDADE={1:"Alta",2:"Normal",3:"Baixa"};
 const FAIXAS=[["atrasada","Atrasadas","e3"],["hoje","Hoje","e3"],["d7","Até 7 dias","e2"],["d15","Até 15 dias","g"],["d30","Até 30 dias","g"],["depois","Depois de 30 dias",""],["sem_prazo","Sem prazo",""],["fechada","Concluídas / canceladas",""]];
 const TIPOS_ATIV={solicitacao_documentos:"Solicitação de documentos",requerimento_bacen:"Requerimento ao Bacen",analise_contrato:"Análise de contrato",parecer_tecnico:"Parecer técnico",contato_banco:"Contato com jurídico do banco",proposta_acordo:"Proposta de acordo",reuniao_cliente:"Reunião com cliente",ata:"Ata",protocolo:"Protocolo",andamento:"Andamento processual",peticao:"Petição",audiencia:"Audiência",atendimento:"Atendimento",interno:"Interno / administrativo",outro:"Outro"};
@@ -62,7 +62,7 @@ function linhaTarefa(t,{mostrarCliente=true}={}){
       el("div",{style:"min-width:0;cursor:pointer",title:"Abrir a tarefa",onclick:()=>openTarefa(t)},el("div",{class:"n",style:t.status==="concluida"||t.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px"},"Alta"):null,t.titulo),
         el("div",{class:"s"},meta),trilha?el("div",{class:"s",style:"color:var(--faint);font-size:12px"},trilha):null,t.descricao?el("div",{class:"s",style:"white-space:pre-wrap;margin-top:2px"},t.descricao):null)),
     el("div",{style:"display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end"},prazo,
-      t.status==="em_andamento"?el("span",{class:"pill c"},"Em andamento"):null,
+      t.status==="em_andamento"?el("span",{class:"pill c"},"Fazendo"):null,
       el("button",{class:"btn sm primary",onclick:()=>openTarefa(t)},"Abrir")));
 }
 function listaAgrupada(lista,opts){
@@ -87,7 +87,7 @@ function renderTarefas(){
   const K=(l,val,h,cls)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v num",style:cls?`color:var(--${cls})`:""},String(val)),el("div",{class:"h"},h));
   v.append(el("div",{class:"kpis"},K("Atrasadas",n("atrasada"),"prazo já passou",n("atrasada")?"crit":""),K("Hoje",n("hoje"),"vencem hoje",n("hoje")?"crit":""),K("Próximos 7 dias",n("d7"),"além de hoje"),K("8 a 15 dias",n("d15"),""),K("16 a 30 dias",n("d30"),""),K("Fatais em 7 dias",fat,"inclui atrasados",fat?"crit":"")));
   const f=T.f;
-  const fStatus=sel({abertas:"Abertas e em andamento",aberta:"Só abertas",em_andamento:"Só em andamento",concluida:"Concluídas",cancelada:"Canceladas",todas:"Todas"},f.status),fResp=selColab(f.resp,"Todos os responsáveis"),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes"),fFat=check("Só prazos fatais",f.fatais);
+  const fStatus=sel({abertas:"A fazer e fazendo",aberta:"Só a fazer",em_andamento:"Só fazendo",concluida:"Feitas",cancelada:"Canceladas",todas:"Todas"},f.status),fResp=selColab(f.resp,"Todos os responsáveis"),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes"),fFat=check("Só prazos fatais",f.fatais);
   fStatus.onchange=()=>{f.status=fStatus.value;render()};fResp.onchange=()=>{f.resp=fResp.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};fFat.input.onchange=()=>{f.fatais=fFat.input.checked;render()};fFat.wrap.className="";
   const escT=PP.escopoTarefas?.()||{tudo:true};
   v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
