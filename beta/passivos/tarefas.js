@@ -211,6 +211,7 @@ function openTarefa(t){
     el("span",{class:"sp",style:"flex:1"}),
     aberta?el("button",{class:"btn sm",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
+    t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,
     el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar"));
   if(!window.PP_TS&&aberta)acoes.prepend(el("button",{class:"btn primary",onclick:concluir},"✓ Concluir"));
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
