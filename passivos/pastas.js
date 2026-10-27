@@ -49,7 +49,7 @@
   }
 
   // ---------- seção "Pasta e processos relacionados" (ficha do processo) ----------
-  function secaoProcesso(p, recarregar) {
+  function secaoProcesso(p, recarregar, opts = {}) {
     if (PA.relDe !== p.id && !PA.rel[p.id]) carregarRel(p.id);
     const rel = PA.rel[p.id] || [];
     const falta = p.campos_faltando || faltando(p);
@@ -63,7 +63,7 @@
         el("div", {}, el("a", { href: "#processos/" + r.relacionado_id, onclick: (ev) => { ev.preventDefault(); window.PP_PROCESSOS?.abrir(r.relacionado_id); } }, r.numero_cnj || r.tipo_acao || "(sem número)"), el("span", { class: "note" }, " · " + [r.tipo_acao, r.fase, pastaTxt(r)].filter(Boolean).join(" · "))),
         r.observacao ? el("div", { class: "note" }, r.observacao) : null,
         el("div", { class: "actions edit-only", style: "justify-content:flex-start;margin-top:2px" }, el("button", { class: "btn sm", onclick: async () => { if (!confirm("Desfazer este relacionamento? (a pasta não muda)")) return; await SB.from("processo_relacoes").delete().eq("id", r.id); delete PA.rel[p.id]; recarregar?.(); carregarRel(p.id); } }, "Desfazer"))))) : el("div", { class: "note" }, "Nenhum. Use “Relacionar processo…” para vincular cumprimento de sentença, recurso, embargos etc."));
-    if (window.PP_PUB_TRAT?.secaoProcesso) { const wrap = el("div", { style: "display:contents" }, box); window.PP_PUB_TRAT.secaoProcesso(p, wrap); return wrap; }
+    if (window.PP_PUB_TRAT?.secaoProcesso && !opts.semPublicacoes) { const wrap = el("div", { style: "display:contents" }, box); window.PP_PUB_TRAT.secaoProcesso(p, wrap); return wrap; }
     return box;
   }
   function modalRelacionar(p, recarregar) {
