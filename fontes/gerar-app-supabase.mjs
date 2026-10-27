@@ -328,7 +328,7 @@ const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
-  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['faturamento','financeiro'],
+  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['faturamento','financeiro'],['dossie','core'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],

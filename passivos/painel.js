@@ -106,6 +106,7 @@ function faixaAgora(meu){
   if(AG.horas!=null)dir.append(K("Horas na semana",hFmt(AG.horas),"",irTab("horas")));
   if(AG.pub)dir.append(K("Publicações a tratar",String(AG.pub.total)+(AG.pub.vencidas?` · ${AG.pub.vencidas} vencidas`:""),AG.pub.vencidas?"crit":"",irTab("publicacoes")));
   if(AG.sf)dir.append(K("Faturamento em análise",`${AG.sf.n} · ${BRL(AG.sf.valor)}`,AG.sf.n?"warn":"",irTab("faturamento")));
+  dir.prepend(el("button",{class:"btn sm primary",style:"align-self:center",onclick:()=>{const cli=sel({"":"— cliente —",...Object.fromEntries([...(S.clientes||[])].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},"");modal("Registrar — escolha o cliente",el("div",{class:"form"},field("rg-cli","Cliente",cli)),async()=>{if(!cli.value)throw new Error("Escolha o cliente");setTimeout(()=>window.PP_CARTEIRA?.registrar(cli.value,{}),50)});const b=$("#modalHost button.btn.primary");if(b)b.textContent="Continuar"}},"+ Registrar"));
   box.append(dir);return box;
 }
 function renderPainel(){
