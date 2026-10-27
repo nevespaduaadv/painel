@@ -16,7 +16,8 @@
   async function carregar(cid) {
     D.cache[cid] = { ok: false, itens: [], frentes: [], colab: [] };
     const [a, b, c] = await Promise.all([SB.from("v_dossie").select("*").eq("cliente_id", cid).order("quando", { ascending: false }).limit(150), SB.from("v_cliente_frentes").select("*").eq("cliente_id", cid), SB.from("colaboradores").select("id,nome,frente,ativo").order("nome")]);
-    D.cache[cid] = { ok: true, itens: a.data || [], frentes: b.data || [], colab: c.data || [] }; render();
+    const vistos = new Set(); const itens = (a.data || []).filter((i) => { const k = [i.origem, i.processo_id, String(i.quando).slice(0, 10), (i.texto || "").slice(0, 300)].join("|"); if (i.origem !== "registro" && vistos.has(k)) return false; vistos.add(k); return true; });
+    D.cache[cid] = { ok: true, itens, frentes: b.data || [], colab: c.data || [] }; render();
   }
   const rotuloTipo = (it) => it.origem === "registro" ? (TIPO[it.tipo] || it.tipo) : it.origem === "publicacao" ? "Publicação · " + (it.tipo || "").replace("publicacao_", "").replace("_", " ") : it.origem === "negociacao" ? "Negociação" : it.origem === "cobranca" ? "Cobrança" : ORIGEM[it.origem] || it.origem;
   function definirResp(c, frente, atual, colab) {
