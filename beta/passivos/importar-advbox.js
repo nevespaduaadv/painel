@@ -22,17 +22,25 @@
     const { data, error } = await SB.from("importacao_bruta").select("parte,dados").eq("origem", "advbox").eq("chave", A.chave).order("parte"); if (error) { toast(error.message); return; }
     const txt = (data || []).map((r) => r.dados).join(""); try { A.bruto = JSON.parse(txt); } catch (e) { toast("JSON inválido: " + e.message); return; }
     const [c, t, e, p] = await Promise.all([SB.from("colaboradores").select("id,nome,ativo"), SB.from("tarefas").select("id,descricao").like("descricao", "%(ADVBox #%"), SB.from("entradas_timeline").select("id_externo").like("id_externo", "advbox:%"), SB.from("processos").select("id,numero_cnj,cliente_id,id_externo")]);
-    A.colab = c.data || []; A.existentes = { tar: new Set((t.data || []).map((x) => /\(ADVBox #(\d+)\)/.exec(x.descricao || "")?.[1]).filter(Boolean)), tl: new Set((e.data || []).map((x) => x.id_externo)), proc: p.data || [] };
+    const [tv, ev] = await Promise.all([SB.from("tarefas").select("cliente_id,titulo,prazo").like("descricao", "%(importado do ADVBox)"), SB.from("entradas_timeline").select("cliente_id").like("id_externo", "advbox:%:tl:%")]);
+    A.colab = c.data || []; A.existentes = { tar: new Set((t.data || []).map((x) => /\(ADVBox #(\d+)\)/.exec(x.descricao || "")?.[1]).filter(Boolean)), tl: new Set((e.data || []).map((x) => x.id_externo)), proc: p.data || [],
+      velhasTar: new Set((tv.data || []).map((x) => x.cliente_id + "|" + norm(x.titulo) + "|" + (x.prazo || ""))), velhosCli: new Set((ev.data || []).map((x) => x.cliente_id)) };
     // mapa automático de clientes
     const nomes = [...new Set(Object.values(A.bruto).map((v) => v.cliente))];
-    for (const n of nomes) { if (A.mapa[n]) continue; const nn = norm(n); const hit = S.clientes.find((c) => { const a = norm(c.nome), b = norm(c.nome_fantasia); return (a && (a === nn || (nn.length >= 8 && (a.includes(nn) || nn.includes(a))))) || (b && (b === nn || (nn.length >= 8 && (b.includes(nn) || nn.includes(b))))); }); A.mapa[n] = hit ? hit.id : ""; }
+    const GEN = new Set(["COMERCIO", "SERVICO", "SERVICOS", "ARTIGOS", "ACESSORIOS", "CENTRO", "TRANSPORTES", "ENERGIA", "SOLAR", "LOCACAO", "IMOVEIS", "SILVA", "SANTOS", "OLIVEIRA", "SOUZA", "ALMEIDA", "MARIA", "JOSE", "CARLOS", "PEREIRA", "FERREIRA", "AUTOMOTIVA", "AUTOMOTIVO", "INDUSTRIA", "PRODUTOR", "RURAL", "LANCHERIA", "CAMPOS", "ALVES", "LUCIA", "CRISTINA"]);
+    const toks = (x) => norm(x).split(" ").filter((t) => t.length >= 5 && !GEN.has(t) && !/^\d+$/.test(t));
+    for (const n of nomes) { if (A.mapa[n] != null && A.mapa[n] !== "") continue; const nn = norm(n); const tn = toks(n);
+      const hit = S.clientes.find((c) => { const a = norm(c.nome), b = norm(c.nome_fantasia); if ((a && (a === nn || (nn.length >= 8 && (a.includes(nn) || nn.includes(a))))) || (b && (b === nn || (nn.length >= 8 && (b.includes(nn) || nn.includes(b)))))) return true; const tc = new Set([...toks(c.nome), ...toks(c.nome_fantasia)]); return tn.some((t) => tc.has(t)); });
+      A.mapa[n] = hit ? hit.id : ""; }
     A.prev = prever(); render();
   }
+  const CORTE = "2026-10-08"; // data da importação anterior (0013): o que é anterior e já veio para clientes daquela leva não entra de novo
+  const jaVelho = (k, it, cid) => { const d = dhBR(it.hora)?.slice(0, 10) || dBR(it.dataComp) || ""; if (k === "tarefa_aberta") return A.existentes.velhasTar.has(cid + "|" + norm(it.titulo) + "|" + (dBR(it.dataComp) || "")); return A.existentes.velhosCli.has(cid) && d && d < CORTE; };
   function prever() {
     const p = { porCliente: {}, processosNovos: [], tar: 0, feitas: 0, reg: 0, etapas: 0, ign: 0, jaImportado: 0, semCliente: 0 };
     for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; const pc = p.porCliente[v.cliente] = p.porCliente[v.cliente] || { cid, lids: 0, tar: 0, feitas: 0, reg: 0, etapas: 0, nums: [] }; pc.lids++; if (v.num) pc.nums.push(v.num);
       if (cid && v.num && !A.existentes.proc.some((x) => x.numero_cnj === v.num)) p.processosNovos.push({ cliente: v.cliente, cid, num: v.num, tipo: v.tipo, lid: v.lid });
-      for (const it of v.itens) { const k = classificar(it); if (k === "ignorar") { p.ign++; continue; } if (!cid) { p.semCliente++; continue; } const ja = (k === "tarefa_aberta" || k === "tarefa_feita") ? A.existentes.tar.has(it.id) : A.existentes.tl.has("advbox:" + (it.id || (v.lid + ":" + it.hora + ":" + it.texto.slice(0, 40)))); if (ja) { p.jaImportado++; continue; }
+      for (const it of v.itens) { const k = classificar(it); if (k === "ignorar") { p.ign++; continue; } if (!cid) { p.semCliente++; continue; } const ja = ((k === "tarefa_aberta" || k === "tarefa_feita") ? A.existentes.tar.has(it.id) : A.existentes.tl.has("advbox:" + (it.id || (v.lid + ":" + it.hora + ":" + it.texto.slice(0, 40))))) || jaVelho(k, it, cid); if (ja) { p.jaImportado++; continue; }
         if (k === "tarefa_aberta") { p.tar++; pc.tar++; } else if (k === "tarefa_feita") { p.feitas++; pc.feitas++; } else if (k === "registro") { p.reg++; pc.reg++; } else { p.etapas++; pc.etapas++; } } }
     return p;
   }
@@ -49,6 +57,7 @@
       const tarefas = [], eventos = [], regs = [];
       for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; if (!cid) continue; const pid = procId(v.num);
         for (const it of v.itens) { const k = classificar(it); if (k === "ignorar") continue; const { autor, resp } = quem(it); const ca = colabPor(autor), cr = colabPor(resp); const criado = dhBR(it.hora) || new Date().toISOString(); const prazo = dBR(it.dataComp);
+          if (jaVelho(k, it, cid)) continue;
           if (k === "tarefa_aberta" || k === "tarefa_feita") { if (A.existentes.tar.has(it.id)) continue; const fatal = /prazo fatal/i.test(it.texto); const texto = it.texto.replace(/^Prazo fatal:\s*\d{2}\/\d{2}\/\d{4}\.?\s*/i, "").trim(); const feita = k === "tarefa_feita";
             const tid = crypto.randomUUID(); const concl = feita ? (prazo && prazo <= new Date().toISOString().slice(0, 10) ? prazo + "T18:00:00-03:00" : criado) : null;
             tarefas.push({ id: tid, titulo: (it.titulo || "Tarefa do ADVBox").slice(0, 200), descricao: (texto ? texto + "\n" : "") + `(ADVBox #${it.id})`, cliente_id: cid, processo_id: pid, responsavel_id: cr?.id || ca?.id || null, nucleo: "juridico", prazo, prazo_fatal: fatal, prioridade: fatal ? 1 : 2, status: feita ? "concluida" : "aberta", concluida_em: concl, created_at: criado, created_by: null });
