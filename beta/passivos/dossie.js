@@ -26,6 +26,18 @@
       const { error } = await SB.from("clientes").update({ [col]: s.value || null }).eq("id", c.id); if (error) throw new Error(error.message); c[col] = s.value || null; toast("Salvo"); invalidar(c.id); render();
     });
   }
+  // ---------- exportar linha do tempo ----------
+  function exportarCSV(c, itens) {
+    const cols = ["quando", "frente", "origem", "tipo", "autor", "numero_cnj", "texto", "visivel_cliente"]; const esc = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const txt = [cols.join(";"), ...itens.map((i) => cols.map((k) => esc(k === "quando" ? fmtDH(i.quando) : k === "frente" ? (FRENTES[i.frente] || "") : k === "tipo" ? rotuloTipo(i) : i[k])).join(";"))].join("\n");
+    const u = URL.createObjectURL(new Blob(["\ufeff" + txt], { type: "text/csv;charset=utf-8" })); const a = el("a", { href: u, download: `dossie_${(c.nome || c.id).replace(/\W+/g, "_")}.csv` }); document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+  }
+  function exportarPDF(c, itens, fl) {
+    const e = (s) => String(s ?? "").replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+    const linhas = itens.map((i) => `<tr><td class=d>${fmtDH(i.quando)}</td><td>${e(i.frente ? FRENTES[i.frente].split(" /")[0] : "—")}</td><td>${e(rotuloTipo(i))}${i.numero_cnj ? `<div class=n>${e(i.numero_cnj)}</div>` : ""}</td><td class=t>${e(i.texto)}</td><td class=n>${e(i.autor || "")}</td></tr>`).join("");
+    const html = `<!doctype html><html lang=pt-BR><head><meta charset=utf-8><title>Dossiê — ${e(c.nome)}</title><style>body{font-family:Georgia,serif;color:#0C1F38;margin:28px 36px;font-size:12.5px}.cab{display:flex;justify-content:space-between;border-bottom:2px solid #B8964A;padding-bottom:10px;margin-bottom:16px}.marca{font-weight:700;letter-spacing:.04em}.marca small{display:block;font-family:Arial,sans-serif;font-weight:400;font-size:11px;color:#555}h1{font-size:18px;margin:0 0 12px}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}th{text-align:left;background:#0C1F38;color:#fff;padding:6px 8px}td{padding:6px 8px;border-bottom:1px solid #e4e4e4;vertical-align:top}.d{white-space:nowrap}.t{white-space:pre-wrap;max-width:420px}.n{color:#666;font-size:10.5px}@media print{body{margin:14mm 12mm}}</style></head><body><div class=cab><div class=marca>NEVES PÁDUA ADVOCACIA<small>OAB/SP 488.803 · Dossiê do cliente${fl && FRENTES[fl] ? " · " + FRENTES[fl] : ""}</small></div><div style="text-align:right;font-family:Arial,sans-serif;font-size:11px"><b>${e(c.nome)}</b><br>Emitido em ${new Date().toLocaleDateString("pt-BR")} · ${itens.length} registro(s)</div></div><h1>Linha do tempo</h1><table><thead><tr><th>Quando</th><th>Frente</th><th>Tipo</th><th>Registro</th><th>Quem</th></tr></thead><tbody>${linhas}</tbody></table><script>setTimeout(()=>window.print(),400)</script></body></html>`;
+    const w = window.open("", "_blank"); if (!w) { toast("Permita pop-ups para gerar o PDF"); return; } w.document.write(html); w.document.close();
+  }
   function cardDossie(c) {
     const st = D.cache[c.id]; if (!st) { carregar(c.id); }
     const box = el("section", { class: "card section", style: "display:flex;flex-direction:column;gap:12px" });
@@ -46,14 +58,17 @@
     box.append(cols);
     // linha do tempo
     const fl = D.filtro[c.id] || ""; const fs = sel({ "": "Todas as frentes", ...FRENTES, "__reg": "Só registros manuais" }, fl); fs.onchange = () => { D.filtro[c.id] = fs.value; render(); };
-    const itens = st.itens.filter((i) => !fl || (fl === "__reg" ? i.origem === "registro" : i.frente === fl));
+    const itens0 = st.itens.filter((i) => !fl || (fl === "__reg" ? i.origem === "registro" : i.frente === fl));
+    const itens = D.soCliente?.[c.id] ? itens0.filter((i) => i.visivel_cliente) : itens0;
     const lista = el("ul", { class: "tl", style: "margin-top:6px" }, ...itens.slice(0, 80).map((i) => el("li", { class: i.origem === "registro" ? "" : "ev-sistema" }, el("div", { class: "d" }, fmtDH(i.quando), " · ", el("span", { class: "pill " + (i.frente === "juridico" ? "e3" : i.frente === "negocial" ? "e2" : "c"), style: "margin:0 4px" }, i.frente ? FRENTES[i.frente].split(" /")[0] : "—"), rotuloTipo(i), i.autor ? " · " + i.autor : "", i.numero_cnj ? el("a", { href: "#processos", style: "margin-left:6px", onclick: (ev) => { ev.preventDefault(); if (i.processo_id) window.PP_CARTEIRA?.abrirProcesso(c.id, i.processo_id); } }, i.numero_cnj) : null, i.visivel_cliente ? el("span", { class: "pill e1", style: "margin-left:6px" }, "visível ao cliente") : null),
       el("div", { style: "white-space:pre-wrap;font-size:13.5px" + (i.origem === "registro" ? ";padding:6px 10px;background:var(--surface-2);border-radius:8px;margin-top:2px" : "") }, i.texto),
       i.tarefa_id && i.origem !== "registro" ? el("div", { class: "actions", style: "justify-content:flex-start;margin-top:2px" }, el("button", { class: "btn sm", onclick: () => window.PP_TAREFAS?.abrir(i.tarefa_id) }, "Abrir tarefa")) : null)));
-    box.append(el("div", {}, el("div", { class: "section-h" }, el("h3", { style: "margin:0;font-size:15px" }, `Linha do tempo (${itens.length})`), fs), itens.length ? lista : el("div", { class: "note" }, "Nada ainda.")));
+    const soCli = el("input", { type: "checkbox", style: "width:15px;height:15px;margin:0;accent-color:var(--gold)" }); soCli.checked = !!D.soCliente?.[c.id]; soCli.onchange = () => { D.soCliente = D.soCliente || {}; D.soCliente[c.id] = soCli.checked; render(); };
+    const itensF = itens;
+    box.append(el("div", {}, el("div", { class: "section-h", style: "flex-wrap:wrap;gap:8px" }, el("h3", { style: "margin:0;font-size:15px" }, `Linha do tempo (${itensF.length})`), el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, fs, el("label", { style: "display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer" }, soCli, "Só o que o cliente vê"), el("button", { class: "btn sm", onclick: () => exportarCSV(c, itensF) }, "CSV"), el("button", { class: "btn sm", onclick: () => exportarPDF(c, itensF, fl) }, "PDF"))), itensF.length ? lista : el("div", { class: "note" }, "Nada ainda.")));
     return box;
   }
-  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { if (typeof equipe === "function" && equipe() && !(typeof readOnly === "function" && readOnly())) host.append(cardDossie(c)); _r && _r(c, host, ind); }; }
+  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { if (S.sub === "cliente" || S.sub === "financeiro") { _r && _r(c, host, ind); return; } if (typeof equipe === "function" && equipe() && !(typeof readOnly === "function" && readOnly())) host.append(cardDossie(c)); _r && _r(c, host, ind); }; }
   window.PP_DOSSIE = { invalidar, FRENTES };
   window.__PP_LOGIN?.then(() => { if (typeof equipe === "function" && equipe()) { const ch = SB.channel("dossie"); for (const t of ["entradas_timeline", "andamentos", "tarefas", "negociacoes"]) ch.on("postgres_changes", { event: "*", schema: "public", table: t }, (m) => { const cid = m.new?.cliente_id || m.old?.cliente_id; if (cid) invalidar(cid); else invalidar(); if (S.tab === "clientes") render(); }); ch.subscribe(); } });
 })();

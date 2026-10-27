@@ -195,7 +195,7 @@
     })();
     return card;
   }
-  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (typeof readOnly === "function" && readOnly()) return; if (!(typeof equipe === "function" && equipe())) return; host.append(cardHonorarios(c)); }; }
+  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (typeof readOnly === "function" && readOnly()) return; if (!(typeof equipe === "function" && equipe())) return; if (S.sub === "dossie" || S.sub === "cliente") return; host.append(cardHonorarios(c)); }; }
 
   // ---------- render ----------
   function renderFat() {

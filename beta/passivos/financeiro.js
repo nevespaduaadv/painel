@@ -137,6 +137,6 @@ function cardFinanceiro(c){
 document.head.append(el("style",{},`.fin-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:1000px){.fin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}`));
 window.PP_FINANCEIRO={invalidar,render:renderFinanceiro,cardFinanceiro};
 {const _r=render;render=function(){_r();const vf=$("#view-financeiro");if(!vf)return;if(!podeFin()&&S.tab==="financeiro")S.tab="clientes";vf.hidden=S.tab!=="financeiro";if(S.tab==="financeiro")renderFinanceiro()}}
-{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly()||!podeFin())return;host.append(cardFinanceiro(c))}}
+{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly()||!podeFin())return;if(S.sub==="dossie"||S.sub==="cliente")return;host.append(cardFinanceiro(c))}}
 window.__PP_LOGIN?.then(()=>{if(podeFin()){const ch=SB.channel("financeiro");let t;const re=()=>{clearTimeout(t);t=setTimeout(invalidar,500)};ch.on("postgres_changes",{event:"*",schema:"public",table:"cobrancas"},re);ch.subscribe()}});
 })();
