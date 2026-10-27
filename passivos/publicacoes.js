@@ -42,7 +42,7 @@ function renderPublicacoes(){
     const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},fmtD(parseD(data))),el("span",{class:"note"},`${ps.length} publicaç${ps.length===1?"ão":"ões"}`)));
     sec.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Processo / cliente"),el("th",{},"Tipo"),el("th",{},"Órgão"),el("th",{},"Partes"),el("th",{},"Resumo"),el("th",{},"Tarefa"),el("th",{},""))),
       el("tbody",{},ps.map(p=>el("tr",{"data-pub-id":String(p.id),style:p.ignorada?"opacity:.5":(!p.lida?"font-weight:600":"")},
-        el("td",{},el("div",{class:"num"},p.numero_processo||"—"),p.cliente_id?el("div",{class:"note"},p.cliente_nome):p.processo_id?el("span",{class:"pill g"},"fora da base"):el("span",{class:"pill e2"},"sem processo")),
+        el("td",{},el("div",{class:"num"},p.numero_processo||"—"),p.cliente_id?el("div",{class:"note"},p.cliente_nome):p.processo_id?el("span",{class:"pill g"},"fora da base"):p.cliente_sugerido_id?el("div",{},el("span",{class:"pill e2"},"sem processo"),el("div",{class:"note"},"parece ser de ",el("b",{},p.cliente_sugerido_nome))):el("span",{class:"pill e2"},"sem processo")),
         el("td",{},el("div",{},p.tipo_documento||p.tipo_comunicacao||"—"),p.tipo_documento&&p.tipo_comunicacao?el("div",{class:"note"},p.tipo_comunicacao):null),
         el("td",{},el("div",{},p.tribunal||"—"),el("div",{class:"note"},p.orgao||"")),
         el("td",{class:"note"},(p.destinatarios||[]).map(d=>d.nome).filter(Boolean).slice(0,3).join(", ")||"—"),

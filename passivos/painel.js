@@ -76,6 +76,38 @@ document.head.append(el("style",{},`.mc-grade{display:grid;grid-template-columns
 .mc-d{position:relative;border:0;background:none;font:inherit;color:var(--fg);height:40px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}.mc-d:hover{background:var(--surface-2)}.mc-d.fora{opacity:.35}.mc-d.sel{background:var(--surface-2);box-shadow:inset 0 0 0 1.5px var(--line)}
 .mc-n{font-size:12.5px;line-height:1}.mc-d.hoje .mc-n{background:var(--btn-primary);color:#fff;border-radius:999px;width:22px;line-height:22px;text-align:center}
 .mc-b{font-size:9.5px;line-height:14px;min-width:14px;padding:0 4px;border-radius:999px;color:#fff;background:var(--info)}.mc-b.warn{background:var(--warn)}.mc-b.crit{background:var(--crit)}`));
+/* ---------- "Agora": cronômetro rodando, publicações pendentes, faturamento em análise, horas da semana (beta) ---------- */
+const AG={ok:false,cron:null,pub:null,sf:null,horas:null,t:null};
+async function carregarAgora(meu){
+  if(AG.ok)return;AG.ok=true;
+  const temJur=PP.temAcesso?.("processos")??true,temFin=PP.perfil?.papel==="admin"||(PP.perfil?.acessos||[]).includes("financeiro");
+  const d=new Date();const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);const ini=d.toISOString().slice(0,10);
+  const [c,p,f,h]=await Promise.all([
+    meu?SB.from("ts_cronometros").select("*").eq("colaborador_id",meu.id).maybeSingle():{data:null},
+    temJur?SB.from("v_publicacoes").select("id,dias_para_tratar",{count:"exact"}).is("providencia",null).eq("ignorada",false).limit(500):{data:null,count:null},
+    temFin?SB.from("solicitacoes_faturamento").select("id,valor_total").eq("status","em_analise"):{data:null},
+    meu?SB.from("apontamentos_horas").select("horas").eq("colaborador_id",meu.id).gte("data",ini):{data:null}]);
+  AG.cron=c.data||null;AG.pub=p.count==null?null:{total:p.count,vencidas:(p.data||[]).filter(x=>x.dias_para_tratar!=null&&x.dias_para_tratar<0).length};
+  AG.sf=f.data?{n:f.data.length,valor:f.data.reduce((s,x)=>s+(+x.valor_total||0),0)}:null;AG.horas=h.data?h.data.reduce((s,x)=>s+(+x.horas||0),0):null;
+  render();
+}
+function faixaAgora(meu){
+  if(!AG.ok)carregarAgora(meu);
+  const irTab=t=>()=>{S.tab=t;try{localStorage.setItem("pp-tab",t)}catch(_){}render()};
+  const box=el("div",{class:"card",style:"padding:12px 16px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:14px;border-color:var(--gold)"});
+  const hFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
+  if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("b",{style:"font-size:20px;font-variant-numeric:tabular-nums"},"00:00:00");
+    const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
+    box.append(el("div",{style:"display:flex;gap:10px;align-items:center"},el("span",{class:"pill e2"},"● trabalhando"),rel,el("div",{},el("b",{},t?t.titulo:(AG.cron.descricao||"atividade")),el("div",{class:"note"},(S.clientes||[]).find(c=>c.id===AG.cron.cliente_id)?.nome||"")),
+      t?el("button",{class:"btn sm primary",onclick:()=>window.PP_TAREFAS?.abrir(t.id)},"Abrir tarefa"):null,el("button",{class:"btn sm",onclick:async()=>{try{await window.PP_TS?.pararDireto({});toast("Tempo gravado");AG.ok=false;render()}catch(e){toast(e.message)}}},"⏸ Pausar")));}
+  else box.append(el("div",{class:"note"},meu?"Nenhum cronômetro rodando — abra uma tarefa e clique em “Iniciar trabalho”.":"Seu usuário não está vinculado a um colaborador."));
+  const K=(l,v,cls,on)=>el("button",{class:"btn sm",style:"display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:6px 12px;line-height:1.2"+(cls?";border-color:var(--"+cls+")":""),onclick:on},el("span",{class:"note",style:"font-size:11px"},l),el("b",{},v));
+  const dir=el("div",{style:"display:flex;gap:8px;margin-left:auto;flex-wrap:wrap"});
+  if(AG.horas!=null)dir.append(K("Horas na semana",hFmt(AG.horas),"",irTab("horas")));
+  if(AG.pub)dir.append(K("Publicações a tratar",String(AG.pub.total)+(AG.pub.vencidas?` · ${AG.pub.vencidas} vencidas`:""),AG.pub.vencidas?"crit":"",irTab("publicacoes")));
+  if(AG.sf)dir.append(K("Faturamento em análise",`${AG.sf.n} · ${BRL(AG.sf.valor)}`,AG.sf.n?"warn":"",irTab("faturamento")));
+  box.append(dir);return box;
+}
 function renderPainel(){
   const v=$("#view-painel");v.replaceChildren();
   const nome=(PP.perfil?.nome||"").split(" ").slice(0,2).join(" ");
@@ -85,7 +117,8 @@ function renderPainel(){
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),el("h1",{},`${sauda}${nome?", "+nome:""}`),el("div",{class:"sub"},"O que precisa da sua atenção hoje.")),
     el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu Discord/WhatsApp (conforme a sua ficha), o mesmo resumo que chega às 8h",onclick:enviarResumo},"Receber resumo agora"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
-  const meu=meuColab();const minhas=z=>D.escopo==="equipe"?(esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id)):(!meu||z.responsavel_id===meu.id);
+  const meu=meuColab();
+  v.append(faixaAgora(meu));const minhas=z=>D.escopo==="equipe"?(esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id)):(!meu||z.responsavel_id===meu.id);
   const prazos=D.prazos.filter(minhas);
   const atrasadas=prazos.filter(z=>z.faixa==="atrasada"),hoje=prazos.filter(z=>z.faixa==="hoje"),d7=prazos.filter(z=>z.faixa==="d7"),fatais=prazos.filter(z=>z.prazo_fatal&&["atrasada","hoje","d7"].includes(z.faixa));
   const tarefas=D.tarefas.filter(minhas);
@@ -122,8 +155,8 @@ async function enviarResumo(){
   catch(e){toast("Não foi possível enviar: "+e.message)}
 }
 let rt=null;
-function tempoReal(){const ch=SB.channel("painel-tarefas");ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rt);rt=setTimeout(()=>{D.ok=false;if(S.tab==="painel")garantir()},500)});ch.subscribe()}
+function tempoReal(){const ch=SB.channel("painel-tarefas");ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rt);rt=setTimeout(()=>{D.ok=false;if(S.tab==="painel")garantir()},500)});ch.on("postgres_changes",{event:"*",schema:"public",table:"ts_cronometros"},()=>{AG.ok=false;if(S.tab==="painel")render()});ch.subscribe()}
 {const _r=render;render=function(){_r();const v=$("#view-painel");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="painel")S.tab="clientes";v.hidden=S.tab!=="painel";if(S.tab==="painel")renderPainel()}}
-window.PP_PAINEL={recarregar:()=>{D.ok=false;garantir()}};
+window.PP_PAINEL={recarregar:()=>{D.ok=false;AG.ok=false;garantir()}};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal();let salvo=null;try{salvo=localStorage.getItem("pp-tab")}catch(_){}if(!location.hash&&!salvo){S.tab="painel";render()}}});
 })();

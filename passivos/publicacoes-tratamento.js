@@ -38,7 +38,8 @@
     if (!p.processo_id) {
       const opts = { "": "— escolha o processo —" }; for (const x of procs) opts[x.id] = `${x.numero_cnj || "s/ nº"} · ${(S.clientes || []).find((c) => c.id === x.cliente_id)?.nome || "?"}${x.tipo_acao ? " · " + x.tipo_acao : ""}`;
       selProc = sel(opts, ""); selCli = sel({ "": "— ou crie o processo no cliente —", ...Object.fromEntries([...(S.clientes || [])].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => [c.id, c.nome])) }, "");
-      fVinc = el("div", { class: "f full", style: "border-top:1px solid var(--line);padding-top:10px" }, el("div", { class: "eyebrow" }, "Processo"), el("div", { class: "note" }, "Esta publicação ainda não está ligada a um processo da base. Vincule aqui (ou deixe em branco se for de terceiro — use “duplicidade / não é nosso”)."),
+      if (p.cliente_sugerido_id) { const meusProcs = procs.filter((x) => x.cliente_id === p.cliente_sugerido_id); if (meusProcs.length === 1) selProc.value = meusProcs[0].id; else selCli.value = p.cliente_sugerido_id; }
+      fVinc = el("div", { class: "f full", style: "border-top:1px solid var(--line);padding-top:10px" }, el("div", { class: "eyebrow" }, "Processo"), el("div", { class: "note" }, p.cliente_sugerido_id ? ["Pelo nome das partes, esta publicação parece ser de ", el("b", {}, p.cliente_sugerido_nome), " — já deixei sugerido abaixo; confira e ajuste se precisar."] : "Esta publicação ainda não está ligada a um processo da base. Vincule aqui (ou deixe em branco se for de terceiro — use “duplicidade / não é nosso”)."),
         el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px" }, selProc, selCli));
     }
     // 3) providência

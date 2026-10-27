@@ -54,6 +54,7 @@ function renderProcessos(){
   v.append(card);
   const p=P.lista.find(x=>x.id===P.sel);
   if(p){
+    if(window.PP_PROCESSO?.ficha){v.append(window.PP_PROCESSO.ficha(p,{recarregar:()=>{P.ok=false;garantir()}}));return}
     const ands=P.andsDe===p.id?P.ands:[];
     v.append(el("div",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},p.cliente_nome||"Fora da base"),el("h2",{},p.numero_cnj||"(sem número)"),el("div",{class:"note"},[p.tipo_acao,p.parte_contraria?"× "+p.parte_contraria:null,p.valor_causa?"valor da causa "+BRL(+p.valor_causa):null,p.responsavel_nome?"resp. "+p.responsavel_nome:null].filter(Boolean).join(" · "))),
         el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,p)},"Editar processo"),el("button",{class:"btn sm",onclick:()=>window.PP_TAREFAS?.nova({processo_id:p.id,cliente_id:p.cliente_id||null,titulo:""})},"+ Tarefa"),el("button",{class:"btn sm primary",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p)},"+ Andamento"))),

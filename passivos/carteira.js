@@ -29,7 +29,7 @@ async function carregarCliente(cid,forcar=false){
     await carregarPessoas();
     const [tl,pr]=await Promise.all([
       SB.from("entradas_timeline").select("*").eq("cliente_id",cid).order("data",{ascending:false}).order("created_at",{ascending:false}),
-      SB.from("processos").select("*").eq("cliente_id",cid).order("created_at")]);
+      (readOnly()?SB.from("processos").select("*"):SB.from("v_processos").select("*")).eq("cliente_id",cid).order("created_at")]);
     if(tl.error)throw tl.error;if(pr.error)throw pr.error;
     const pids=pr.data.map(p=>p.id), eids=tl.data.map(e=>e.id);
     const [an,ax]=await Promise.all([
@@ -183,6 +183,7 @@ function renderProcessos(c,host){
 }
 function detalheProcesso(c,p){
   const cliente=readOnly();
+  if(!cliente&&window.PP_PROCESSO?.ficha)return window.PP_PROCESSO.ficha(p,{cliente:c,recarregar:()=>carregarCliente(c.id,true)});
   const ands=M.andamentos.filter(a=>a.processo_id===p.id);
   const box=el("div",{class:"card",style:"padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2)"},
     el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Processo"),el("h3",{},p.numero_cnj||"(sem número)"),el("div",{class:"note"},[p.tipo_acao,p.parte_contraria?"× "+p.parte_contraria:null,p.valor_causa?"valor da causa "+BRL(+p.valor_causa):null].filter(Boolean).join(" · "))),
@@ -209,7 +210,7 @@ function openProcessoForm(c,p={}){
   cli.onchange=()=>{const novo=S.clientes.find(x=>x.id===cli.value);kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cli.value).map(k=>el("option",{value:k.id},shortName(k))));kon.value="";cli.parentElement.querySelector(".help").textContent=cli.value!==(c.id||"")?(novo?`O processo, os andamentos e as tarefas vinculadas passam para ${novo.nome}.`:"O processo deixa de aparecer na ficha do cliente e fica só na lista de Processos."):"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."};
   const body=el("div",{class:"form"},field("p-cli","Cliente",cli,"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."),field("p-cnj","Número CNJ",cnj),field("p-acao","Tipo de ação",acao.wrap),field("p-trib","Tribunal",trib),field("p-vara","Vara / comarca",vara),
     field("p-parte","Parte contrária",parte),field("p-polo","Polo do cliente",polo),field("p-con","Contrato relacionado",kon),field("p-banco","Banco relacionado",banco.wrap),
-    field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),field("p-prazo","Próximo prazo",prazo),fatal.wrap,field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
+    field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),el("div",{class:"f full note"},"Prazos deste processo são tarefas com prazo (botão “+ Prazo / tarefa” na ficha). O próximo prazo é calculado automaticamente."),field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
   const extras=window.PP_PASTAS?.camposForm?.(p,c);if(extras)body.append(extras.wrap);
   const extra=p.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este processo e todos os andamentos?"))return;const {error}=await SB.from("processos").delete().eq("id",p.id);$("#modalHost").replaceChildren();M.procSel=null;toast(error?"Não foi possível excluir":"Processo excluído")}},"Excluir"):null;
   modal(p.id?"Editar processo":"Novo processo",body,async()=>{
