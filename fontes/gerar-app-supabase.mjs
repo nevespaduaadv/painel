@@ -77,6 +77,64 @@ html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos e pas
 html = html.replace('{tab:"historico",label:"Base de acordos",cls:"area-juridico"},]},', '{tab:"historico",label:"Base de acordos",cls:"area-juridico"}]},\n  {grupo:"juridico-ferr",label:"Ferramentas jurídicas",cls:"edit-only grp-juridico",fechadoPadrao:true,itens:[{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)}]},');
 html = html.replace('const temAtivo=n.itens.some(ativo),fechado=!!fechados[n.grupo]&&!temAtivo;', 'const temAtivo=n.itens.some(ativo),fechado=(fechados[n.grupo]??!!n.fechadoPadrao)&&!temAtivo;');
 html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"painel",label:"Hoje",cls:"edit-only"}');
+
+// [espelho] página do cliente: 7 pastas (Dossiê · Cadastro · Passivos · Jurídico · Negocial · Tarefas · Financeiro) em vez de 9 abas
+if(ESPELHO){
+  must('  const SUBS=[["resumo","Resumo"],');
+  const ini = html.indexOf('  const SUBS=[["resumo","Resumo"],');
+  const fimMarca = '  if(S.sub==="notas"){';
+  const fim0 = html.indexOf(fimMarca, ini);
+  const fim = html.indexOf('    m.append(sec);return;\n  }\n', fim0) + '    m.append(sec);return;\n  }\n'.length;
+  const antigo = html.slice(ini, fim);
+  const novo = `  const EQ=!readOnly();
+  const SUBS=EQ?[["dossie","Dossiê"],["cliente","Cadastro"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],["financeiro","Financeiro"]]
+    :[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline","Andamento",cnt.timeline],["processos","Processos",cnt.processos]];
+  if(EQ){const mapa={resumo:"dossie",timeline:"dossie",notas:"cliente",geral:"passivos",contratos:"passivos",reserva:"passivos"};if(mapa[S.sub]){if(["geral","contratos","reserva"].includes(S.sub))S.sub2=S.sub;S.sub=mapa[S.sub]}}
+  if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub=EQ?"dossie":(MOD.resumo?"resumo":"geral");
+  m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
+  if(S.sub==="resumo"||S.sub==="dossie"||S.sub==="cliente"||S.sub==="financeiro"){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);
+    if(MOD.resumo)MOD.resumo(c,host,{ks,ativos,saldoTotal,saldoNeg,acordoTotal,reservaTotal});else{S.sub=EQ?"passivos":"geral";render();return}
+    if(S.sub==="cliente"){
+      const sec=el("section",{class:"card section edit-only"},el("div",{class:"section-h"},el("h2",{},"Notas internas"),el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar")));
+      sec.append(c.notasInternas?el("div",{style:"white-space:pre-wrap"},c.notasInternas):el("div",{class:"note"},"Nenhuma nota interna. Prefira registrar no Dossiê (tipo “Informação do cliente”, fixada) — este campo é o legado."));
+      const kn=ks.filter(k=>k.notas);if(kn.length)sec.append(el("h3",{style:"margin-top:8px"},"Notas por contrato"),el("ul",{style:"margin:0;padding-left:18px"},kn.map(k=>el("li",{},el("b",{},shortName(k)),": ",k.notas))));
+      host.append(sec);
+    }
+    return;
+  }
+  let sub2=EQ&&S.sub==="passivos"?(S.sub2||"geral"):S.sub;
+  if(EQ&&S.sub==="passivos")m.append(el("div",{class:"actions",style:"justify-content:flex-start;margin:-4px 0 10px"},...[["geral","Visão geral"],["contratos","Contratos"],["reserva","Reserva de quitação"]].map(([k,l])=>el("button",{class:"btn sm"+(sub2===k?" primary":""),onclick:()=>{S.sub2=k;render()}},l))));
+  if(sub2==="contratos"){
+    const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Contratos"),el("span",{class:"note"},\`Projeção baseada em \${acordos.length} acordos reais do escritório · estágio conforme Res. CMN 4.966/2021 · provisão mínima conforme Res. BCB 352/2023\`)));
+    if(!ks.length)sec.append(el("div",{class:"empty"},"Nenhum contrato cadastrado para este cliente."));
+    else sec.append(el("div",{class:"contracts"},ks.map(k=>contractCard(k,projetar(k,R,acordos),R))));
+    m.append(sec,disclaimer());return;
+  }
+  if(sub2==="reserva"){m.append(renderReserva(c,neg,fora,R,acumulada,alvoTotal,reservaTotal,mesesMax),disclaimer());return}
+  if(S.sub==="timeline"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.timeline)MOD.timeline(c,host);else legacyTimeline(c,host);
+    return;
+  }
+  if(S.sub==="processos"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.processos)MOD.processos(c,host);else host.append(el("div",{class:"empty"},el("h3",{},"Processos"),el("div",{},"Disponível na versão do painel conectada ao banco de dados.")));
+    return;
+  }
+  if(S.sub==="tarefas"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.tarefas)MOD.tarefas(c,host);else host.append(el("div",{class:"empty"},"Disponível na versão do painel conectada ao banco de dados."));
+    return;
+  }
+  if(S.sub==="negociacoes"){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);if(MOD.negociacoes)MOD.negociacoes(c,host);else host.append(el("div",{class:"empty"},"Módulo de negociações não carregado."));return;
+  }
+`;
+  html = html.slice(0, ini) + novo + html.slice(fim);
+  html = html.replace('negociacoes:"Negociações",notas:"Notas internas"}', 'negociacoes:"Negocial",notas:"Notas internas",dossie:"Dossiê",cliente:"Cadastro",passivos:"Passivos",financeiro:"Financeiro"}');
+  console.log('[espelho] página do cliente reorganizada (', antigo.length, '→', novo.length, ')');
+}
 if(ESPELHO){ must('<title>Sistema interno — Neves Pádua Advocacia</title>'); html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>ESPELHO (beta) — Neves Pádua Advocacia</title>'); html = html.replace('</style>', '.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}</style>',1); html = html.replace('<body', '<body data-espelho="1"',1); html = html.replace('</style>', '.espelho-only{display:none!important}</style>',1); html = html.replace('</body>', '<div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div></body>'); }
 must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
