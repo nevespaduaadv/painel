@@ -116,16 +116,29 @@ function linhaEvento(e){
   return el("li",{class:"ev-sistema"},el("div",{class:"d"},fmtDT(e.criado_em)+" · "+txt,e.nota?el("div",{style:"white-space:pre-wrap;margin-top:2px"},e.nota):null));
 }
 async function historico(id,host){
-  const {data,error}=await SB.from("tarefa_eventos").select("*").eq("tarefa_id",id).order("criado_em",{ascending:false});
+  const [{data,error},ax]=await Promise.all([SB.from("tarefa_eventos").select("*").eq("tarefa_id",id).order("criado_em",{ascending:false}),SB.from("anexos").select("id,tarefa_evento_id,nome,caminho_storage").eq("tarefa_id",id)]);
   host.replaceChildren();
   if(error){host.append(el("div",{class:"note"},"Histórico indisponível"));return}
   if(!data.length){host.append(el("div",{class:"note"},"Sem registros ainda."));return}
-  host.append(el("ul",{class:"tl",style:"margin:0"},data.map(linhaEvento)));
+  const porEv={};for(const a of (ax.data||[])){(porEv[a.tarefa_evento_id]=porEv[a.tarefa_evento_id]||[]).push(a)}
+  host.append(el("ul",{class:"tl",style:"margin:0"},data.map(e=>{const li=linhaEvento(e);const as=porEv[e.id];if(as?.length)li.append(el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"},as.map(anexoPill)));return li})));
 }
-async function comentar(id,texto){
-  const {error}=await SB.from("tarefa_eventos").insert({tarefa_id:id,tipo:"comentario",nota:texto,autor:PP.perfil?.id,autor_nome:meuColab()?.nome||PP.perfil?.nome||null});
+async function comentar(id,texto,files){
+  const {data:ev,error}=await SB.from("tarefa_eventos").insert({tarefa_id:id,tipo:"comentario",nota:texto,autor:PP.perfil?.id,autor_nome:meuColab()?.nome||PP.perfil?.nome||null}).select("id").single();
   if(error)throw new Error("Não foi possível registrar o comentário");
+  if(files&&files.length)await anexarEvento(id,ev.id,files);
+  return ev.id;
 }
+async function anexarEvento(tarefaId,eventoId,files){
+  for(const f of files){
+    const nome=f.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_");
+    const caminho=`tarefas/${tarefaId}/${eventoId}/${Date.now().toString(36)}-${nome}`;
+    const {error}=await SB.storage.from("anexos").upload(caminho,f,{contentType:f.type||undefined});if(error)throw new Error("Falha ao enviar "+f.name);
+    const {error:e2}=await SB.from("anexos").insert({tarefa_id:tarefaId,tarefa_evento_id:eventoId,nome:f.name,caminho_storage:caminho,tamanho:f.size,mime:f.type||null});if(e2)throw new Error(e2.message);
+  }
+}
+async function abrirAnexoTarefa(a){const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}
+const anexoPill=a=>el("button",{class:"btn sm",style:"padding:1px 8px;font-size:12px",onclick:()=>abrirAnexoTarefa(a)},"📎 "+a.nome);
 /* @menção: ao digitar "@" no comentário, sugere colaboradores; o banco notifica quem foi marcado (0046). */
 const cssM=document.createElement("style");cssM.textContent=".menu-pop{position:relative;z-index:5;margin-top:-2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:4px;display:flex;flex-direction:column;max-width:320px}.menu-pop .item{border:0;background:transparent;text-align:left;padding:7px 10px;border-radius:8px;cursor:pointer;font:inherit;color:inherit}.menu-pop .item:hover{background:var(--surface-2)}";document.head.append(cssM);
 function mencoes(ta){
@@ -143,17 +156,18 @@ function comentarConclusao(t){
   modal("Tarefa concluída: "+t.titulo,body,async()=>{if(ta.value.trim())await comentar(t.id,ta.value.trim())});
 }
 /* ---------- Tela da tarefa: o que fazer, para quem passar, o que já aconteceu ---------- */
-async function mudarStatus(t,status,nota){
+async function mudarStatus(t,status,nota,files){
   const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);if(error)throw new Error("Não foi possível atualizar");
-  if(nota)await comentar(t.id,nota);
+  if(nota||files?.length)await comentar(t.id,nota||"(anexo)",files);
 }
 function passarPara(t,recarregar){
   const meu=meuColab();const para=selColab(t.responsavel_id);const nota=el("textarea",{rows:3,placeholder:"O que a pessoa precisa saber para continuar? (ex.: já liguei para o banco, falta protocolar; prazo fatal 20/10)"});
-  const body=el("div",{class:"form"},field("pp-para","Passar para",para),el("div",{class:"f full"},el("label",{},"Recado para quem recebe"),nota,el("div",{class:"help"},"Quem recebe é avisado no sino e vê este recado no histórico da tarefa. Você continua podendo acompanhar.")));
+  const arqP=el("input",{type:"file",multiple:""});
+  const body=el("div",{class:"form"},field("pp-para","Passar para",para),el("div",{class:"f full"},el("label",{},"Recado para quem recebe"),nota,el("div",{class:"help"},"Quem recebe é avisado no sino e vê este recado no histórico da tarefa e no dossiê do cliente. Você continua podendo acompanhar.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a réplica para correção)"),arqP));
   modal("Passar a tarefa: "+t.titulo,body,async()=>{
     if(!para.value)throw new Error("Escolha para quem passar");if(para.value===t.responsavel_id)throw new Error("Essa pessoa já é a responsável");
     const {error}=await SB.from("tarefas").update({responsavel_id:para.value,status:t.status==="concluida"?"aberta":t.status}).eq("id",t.id);if(error)throw new Error("Não foi possível passar a tarefa");
-    const quem=nomeColab(para.value);await comentar(t.id,`Passei para ${quem}${meu?" (de "+meu.nome.split(" ")[0]+")":""}.`+(nota.value.trim()?"\n"+nota.value.trim():""));
+    const quem=nomeColab(para.value);await comentar(t.id,`Passei para ${quem}${meu?" (de "+meu.nome.split(" ")[0]+")":""}.`+(nota.value.trim()?"\n"+nota.value.trim():""),[...arqP.files]);
     toast("Tarefa passada para "+quem);setTimeout(recarregar,300);
   });
 }
@@ -176,11 +190,11 @@ function openTarefa(t){
   const desc=t.descricao?el("div",{class:"tf-desc"},t.descricao):el("div",{class:"note"},"Sem descrição.");
   /* ---- concluir: o que foi feito é obrigatório; se o cronômetro desta tarefa estiver rodando, grava o tempo antes ---- */
   const concluir=async()=>{
-    const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:4});
-    const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do andamento; quem abriu a tarefa é avisado.")));
+    const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:4});const arq=el("input",{type:"file",multiple:""});
+    const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do andamento e do dossiê do cliente; quem abriu a tarefa é avisado.")),el("div",{class:"f full"},el("label",{},"Anexar (peça, comprovante, protocolo…)"),arq));
     modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");
       if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      await mudarStatus(t,"concluida",ta.value.trim());toast("Tarefa concluída");setTimeout(reabrirTela,300)});
+      await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída");setTimeout(reabrirTela,300)});
     const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Concluir tarefa";
   };
   /* ---- trabalho: cronômetro dentro da tarefa (iniciar = em andamento; pausar grava o tempo; concluir grava e encerra) ---- */
@@ -217,12 +231,14 @@ function openTarefa(t){
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
   const hist=el("div",{},el("div",{class:"note"},"Carregando…"));
   const com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:"Registrar o que você fez, ou avisar alguém com @ (ex.: @Natasha o banco respondeu). Ctrl+Enter envia."});
-  const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Registrar");
+  const arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.textContent=arqCom.files.length?`📎 ${arqCom.files.length}`:"📎"};
+  const btnArq=el("button",{class:"btn sm",title:"Anexar arquivo ao registro",onclick:()=>arqCom.click()},"📎");
+  const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.textContent="📎";toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Registrar");
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))btnCom.click()});
   mencoes(com);
   const body=el("div",{class:"tf"},cab,meta,desc,acoes,
     el("div",{class:"tf-h"},"Andamento"),
-    el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnCom),hist);
+    el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnArq,arqCom,btnCom),hist);
   const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px"},el("h2",{style:t.status==="concluida"?"text-decoration:line-through;color:var(--muted)":""},t.titulo),body,
     el("div",{class:"actions"},el("button",{class:"btn",onclick:close},"Fechar")));
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));

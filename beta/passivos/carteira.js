@@ -81,7 +81,10 @@ function csv(nome,linhas,colunas){
   baixar(nome+".csv",txt,"text/csv;charset=utf-8");
 }
 function baixar(nome,conteudo,mime){const a=el("a",{href:URL.createObjectURL(new Blob([conteudo],{type:mime})),download:nome});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
-const exportBtns=(nome,rows,cols)=>[el("button",{class:"btn sm edit-only",onclick:()=>csv(nome,rows,cols)},"CSV"),el("button",{class:"btn sm edit-only",onclick:()=>baixar(nome+".json",JSON.stringify(rows,null,2),"application/json")},"JSON")];
+function pdfTabela(nome,rows,cols){const e=s=>String(s??"").replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch]));const titulo=nome.replace(/[-_]+/g," ");
+  const html=`<!doctype html><html lang=pt-BR><head><meta charset=utf-8><title>${e(titulo)}</title><style>body{font-family:Georgia,serif;color:#0C1F38;margin:28px 36px;font-size:12px}.cab{display:flex;justify-content:space-between;border-bottom:2px solid #B8964A;padding-bottom:10px;margin-bottom:16px}.marca{font-weight:700;letter-spacing:.04em}.marca small{display:block;font-family:Arial,sans-serif;font-weight:400;font-size:11px;color:#555}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10.5px}th{text-align:left;background:#0C1F38;color:#fff;padding:5px 7px}td{padding:5px 7px;border-bottom:1px solid #e4e4e4;vertical-align:top}@media print{body{margin:12mm 10mm}}</style></head><body><div class=cab><div class=marca>NEVES PÁDUA ADVOCACIA<small>OAB/SP 488.803 · ${e(titulo)}</small></div><div style="font-family:Arial,sans-serif;font-size:11px">Emitido em ${new Date().toLocaleDateString("pt-BR")} · ${rows.length} linha(s)</div></div><table><thead><tr>${cols.map(c=>`<th>${e(c.replace(/_/g," "))}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${e(r[c]==null?"":typeof r[c]==="object"?JSON.stringify(r[c]):r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table><script>setTimeout(()=>window.print(),400)</script></body></html>`;
+  const w=window.open("","_blank");if(!w){toast("Permita pop-ups para gerar o PDF");return}w.document.write(html);w.document.close()}
+const exportBtns=(nome,rows,cols)=>[el("button",{class:"btn sm edit-only",onclick:()=>csv(nome,rows,cols)},"CSV"),el("button",{class:"btn sm edit-only",onclick:()=>pdfTabela(nome,rows,cols)},"PDF")];
 async function abrirAnexo(a){
   const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);
   if(error||!data){toast("Não foi possível abrir o anexo");return}
@@ -175,16 +178,16 @@ function renderProcessos(c,host){
   if(!M.processos.length){host.append(el("div",{class:"empty"},el("h3",{},"Nenhum processo vinculado"),el("div",{},cliente?"Não há processo judicial em andamento. O trabalho do escritório segue registrado na aba Andamento.":"Cadastre os processos do cliente para acompanhar prazos e andamentos. Clientes sem processo continuam normalmente.")));return}
   const ordem=[...M.processos].sort((a,b)=>(a.status==="encerrado")-(b.status==="encerrado")||(a.proximo_prazo||"9999").localeCompare(b.proximo_prazo||"9999"));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Último andamento"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
-    el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{M.procSel=M.procSel===p.id?null:p.id;render()}},
+    el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{if(!readOnly()&&window.PP_PROCESSOS?.abrir){window.PP_PROCESSOS.abrir(p.id,{voltar:{tab:"clientes",sel:c.id,sub:"processos"}});return}M.procSel=M.procSel===p.id?null:p.id;render()}},
       el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
       el("td",{},p.tipo_acao||"—",p.polo?el("div",{class:"note"},p.polo==="ativo"?"polo ativo":"polo passivo"):null),
       el("td",{},[p.tribunal,p.vara].filter(Boolean).join(" · ")||"—"),el("td",{},p.parte_contraria||"—"),
       el("td",{},p.banco||nomeContrato(p.contrato_id)||"—",p.contrato_id&&p.banco?el("div",{class:"note"},nomeContrato(p.contrato_id)):null),
       el("td",{},p.fase||"—"),el("td",{},(()=>{const ua=M.andamentos.filter(a=>a.processo_id===p.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0];return ua?el("span",{},fmtD(parseD(ua.data)),el("div",{class:"note"},(ua.tipo?ua.tipo+": ":"")+ua.descricao.slice(0,70)+(ua.descricao.length>70?"…":""))):el("span",{class:"note"},"—")})()),el("td",{},prazoPill(p)),cliente?null:el("td",{},responsavelDe(p)),el("td",{},el("span",{class:"pill "+(p.status==="ativo"?"e1":p.status==="suspenso"?"e2":"g")},STATUS_PROC[p.status]||p.status))))));
   host.append(el("div",{class:"tbl"},tb));
-  const p=M.processos.find(x=>x.id===M.procSel);
+  const p=readOnly()?M.processos.find(x=>x.id===M.procSel):null;
   if(p)host.append(detalheProcesso(c,p));
-  else host.append(el("div",{class:"note"},"Clique em um processo para ver os andamentos."));
+  else host.append(el("div",{class:"note"},readOnly()?"Clique em um processo para ver os andamentos.":"Clique em um processo para abrir a página dele (prazos, trabalho do escritório, andamentos, publicações e pasta)."));
 }
 function detalheProcesso(c,p){
   const cliente=readOnly();

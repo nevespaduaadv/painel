@@ -20,6 +20,15 @@ async function carregarAndamentos(pid){
 const prazoPill=p=>{if(!p.proximo_prazo)return el("span",{class:"note"},"—");const d=p.dias_para_prazo;const cls=d<0||d===0?"e3":d<=7?"e2":"g";return el("span",{class:"pill "+cls},fmtD(parseD(p.proximo_prazo)),p.prazo_fatal?" · fatal":"",d<0?` · ${-d}d atrás`:d===0?" · hoje":d<=30?` · em ${d}d`:"")};
 function renderProcessos(){
   const v=$("#view-processos");v.replaceChildren();
+  if(P.sel&&window.PP_PROCESSO?.ficha){
+    if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
+    const p=P.lista.find(x=>x.id===P.sel);if(!p){P.sel=null;render();return}
+    const volta=P.voltar||{tab:"processos"};
+    v.append(el("div",{class:"crumbs",style:"margin-bottom:10px"},el("button",{class:"btn sm btn-voltar",onclick:()=>{P.sel=null;P.voltar=null;if(volta.tab==="clientes"){S.tab="clientes";S.sel=volta.sel;S.sub=volta.sub||"processos"}else{S.tab="processos"}render()}},volta.tab==="clientes"?"← Cliente":"← Processos"),
+      el("span",{class:"note"},(p.cliente_nome||"Fora da base")+" › Processo "+(p.numero_cnj||"(sem número)")+(p.pasta_codigo?" › Pasta "+p.pasta_codigo:""))));
+    v.append(window.PP_PROCESSO.ficha(p,{recarregar:()=>{P.ok=false;garantir()}}));
+    return;
+  }
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Processos"),el("div",{class:"sub"},"Todos os processos acompanhados, inclusive os de pessoas fora da base de clientes.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})},"+ Processo"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -49,8 +58,8 @@ function renderProcessos(){
       {label:"Próximo prazo",r:p=>prazoPill(p)},
       {label:"Responsável",r:p=>p.responsavel_nome||"—"},
       {label:"Status",r:p=>el("span",{class:"pill "+(p.status==="ativo"?"e1":p.status==="suspenso"?"e2":"g")},p.status)}],
-    rows:lista,onRow:p=>{P.sel=P.sel===p.id?null:p.id;if(P.sel)carregarAndamentos(p.id);render()},vazio:"Nenhum processo com esses filtros.",
-    acts:p=>[p.cliente_id?btnIco("abrir","Abrir na ficha do cliente",()=>window.PP_CARTEIRA?.abrirProcesso(p.cliente_id,p.id)):null,btnIco("editar","Editar",()=>window.PP_CARTEIRA?.openProcessoForm(null,p))]}));
+    rows:lista,onRow:p=>{if(window.PP_PROCESSO?.ficha){window.PP_PROCESSOS.abrir(p.id);return}P.sel=P.sel===p.id?null:p.id;if(P.sel)carregarAndamentos(p.id);render()},vazio:"Nenhum processo com esses filtros.",
+    acts:p=>[btnIco("abrir","Abrir o processo",()=>window.PP_PROCESSOS.abrir(p.id)),btnIco("editar","Editar",()=>window.PP_CARTEIRA?.openProcessoForm(null,p))]}));
   v.append(card);
   const p=P.lista.find(x=>x.id===P.sel);
   if(p){
@@ -68,7 +77,7 @@ function renderProcessos(){
 let rt=null;
 function tempoReal(){const ch=SB.channel("processos-lista");for(const t of ["processos","andamentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{clearTimeout(rt);rt=setTimeout(()=>{P.ok=false;if(P.sel)carregarAndamentos(P.sel);if(S.tab==="processos")garantir()},500)});ch.subscribe()}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^processos\/([0-9a-f-]{36})$/i.exec(h);if(m){P.sel=m[1];carregarAndamentos(m[1])}return _h.apply(this,arguments)}}
-window.PP_PROCESSOS={lista:()=>{garantir();return P.lista},recarregar:()=>{P.ok=false;garantir()},abrir:id=>{P.sel=id;carregarAndamentos(id);S.tab="processos";render()}};
+window.PP_PROCESSOS={lista:()=>{garantir();return P.lista},recarregar:()=>{P.ok=false;garantir()},abrir:(id,opts={})=>{P.sel=id;P.voltar=opts.voltar||null;S.tab="processos";try{localStorage.setItem("pp-tab","processos")}catch(_){}history.replaceState(null,"","#processos/"+id);render()}};
 {const _r=render;render=function(){_r();const v=$("#view-processos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="processos")S.tab="clientes";v.hidden=S.tab!=="processos";if(S.tab==="processos")renderProcessos()}}
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal();setTimeout(garantir,1500)}});
 })();
