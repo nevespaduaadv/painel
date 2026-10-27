@@ -5,7 +5,8 @@
 (()=>{
 "use strict";
 const TIPOS={solicitacao_documentos:"Solicitação de documentos",requerimento_bacen:"Requerimento ao Bacen",analise_contrato:"Análise de contrato",parecer_tecnico:"Parecer técnico",contato_banco:"Contato com jurídico do banco",proposta_acordo:"Proposta de acordo",reuniao_cliente:"Reunião com cliente",ata:"Ata",protocolo:"Protocolo",mudanca_estagio:"Mudança de estágio",acordo_fechado:"Acordo fechado",tarefa:"Tarefa",andamento:"Andamento processual",outro:"Outro"};
-const TIPOS_MANUAIS=Object.fromEntries(Object.entries(TIPOS).filter(([k])=>!["mudanca_estagio","acordo_fechado","andamento"].includes(k)));
+const TIPOS_MANUAIS={registro:"Registro de trabalho",informacao_cliente:"Informação do cliente (perfil)",decisao:"Decisão",nao_feito:"Motivo de não fazer",contato_cliente:"Contato com o cliente",...Object.fromEntries(Object.entries(TIPOS).filter(([k])=>!["mudanca_estagio","acordo_fechado","andamento","tarefa"].includes(k)))};
+const FRENTES={estrategico:"Estratégico / Consultivo",juridico:"Jurídico / Contencioso",negocial:"Negocial / Acordos"};
 const POLOS={passivo:"Passivo (cliente é réu/executado)",ativo:"Ativo (cliente é autor)"};
 const STATUS_PROC={ativo:"Ativo",suspenso:"Suspenso",encerrado:"Encerrado"};
 const FASES_PROC=["Conhecimento","Recursal","Execução / cumprimento de sentença","Embargos","Suspenso","Arquivado"];
@@ -29,7 +30,7 @@ async function carregarCliente(cid,forcar=false){
     await carregarPessoas();
     const [tl,pr]=await Promise.all([
       SB.from("entradas_timeline").select("*").eq("cliente_id",cid).order("data",{ascending:false}).order("created_at",{ascending:false}),
-      SB.from("processos").select("*").eq("cliente_id",cid).order("created_at")]);
+      (readOnly()?SB.from("processos").select("*"):SB.from("v_processos").select("*")).eq("cliente_id",cid).order("created_at")]);
     if(tl.error)throw tl.error;if(pr.error)throw pr.error;
     const pids=pr.data.map(p=>p.id), eids=tl.data.map(e=>e.id);
     const [an,ax]=await Promise.all([
@@ -80,7 +81,10 @@ function csv(nome,linhas,colunas){
   baixar(nome+".csv",txt,"text/csv;charset=utf-8");
 }
 function baixar(nome,conteudo,mime){const a=el("a",{href:URL.createObjectURL(new Blob([conteudo],{type:mime})),download:nome});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
-const exportBtns=(nome,rows,cols)=>[el("button",{class:"btn sm edit-only",onclick:()=>csv(nome,rows,cols)},"CSV"),el("button",{class:"btn sm edit-only",onclick:()=>baixar(nome+".json",JSON.stringify(rows,null,2),"application/json")},"JSON")];
+function pdfTabela(nome,rows,cols){const e=s=>String(s??"").replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch]));const titulo=nome.replace(/[-_]+/g," ");
+  const html=`<!doctype html><html lang=pt-BR><head><meta charset=utf-8><title>${e(titulo)}</title><style>body{font-family:Georgia,serif;color:#0C1F38;margin:28px 36px;font-size:12px}.cab{display:flex;justify-content:space-between;border-bottom:2px solid #B8964A;padding-bottom:10px;margin-bottom:16px}.marca{font-weight:700;letter-spacing:.04em}.marca small{display:block;font-family:Arial,sans-serif;font-weight:400;font-size:11px;color:#555}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10.5px}th{text-align:left;background:#0C1F38;color:#fff;padding:5px 7px}td{padding:5px 7px;border-bottom:1px solid #e4e4e4;vertical-align:top}@media print{body{margin:12mm 10mm}}</style></head><body><div class=cab><div class=marca>NEVES PÁDUA ADVOCACIA<small>OAB/SP 488.803 · ${e(titulo)}</small></div><div style="font-family:Arial,sans-serif;font-size:11px">Emitido em ${new Date().toLocaleDateString("pt-BR")} · ${rows.length} linha(s)</div></div><table><thead><tr>${cols.map(c=>`<th>${e(c.replace(/_/g," "))}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${e(r[c]==null?"":typeof r[c]==="object"?JSON.stringify(r[c]):r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table><script>setTimeout(()=>window.print(),400)</script></body></html>`;
+  const w=window.open("","_blank");if(!w){toast("Permita pop-ups para gerar o PDF");return}w.document.write(html);w.document.close()}
+const exportBtns=(nome,rows,cols)=>[el("button",{class:"btn sm edit-only",onclick:()=>csv(nome,rows,cols)},"CSV"),el("button",{class:"btn sm edit-only",onclick:()=>pdfTabela(nome,rows,cols)},"PDF")];
 async function abrirAnexo(a){
   const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);
   if(error||!data){toast("Não foi possível abrir o anexo");return}
@@ -132,26 +136,30 @@ function renderTimeline(c,host){
   })));
 }
 function openEntradaForm(c,e={}){
-  const data=inp("date",e.data||hojeISO()),tipo=sel(TIPOS_MANUAIS,e.tipo||"outro"),resp=selColab(e.responsavel_id||meuColab()?.id),horas=inp("number",e.horas||"",{step:"0.25",min:0,placeholder:"0"}),
+  const data=inp("date",e.data||hojeISO()),tipo=sel(TIPOS_MANUAIS,e.tipo||"registro"),resp=selColab(e.responsavel_id||meuColab()?.id),
+        frente=sel({"":"— automática —",...FRENTES},e.frente||meuColab()?.frente||(e.processo_id?"juridico":e.negociacao_id?"negocial":"")),fixado=check("Fixar no perfil do cliente",e.fixado,"Para informações que não podem ser esquecidas (frota, garantias, sócios, combinados)."),horas=inp("number",e.horas||"",{step:"0.25",min:0,placeholder:"0"}),
         kon=selContrato(c,e.contrato_id),pro=selProcesso(e.processo_id),desc=el("textarea",{placeholder:"O que foi feito, com quem, resultado e próximos passos."},e.descricao||""),
         links=el("textarea",{placeholder:"Um por linha. Ex.: Ata da reunião | https://drive.google.com/…"},linksTexto(e.links)),vis=check("Visível ao cliente",e.visivel_cliente,"Por padrão a atuação é interna. Marque para publicar na área do cliente."),
         arq=el("input",{type:"file",multiple:""});
-  const anexosAtuais=e.id?M.anexos.filter(a=>a.entrada_id===e.id):[];
+  const anexosAtuais=e.id?M.anexos.filter(a=>a.entrada_id===e.id):[];const criarTarefa=el("input",{type:"checkbox",style:"width:16px;height:16px;margin:0;accent-color:var(--gold)"});
   const listaAnexos=el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},anexosAtuais.map(a=>el("span",{class:"pill g"},a.nome," ",el("button",{class:"btn sm danger",style:"padding:0 4px",title:"Remover anexo",onclick:async(ev)=>{ev.preventDefault();await SB.storage.from("anexos").remove([a.caminho_storage]);await SB.from("anexos").delete().eq("id",a.id);ev.target.closest(".pill").remove()}},"×"))));
-  const body=el("div",{class:"form"},field("t-data","Data",data),field("t-tipo","Tipo",tipo),field("t-resp","Responsável",resp,M.colab.length?null:"Nenhum colaborador cadastrado ainda; o registro guarda quem lançou."),field("t-horas","Horas gastas",horas),
+  tipo.onchange=()=>{if(tipo.value==="informacao_cliente"&&!e.id)fixado.input.checked=true};
+  const body=el("div",{class:"form"},field("t-data","Data",data),field("t-tipo","Tipo",tipo),field("t-frente","Frente",frente,"Em qual das três frentes isto se encaixa. Avisa o responsável da frente neste cliente, se houver."),field("t-resp","Responsável",resp,M.colab.length?null:"Nenhum colaborador cadastrado ainda; o registro guarda quem lançou."),field("t-horas","Horas gastas",horas),
     field("t-con","Contrato vinculado",kon),field("t-pro","Processo vinculado",pro),field("t-desc","Descrição",desc),field("t-links","Links (Drive, ata, gravação)",links),
-    el("div",{class:"f full"},el("label",{for:"t-arq"},"Anexos (upload opcional)"),Object.assign(arq,{id:"t-arq"}),listaAnexos),vis.wrap);
+    el("div",{class:"f full"},el("label",{for:"t-arq"},"Anexos (upload opcional)"),Object.assign(arq,{id:"t-arq"}),listaAnexos),vis.wrap,fixado.wrap,
+    e.id?null:el("div",{class:"f full"},el("label",{style:"display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer"},criarTarefa," Criar uma tarefa a partir deste registro ao salvar")));
   const extra=e.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir esta atuação e seus anexos?"))return;
       const paths=anexosAtuais.map(a=>a.caminho_storage);if(paths.length)await SB.storage.from("anexos").remove(paths);
       const {error}=await SB.from("entradas_timeline").delete().eq("id",e.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível excluir":"Atuação excluída")}},"Excluir"):null;
-  modal(e.id?"Editar atuação":"Registrar atuação",body,async()=>{
+  modal(e.id?"Editar registro":"Registrar — "+(c.nome||""),body,async()=>{
     if(!desc.value.trim())throw new Error("Descreva a atuação");if(!data.value)throw new Error("Informe a data");
-    const row={cliente_id:c.id,data:data.value,tipo:tipo.value,responsavel_id:resp.value||null,horas:+horas.value||0,contrato_id:kon.value||null,processo_id:pro.value||null,descricao:desc.value.trim(),links:linksParse(links.value),visivel_cliente:vis.input.checked};
+    const row={cliente_id:c.id,data:data.value,tipo:tipo.value,responsavel_id:resp.value||null,horas:+horas.value||0,contrato_id:kon.value||null,processo_id:pro.value||null,descricao:desc.value.trim(),links:linksParse(links.value),visivel_cliente:vis.input.checked,frente:frente.value||null,fixado:fixado.input.checked,negociacao_id:e.negociacao_id||null};
     let id=e.id;
     if(id){const {error}=await SB.from("entradas_timeline").update(row).eq("id",id);if(error)throw error}
     else{const {data:ins,error}=await SB.from("entradas_timeline").insert(row).select("id").single();if(error)throw error;id=ins.id}
     if(arq.files.length)await enviarAnexos(id,c.id,[...arq.files]);
-    toast("Atuação registrada");
+    toast("Registrado");window.PP_DOSSIE?.invalidar?.(c.id);
+    if(criarTarefa.checked)setTimeout(()=>window.PP_TAREFAS?.nova({cliente_id:c.id,processo_id:pro.value||null,contrato_id:kon.value||null,titulo:desc.value.trim().split("\n")[0].slice(0,80),descricao:desc.value.trim(),nucleo:frente.value==="negocial"?"acordos":frente.value==="estrategico"?"acompanhamento_pj":"juridico"}),400);
   },extra);
 }
 
@@ -170,19 +178,20 @@ function renderProcessos(c,host){
   if(!M.processos.length){host.append(el("div",{class:"empty"},el("h3",{},"Nenhum processo vinculado"),el("div",{},cliente?"Não há processo judicial em andamento. O trabalho do escritório segue registrado na aba Andamento.":"Cadastre os processos do cliente para acompanhar prazos e andamentos. Clientes sem processo continuam normalmente.")));return}
   const ordem=[...M.processos].sort((a,b)=>(a.status==="encerrado")-(b.status==="encerrado")||(a.proximo_prazo||"9999").localeCompare(b.proximo_prazo||"9999"));
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"Nº CNJ"),el("th",{},"Ação"),el("th",{},"Tribunal / vara"),el("th",{},"Parte contrária"),el("th",{},"Banco / contrato"),el("th",{},"Fase"),el("th",{},"Último andamento"),el("th",{},"Próximo prazo"),cliente?null:el("th",{},"Responsável"),el("th",{},"Status"))),
-    el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{M.procSel=M.procSel===p.id?null:p.id;render()}},
-      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p.pasta_numero)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
+    el("tbody",{},ordem.map(p=>el("tr",{style:"cursor:pointer"+(M.procSel===p.id?";background:var(--gold-soft)":""),onclick:()=>{if(!readOnly()&&window.PP_PROCESSOS?.abrir){window.PP_PROCESSOS.abrir(p.id,{voltar:{tab:"clientes",sel:c.id,sub:"processos"}});return}M.procSel=M.procSel===p.id?null:p.id;render()}},
+      el("td",{class:"num"},el("b",{},p.numero_cnj||"(sem número)"),cliente?null:el("div",{class:"note"},window.PP_PASTAS?.pastaTxt?.(p)||""),cliente||p.visivel_cliente?null:el("div",{class:"pill e2"},"Oculto do cliente")),
       el("td",{},p.tipo_acao||"—",p.polo?el("div",{class:"note"},p.polo==="ativo"?"polo ativo":"polo passivo"):null),
       el("td",{},[p.tribunal,p.vara].filter(Boolean).join(" · ")||"—"),el("td",{},p.parte_contraria||"—"),
       el("td",{},p.banco||nomeContrato(p.contrato_id)||"—",p.contrato_id&&p.banco?el("div",{class:"note"},nomeContrato(p.contrato_id)):null),
       el("td",{},p.fase||"—"),el("td",{},(()=>{const ua=M.andamentos.filter(a=>a.processo_id===p.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0];return ua?el("span",{},fmtD(parseD(ua.data)),el("div",{class:"note"},(ua.tipo?ua.tipo+": ":"")+ua.descricao.slice(0,70)+(ua.descricao.length>70?"…":""))):el("span",{class:"note"},"—")})()),el("td",{},prazoPill(p)),cliente?null:el("td",{},responsavelDe(p)),el("td",{},el("span",{class:"pill "+(p.status==="ativo"?"e1":p.status==="suspenso"?"e2":"g")},STATUS_PROC[p.status]||p.status))))));
   host.append(el("div",{class:"tbl"},tb));
-  const p=M.processos.find(x=>x.id===M.procSel);
+  const p=readOnly()?M.processos.find(x=>x.id===M.procSel):null;
   if(p)host.append(detalheProcesso(c,p));
-  else host.append(el("div",{class:"note"},"Clique em um processo para ver os andamentos."));
+  else host.append(el("div",{class:"note"},readOnly()?"Clique em um processo para ver os andamentos.":"Clique em um processo para abrir a página dele (prazos, trabalho do escritório, andamentos, publicações e pasta)."));
 }
 function detalheProcesso(c,p){
   const cliente=readOnly();
+  if(!cliente&&window.PP_PROCESSO?.ficha)return window.PP_PROCESSO.ficha(p,{cliente:c,recarregar:()=>carregarCliente(c.id,true)});
   const ands=M.andamentos.filter(a=>a.processo_id===p.id);
   const box=el("div",{class:"card",style:"padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2)"},
     el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Processo"),el("h3",{},p.numero_cnj||"(sem número)"),el("div",{class:"note"},[p.tipo_acao,p.parte_contraria?"× "+p.parte_contraria:null,p.valor_causa?"valor da causa "+BRL(+p.valor_causa):null].filter(Boolean).join(" · "))),
@@ -209,7 +218,7 @@ function openProcessoForm(c,p={}){
   cli.onchange=()=>{const novo=S.clientes.find(x=>x.id===cli.value);kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cli.value).map(k=>el("option",{value:k.id},shortName(k))));kon.value="";cli.parentElement.querySelector(".help").textContent=cli.value!==(c.id||"")?(novo?`O processo, os andamentos e as tarefas vinculadas passam para ${novo.nome}.`:"O processo deixa de aparecer na ficha do cliente e fica só na lista de Processos."):"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."};
   const body=el("div",{class:"form"},field("p-cli","Cliente",cli,"Troque para transferir o processo; deixe sem cliente quando a pessoa não está na base."),field("p-cnj","Número CNJ",cnj),field("p-acao","Tipo de ação",acao.wrap),field("p-trib","Tribunal",trib),field("p-vara","Vara / comarca",vara),
     field("p-parte","Parte contrária",parte),field("p-polo","Polo do cliente",polo),field("p-con","Contrato relacionado",kon),field("p-banco","Banco relacionado",banco.wrap),
-    field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),field("p-prazo","Próximo prazo",prazo),fatal.wrap,field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
+    field("p-fase","Fase",fase.wrap),field("p-valor","Valor da causa (R$)",valor),el("div",{class:"f full note"},"Prazos deste processo são tarefas com prazo (botão “+ Prazo / tarefa” na ficha). O próximo prazo é calculado automaticamente."),field("p-resp","Responsável",resp),field("p-status","Status",status),vis.wrap,field("p-obs","Observações internas",obs));
   const extras=window.PP_PASTAS?.camposForm?.(p,c);if(extras)body.append(extras.wrap);
   const extra=p.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este processo e todos os andamentos?"))return;const {error}=await SB.from("processos").delete().eq("id",p.id);$("#modalHost").replaceChildren();M.procSel=null;toast(error?"Não foi possível excluir":"Processo excluído")}},"Excluir"):null;
   modal(p.id?"Editar processo":"Novo processo",body,async()=>{
@@ -223,7 +232,7 @@ function openProcessoForm(c,p={}){
     if(data?.id)M.procSel=data.id;toast("Processo salvo");window.PP_PROCESSOS?.recarregar?.();
   },extra);
 }
-window.PP_CARTEIRA={processosDoCliente:cid=>(cid&&M.cid===cid?M.processos:[]),openProcessoForm,openAndamentoForm:(p,a)=>openAndamentoForm(p,a),abrirProcesso:(cid,pid)=>{S.sel=cid;S.sub="processos";S.tab="clientes";M.procSel=pid;render()}};
+window.PP_CARTEIRA={registrar:async(cid,pre={})=>{const c=S.clientes.find(x=>x.id===cid);if(!c){toast("Cliente não encontrado");return}if(M.cid!==cid)await carregarCliente(cid,true);openEntradaForm(c,pre)},processosDoCliente:cid=>(cid&&M.cid===cid?M.processos:[]),openProcessoForm,openAndamentoForm:(p,a)=>openAndamentoForm(p,a),abrirProcesso:(cid,pid)=>{S.sel=cid;S.sub="processos";S.tab="clientes";M.procSel=pid;render()}};
 function openAndamentoForm(p,a={}){
   const data=inp("date",a.data||hojeISO()),tipo=datalistInput("a-tipo",a.tipo||"",TIPOS_AND),desc=el("textarea",{placeholder:"Resumo do andamento e o que ele exige do escritório."},a.descricao||""),vis=check("Visível ao cliente",a.visivel_cliente,"O andamento também entra na timeline do cliente com esta mesma visibilidade.");
   const body=el("div",{class:"form"},field("a-data","Data",data),field("a-tipo","Tipo",tipo.wrap),field("a-desc","Descrição",desc),vis.wrap);

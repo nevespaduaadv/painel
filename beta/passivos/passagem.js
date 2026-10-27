@@ -1,0 +1,56 @@
+/* Ficha de passagem (perguntas norteadoras) — beta 0012. Card no Cadastro do cliente e pendências no Hoje.
+   O que a frente negocial precisa saber antes de falar com o cliente: situação de inadimplência, patrimônio bem a bem
+   (exposto / em transferência / protegido / não compensa / não protegível), renegociações anteriores, processos existentes,
+   contratos obtidos, alçada e reserva mensal. Cada mudança guarda quem/quando (historico). "Onboarding concluído" avisa a frente negocial.
+   Supabase: cliente_passagem, v_cliente_passagem. */
+(() => {
+  "use strict";
+  const G = { cache: {}, hoje: null };
+  const SIT = { "": "— não respondido —", adimplente: "Adimplente", vai_ficar_inadimplente: "Vai ficar inadimplente", inadimplente: "Inadimplente" };
+  const STB = { exposto: ["Exposto", "e3"], em_transferencia: ["Em transferência", "e2"], protegido: ["Protegido", "e1"], nao_compensa: ["Não compensa proteger", "g"], nao_protegivel: ["Não dá para proteger", "c"] };
+  const fmtDH = (s) => s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+  const R$ = (v) => v == null ? "—" : (+v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  async function carregar(cid) { const { data } = await SB.from("v_cliente_passagem").select("*").eq("cliente_id", cid).maybeSingle(); G.cache[cid] = data || { cliente_id: cid, patrimonio: [], historico: [], faltam: [] }; render(); }
+  async function salvar(cid, patch) { const { error } = await SB.from("cliente_passagem").upsert({ cliente_id: cid, ...patch }, { onConflict: "cliente_id" }); if (error) { toast(error.message); return false; } toast("Salvo"); delete G.cache[cid]; G.hoje = null; render(); return true; }
+  function modalBem(cid, p, idx) {
+    const b = idx != null ? p.patrimonio[idx] : {}; const bem = inp("text", b.bem || "", { placeholder: "Ex.: Caminhão Volvo placa ABC1D23; terreno em Franca; carro da esposa" }), st = sel(Object.fromEntries(Object.entries(STB).map(([k, v]) => [k, v[0]])), b.status || "exposto"), obs = inp("text", b.obs || "", { placeholder: "Ex.: financiado pelo BV, alienado; transferência para a holding em andamento" });
+    modal(idx != null ? "Editar bem" : "Adicionar bem", el("div", { class: "form" }, el("div", { class: "f full" }, field("pb-b", "Bem", bem)), field("pb-s", "Situação", st), el("div", { class: "f full" }, field("pb-o", "Observação", obs))), async () => {
+      if (!bem.value.trim()) throw new Error("Descreva o bem"); const lista = [...(p.patrimonio || [])]; const item = { bem: bem.value.trim(), status: st.value, obs: obs.value.trim() || null, em: new Date().toISOString().slice(0, 10) }; if (idx != null) lista[idx] = item; else lista.push(item); await salvar(cid, { patrimonio: lista });
+    }, idx != null ? el("button", { class: "btn danger", onclick: async () => { const lista = p.patrimonio.filter((_, i) => i !== idx); $("#modalHost").replaceChildren(); await salvar(cid, { patrimonio: lista }); } }, "Remover") : null);
+  }
+  function card(c) {
+    const p = G.cache[c.id]; const box = el("section", { class: "card section" });
+    if (!p) { carregar(c.id); box.append(el("h2", {}, "Ficha de passagem"), el("div", { class: "note" }, "Carregando…")); return box; }
+    const faltam = p.faltam || []; const txt = (k, label, ph) => { const t = el("textarea", { rows: 2, placeholder: ph }, p[k] || ""); t.onchange = () => salvar(c.id, { [k]: t.value.trim() || null }); return el("div", { class: "f full" }, el("label", {}, label, p[k] == null ? el("span", { class: "pill e2", style: "margin-left:6px" }, "pendente") : null), t); };
+    const sit = sel(SIT, p.situacao || ""); sit.onchange = () => salvar(c.id, { situacao: sit.value || null }); const desde = inp("date", p.inadimplente_desde || ""); desde.onchange = () => salvar(c.id, { inadimplente_desde: desde.value || null });
+    const alc = inp("number", p.alcada ?? "", { step: "0.01", placeholder: "R$" }); alc.onchange = () => salvar(c.id, { alcada: alc.value === "" ? null : +alc.value }); const res = inp("number", p.reserva_mensal ?? "", { step: "0.01", placeholder: "R$/mês" }); res.onchange = () => salvar(c.id, { reserva_mensal: res.value === "" ? null : +res.value }); const pm = inp("number", p.prazo_meses ?? "", { min: 1, max: 60, placeholder: "meses" }); pm.onchange = () => salvar(c.id, { prazo_meses: pm.value === "" ? null : +pm.value });
+    const concl = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); concl.checked = !!p.patrimonio_concluido; concl.onchange = () => salvar(c.id, { patrimonio_concluido: concl.checked });
+    const onb = p.onboarding_concluido_em ? el("span", { class: "pill e1" }, "onboarding concluído em " + new Date(p.onboarding_concluido_em + "T12:00:00").toLocaleDateString("pt-BR")) : el("button", { class: "btn sm primary", onclick: async () => { if (!confirm("Marcar o ciclo de onboarding como concluído? A frente negocial é avisada com o que falta responder.")) return; await salvar(c.id, { onboarding_concluido_em: new Date().toISOString().slice(0, 10) }); } }, "Concluir onboarding → passar o bastão");
+    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Ficha de passagem"), el("div", { class: "note" }, "O que a frente negocial precisa saber antes de falar com o cliente. Cada resposta guarda quem e quando." + (p.responsavel_nome ? " Responsável: " + p.responsavel_nome + "." : ""))), el("div", { class: "actions" }, faltam.length ? el("span", { class: "pill e2" }, faltam.length + " pendente(s)") : el("span", { class: "pill e1" }, "completa"), onb)),
+      el("div", { class: "form" }, field("pp-sit", "Situação de inadimplência", sit), field("pp-desde", "Inadimplente desde", desde),
+        el("div", { class: "f full" }, el("label", {}, "Patrimônio (bem a bem)", (p.patrimonio || []).length ? null : el("span", { class: "pill e2", style: "margin-left:6px" }, "pendente"), p.bens_expostos ? el("span", { class: "pill e3", style: "margin-left:6px" }, p.bens_expostos + " exposto(s)") : null),
+          (p.patrimonio || []).length ? el("div", { class: "tbl" }, el("table", {}, el("tbody", {}, ...p.patrimonio.map((b, i) => el("tr", { style: "cursor:pointer", onclick: () => modalBem(c.id, p, i) }, el("td", {}, b.bem, b.obs ? el("div", { class: "note" }, b.obs) : null), el("td", {}, el("span", { class: "pill " + (STB[b.status]?.[1] || "g") }, STB[b.status]?.[0] || b.status)), el("td", { class: "note r" }, b.em ? new Date(b.em + "T12:00:00").toLocaleDateString("pt-BR") : "")))))) : el("div", { class: "note" }, "Nenhum bem registrado. Use o formulário de onboarding como ponto de partida."),
+          el("div", { class: "actions", style: "justify-content:flex-start;margin-top:6px" }, el("button", { class: "btn sm", onclick: () => modalBem(c.id, p) }, "+ Bem"), el("label", { style: "display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0" }, concl, "Blindagem concluída (ciclo de 45 dias)"))),
+        txt("renegociacoes_anteriores", "Renegociações anteriores", "Já renegociou com algum banco? Quando, o quê, resultado."), txt("processos_existentes", "Processos existentes", "Execuções, monitórias, busca e apreensão… (ou “nenhum”)"), txt("contratos_obtidos", "Contratos bancários obtidos", "Quais contratos já temos, quais faltam e quem está pedindo (cliente / gerente / Bacen)."),
+        field("pp-alc", "Alçada combinada (R$)", alc), field("pp-res", "Reserva mensal (R$)", res), field("pp-pm", "Prazo estimado (meses)", pm), txt("observacoes", "Observações", "O que mais a frente negocial precisa saber.")),
+      (p.historico || []).length ? el("details", { style: "margin-top:8px" }, el("summary", { class: "note", style: "cursor:pointer" }, `Histórico (${p.historico.length})`), el("ul", { class: "tl", style: "margin-top:6px" }, ...[...p.historico].reverse().slice(0, 30).map((h) => el("li", { class: "ev-sistema" }, el("div", { class: "d" }, fmtDH(h.em) + " · " + (h.por_nome || "—") + " · " + h.campo + (typeof h.para === "string" || typeof h.para === "number" ? ": " + String(h.para).slice(0, 80) : "")))))) : null);
+    return box;
+  }
+  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (S.sub !== "cliente") return; if (!(typeof equipe === "function" && equipe())) return; const first = host.children[0]; const cd = card(c); if (first && first.nextSibling) host.insertBefore(cd, first.nextSibling); else host.append(cd); }; }
+  // Hoje: pendências da passagem e clientes sem registro na minha frente
+  async function pendenciasHoje() {
+    const me = window.PP_TS?.meu?.() || null; const [a, b] = await Promise.all([SB.from("v_cliente_passagem").select("cliente_id,cliente_nome,faltam,responsavel_id,onboarding_concluido_em,bens_expostos,cliente_desde").is("onboarding_concluido_em", null).order("cliente_desde", { ascending: false }).limit(50), SB.from("v_cliente_frentes").select("cliente_id,frente,ultimo_em,responsavel_id").is("ultimo_em", null)]);
+    G.hoje = { fichas: (a.data || []).filter((x) => (x.faltam || []).length), semRegistro: b.data || [], me }; render();
+  }
+  { const _r = render; render = function () { _r(); const v = $("#view-painel"); if (!v || v.hidden || S.tab !== "painel") return; if (!(typeof equipe === "function" && equipe())) return; if (!G.hoje) { pendenciasHoje(); return; }
+      const me = G.hoje.me; const frente = me?.frente || null; const nomeCli = (id) => (S.clientes || []).find((c) => c.id === id)?.nome || id; const irCli = (id, sub) => () => { S.tab = "clientes"; S.sel = id; S.sub = sub || "cliente"; render(); };
+      const fichas = G.hoje.fichas.filter((f) => !me || !f.responsavel_id || f.responsavel_id === me.id || PP.perfil?.papel === "admin");
+      const sem = frente ? G.hoje.semRegistro.filter((x) => x.frente === frente && (S.clientes || []).some((c) => c.id === x.cliente_id)) : [];
+      if (!fichas.length && !sem.length) return;
+      const kp = v.querySelector(".kpis"); if (!kp || v.querySelector(".passagem-hoje")) return;
+      const box = el("div", { class: "card section passagem-hoje", style: "margin-bottom:14px" }, el("div", { class: "section-h" }, el("h2", {}, "Passagem de bastão"), el("span", { class: "note" }, "clientes que ainda não estão redondos entre as frentes")),
+        sem.length ? el("div", { style: "margin-bottom:8px" }, el("b", {}, `Sem nenhum registro na sua frente (${sem.length}): `), ...sem.slice(0, 12).flatMap((x, i) => [i ? " · " : "", el("a", { href: "#", onclick: (ev) => { ev.preventDefault(); irCli(x.cliente_id, "dossie")(); } }, nomeCli(x.cliente_id))])) : null,
+        fichas.length ? el("div", {}, el("b", {}, `Ficha de passagem incompleta (${fichas.length}): `), ...fichas.slice(0, 12).flatMap((f, i) => [i ? " · " : "", el("a", { href: "#", title: "Falta: " + (f.faltam || []).join(", "), onclick: (ev) => { ev.preventDefault(); irCli(f.cliente_id, "cliente")(); } }, f.cliente_nome + (f.bens_expostos ? " ⚠" : ""))])) : null);
+      kp.after(box); }; }
+  window.PP_PASSAGEM = { invalidar: (cid) => { if (cid) delete G.cache[cid]; else G.cache = {}; G.hoje = null; } };
+})();

@@ -1,0 +1,213 @@
+/* Contratos de honorários e solicitações de faturamento — bloco 3 da controladoria (beta 0006). Financeiro → Contratos e faturamento.
+   - Contratos: o contrato de prestação de serviços com o cliente (CH-AAAA-NNNN): tipo, status, vigência, entrada/parcelas/mensalidade/
+     êxito, horas contratadas, tabela de hora, pasta, responsável/closer, aditivos, link do contrato. Backfill dos fechamentos.
+   - Solicitações (SF-AAAA-NNNN): qualquer pessoa da equipe pede → financeiro autoriza/não autoriza → fatura (gera as cobranças no painel;
+     a emissão no Asaas segue pela tela Cobranças). Parcelas geradas na autorização; comissão do closer (8% da entrada) prevista automaticamente.
+   - Comissões: previstas × liberadas (quando a cobrança é paga) × pagas, por colaborador e mês.
+   Supabase: contratos_honorarios(+aditivos), solicitacoes_faturamento, sf_parcelas, comissoes; views v_contratos_honorarios,
+   v_solicitacoes_faturamento, v_comissoes; rpcs sf_autorizar, sf_faturar, sf_cancelar. */
+(() => {
+  "use strict";
+  const F = { aba: "sf", ok: false, ch: [], sf: [], com: [], colab: [], tabelas: [], carregando: false, fSf: "em_analise", fCh: "ativos", q: "", abrirCh: null, aditivos: {}, parcelas: {} };
+  const podeFin = () => PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("financeiro");
+  const R$ = (v) => v == null || isNaN(v) ? "—" : (+v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const fmt = (s) => s ? new Date(String(s).slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+  const fmtDH = (s) => s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+  const TIPO_CH = { gestao_passivos: "Gestão de passivos", superendividamento: "Superendividamento", ad_exitum: "Ad exitum", partido: "Partido (mensal)", avulso: "Avulso", consulta: "Consulta", prestacao_servico: "Prestação de serviço", outro: "Outro" };
+  const ST_CH = { minuta: ["Minuta", "g"], enviado: ["Enviado p/ assinatura", "e2"], assinado: ["Assinado", "e1"], ativo: ["Ativo", "e1"], encerrado: ["Encerrado", "c"], cancelado: ["Cancelado", "e3"] };
+  const TIPO_SF = { entrada: "Entrada", parcela: "Parcela de honorários", mensalidade: "Mensalidade", exito: "Êxito", sucumbencia: "Sucumbência", custas: "Custas / despesas", avulso: "Avulso", outro: "Outro" };
+  const ST_SF = { em_analise: ["Em análise", "e2"], autorizada: ["Autorizada", "c"], faturada: ["Faturada", "e1"], nao_autorizada: ["Não autorizada", "e3"], cancelada: ["Cancelada", "g"] };
+  const FORMA = { UNDEFINED: "Boleto ou Pix", BOLETO: "Boleto", PIX: "Pix", CREDIT_CARD: "Cartão" };
+  const ST_COM = { prevista: ["Prevista", "g"], liberada: ["Liberada", "e2"], paga: ["Paga", "e1"], cancelada: ["Cancelada", "c"] };
+  const selCliente = (v, vazio = "— cliente —") => sel({ "": vazio, ...Object.fromEntries([...S.clientes].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => [c.id, c.nome])) }, v || "");
+  const selColab = (v, vazio = "—") => sel({ "": vazio, ...Object.fromEntries(F.colab.filter((c) => c.ativo !== false || c.id === v).map((c) => [c.id, c.nome])) }, v || "");
+  const meu = () => F.colab.find((c) => c.perfil_id === PP.perfil?.id);
+
+  async function carregar() {
+    if (F.carregando) return; F.carregando = true;
+    try {
+      const [a, b, c, d, e] = await Promise.all([SB.from("v_contratos_honorarios").select("*").order("created_at", { ascending: false }), SB.from("v_solicitacoes_faturamento").select("*").order("created_at", { ascending: false }).limit(1000),
+        podeFin() ? SB.from("v_comissoes").select("*").order("created_at", { ascending: false }).limit(2000) : SB.from("v_comissoes").select("*").order("created_at", { ascending: false }).limit(500), SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome"), SB.from("ts_tabelas_hora").select("*").order("nome")]);
+      F.ch = a.data || []; F.sf = b.data || []; F.com = c.data || []; F.colab = d.data || []; F.tabelas = e.data || []; F.ok = true;
+    } finally { F.carregando = false; }
+    render();
+  }
+  const inval = () => { F.ok = false; F.aditivos = {}; F.parcelas = {}; };
+  const pill = (map, k) => el("span", { class: "pill " + (map[k]?.[1] || "g") }, map[k]?.[0] || k || "—");
+
+  // ---------- contratos ----------
+  function formContrato(ch = {}) {
+    const cli = selCliente(ch.cliente_id); if (ch.id) cli.disabled = true;
+    const tipo = sel(TIPO_CH, ch.tipo || "gestao_passivos"), sub = sel({ "": "—", contencioso: "Contencioso", consultivo: "Consultivo", misto: "Misto" }, ch.subtipo || ""), status = sel(Object.fromEntries(Object.entries(ST_CH).map(([k, v]) => [k, v[0]])), ch.status || "ativo");
+    const resp = selColab(ch.responsavel_id, "— responsável —"), closer = selColab(ch.closer_id, "— closer —"), area = inp("text", ch.area || "", { placeholder: "Ex.: Bancário PJ" });
+    const desc = el("textarea", { rows: 2, placeholder: "Objeto do contrato / serviço contratado" }, ch.descricao_servico || "");
+    const entrada = inp("number", ch.entrada ?? "", { step: "0.01", min: 0 }), parcelas = inp("number", ch.parcelas ?? "", { min: 0, max: 120 }), vparc = inp("number", ch.valor_parcela ?? "", { step: "0.01", min: 0 }), vdia = sel({ "": "—", 1: "Dia 01", 5: "Dia 05", 10: "Dia 10", 15: "Dia 15", 20: "Dia 20", 25: "Dia 25" }, ch.vencimento_dia ? String(ch.vencimento_dia) : "");
+    const mens = inp("number", ch.mensalidade ?? "", { step: "0.01", min: 0 }), exito = inp("number", ch.exito_pct ?? "", { step: "0.5", min: 0, max: 100 }), forma = inp("text", ch.forma_pagamento || "", { placeholder: "boleto / pix / cartão" }), total = inp("number", ch.valor_total ?? "", { step: "0.01", min: 0 });
+    const horas = inp("number", ch.horas_contratadas_mes ?? "", { step: "0.5", min: 0 }), tab = sel({ "": "— padrão —", ...Object.fromEntries(F.tabelas.filter((t) => t.ativa).map((t) => [t.id, t.nome + " (" + R$(t.valor_hora) + "/h)"])) }, ch.tabela_hora_id || "");
+    const vini = inp("date", ch.vigencia_inicio || ""), vfim = inp("date", ch.vigencia_fim || ""), indet = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); indet.checked = ch.indeterminado !== false;
+    const assin = inp("date", ch.assinado_em || ""), url = inp("url", ch.contrato_url || "", { placeholder: "Drive / ZapSign" }), obs = el("textarea", { rows: 2 }, ch.observacoes || "");
+    const pasta = sel({ "": "— sem pasta —" }, ch.pasta_numero ? String(ch.pasta_numero) : ""); const carregarPastas = async () => { if (!cli.value) return; const { data } = await SB.from("v_pastas").select("numero,codigo,titulo,tipo,status").eq("cliente_id", cli.value).order("numero", { ascending: false }); pasta.replaceChildren(el("option", { value: "" }, "— sem pasta —"), ...(data || []).map((p) => el("option", { value: String(p.numero), selected: p.numero === ch.pasta_numero ? "" : null }, "Pasta " + (p.codigo || p.numero) + (p.titulo ? " — " + p.titulo : " (" + p.tipo + ")")))); }; cli.onchange = carregarPastas; carregarPastas();
+    const calcTotal = () => { if (!total.dataset.manual) total.value = ((+entrada.value || 0) + (+parcelas.value || 0) * (+vparc.value || 0)).toFixed(2); }; entrada.oninput = parcelas.oninput = vparc.oninput = calcTotal; total.oninput = () => { total.dataset.manual = "1"; }; if (!ch.id) calcTotal();
+    const body = el("div", { class: "form" }, field("ch-cli", "Cliente", cli), field("ch-tipo", "Tipo", tipo), field("ch-sub", "Subtipo", sub), field("ch-st", "Status", status), field("ch-area", "Área", area), field("ch-pasta", "Pasta", pasta),
+      field("ch-resp", "Responsável", resp), field("ch-closer", "Closer (comissão)", closer), el("div", { class: "f full" }, field("ch-desc", "Objeto / serviço", desc)),
+      el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Honorários")),
+      field("ch-ent", "Entrada (R$)", entrada), field("ch-parc", "Parcelas (qtd)", parcelas), field("ch-vparc", "Valor da parcela (R$)", vparc), field("ch-vdia", "Vencimento", vdia), field("ch-mens", "Mensalidade (R$)", mens), field("ch-exito", "Êxito (%)", exito), field("ch-forma", "Forma de pagamento", forma), field("ch-total", "Valor total (R$)", total, "Entrada + parcelas; edite se for diferente."),
+      el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Horas e vigência")),
+      field("ch-horas", "Horas contratadas / mês", horas, "Para o timesheet (horas × contrato)."), field("ch-tab", "Tabela de R$/hora", tab), field("ch-vini", "Início da vigência", vini), field("ch-vfim", "Fim da vigência", vfim), el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, indet, "Prazo indeterminado")),
+      field("ch-ass", "Assinado em", assin), el("div", { class: "f full" }, field("ch-url", "Link do contrato", url)), el("div", { class: "f full" }, field("ch-obs", "Observações", obs)));
+    modal(ch.id ? "Contrato " + ch.codigo : "Novo contrato de honorários", body, async () => {
+      if (!cli.value) throw new Error("Escolha o cliente");
+      const row = { cliente_id: cli.value, tipo: tipo.value, subtipo: sub.value || null, status: status.value, area: area.value.trim() || null, pasta_numero: pasta.value ? +pasta.value : null, responsavel_id: resp.value || null, closer_id: closer.value || null, descricao_servico: desc.value.trim() || null,
+        entrada: entrada.value === "" ? null : +entrada.value, parcelas: parcelas.value === "" ? null : +parcelas.value, valor_parcela: vparc.value === "" ? null : +vparc.value, vencimento_dia: vdia.value ? +vdia.value : null, mensalidade: mens.value === "" ? null : +mens.value, exito_pct: exito.value === "" ? null : +exito.value, forma_pagamento: forma.value.trim() || null, valor_total: total.value === "" ? null : +total.value,
+        horas_contratadas_mes: horas.value === "" ? null : +horas.value, tabela_hora_id: tab.value || null, vigencia_inicio: vini.value || null, vigencia_fim: vfim.value || null, indeterminado: indet.checked, assinado_em: assin.value || null, contrato_url: url.value.trim() || null, observacoes: obs.value.trim() || null };
+      const { error } = ch.id ? await SB.from("contratos_honorarios").update(row).eq("id", ch.id) : await SB.from("contratos_honorarios").insert(row); if (error) throw new Error(error.message);
+      toast("Contrato salvo"); inval(); carregar();
+    });
+  }
+  function modalAditivo(ch) {
+    const data = inp("date", new Date().toISOString().slice(0, 10)), desc = inp("text", "", { placeholder: "Ex.: inclusão de novo contrato bancário; reajuste de mensalidade" }), delta = inp("number", "", { step: "0.01", placeholder: "± R$" }), vfim = inp("date", ""), url = inp("url", "", { placeholder: "Link do aditivo" });
+    modal("Aditivo — " + ch.codigo, el("div", { class: "form" }, field("ad-d", "Data", data), el("div", { class: "f full" }, field("ad-desc", "Descrição", desc)), field("ad-v", "Variação de valor (R$)", delta), field("ad-f", "Nova vigência final", vfim), el("div", { class: "f full" }, field("ad-u", "Link", url))), async () => {
+      if (!desc.value.trim()) throw new Error("Descreva o aditivo");
+      const { error } = await SB.from("contratos_honorarios_aditivos").insert({ contrato_id: ch.id, data: data.value, descricao: desc.value.trim(), valor_delta: delta.value === "" ? null : +delta.value, nova_vigencia_fim: vfim.value || null, url: url.value.trim() || null }); if (error) throw new Error(error.message);
+      const upd = {}; if (delta.value !== "" && ch.valor_total != null) upd.valor_total = +ch.valor_total + +delta.value; if (vfim.value) { upd.vigencia_fim = vfim.value; upd.indeterminado = false; } if (Object.keys(upd).length) await SB.from("contratos_honorarios").update(upd).eq("id", ch.id);
+      toast("Aditivo registrado"); inval(); carregar();
+    });
+  }
+  function fichaContrato(ch, host) {
+    if (!F.aditivos[ch.id]) { F.aditivos[ch.id] = { ok: false, lista: [] }; SB.from("contratos_honorarios_aditivos").select("*").eq("contrato_id", ch.id).order("data").then(({ data }) => { F.aditivos[ch.id] = { ok: true, lista: data || [] }; render(); }); }
+    const ad = F.aditivos[ch.id]; const sfs = F.sf.filter((s) => s.contrato_id === ch.id);
+    const kv = (l, v) => el("div", {}, el("div", { class: "note" }, l), el("div", {}, v ?? "—"));
+    host.append(el("div", { class: "card", style: "padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2)" },
+      el("div", { class: "section-h" }, el("div", {}, el("div", { class: "eyebrow" }, TIPO_CH[ch.tipo] || ch.tipo), el("h3", { style: "margin:0" }, ch.codigo + " · " + ch.cliente_nome)), el("div", { class: "actions" }, pill(ST_CH, ch.status), el("button", { class: "btn sm", onclick: () => formContrato(ch) }, "Editar"), el("button", { class: "btn sm", onclick: () => modalAditivo(ch) }, "+ Aditivo"), el("button", { class: "btn sm primary", onclick: () => formSF({ cliente_id: ch.cliente_id, contrato_id: ch.id, pasta_numero: ch.pasta_numero }) }, "Solicitar faturamento"), el("button", { class: "btn sm", onclick: () => { F.abrirCh = null; render(); } }, "Fechar"))),
+      el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px" }, kv("Entrada", R$(ch.entrada)), kv("Parcelas", ch.parcelas ? `${ch.parcelas} × ${R$(ch.valor_parcela)}${ch.vencimento_dia ? " · dia " + ch.vencimento_dia : ""}` : "—"), kv("Mensalidade", R$(ch.mensalidade)), kv("Êxito", ch.exito_pct != null ? ch.exito_pct + "%" : "—"), kv("Valor total", R$(ch.valor_total)), kv("Faturado", R$(ch.faturado)), kv("Recebido", R$(ch.recebido)),
+        kv("Horas contratadas/mês", ch.horas_contratadas_mes ?? "—"), kv("Tabela de hora", ch.tabela_hora_nome || "padrão"), kv("Vigência", (ch.vigencia_inicio ? fmt(ch.vigencia_inicio) : "—") + " → " + (ch.indeterminado ? "indeterminado" : fmt(ch.vigencia_fim))), kv("Pasta", ch.pasta_codigo ? "Pasta " + ch.pasta_codigo : "—"), kv("Responsável", ch.responsavel_nome), kv("Closer", ch.closer_nome), kv("Assinado em", fmt(ch.assinado_em)), kv("Contrato", ch.contrato_url ? el("a", { href: ch.contrato_url, target: "_blank", rel: "noopener" }, "↗ abrir") : "—")),
+      ch.descricao_servico ? el("div", { class: "note" }, ch.descricao_servico) : null,
+      el("div", {}, el("b", {}, `Aditivos (${ad.ok ? ad.lista.length : "…"})`), ad.ok && ad.lista.length ? el("ul", { class: "tl" }, ...ad.lista.map((a) => el("li", {}, el("div", { class: "d" }, fmt(a.data) + " · " + a.descricao + (a.valor_delta != null ? " · " + (a.valor_delta >= 0 ? "+" : "") + R$(a.valor_delta) : "") + (a.nova_vigencia_fim ? " · vigência até " + fmt(a.nova_vigencia_fim) : "")), a.url ? el("a", { href: a.url, target: "_blank", rel: "noopener", class: "note" }, "↗ documento") : null))) : el("div", { class: "note" }, ad.ok ? "Nenhum." : "Carregando…")),
+      el("div", {}, el("b", {}, `Solicitações de faturamento (${sfs.length})`), sfs.length ? tabelaSF(sfs) : el("div", { class: "note" }, "Nenhuma."))));
+  }
+  function renderContratos(v) {
+    const q = inp("search", F.q, { placeholder: "Cliente, código…", style: "min-width:240px" }); q.oninput = () => { F.q = q.value; render(); const b = v.querySelector("input[type=search]"); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } };
+    const fs = sel({ ativos: "Ativos / assinados", minuta: "Minuta / enviado", encerrados: "Encerrados / cancelados", todos: "Todos" }, F.fCh); fs.onchange = () => { F.fCh = fs.value; render(); };
+    const ql = F.q.trim().toLowerCase();
+    const lista = F.ch.filter((c) => ({ ativos: ["ativo", "assinado"], minuta: ["minuta", "enviado"], encerrados: ["encerrado", "cancelado"], todos: Object.keys(ST_CH) })[F.fCh].includes(c.status) && (!ql || [c.codigo, c.cliente_nome, c.pasta_codigo, c.descricao_servico].join(" ").toLowerCase().includes(ql)));
+    const aberto = F.abrirCh ? F.ch.find((c) => c.id === F.abrirCh) : null; if (aberto) fichaContrato(aberto, v);
+    const tot = lista.reduce((x, c) => x + (+c.valor_total || 0), 0), mens = lista.reduce((x, c) => x + (+c.mensalidade || 0), 0);
+    v.append(el("div", { class: "card" }, el("div", { class: "tbl-tools" }, q, fs, el("div", { class: "sp" }), el("span", { class: "note" }, `${lista.length} contrato(s) · total ${R$(tot)}${mens ? " · mensalidades " + R$(mens) + "/mês" : ""}`)),
+      el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Código"), el("th", {}, "Cliente"), el("th", {}, "Tipo"), el("th", {}, "Honorários"), el("th", { class: "r" }, "Total"), el("th", { class: "r" }, "Faturado / recebido"), el("th", {}, "Vigência"), el("th", {}, "Status"), el("th", {}, ""))),
+        el("tbody", {}, ...(lista.length ? lista.map((c) => el("tr", {}, el("td", {}, el("b", {}, c.codigo), c.pasta_codigo ? el("div", { class: "note" }, "Pasta " + c.pasta_codigo) : null), el("td", {}, c.cliente_nome, c.responsavel_nome ? el("div", { class: "note" }, c.responsavel_nome) : null), el("td", {}, TIPO_CH[c.tipo] || c.tipo),
+          el("td", { class: "note" }, [c.entrada ? "entrada " + R$(c.entrada) : null, c.parcelas ? `${c.parcelas}× ${R$(c.valor_parcela)}` : null, c.mensalidade ? R$(c.mensalidade) + "/mês" : null, c.exito_pct != null ? "êxito " + c.exito_pct + "%" : null].filter(Boolean).join(" · ") || "—"), el("td", { class: "r num" }, R$(c.valor_total)), el("td", { class: "r num" }, R$(c.faturado), el("div", { class: "note" }, R$(c.recebido))), el("td", { class: "note" }, (c.vigencia_inicio ? fmt(c.vigencia_inicio) : "—") + (c.indeterminado ? " → indet." : " → " + fmt(c.vigencia_fim))), el("td", {}, pill(ST_CH, c.status)),
+          el("td", {}, el("button", { class: "btn sm", onclick: () => { F.abrirCh = c.id; render(); window.scrollTo({ top: 0, behavior: "smooth" }); } }, "Abrir")))) : [el("tr", {}, el("td", { colspan: 9, class: "note" }, "Nenhum contrato."))]))))));
+  }
+
+  // ---------- solicitações ----------
+  function formSF(pre = {}) {
+    const cli = selCliente(pre.cliente_id); const chSel = sel({ "": "— contrato —" }, ""), proc = sel({ "": "— processo —" }, ""), pasta = sel({ "": "— pasta —" }, "");
+    const tipo = sel(TIPO_SF, pre.tipo || "parcela"), desc = inp("text", pre.descricao || "", { placeholder: "Aparece no boleto. Ex.: Honorários — parcela 3/10" }), valor = inp("number", pre.valor_total ?? "", { step: "0.01", min: "0.01" }), qtd = inp("number", "1", { min: 1, max: 120 }), venc = inp("date", ""), forma = sel(FORMA, "UNDEFINED"), nf = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); nf.checked = true;
+    const area = inp("text", pre.area || "", { placeholder: "Ex.: Bancário PJ" }), obs = el("textarea", { rows: 2 }, "");
+    const rateioBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" }); const linhas = [];
+    const addLinha = (r = {}) => { const c = selColab(r.colaborador_id, "— colaborador —"), papel = sel({ closer: "Closer", sdr: "SDR", advogado: "Advogado", indicacao: "Indicação", outro: "Outro" }, r.papel || "outro"), pct = inp("number", r.pct ?? "", { step: "0.5", min: 0, max: 100, style: "width:90px", placeholder: "%" }); const row = el("div", { style: "display:flex;gap:6px;align-items:center" }, c, papel, pct, el("button", { class: "btn sm", onclick: () => { row.remove(); linhas.splice(linhas.indexOf(l), 1); } }, "×")); const l = { c, papel, pct }; linhas.push(l); rateioBox.append(row); };
+    const hint = el("div", { class: "note" }); const calc = () => { const v = +valor.value || 0, n = +qtd.value || 1; hint.textContent = n > 1 && v ? `${n} parcelas de ${R$(v / n)} a cada mês a partir do vencimento` : v ? "Cobrança única de " + R$(v) : ""; }; valor.oninput = qtd.oninput = calc;
+    const recarregar = async () => { const cid = cli.value; const chs = F.ch.filter((c) => c.cliente_id === cid && !["cancelado"].includes(c.status)); chSel.replaceChildren(el("option", { value: "" }, chs.length ? "— contrato —" : "— sem contrato cadastrado —"), ...chs.map((c) => el("option", { value: c.id, selected: c.id === pre.contrato_id || (chs.length === 1 && !pre.contrato_id) ? "" : null }, c.codigo + " · " + (TIPO_CH[c.tipo] || c.tipo))));
+      const [ps, pa] = await Promise.all([cid ? SB.from("processos").select("id,numero_cnj,tipo_acao,pasta_numero").eq("cliente_id", cid).order("numero_cnj") : { data: [] }, cid ? SB.from("v_pastas").select("numero,codigo,titulo").eq("cliente_id", cid).order("numero", { ascending: false }) : { data: [] }]);
+      proc.replaceChildren(el("option", { value: "" }, "— processo —"), ...(ps.data || []).map((p) => el("option", { value: p.id, selected: p.id === pre.processo_id ? "" : null }, p.numero_cnj || p.tipo_acao || "(sem número)"))); pasta.replaceChildren(el("option", { value: "" }, "— pasta —"), ...(pa.data || []).map((p) => el("option", { value: String(p.numero), selected: p.numero === pre.pasta_numero ? "" : null }, "Pasta " + (p.codigo || p.numero) + (p.titulo ? " — " + p.titulo : "")))); sugerir(); };
+    const sugerir = () => { const c = F.ch.find((x) => x.id === chSel.value); if (!c) return; if (tipo.value === "entrada" && c.entrada) { valor.value = c.entrada; qtd.value = 1; } if (tipo.value === "parcela" && c.valor_parcela) { valor.value = c.valor_parcela; } if (tipo.value === "mensalidade" && c.mensalidade) { valor.value = c.mensalidade; qtd.value = 1; } if (!desc.value) desc.value = (TIPO_SF[tipo.value] || "") + " — honorários"; if (tipo.value === "entrada" && c.closer_id && !linhas.length) addLinha({ colaborador_id: c.closer_id, papel: "closer", pct: 8 }); calc(); };
+    cli.onchange = recarregar; chSel.onchange = sugerir; tipo.onchange = sugerir; recarregar();
+    const body = el("div", { class: "form" }, field("sf-cli", "Cliente", cli), field("sf-ch", "Contrato de honorários", chSel), field("sf-tipo", "Tipo", tipo), field("sf-area", "Área", area), field("sf-proc", "Processo (opcional)", proc), field("sf-pasta", "Pasta (opcional)", pasta),
+      el("div", { class: "f full" }, field("sf-desc", "Descrição do serviço / cobrança", desc)), field("sf-val", "Valor total (R$)", valor), field("sf-qtd", "Parcelas", qtd, hint), field("sf-venc", "Vencimento (1ª parcela)", venc), field("sf-forma", "Forma", forma),
+      el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, nf, "Emitir nota fiscal")),
+      el("div", { class: "f full" }, el("label", {}, "Participação / comissões (sobre o valor desta solicitação)"), rateioBox, el("div", { class: "actions", style: "justify-content:flex-start;margin-top:4px" }, el("button", { class: "btn sm", onclick: () => addLinha() }, "+ Pessoa")), el("div", { class: "note" }, "Closer: 8% sobre a entrada, previsto automaticamente. A comissão só é liberada quando a cobrança é paga.")),
+      el("div", { class: "f full" }, field("sf-obs", "Observações para o financeiro", obs)));
+    modal("Solicitação de faturamento", body, async () => {
+      if (!cli.value) throw new Error("Escolha o cliente"); if (!desc.value.trim()) throw new Error("Descreva a cobrança"); if (!(+valor.value > 0)) throw new Error("Informe o valor"); if (!venc.value) throw new Error("Informe o vencimento");
+      const rateio = linhas.filter((l) => l.c.value && +l.pct.value > 0).map((l) => ({ colaborador_id: l.c.value, papel: l.papel.value, pct: +l.pct.value }));
+      const row = { cliente_id: cli.value, contrato_id: chSel.value || null, processo_id: proc.value || null, pasta_numero: pasta.value ? +pasta.value : null, tipo: tipo.value, area: area.value.trim() || null, descricao: desc.value.trim(), valor_total: +valor.value, qtd_parcelas: +qtd.value || 1, vencimento_inicial: venc.value, forma: forma.value, emitir_nf: nf.checked, rateio, observacoes: obs.value.trim() || null };
+      const { error } = await SB.from("solicitacoes_faturamento").insert(row); if (error) throw new Error(error.message);
+      toast("Solicitação enviada ao financeiro"); inval(); carregar();
+    });
+    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Enviar solicitação";
+  }
+  async function decidir(s, autorizar) {
+    const motivo = inp("text", "", { placeholder: autorizar ? "Opcional" : "Obrigatório — o solicitante é avisado" });
+    modal((autorizar ? "Autorizar " : "Não autorizar ") + s.codigo, el("div", { class: "form" }, el("div", { class: "f full note" }, `${s.cliente_nome} · ${TIPO_SF[s.tipo]} · ${R$(s.valor_total)} em ${s.qtd_parcelas}× a partir de ${fmt(s.vencimento_inicial)}`), el("div", { class: "f full" }, field("dc-m", "Motivo / observação", motivo))), async () => {
+      if (!autorizar && !motivo.value.trim()) throw new Error("Informe o motivo");
+      const { error } = await SB.rpc("sf_autorizar", { p_id: s.id, p_autorizar: autorizar, p_motivo: motivo.value.trim() || null }); if (error) throw new Error(error.message);
+      toast(autorizar ? "Autorizada — parcelas geradas" : "Não autorizada"); inval(); carregar();
+    });
+    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = autorizar ? "Autorizar" : "Recusar";
+  }
+  async function faturar(s) { if (!confirm(`Faturar ${s.codigo}: gera ${s.qtd_parcelas} cobrança(s) no painel para ${s.cliente_nome}. A emissão do boleto/Pix no Asaas é feita depois, na tela Cobranças. Continuar?`)) return; const { data, error } = await SB.rpc("sf_faturar", { p_id: s.id }); if (error) toast(error.message); else { toast(`${data} cobrança(s) criada(s)`); inval(); carregar(); } }
+  async function cancelar(s) { const m = prompt("Motivo do cancelamento:"); if (m == null) return; const { error } = await SB.rpc("sf_cancelar", { p_id: s.id, p_motivo: m || null }); if (error) toast(error.message); else { toast("Cancelada"); inval(); carregar(); } }
+  function detalheSF(s) {
+    if (!F.parcelas[s.id]) { F.parcelas[s.id] = { ok: false, lista: [] }; SB.from("sf_parcelas").select("*, cobranca:cobrancas(status,valor_pago,pago_em,link_fatura)").eq("sf_id", s.id).order("n").then(({ data }) => { F.parcelas[s.id] = { ok: true, lista: data || [] }; const h = $("#modalHost .sf-parc"); if (h) h.replaceChildren(tabParc(s)); }); }
+    const tabParc = (s2) => { const p = F.parcelas[s2.id]; if (!p.ok) return el("div", { class: "note" }, "Carregando…"); if (!p.lista.length) return el("div", { class: "note" }, "Parcelas são geradas na autorização."); return el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "#"), el("th", { class: "r" }, "Valor"), el("th", {}, "Vencimento"), el("th", {}, "Cobrança"))), el("tbody", {}, ...p.lista.map((x) => el("tr", {}, el("td", {}, String(x.n)), el("td", { class: "r num" }, R$(x.valor)), el("td", {}, fmt(x.vencimento)), el("td", {}, x.cobranca ? el("span", {}, el("span", { class: "pill " + (x.cobranca.status === "paga" ? "e1" : x.cobranca.status === "atrasada" ? "e3" : "g") }, x.cobranca.status), x.cobranca.pago_em ? " " + fmt(x.cobranca.pago_em) : "", x.cobranca.link_fatura ? el("a", { href: x.cobranca.link_fatura, target: "_blank", rel: "noopener", style: "margin-left:6px" }, "↗") : null) : el("span", { class: "note" }, "não faturada"))))))); };
+    const coms = F.com.filter((c) => c.sf_id === s.id);
+    const body = el("div", { class: "form" }, el("div", { class: "f full" }, el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px" }, ...[["Cliente", s.cliente_nome], ["Contrato", s.contrato_codigo || "—"], ["Tipo", TIPO_SF[s.tipo]], ["Valor", R$(s.valor_total) + (s.qtd_parcelas > 1 ? ` em ${s.qtd_parcelas}×` : "")], ["1º vencimento", fmt(s.vencimento_inicial)], ["Forma", FORMA[s.forma] || s.forma], ["NF", s.emitir_nf ? "sim" : "não"], ["Solicitante", (s.solicitante_nome || "—") + " · " + fmtDH(s.created_at)], ["Decisão", s.autorizada_por_nome ? s.autorizada_por_nome + " · " + fmtDH(s.autorizada_em) : "—"], ["Pasta / processo", [s.pasta_codigo ? "Pasta " + s.pasta_codigo : null, s.numero_cnj].filter(Boolean).join(" · ") || "—"]].map(([l, v2]) => el("div", {}, el("div", { class: "note" }, l), el("div", {}, v2))))),
+      el("div", { class: "f full" }, el("b", {}, "Descrição"), el("div", {}, s.descricao), s.observacoes ? el("div", { class: "note" }, s.observacoes) : null, s.motivo ? el("div", { class: "note", style: "color:var(--crit)" }, "Motivo: " + s.motivo) : null),
+      el("div", { class: "f full sf-parc" }, tabParc(s)),
+      el("div", { class: "f full" }, el("b", {}, "Comissões"), coms.length ? el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Quem"), el("th", {}, "Papel"), el("th", { class: "r" }, "%"), el("th", { class: "r" }, "Base"), el("th", { class: "r" }, "Valor"), el("th", {}, "Status"))), el("tbody", {}, ...coms.map((c) => el("tr", {}, el("td", {}, c.colaborador_nome), el("td", {}, c.papel), el("td", { class: "r num" }, c.pct + "%"), el("td", { class: "r num" }, R$(c.base)), el("td", { class: "r num" }, R$(c.valor)), el("td", {}, pill(ST_COM, c.status))))))) : el("div", { class: "note" }, (s.rateio || []).length ? (s.rateio || []).map((r) => (F.colab.find((c) => c.id === r.colaborador_id)?.nome || "?") + " " + r.pct + "%").join(" · ") + " (previstas na autorização)" : "Sem rateio.")));
+    modal(s.codigo + " · " + pill(ST_SF, s.status).textContent, body, async () => {});
+    const host = $("#modalHost"); host.querySelector("button.btn.primary")?.remove(); const acts = host.querySelector(".actions");
+    if (acts && podeFin()) { if (s.status === "em_analise") acts.prepend(el("button", { class: "btn", onclick: () => decidir(s, false) }, "Não autorizar"), el("button", { class: "btn primary", onclick: () => decidir(s, true) }, "Autorizar")); if (s.status === "autorizada") acts.prepend(el("button", { class: "btn primary", onclick: () => { host.replaceChildren(); faturar(s); } }, "Faturar (gerar cobranças)")); if (["em_analise", "autorizada"].includes(s.status)) acts.prepend(el("button", { class: "btn", onclick: () => { host.replaceChildren(); cancelar(s); } }, "Cancelar SF")); }
+    else if (acts && s.status === "em_analise" && s.created_by === PP.perfil?.id) acts.prepend(el("button", { class: "btn", onclick: () => { host.replaceChildren(); cancelar(s); } }, "Cancelar"));
+    const card = host.querySelector(".modal > .card"); if (card) card.style.maxWidth = "860px";
+  }
+  function tabelaSF(lista) {
+    return el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Código"), el("th", {}, "Cliente"), el("th", {}, "Tipo / descrição"), el("th", { class: "r" }, "Valor"), el("th", {}, "Vencimento"), el("th", {}, "Solicitante"), el("th", {}, "Status"), el("th", {}, ""))),
+      el("tbody", {}, ...(lista.length ? lista.map((s) => el("tr", {}, el("td", {}, el("b", {}, s.codigo), el("div", { class: "note" }, fmtDH(s.created_at))), el("td", {}, s.cliente_nome, s.contrato_codigo ? el("div", { class: "note" }, s.contrato_codigo) : null), el("td", {}, TIPO_SF[s.tipo] || s.tipo, el("div", { class: "note", style: "max-width:320px" }, s.descricao)), el("td", { class: "r num" }, R$(s.valor_total), s.qtd_parcelas > 1 ? el("div", { class: "note" }, s.qtd_parcelas + "×") : null, s.status === "faturada" ? el("div", { class: "note" }, `${s.parcelas_pagas}/${s.qtd_parcelas} pagas · ${R$(s.valor_pago)}`) : null), el("td", {}, fmt(s.vencimento_inicial)), el("td", { class: "note" }, s.solicitante_nome || "—"), el("td", {}, pill(ST_SF, s.status), s.comissao_prevista > 0 ? el("div", { class: "note" }, "comissão " + R$(s.comissao_prevista)) : null),
+        el("td", {}, el("div", { style: "display:flex;gap:4px;flex-wrap:wrap" }, el("button", { class: "btn sm", onclick: () => detalheSF(s) }, "Abrir"), podeFin() && s.status === "em_analise" ? el("button", { class: "btn sm primary", onclick: () => decidir(s, true) }, "Autorizar") : null, podeFin() && s.status === "autorizada" ? el("button", { class: "btn sm primary", onclick: () => faturar(s) }, "Faturar") : null)))) : [el("tr", {}, el("td", { colspan: 8, class: "note" }, "Nenhuma solicitação."))]))));
+  }
+  function renderSF(v) {
+    const fs = sel({ em_analise: "Em análise", autorizada: "Autorizadas (a faturar)", faturada: "Faturadas", nao_autorizada: "Não autorizadas", cancelada: "Canceladas", minhas: "Minhas solicitações", todas: "Todas" }, F.fSf); fs.onchange = () => { F.fSf = fs.value; render(); };
+    const q = inp("search", F.q, { placeholder: "Cliente, código, descrição…", style: "min-width:240px" }); q.oninput = () => { F.q = q.value; render(); const b = v.querySelector("input[type=search]"); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } };
+    const ql = F.q.trim().toLowerCase(); const m = meu();
+    const lista = F.sf.filter((s) => (F.fSf === "todas" || (F.fSf === "minhas" ? (s.solicitante_id === m?.id || s.created_by === PP.perfil?.id) : s.status === F.fSf)) && (!ql || [s.codigo, s.cliente_nome, s.descricao, s.contrato_codigo].join(" ").toLowerCase().includes(ql)));
+    const kpi = (l, v2, n) => el("div", { class: "card kpi" }, el("div", { class: "l" }, l), el("div", { class: "v" }, v2), n ? el("div", { class: "note" }, n) : null);
+    const ea = F.sf.filter((s) => s.status === "em_analise"), au = F.sf.filter((s) => s.status === "autorizada"), mesAtual = new Date().toISOString().slice(0, 7), fatMes = F.sf.filter((s) => s.status === "faturada" && (s.faturada_em || "").slice(0, 7) === mesAtual);
+    v.append(el("div", { class: "kpis" }, kpi("Em análise", String(ea.length), R$(ea.reduce((x, s) => x + +s.valor_total, 0))), kpi("Autorizadas a faturar", String(au.length), R$(au.reduce((x, s) => x + +s.valor_total, 0))), kpi("Faturado no mês", R$(fatMes.reduce((x, s) => x + +s.valor_total, 0)), fatMes.length + " SF"), kpi("Comissões previstas", R$(F.com.filter((c) => c.status === "prevista").reduce((x, c) => x + +c.valor, 0)))));
+    v.append(el("div", { class: "card" }, el("div", { class: "tbl-tools" }, q, fs, el("div", { class: "sp" }), el("span", { class: "note" }, lista.length + " de " + F.sf.length)), tabelaSF(lista)));
+  }
+
+  // ---------- comissões ----------
+  function renderComissoes(v) {
+    const fin = podeFin(); const porMes = new Map();
+    for (const c of F.com) { if (c.status === "cancelada") continue; const k = (c.mes || "").slice(0, 7) + "|" + c.colaborador_id; const g = porMes.get(k) || { mes: (c.mes || "").slice(0, 7), nome: c.colaborador_nome, prevista: 0, liberada: 0, paga: 0, itens: [] }; g[c.status] += +c.valor; g.itens.push(c); porMes.set(k, g); }
+    const rows = [...porMes.values()].sort((a, b) => b.mes.localeCompare(a.mes) || a.nome.localeCompare(b.nome));
+    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, fin ? "Comissões por colaborador e mês" : "Minhas comissões"), el("span", { class: "note" }, "Liberada = a cobrança correspondente foi paga. Paga = o escritório pagou a comissão.")),
+      el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Mês"), el("th", {}, "Colaborador"), el("th", { class: "r" }, "Prevista"), el("th", { class: "r" }, "Liberada"), el("th", { class: "r" }, "Paga"), el("th", {}, ""))),
+        el("tbody", {}, ...(rows.length ? rows.map((g) => el("tr", {}, el("td", {}, g.mes), el("td", {}, g.nome), el("td", { class: "r num" }, R$(g.prevista)), el("td", { class: "r num", style: g.liberada ? "font-weight:600" : "" }, R$(g.liberada)), el("td", { class: "r num" }, R$(g.paga)), el("td", {}, fin && g.liberada ? el("button", { class: "btn sm", onclick: async () => { const d = prompt("Data do pagamento (AAAA-MM-DD):", new Date().toISOString().slice(0, 10)); if (!d) return; const ids = g.itens.filter((c) => c.status === "liberada").map((c) => c.id); const { error } = await SB.from("comissoes").update({ status: "paga", paga_em: d }).in("id", ids); if (error) toast(error.message); else { toast("Marcadas como pagas"); inval(); carregar(); } } }, "Marcar pagas") : null))) : [el("tr", {}, el("td", { colspan: 6, class: "note" }, "Nenhuma comissão."))]))))));
+    const L = F.com.filter((c) => c.status !== "cancelada").slice(0, 300);
+    v.append(el("div", { class: "card section" }, el("h2", {}, "Lançamentos"), el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Quem"), el("th", {}, "SF / cliente"), el("th", {}, "Papel"), el("th", { class: "r" }, "%"), el("th", { class: "r" }, "Base"), el("th", { class: "r" }, "Valor"), el("th", {}, "Pago em"), el("th", {}, "Status"))),
+      el("tbody", {}, ...(L.length ? L.map((c) => el("tr", {}, el("td", {}, c.colaborador_nome), el("td", {}, c.sf_codigo || "—", el("div", { class: "note" }, c.cliente_nome || "")), el("td", {}, c.papel), el("td", { class: "r num" }, c.pct + "%"), el("td", { class: "r num" }, R$(c.base)), el("td", { class: "r num" }, R$(c.valor)), el("td", {}, c.pago_em ? fmt(c.pago_em) : c.paga_em ? fmt(c.paga_em) : "—"), el("td", {}, pill(ST_COM, c.status)))) : [el("tr", {}, el("td", { colspan: 8, class: "note" }, "Nenhum."))]))))));
+  }
+
+  // ---------- card "Honorários" na ficha do cliente (aba Resumo) ----------
+  function cardHonorarios(c) {
+    const card = el("section", { class: "card section" }, el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Honorários"), el("div", { class: "note" }, "Contrato de honorários e faturamento deste cliente.")), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm", onclick: () => formContrato({ cliente_id: c.id }) }, "+ Contrato"), el("button", { class: "btn sm primary", onclick: () => { const ch = F.ch.find((x) => x.cliente_id === c.id && ["ativo", "assinado"].includes(x.status)); formSF({ cliente_id: c.id, contrato_id: ch?.id, pasta_numero: ch?.pasta_numero }); } }, "Solicitar faturamento"))), el("div", { class: "note" }, "Carregando…"));
+    (async () => {
+      if (!F.ok) await carregar();
+      const chs = F.ch.filter((x) => x.cliente_id === c.id), sfs = F.sf.filter((x) => x.cliente_id === c.id);
+      const linhas = chs.map((ch) => el("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)" }, el("b", {}, ch.codigo), el("span", {}, TIPO_CH[ch.tipo] || ch.tipo), pill(ST_CH, ch.status),
+        el("span", { class: "note" }, [ch.entrada ? "entrada " + R$(ch.entrada) : null, ch.parcelas ? `${ch.parcelas}× ${R$(ch.valor_parcela)}` : null, ch.mensalidade ? R$(ch.mensalidade) + "/mês" : null, ch.exito_pct != null ? "êxito " + ch.exito_pct + "%" : null, ch.horas_contratadas_mes ? ch.horas_contratadas_mes + " h/mês" : null].filter(Boolean).join(" · ")),
+        el("span", { class: "note", style: "margin-left:auto" }, `faturado ${R$(ch.faturado)} · recebido ${R$(ch.recebido)}`), el("button", { class: "btn sm", onclick: () => { F.aba = "ch"; F.abrirCh = ch.id; S.tab = "faturamento"; render(); } }, "Abrir")));
+      const pend = sfs.filter((x) => ["em_analise", "autorizada"].includes(x.status));
+      const rod = el("div", { class: "note", style: "margin-top:6px" }, sfs.length ? `${sfs.length} solicitação(ões) de faturamento${pend.length ? " · " + pend.length + " em aberto" : ""} · ` : "", sfs.length ? el("a", { href: "#faturamento", onclick: (ev) => { ev.preventDefault(); F.aba = "sf"; F.fSf = "todas"; F.q = c.nome || ""; S.tab = "faturamento"; render(); } }, "ver") : null);
+      card.replaceChildren(card.firstChild, linhas.length ? el("div", {}, ...linhas) : el("div", { class: "note" }, "Nenhum contrato de honorários cadastrado para este cliente."), rod);
+    })();
+    return card;
+  }
+  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (typeof readOnly === "function" && readOnly()) return; if (!(typeof equipe === "function" && equipe())) return; if (S.sub === "dossie" || S.sub === "cliente") return; host.append(cardHonorarios(c)); }; }
+
+  // ---------- render ----------
+  function renderFat() {
+    const v = $("#view-faturamento"); if (!v) return; v.replaceChildren();
+    v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Contratos e faturamento"), el("div", { class: "sub" }, "Contratos de honorários, solicitações de faturamento (quem presta o serviço pede, o financeiro autoriza e fatura) e comissões.")),
+      el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => formContrato({}) }, "+ Contrato"), el("button", { class: "btn primary", onclick: () => formSF({}) }, "+ Solicitar faturamento"))));
+    const b = (k, l, n) => el("button", { class: "btn sm" + (F.aba === k ? " primary" : ""), onclick: () => { F.aba = k; F.q = ""; render(); } }, l, n ? el("span", { class: "cnt", style: "margin-left:6px" }, String(n)) : null);
+    v.append(el("div", { class: "actions", style: "justify-content:flex-start;margin:-6px 0 10px" }, b("sf", "Solicitações", F.sf.filter((s) => s.status === "em_analise").length), b("ch", "Contratos de honorários", F.ch.filter((c) => ["ativo", "assinado"].includes(c.status)).length), b("com", "Comissões")));
+    if (!F.ok) { v.append(el("div", { class: "note" }, "Carregando…")); carregar(); return; }
+    ({ sf: renderSF, ch: renderContratos, com: renderComissoes })[F.aba](v);
+  }
+  { const _r = render; render = function () { _r(); const v = $("#view-faturamento"); if (!v) return; const eq = typeof equipe === "function" && equipe(); if (!eq && S.tab === "faturamento") S.tab = "clientes"; v.hidden = S.tab !== "faturamento"; if (S.tab === "faturamento") renderFat(); }; }
+  window.PP_FATURAMENTO = { solicitar: (pre) => { if (!F.ok) { carregar().then(() => formSF(pre)); return; } formSF(pre); }, contratosDoCliente: (cid) => F.ch.filter((c) => c.cliente_id === cid) };
+  window.__PP_LOGIN?.then(() => { if (typeof equipe === "function" && equipe()) { const ch = SB.channel("faturamento"); for (const t of ["solicitacoes_faturamento", "contratos_honorarios", "comissoes"]) ch.on("postgres_changes", { event: "*", schema: "public", table: t }, () => { inval(); if (S.tab === "faturamento") carregar(); }); ch.subscribe(); } });
+})();
