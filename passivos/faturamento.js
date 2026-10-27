@@ -180,6 +180,23 @@
       el("tbody", {}, ...(L.length ? L.map((c) => el("tr", {}, el("td", {}, c.colaborador_nome), el("td", {}, c.sf_codigo || "—", el("div", { class: "note" }, c.cliente_nome || "")), el("td", {}, c.papel), el("td", { class: "r num" }, c.pct + "%"), el("td", { class: "r num" }, R$(c.base)), el("td", { class: "r num" }, R$(c.valor)), el("td", {}, c.pago_em ? fmt(c.pago_em) : c.paga_em ? fmt(c.paga_em) : "—"), el("td", {}, pill(ST_COM, c.status)))) : [el("tr", {}, el("td", { colspan: 8, class: "note" }, "Nenhum."))]))))));
   }
 
+  // ---------- card "Honorários" na ficha do cliente (aba Resumo) ----------
+  function cardHonorarios(c) {
+    const card = el("section", { class: "card section" }, el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Honorários"), el("div", { class: "note" }, "Contrato de honorários e faturamento deste cliente.")), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm", onclick: () => formContrato({ cliente_id: c.id }) }, "+ Contrato"), el("button", { class: "btn sm primary", onclick: () => { const ch = F.ch.find((x) => x.cliente_id === c.id && ["ativo", "assinado"].includes(x.status)); formSF({ cliente_id: c.id, contrato_id: ch?.id, pasta_numero: ch?.pasta_numero }); } }, "Solicitar faturamento"))), el("div", { class: "note" }, "Carregando…"));
+    (async () => {
+      if (!F.ok) await carregar();
+      const chs = F.ch.filter((x) => x.cliente_id === c.id), sfs = F.sf.filter((x) => x.cliente_id === c.id);
+      const linhas = chs.map((ch) => el("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)" }, el("b", {}, ch.codigo), el("span", {}, TIPO_CH[ch.tipo] || ch.tipo), pill(ST_CH, ch.status),
+        el("span", { class: "note" }, [ch.entrada ? "entrada " + R$(ch.entrada) : null, ch.parcelas ? `${ch.parcelas}× ${R$(ch.valor_parcela)}` : null, ch.mensalidade ? R$(ch.mensalidade) + "/mês" : null, ch.exito_pct != null ? "êxito " + ch.exito_pct + "%" : null, ch.horas_contratadas_mes ? ch.horas_contratadas_mes + " h/mês" : null].filter(Boolean).join(" · ")),
+        el("span", { class: "note", style: "margin-left:auto" }, `faturado ${R$(ch.faturado)} · recebido ${R$(ch.recebido)}`), el("button", { class: "btn sm", onclick: () => { F.aba = "ch"; F.abrirCh = ch.id; S.tab = "faturamento"; render(); } }, "Abrir")));
+      const pend = sfs.filter((x) => ["em_analise", "autorizada"].includes(x.status));
+      const rod = el("div", { class: "note", style: "margin-top:6px" }, sfs.length ? `${sfs.length} solicitação(ões) de faturamento${pend.length ? " · " + pend.length + " em aberto" : ""} · ` : "", sfs.length ? el("a", { href: "#faturamento", onclick: (ev) => { ev.preventDefault(); F.aba = "sf"; F.fSf = "todas"; F.q = c.nome || ""; S.tab = "faturamento"; render(); } }, "ver") : null);
+      card.replaceChildren(card.firstChild, linhas.length ? el("div", {}, ...linhas) : el("div", { class: "note" }, "Nenhum contrato de honorários cadastrado para este cliente."), rod);
+    })();
+    return card;
+  }
+  { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (typeof readOnly === "function" && readOnly()) return; if (!(typeof equipe === "function" && equipe())) return; host.append(cardHonorarios(c)); }; }
+
   // ---------- render ----------
   function renderFat() {
     const v = $("#view-faturamento"); if (!v) return; v.replaceChildren();

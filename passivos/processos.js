@@ -2,7 +2,7 @@
    Criação/edição e andamentos reaproveitam os formulários de carteira.js (PP_CARTEIRA). Depende de 0035. */
 (()=>{
 "use strict";
-const P={lista:[],ok:false,carregando:false,f:{q:"",cliente:"",status:"ativo",resp:"",semCliente:false,incompleto:false},sel:null,ands:[],andsDe:null,colab:[]};
+const P={lista:[],ok:false,carregando:false,f:{q:"",cliente:"",status:"ativo",resp:"",area:"",semCliente:false,incompleto:false},sel:null,ands:[],andsDe:null,colab:[]};
 async function carregar(){
   if(P.carregando)return;P.carregando=true;
   try{
@@ -28,15 +28,17 @@ function renderProcessos(){
   const K=(l,val,h,cls)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},String(val)),el("div",{class:"h"},h));
   const semCli=ativos.filter(p=>!p.cliente_id).length,atras=ativos.filter(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0).length,semProv=ativos.filter(p=>p.sem_providencia).length,incompl=ativos.filter(p=>(p.campos_faltando||[]).length).length;
   v.append(el("div",{class:"kpis"},K("Ativos",ativos.length,`${P.lista.length} no total`),K("Prazo vencido",atras,"próximo prazo já passou",atras?"crit":""),K("Cadastro incompleto",incompl,"campos obrigatórios em branco",incompl?"warn":""),K("Sem providência",semProv,"30 dias sem andamento nem tarefa",semProv?"warn":""),K("Sem cliente na base",semCli,"pessoas fora do cadastro")));
+  {const m=new Map();for(const p of ativos)m.set(p.area||"Sem área",(m.get(p.area||"Sem área")||0)+1);if(m.size>1)v.append(el("div",{class:"note",style:"margin:-4px 0 8px"},"Ativos por área: ",...[...m.entries()].sort((a,b)=>b[1]-a[1]).flatMap(([k,n],i)=>[i?" · ":"",el("a",{href:"#",onclick:ev=>{ev.preventDefault();f.area=k==="Sem área"?"__sem":k;render()}},`${k} ${n}`)])))}
   const q=el("input",{class:"search",placeholder:"Nº CNJ, parte, banco, cliente…",value:f.q,oninput:e=>{f.q=e.target.value;render()}});
   const fs=sel({ativo:"Ativos",suspenso:"Suspensos",encerrado:"Encerrados","":"Todos"},f.status);fs.onchange=()=>{f.status=fs.value;render()};
   const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(P.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp);fr.onchange=()=>{f.resp=fr.value;render()};
   const fc=sel({"":"Todos os clientes","__sem":"Só sem cliente",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},f.cliente);fc.onchange=()=>{f.cliente=fc.value;render()};
+  const areasAtivas=[...new Set(P.lista.map(p=>p.area).filter(Boolean))].sort();const fa=sel({"":"Todas as áreas","__sem":"Sem área",...Object.fromEntries(areasAtivas.map(a=>[a,a]))},f.area||"");fa.onchange=()=>{f.area=fa.value;render()};
   const ql=f.q.trim().toLowerCase();
-  const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)&&(!f.incompleto||(p.campos_faltando||[]).length)
+  const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.area==="__sem"?!p.area:!f.area||p.area===f.area)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)&&(!f.incompleto||(p.campos_faltando||[]).length)
     &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_codigo||(p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):"")].join(" ").toLowerCase().includes(ql)));
   const fi=el("label",{class:"switch"},el("input",{type:"checkbox",checked:f.incompleto?"":null,onchange:e=>{f.incompleto=e.target.checked;render()}})," Só cadastro incompleto");
-  const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,fi,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
+  const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,fa,fi,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
   card.append(tabela({cols:[
       {label:"Pasta",r:p=>el("div",{},el("b",{},window.PP_PASTAS?.pastaTxt?.(p)||"—"),(p.campos_faltando||[]).length?el("div",{class:"pill e2",title:"Falta: "+p.campos_faltando.join(", ")},"incompleto"):null,p.qtd_relacionados?el("div",{class:"note"},p.qtd_relacionados+" relacionado(s)"):null)},
       {label:"Processo",r:p=>el("div",{},el("span",{class:"t num"},p.numero_cnj||"(sem número)"),el("span",{class:"sub"},[p.area,p.tipo_acao,p.tribunal,p.vara].filter(Boolean).join(" · ")))},

@@ -118,11 +118,23 @@
     host.append(box);
   }
 
+  // ---------- admin: dar ciência em lote nas publicações antigas (zera o passivo do começo) ----------
+  function limparAntigas() {
+    const ate = inp("date", new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)), obs = inp("text", "Tratada antes do início do controle de publicações", { style: "min-width:320px" });
+    const prev = el("div", { class: "note" }); const contar = async () => { const { count } = await SB.from("publicacoes").select("id", { count: "exact", head: true }).is("providencia", null).lte("data_disponibilizacao", ate.value); prev.textContent = `${count ?? 0} publicação(ões) pendentes até ${fmtDt(ate.value)} receberão a providência "Ciência".`; }; ate.onchange = contar; contar();
+    modal("Dar ciência em lote", el("div", { class: "form" }, el("div", { class: "f full note" }, "Use uma vez, para limpar as publicações anteriores ao início do controle. Elas ficam marcadas como “Ciência”, com você como responsável e a observação abaixo, e saem da lista de pendentes (contam como tratadas fora do prazo no relatório — por isso prefira uma data anterior ao mês que você quer medir)."), field("la-ate", "Pendentes disponibilizadas até", ate), el("div", { class: "f full" }, field("la-obs", "Observação", obs)), el("div", { class: "f full" }, prev)), async () => {
+      const { data, error } = await SB.from("publicacoes").select("id").is("providencia", null).lte("data_disponibilizacao", ate.value).limit(2000); if (error) throw new Error(error.message);
+      let n = 0; for (const p of data || []) { const { error: e2 } = await SB.rpc("publicacao_tratar", { p_id: p.id, p_providencia: "ciencia", p_obs: obs.value.trim() || null, p_encaminhar: null }); if (!e2) n++; }
+      toast(`${n} publicação(ões) marcadas como ciência`); recarregar();
+    });
+    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Aplicar";
+  }
+
   // ---------- integração com a tela Publicações ----------
   { const _r = render; render = function () { _r(); const v = $("#view-publicacoes"); if (!v || v.hidden) return;
       const head = v.querySelector(".head"); if (!head) return;
       const b = (k, l) => el("button", { class: "btn sm" + (T.aba === k ? " primary" : ""), onclick: () => { T.aba = k; render(); } }, l);
-      head.after(el("div", { class: "actions", style: "justify-content:flex-start;margin:-6px 0 10px" }, b("lista", "Publicações"), b("rel", "Tempestividade")));
+      head.after(el("div", { class: "actions", style: "justify-content:flex-start;margin:-6px 0 10px" }, b("lista", "Publicações"), b("rel", "Tempestividade"), PP.perfil?.papel === "admin" ? el("button", { class: "btn sm", style: "margin-left:auto", onclick: limparAntigas }, "Dar ciência em lote…") : null));
       if (T.aba === "rel") { [...v.children].forEach((ch, i) => { if (i > 1) ch.remove(); }); renderRelatorio(v); return; }
       // filtro "só pendentes de providência" + coluna de providência nas linhas
       const filtros = v.querySelector("div[style*='flex-wrap']"); if (filtros && !filtros.querySelector(".pt-pend")) {
