@@ -48,7 +48,7 @@
     if (A.rodando) return; A.rodando = true; A.log = []; render();
     const log = (m) => { A.log.push(m); render(); };
     try {
-      const imp = async (tabela, linhas, omitir = []) => { if (!linhas.length) return; for (let i = 0; i < linhas.length; i += 200) { const { error } = await SB.rpc("espelho_importar", { tabela, linhas: linhas.slice(i, i + 200), omitir }); if (error) throw new Error(tabela + ": " + error.message); } };
+      const imp = async (tabela, linhas, omitir = []) => { if (!linhas.length) return; for (let i = 0; i < linhas.length; i += 200) { const { error } = await SB.rpc("espelho_importar", { p_tabela: tabela, p_linhas: linhas.slice(i, i + 200), p_omitir: omitir }); if (error) throw new Error(tabela + ": " + error.message); } };
       // 1) processos novos
       const novos = A.prev.processosNovos.filter((n, i, arr) => arr.findIndex((x) => x.num === n.num) === i).map((n) => ({ id: crypto.randomUUID(), cliente_id: n.cid, numero_cnj: n.num, tipo_acao: n.tipo, polo: "passivo", status: "ativo", visivel_cliente: false, fonte: "advbox", id_externo: "advbox:" + n.lid }));
       await imp("processos", novos); if (novos.length) { A.existentes.proc.push(...novos); log(`${novos.length} processo(s) criados`); }
