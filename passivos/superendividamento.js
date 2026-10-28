@@ -22,9 +22,9 @@ const TIPOS={consignado:"Empréstimo consignado",pessoal:"Empréstimo pessoal",c
 const pmt=(P,i,n,g=0)=>{if(n<=0)return 0;const Pg=P*Math.pow(1+i,g);if(!i)return Pg/n;return Pg*i/(1-Math.pow(1+i,-n))};
 // meses necessários para quitar P pagando p por mês à taxa i (null se nunca quita)
 const mesesPara=(P,p,i)=>{if(p<=0)return null;if(!i)return Math.ceil(P/p-1e-9);if(p<=P*i)return null;return Math.ceil(-Math.log(1-P*i/p)/Math.log(1+i)-1e-9)};
-function cronograma(P,parcela,i,n,dataBase,carenciaDias){
+function cronograma(P,parcela,i,n,dataBase,carenciaDias,semQuitar){
   const linhas=[];let saldo=P;const d0=addDias(dataBase,carenciaDias||0);
-  for(let k=1;k<=n;k++){const juros=saldo*i;const amort=k===n?saldo:Math.min(parcela-juros,saldo);saldo=Math.max(0,saldo-amort);const valor=k===n?amort+juros:parcela;linhas.push({k,data:addMeses(d0,k),valor:Math.round(valor*100)/100,juros:Math.round(juros*100)/100,amort:Math.round(amort*100)/100,saldo:Math.round(saldo*100)/100})}
+  for(let k=1;k<=n;k++){const juros=saldo*i;const amort=(k===n&&!semQuitar)?saldo:Math.min(parcela-juros,saldo);saldo=Math.max(0,saldo-amort);const valor=k===n?amort+juros:parcela;linhas.push({k,data:addMeses(d0,k),valor:Math.round(valor*100)/100,juros:Math.round(juros*100)/100,amort:Math.round(amort*100)/100,saldo:Math.round(saldo*100)/100})}
   return linhas;
 }
 function calcular(e){
@@ -46,12 +46,20 @@ function calcular(e){
   // desconto necessário para a dívida caber em 60 meses com a parcela disponível (valor presente das 60 parcelas)
   const vp60=i?disponivel*(1-Math.pow(1+i,-60))/i:disponivel*60;
   const descontoNecessario=Math.max(0,Math.round((saldo-vp60)*100)/100);
-  // rateio por credor (proporcional ao saldo) nos dois cenários
-  const rateio=dividas.map(d=>{const prop=saldo?d.saldo/saldo:0;return {credor:d.credor,cnpj:d.cnpj||"",descricao:d.descricao||"",tipo:d.tipo||"",saldo:d.saldo,parcelaAtual:d.parcela,prop,parcelaCinco:Math.round(parcelaCinco*prop*100)/100,parcelaCabe:Math.round(disponivel*prop*100)/100,consignado:!!d.consignado}});
+  // cenário 3: plano com desídia — parcela = renda disponível, prazo = o informado (≤60); o que não couber fica como saldo remanescente, declarado no plano
+  const tabDes=cronograma(saldo*Math.pow(1+i,g),disponivel,i,n,dataBase,car,true);
+  const remanescente=Math.round((tabDes.at(-1)?.saldo||0)*100)/100;
+  const totalDes=Math.round(tabDes.reduce((s,l)=>s+l.valor,0)*100)/100;
+  const desidia={parcela:disponivel,meses:n,total:totalDes,remanescente,pctPago:saldo?Math.min(1,totalDes/(saldo*Math.pow(1+i,g))):0,cabe:true,tabela:tabDes,necessaria:!cinco.cabe};
+  // rateio por credor (proporcional ao saldo) nos três cenários
+  const rateio=dividas.map(d=>{const prop=saldo?d.saldo/saldo:0;return {credor:d.credor,cnpj:d.cnpj||"",descricao:d.descricao||"",tipo:d.tipo||"",saldo:d.saldo,parcelaAtual:d.parcela,prop,parcelaCinco:Math.round(parcelaCinco*prop*100)/100,parcelaCabe:Math.round(disponivel*prop*100)/100,parcelaDesidia:Math.round(disponivel*prop*100)/100,recebidoDesidia:Math.round(totalDes*prop*100)/100,remanescenteDesidia:Math.round(remanescente*prop*100)/100,consignado:!!d.consignado}});
+  // rateio agrupado por credor (as dívidas do mesmo credor viram uma parcela só)
+  const porCredor={};for(const x of rateio){const k=x.credor.trim().toUpperCase();const a=porCredor[k]||(porCredor[k]={credor:x.credor.trim(),cnpj:x.cnpj,itens:0,saldo:0,parcelaAtual:0,prop:0,parcelaCinco:0,parcelaCabe:0,parcelaDesidia:0,recebidoDesidia:0,remanescenteDesidia:0});a.itens++;a.prop+=x.prop;for(const f of ["saldo","parcelaAtual","parcelaCinco","parcelaCabe","parcelaDesidia","recebidoDesidia","remanescenteDesidia"])a[f]=Math.round((a[f]+x[f])*100)/100;if(!a.cnpj&&x.cnpj)a.cnpj=x.cnpj}
+  const rateioCredor=Object.values(porCredor).sort((a,b)=>b.saldo-a.saldo);
   const consignadoPct=renda?dividas.filter(d=>d.consignado).reduce((s,d)=>s+d.parcela,0)/renda:null;
-  return {renda,saldo,parcelas,comprometimento,limitePct,disponivel,minimo,piso,minimoAbaixoPiso:minimo<piso,juros:i,prazo:n,carenciaDias:car,dataBase,cinco,cabe,descontoNecessario,rateio,consignadoPct,
+  return {renda,saldo,parcelas,comprometimento,limitePct,disponivel,minimo,piso,minimoAbaixoPiso:minimo<piso,juros:i,prazo:n,carenciaDias:car,dataBase,cinco,cabe,desidia,descontoNecessario,rateio,rateioCredor,consignadoPct,
     alertas:[minimo<piso?`O mínimo existencial calculado (${brl2(minimo)}) fica abaixo do piso de referência do Decreto 11.150/2022 (${brl2(piso)}).`:null,
-             !cinco.cabe?`A parcela do plano em ${n} meses (${brl2(parcelaCinco)}) supera a renda disponível (${brl2(disponivel)}): seria preciso desconto de ${brl2(descontoNecessario)} no saldo, ou prazo maior que a lei permite.`:null,
+             !cinco.cabe?`A parcela do plano em ${n} meses (${brl2(parcelaCinco)}) supera a renda disponível (${brl2(disponivel)}): seria preciso desconto de ${brl2(descontoNecessario)} no saldo, ou prazo maior que a lei permite. Alternativa: plano com desídia — ${brl2(disponivel)}/mês por ${n} meses, com saldo remanescente de ${brl2(remanescente)} (${pct(1-desidia.pctPago)} do total) declarado no plano.`:null,
              mCabe==null?"Com a renda disponível informada, a dívida não é amortizada (parcela não cobre os juros).":mCabe>60?`Pagando ${brl2(disponivel)}/mês a quitação levaria ${mCabe} meses — acima do teto legal de 5 anos.`:null,
              consignadoPct!=null&&consignadoPct>0.35?`Descontos consignados somam ${pct(consignadoPct)} da renda — acima do teto de 35% (Lei 10.820/2003).`:null].filter(Boolean)};
 }
@@ -68,7 +76,7 @@ const garantir=()=>{if(!U.ok&&!U.carregando)carregar();return U.ok};
 function entradasPadrao(){return {renda:"",limitePct:"30",minimoPiso:String(PISO_MINIMO),dividas:[{credor:"",cnpj:"",descricao:"",tipo:"consignado",saldo:"",parcela:"",consignado:true}],prazo:"60",carenciaDias:"0",juros:"0",dataCalculo:hojeISO(),comarca:"",processo:""}}
 async function salvar(concluir){
   const p=U.plano;const e=U.ent;const r=calcular(e);
-  const row={titulo:p.titulo||`${p.devedor?.nome||"Plano"} · ${fmtISO(e.dataCalculo)}`,cliente_id:p.cliente_id||null,devedor:p.devedor||{},entradas:e,resultado:{cinco:{parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,cabe:r.cinco.cabe},cabe:{parcela:r.cabe.parcela,meses:r.cabe.meses,quitaEm60:r.cabe.quitaEm60},disponivel:r.disponivel,minimo:r.minimo,saldo:r.saldo,descontoNecessario:r.descontoNecessario},status:concluir?"concluido":(p.status||"rascunho")};
+  const row={titulo:p.titulo||`${p.devedor?.nome||"Plano"} · ${fmtISO(e.dataCalculo)}`,cliente_id:p.cliente_id||null,devedor:p.devedor||{},entradas:e,resultado:{cinco:{parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,cabe:r.cinco.cabe},cabe:{parcela:r.cabe.parcela,meses:r.cabe.meses,quitaEm60:r.cabe.quitaEm60},desidia:{parcela:r.desidia.parcela,meses:r.desidia.meses,total:r.desidia.total,remanescente:r.desidia.remanescente},disponivel:r.disponivel,minimo:r.minimo,saldo:r.saldo,descontoNecessario:r.descontoNecessario},status:concluir?"concluido":(p.status||"rascunho")};
   const q=p.id?SB.from("planos_superendividamento").update(row).eq("id",p.id).select("id").single():SB.from("planos_superendividamento").insert(row).select("id").single();
   const {data,error}=await q;if(error){toast("Não foi possível salvar: "+error.message);return false}
   p.id=data.id;p.status=row.status;toast(concluir?"Plano concluído":"Plano salvo");U.ok=false;garantir();return true;
@@ -139,22 +147,26 @@ function renderResultado(){
   duas.append(cen(`Plano em ${r.prazo} meses`,"Saldo dividido no prazo (praxe do art. 104-A). Compare com a renda disponível.",r.cinco.parcela,r.cinco.meses,r.cinco.total,r.cinco.cabe,r.cinco.cabe?null:el("div",{class:"note"},`Para caber em ${r.prazo} meses: desconto de ${brl2(r.descontoNecessario)} no saldo (${r.saldo?pct(r.descontoNecessario/r.saldo):""}).`)));
   duas.append(cen("O que cabe na renda","Parcela igual à renda disponível; prazo é o necessário para quitar.",r.cabe.parcela,r.cabe.meses,r.cabe.total,r.cabe.quitaEm60,r.cabe.quitaEm60?null:el("div",{class:"note"},r.cabe.meses==null?"A parcela não cobre os juros — reduza os juros ou aumente o percentual.":`Passa de 60 meses (${r.cabe.meses}). Precisa de desconto de ${brl2(r.descontoNecessario)} ou renda disponível maior.`)));
   out.append(duas);
+  out.append(cen("Plano com desídia","Parcela igual à renda disponível pelo prazo informado; o que não couber fica declarado como saldo remanescente (desídia) no plano.",r.desidia.parcela,r.desidia.meses,r.desidia.total,true,
+    el("div",{class:"note"},r.desidia.remanescente>0?`Paga ${pct(r.desidia.pctPago)} do saldo. Saldo remanescente (desídia): ${brl2(r.desidia.remanescente)} — informado expressamente no plano, para conciliação/plano compulsório.`:"A parcela quita o saldo dentro do prazo: não há desídia.")));
   // rateio
   out.append(el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Rateio por credor (proporcional ao saldo)")),
-    tabela({cols:[{label:"Credor",r:x=>el("div",{},el("span",{class:"t"},x.credor),el("span",{class:"sub"},[x.descricao,TIPOS[x.tipo]].filter(Boolean).join(" · ")))},{label:"Saldo",r:x=>brl2(x.saldo),num:true},{label:"% do total",r:x=>pct(x.prop),num:true},{label:"Parcela atual",r:x=>brl2(x.parcelaAtual),num:true},{label:`Parcela em ${r.prazo} m`,r:x=>brl2(x.parcelaCinco),num:true},{label:"Parcela “o que cabe”",r:x=>brl2(x.parcelaCabe),num:true}],rows:r.rateio,vazio:"Informe as dívidas."})));
+    tabela({cols:[{label:"Credor",r:x=>el("div",{},el("span",{class:"t"},x.credor),el("span",{class:"sub"},[x.descricao,TIPOS[x.tipo]].filter(Boolean).join(" · ")))},{label:"Saldo",r:x=>brl2(x.saldo),num:true},{label:"% do total",r:x=>pct(x.prop),num:true},{label:"Parcela atual",r:x=>brl2(x.parcelaAtual),num:true},{label:`Parcela em ${r.prazo} m`,r:x=>brl2(x.parcelaCinco),num:true},{label:"Parcela “o que cabe”",r:x=>brl2(x.parcelaCabe),num:true},{label:"Com desídia: recebe / resta",r:x=>brl2(x.recebidoDesidia)+" / "+brl2(x.remanescenteDesidia),num:true}],rows:r.rateio,vazio:"Informe as dívidas."})));
+  if(r.rateioCredor.length<r.rateio.length)out.append(el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Por credor (dívidas do mesmo credor somadas em uma parcela)")),
+    tabela({cols:[{label:"Credor",r:x=>el("div",{},el("span",{class:"t"},x.credor),el("span",{class:"sub"},`${x.itens} contrato(s)`))},{label:"Saldo",r:x=>brl2(x.saldo),num:true},{label:"% do total",r:x=>pct(x.prop),num:true},{label:`Parcela em ${r.prazo} m`,r:x=>brl2(x.parcelaCinco),num:true},{label:"Parcela “o que cabe”",r:x=>brl2(x.parcelaCabe),num:true},{label:"Com desídia: recebe / resta",r:x=>brl2(x.recebidoDesidia)+" / "+brl2(x.remanescenteDesidia),num:true}],rows:r.rateioCredor,vazio:"—"})));
   // tabela mês a mês (prazo cheio)
   const det=el("details",{},el("summary",{style:"cursor:pointer;padding:12px 18px;font-weight:600"},`Tabela mês a mês — plano em ${r.prazo} meses`));
   det.append(tabela({cols:[{label:"#",r:l=>String(l.k),num:true,w:"50px"},{label:"Vencimento",r:l=>fmtISO(l.data)},{label:"Parcela",r:l=>brl2(l.valor),num:true},{label:"Juros",r:l=>brl2(l.juros),num:true},{label:"Amortização",r:l=>brl2(l.amort),num:true},{label:"Saldo",r:l=>brl2(l.saldo),num:true}],rows:r.cinco.tabela,vazio:"—"}));
   out.append(el("div",{class:"card"},det));
   out.append(el("div",{class:"card section"},el("h2",{},"Documentos"),el("div",{class:"note"},"Saem em .docx no papel timbrado. Escolha o cenário que vai para o parecer e para a petição."),
-    (()=>{const c=sel({cinco:`Plano em ${r.prazo} meses`,cabe:"O que cabe na renda"},U.ent.cenario||"cinco");c.onchange=()=>{U.ent.cenario=c.value};c.style.maxWidth="320px";return el("div",{class:"form"},field("se-cen","Cenário proposto",c))})(),
+    (()=>{const c=sel({cinco:`Plano em ${r.prazo} meses`,cabe:"O que cabe na renda",desidia:`Plano com desídia (${r.prazo} meses, parcela = renda disponível)`},U.ent.cenario||"cinco");c.onchange=()=>{U.ent.cenario=c.value};c.style.maxWidth="320px";return el("div",{class:"form"},field("se-cen","Cenário proposto",c))})(),
     el("div",{class:"actions",style:"justify-content:flex-start"},el("button",{class:"btn",onclick:()=>gerar("relatorio")},"Relatório do cálculo"),el("button",{class:"btn",onclick:()=>gerar("parecer")},"Parecer ao cliente"),el("button",{class:"btn primary",onclick:()=>gerar("peticao")},"Petição de juntada do plano"))));
   return out;
 }
 
 /* ---------- documentos ---------- */
-function cenarioEscolhido(r){const c=U.ent.cenario||"cinco";return c==="cabe"&&r.cabe.meses?{nome:"o que cabe na renda",parcela:r.cabe.parcela,meses:r.cabe.meses,total:r.cabe.total,tabela:r.cabe.tabela,campo:"parcelaCabe"}:{nome:`${r.prazo} meses`,parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,tabela:r.cinco.tabela,campo:"parcelaCinco"}}
-const ext=s=>s?`${s}`:"«a informar»";
+function cenarioEscolhido(r){const c=U.ent.cenario||"cinco";if(c==="desidia")return {nome:`plano com desídia (${r.prazo} meses)`,parcela:r.desidia.parcela,meses:r.desidia.meses,total:r.desidia.total,tabela:r.desidia.tabela,campo:"parcelaDesidia",desidia:true,remanescente:r.desidia.remanescente,pctPago:r.desidia.pctPago};return c==="cabe"&&r.cabe.meses?{nome:"o que cabe na renda",parcela:r.cabe.parcela,meses:r.cabe.meses,total:r.cabe.total,tabela:r.cabe.tabela,campo:"parcelaCabe"}:{nome:`${r.prazo} meses`,parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,tabela:r.cinco.tabela,campo:"parcelaCinco"}}
+const ext=s=>s?`${s}`:"«a informar»";const oabTxt=o=>/^OAB/i.test(String(o).trim())?String(o).trim():"OAB "+o;
 function cabecalhoPartes(p){const d=p.devedor||{};return `${ext(d.nome)}, ${ext(d.nacionalidade)}, ${ext(d.estado_civil)}, ${ext(d.profissao)}, portador(a) do RG nº ${ext(d.rg)}, inscrito(a) no CPF sob o nº ${ext(d.cpf)}, residente e domiciliado(a) em ${ext(d.endereco)}`}
 function docRelatorio(p,e,r){
   const c=cenarioEscolhido(r);const esc=U.escritorio||{};const adv=(esc.advogados||[])[0]||{};
@@ -164,31 +176,35 @@ function docRelatorio(p,e,r){
     {tipo:"subtitulo",texto:"2. Dívidas"},
     {tipo:"tabela",cabecalho:["Credor","Descrição","Saldo devedor","Parcela atual","% do total"],larguras:[28,27,15,15,15],num:[2,3,4],linhas:r.rateio.map(x=>[x.credor+(x.cnpj?` (${x.cnpj})`:""),[x.descricao,TIPOS[x.tipo]].filter(Boolean).join(" · "),brl2(x.saldo),brl2(x.parcelaAtual),pct(x.prop)])},
     {tipo:"subtitulo",texto:"3. Plano proposto"},
-    {tipo:"tabela",cabecalho:["Parâmetro","Valor"],larguras:[55,45],num:[1],linhas:[["Cenário",c.nome],["Parcela mensal",brl2(c.parcela)],["Prazo",`${c.meses} meses`],["Carência",r.carenciaDias?`${r.carenciaDias} dias`:"—"],["Juros",r.juros?`${pct(r.juros)} a.m.`:"sem juros"],["Total do plano",brl2(c.total)],["1ª parcela",fmtISO(c.tabela[0]?.data)],["Última parcela",fmtISO(c.tabela.at(-1)?.data)]]},
-    {tipo:"subtitulo",texto:"4. Rateio por credor"},
-    {tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal"],larguras:[45,20,15,20],num:[1,2,3],linhas:r.rateio.map(x=>[x.credor,brl2(x.saldo),pct(x.prop),brl2(x[c.campo])])},
+    {tipo:"tabela",cabecalho:["Parâmetro","Valor"],larguras:[55,45],num:[1],linhas:[["Cenário",c.nome],["Parcela mensal",brl2(c.parcela)],["Prazo",`${c.meses} meses`],["Carência",r.carenciaDias?`${r.carenciaDias} dias`:"—"],["Juros",r.juros?`${pct(r.juros)} a.m.`:"sem juros"],["Total do plano",brl2(c.total)],...(c.desidia?[["Saldo devedor total",brl2(r.saldo)],["Pago pelo plano",pct(c.pctPago)+" do saldo"],["Saldo remanescente (desídia)",brl2(c.remanescente)]]:[]),["1ª parcela",fmtISO(c.tabela[0]?.data)],["Última parcela",fmtISO(c.tabela.at(-1)?.data)]]},
+    ...(c.desidia?[{tipo:"paragrafo",texto:`O plano é dimensionado pela capacidade de pagamento (${pct(r.limitePct)} da renda, ${brl2(r.disponivel)}/mês) no prazo máximo legal de ${c.meses} meses (art. 104-A, §1º, CDC). Como a parcela não alcança o saldo consolidado, declara-se expressamente a desídia de ${brl2(c.remanescente)} (${pct(1-c.pctPago)} do total), rateada entre os credores na proporção de cada crédito, a ser tratada na conciliação (desconto/remissão) ou no plano judicial compulsório (art. 104-B).`}]:[]),
+    {tipo:"subtitulo",texto:"4. Rateio por credor (dívidas do mesmo credor somadas em uma parcela)"},
+    c.desidia?{tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal","Recebe no plano","Saldo remanescente"],larguras:[30,16,10,15,15,14],num:[1,2,3,4,5],linhas:r.rateioCredor.map(x=>[x.credor+(x.itens>1?` (${x.itens} contratos)`:""),brl2(x.saldo),pct(x.prop),brl2(x.parcelaDesidia),brl2(x.recebidoDesidia),brl2(x.remanescenteDesidia)])}
+    :{tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal"],larguras:[45,20,15,20],num:[1,2,3],linhas:r.rateioCredor.map(x=>[x.credor+(x.itens>1?` (${x.itens} contratos)`:""),brl2(x.saldo),pct(x.prop),brl2(x[c.campo])])},
     {tipo:"subtitulo",texto:"5. Cronograma"},
     {tipo:"tabela",cabecalho:["#","Vencimento","Parcela","Juros","Amortização","Saldo"],larguras:[8,20,18,18,18,18],num:[2,3,4,5],linhas:c.tabela.map(l=>[String(l.k),fmtISO(l.data),brl2(l.valor),brl2(l.juros),brl2(l.amort),brl2(l.saldo)])}];
-  if(r.alertas.length)it.push({tipo:"subtitulo",texto:"6. Observações"},...r.alertas.map(a=>({tipo:"item",texto:"• "+a})));
-  it.push({tipo:"espaco"},{tipo:"paragrafo",texto:`Cálculo elaborado em ${fmtISO(r.dataBase)} por ${adv.nome||esc.nome||"Neves Pádua Advocacia"}${adv.oab?" — OAB "+adv.oab:""}. Operações aritméticas sobre os saldos informados pelo devedor/credores; não substitui a conferência dos extratos.`});
+  const obs=c.desidia?r.alertas.filter(a=>!/supera a renda disponível/.test(a)):r.alertas;
+  if(obs.length)it.push({tipo:"subtitulo",texto:"6. Observações"},...obs.map(a=>({tipo:"item",texto:"• "+a})));
+  it.push({tipo:"espaco"},{tipo:"paragrafo",texto:`Cálculo elaborado em ${fmtISO(r.dataBase)} por ${adv.nome||esc.nome||"Neves Pádua Advocacia"}${adv.oab?" — "+oabTxt(adv.oab):""}. Operações aritméticas sobre os saldos informados pelo devedor/credores; não substitui a conferência dos extratos.`});
   return it;
 }
 function docParecer(p,e,r){
   const c=cenarioEscolhido(r);const esc=U.escritorio||{};const adv=(esc.advogados||[])[0]||{};const d=p.devedor||{};
   return [{tipo:"destaque",texto:"PARECER — PLANO DE PAGAMENTO (SUPERENDIVIDAMENTO)"},{tipo:"centro",texto:`${d.nome||p.titulo} · ${fmtISO(r.dataBase)}`},
     {tipo:"subtitulo",texto:"I. Situação"},
-    {tipo:"paragrafo",texto:`O(a) cliente possui ${r.rateio.length} dívida(s) de consumo com ${r.rateio.map(x=>x.credor).join(", ")}, que somam ${brl2(r.saldo)}. As parcelas contratadas totalizam ${brl2(r.parcelas)} por mês, o que corresponde a ${pct(r.comprometimento)} da renda líquida de ${brl2(r.renda)}.`},
+    {tipo:"paragrafo",texto:`O(a) cliente possui ${r.rateio.length} dívida(s) de consumo com ${r.rateioCredor.map(x=>x.credor+(x.itens>1?` (${x.itens})`:"")).join(", ")}, que somam ${brl2(r.saldo)}. As parcelas contratadas totalizam ${brl2(r.parcelas)} por mês, o que corresponde a ${pct(r.comprometimento)} da renda líquida de ${brl2(r.renda)}.`},
     {tipo:"paragrafo",texto:`Preservando-se ${pct(1-r.limitePct)} da renda para as despesas de subsistência (mínimo existencial de ${brl2(r.minimo)}), restam ${brl2(r.disponivel)} mensais para o pagamento das dívidas.${r.minimoAbaixoPiso?` Atenção: esse mínimo fica abaixo do piso de referência do Decreto 11.150/2022 (${brl2(r.piso)}).`:""}`},
     {tipo:"subtitulo",texto:"II. Enquadramento"},
     {tipo:"paragrafo",texto:"A Lei 14.181/2021 incluiu no Código de Defesa do Consumidor o conceito de superendividamento (art. 54-A, §1º): a impossibilidade manifesta de o consumidor pessoa natural, de boa-fé, pagar a totalidade de suas dívidas de consumo exigíveis e vincendas sem comprometer o mínimo existencial. Para essa situação, o art. 104-A prevê a repactuação das dívidas por meio de plano de pagamento com prazo máximo de 5 anos, preservado o mínimo existencial, e o art. 104-B o plano judicial compulsório quando não há acordo."},
     {tipo:"paragrafo",texto:`O comprometimento de ${pct(r.comprometimento)} da renda com parcelas, em dívidas de consumo, caracteriza a situação descrita na lei e autoriza a proposta de plano.`},
     {tipo:"subtitulo",texto:"III. Plano proposto"},
-    {tipo:"paragrafo",texto:`Cenário “${c.nome}”: parcela mensal de ${brl2(c.parcela)} durante ${c.meses} meses${r.carenciaDias?`, após carência de ${r.carenciaDias} dias`:""}${r.juros?`, com juros de ${pct(r.juros)} ao mês`:", sem juros remuneratórios"}, totalizando ${brl2(c.total)}. A parcela é rateada entre os credores na proporção de cada saldo:`},
-    ...r.rateio.map(x=>({tipo:"item",texto:`• ${x.credor}: ${brl2(x[c.campo])}/mês (saldo ${brl2(x.saldo)}, ${pct(x.prop)} do total).`})),
-    ...(r.cinco.cabe?[]:[{tipo:"paragrafo",texto:`Observação: dividir o saldo em ${r.prazo} meses resultaria em parcela de ${brl2(r.cinco.parcela)}, acima da renda disponível. Para o plano fechar em 5 anos seria necessário desconto de ${brl2(r.descontoNecessario)} no saldo consolidado — ponto a ser levado à conciliação com os credores.`}]),
+    {tipo:"paragrafo",texto:`Cenário “${c.nome}”: parcela mensal de ${brl2(c.parcela)} durante ${c.meses} meses${r.carenciaDias?`, após carência de ${r.carenciaDias} dias`:""}${r.juros?`, com juros de ${pct(r.juros)} ao mês`:", sem juros remuneratórios"}, totalizando ${brl2(c.total)}. A parcela é rateada entre os credores na proporção de cada saldo (dívidas do mesmo credor somadas em uma única parcela):`},
+    ...r.rateioCredor.map(x=>({tipo:"item",texto:`• ${x.credor}${x.itens>1?` (${x.itens} contratos)`:""}: ${brl2(x[c.campo])}/mês (saldo ${brl2(x.saldo)}, ${pct(x.prop)} do total${c.desidia&&x.remanescenteDesidia>0?`; recebe ${brl2(x.recebidoDesidia)} e remanesce ${brl2(x.remanescenteDesidia)}`:""}).`})),
+    ...(c.desidia?[{tipo:"paragrafo",texto:`Desídia declarada: a parcela corresponde a ${pct(r.limitePct)} da renda — o máximo que o(a) cliente consegue pagar sem comprometer o mínimo existencial — e, no prazo máximo de ${c.meses} meses que a lei permite, cobre ${pct(c.pctPago)} do saldo. O plano informa expressamente que restará saldo de ${brl2(c.remanescente)}, rateado entre os credores na proporção de cada crédito. Dividir o saldo integral em ${r.prazo} meses exigiria parcela de ${brl2(r.cinco.parcela)}, inviável. A diferença é objeto da conciliação (desconto ou remissão pelos credores) ou, na falta de acordo, do plano judicial compulsório (art. 104-B do CDC).`}]
+    :r.cinco.cabe?[]:[{tipo:"paragrafo",texto:`Observação: dividir o saldo em ${r.prazo} meses resultaria em parcela de ${brl2(r.cinco.parcela)}, acima da renda disponível. Para o plano fechar em 5 anos seria necessário desconto de ${brl2(r.descontoNecessario)} no saldo consolidado — ponto a ser levado à conciliação com os credores.`}]),
     {tipo:"subtitulo",texto:"IV. Recomendação"},
     {tipo:"paragrafo",texto:"Apresentar o plano aos credores na audiência de conciliação (art. 104-A), com os extratos e comprovantes de renda que embasam o cálculo, requerendo, se necessário, a suspensão dos descontos que excedam a renda disponível até a repactuação. O(a) cliente deve evitar novas contratações de crédito durante o procedimento (art. 104-A, §4º, IV)."},
-    {tipo:"espaco"},{tipo:"paragrafo",texto:`${fmtISO(r.dataBase)} — ${adv.nome||esc.nome||"Neves Pádua Advocacia"}${adv.oab?", OAB "+adv.oab:""}.`}];
+    {tipo:"espaco"},{tipo:"paragrafo",texto:`${fmtISO(r.dataBase)} — ${adv.nome||esc.nome||"Neves Pádua Advocacia"}${adv.oab?", "+oabTxt(adv.oab):""}.`}];
 }
 function docPeticao(p,e,r){
   const c=cenarioEscolhido(r);const esc=U.escritorio||{};const adv=(esc.advogados||[])[0]||{};const d=p.devedor||{};
@@ -202,9 +218,11 @@ function docPeticao(p,e,r){
     {tipo:"paragrafo",texto:`Preservados ${pct(1-r.limitePct)} da renda para as despesas básicas de subsistência (${brl2(r.minimo)}), a renda disponível para o pagamento das dívidas é de ${brl2(r.disponivel)} mensais.`},
     {tipo:"subtitulo",texto:"3. Do plano de pagamento"},
     {tipo:"paragrafo",texto:`Propõe-se o pagamento de ${brl2(c.parcela)} por mês, durante ${c.meses} meses${r.carenciaDias?`, com carência de ${r.carenciaDias} dias`:""}${r.juros?`, acrescidos de juros de ${pct(r.juros)} ao mês`:", sem incidência de juros remuneratórios"}, totalizando ${brl2(c.total)}, com a primeira parcela em ${fmtISO(c.tabela[0]?.data)} e a última em ${fmtISO(c.tabela.at(-1)?.data)} — dentro do prazo máximo de 5 anos do art. 104-A, §1º. A parcela será rateada entre os credores na proporção de cada crédito:`},
-    {tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal"],larguras:[45,20,15,20],num:[1,2,3],linhas:r.rateio.map(x=>[x.credor,brl2(x.saldo),pct(x.prop),brl2(x[c.campo])])},
+    c.desidia?{tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal","Recebe no plano","Saldo remanescente"],larguras:[30,16,10,15,15,14],num:[1,2,3,4,5],linhas:r.rateioCredor.map(x=>[x.credor+(x.itens>1?` (${x.itens} contratos)`:""),brl2(x.saldo),pct(x.prop),brl2(x.parcelaDesidia),brl2(x.recebidoDesidia),brl2(x.remanescenteDesidia)])}
+    :{tipo:"tabela",cabecalho:["Credor","Saldo","% do total","Parcela mensal"],larguras:[45,20,15,20],num:[1,2,3],linhas:r.rateioCredor.map(x=>[x.credor+(x.itens>1?` (${x.itens} contratos)`:""),brl2(x.saldo),pct(x.prop),brl2(x[c.campo])])},
     {tipo:"paragrafo",texto:"O cronograma completo, com vencimentos e saldos, segue anexo (relatório do cálculo)."},
-    ...(r.cinco.cabe?[]:[{tipo:"paragrafo",texto:`Registra-se que a divisão do saldo consolidado em ${r.prazo} meses resultaria em parcela de ${brl2(r.cinco.parcela)}, superior à renda disponível; a viabilidade do plano em 5 anos depende de desconto de ${brl2(r.descontoNecessario)} sobre o saldo, o que se submete à conciliação (art. 104-A, caput) ou, na sua falta, ao plano judicial compulsório (art. 104-B).`}]),
+    ...(c.desidia?[{tipo:"paragrafo",texto:`Declara-se, desde logo, a desídia: a parcela proposta corresponde à integralidade da renda disponível (${pct(r.limitePct)} da renda líquida), preservado o mínimo existencial, e no prazo máximo de ${c.meses} meses do art. 104-A, §1º, do CDC alcança ${brl2(c.total)} — ${pct(c.pctPago)} do saldo consolidado de ${brl2(r.saldo)}. Remanescerá, portanto, saldo de ${brl2(c.remanescente)}, rateado entre os credores na proporção de cada crédito, cuja repactuação (desconto ou remissão) se submete à conciliação ou, na sua falta, ao plano judicial compulsório (art. 104-B do CDC). A divisão do saldo integral em ${r.prazo} meses resultaria em parcela de ${brl2(r.cinco.parcela)}, superior à capacidade de pagamento do(a) requerente.`}]
+    :r.cinco.cabe?[]:[{tipo:"paragrafo",texto:`Registra-se que a divisão do saldo consolidado em ${r.prazo} meses resultaria em parcela de ${brl2(r.cinco.parcela)}, superior à renda disponível; a viabilidade do plano em 5 anos depende de desconto de ${brl2(r.descontoNecessario)} sobre o saldo, o que se submete à conciliação (art. 104-A, caput) ou, na sua falta, ao plano judicial compulsório (art. 104-B).`}]),
     {tipo:"subtitulo",texto:"4. Dos pedidos"},
     {tipo:"paragrafo",texto:"Diante do exposto, requer:"},
     {tipo:"item",texto:"a) a juntada do presente plano de pagamento e do relatório de cálculo anexo, com intimação dos credores para manifestação;"},
@@ -213,7 +231,7 @@ function docPeticao(p,e,r){
     {tipo:"item",texto:"d) não havendo êxito na conciliação, a instauração do processo por superendividamento para revisão e integração dos contratos e repactuação das dívidas, com plano judicial compulsório (art. 104-B do CDC)."},
     {tipo:"paragrafo",texto:"Nestes termos, pede deferimento."},
     {tipo:"centro",texto:`${e.comarca?e.comarca.split("/")[0]:"«cidade»"}, ${fmtISO(r.dataBase)}.`},{tipo:"espaco"},
-    {tipo:"centro",texto:adv.nome||"«advogado(a)»"},{tipo:"centro",texto:adv.oab?"OAB "+adv.oab:"«OAB»"}];
+    {tipo:"centro",texto:adv.nome||"«advogado(a)»"},{tipo:"centro",texto:adv.oab?oabTxt(adv.oab):"«OAB»"}];
 }
 async function gerar(tipo){
   const p=U.plano,e=U.ent,r=U.res||calcular(e);
@@ -224,7 +242,7 @@ async function gerar(tipo){
 }
 
 /* ---------- integração ---------- */
-window.PP_SUPERENDIVIDAMENTO={calcular,abrir,novo:(cliente_id)=>{U.plano={titulo:"",cliente_id:cliente_id||null,devedor:{},status:"rascunho"};U.ent=entradasPadrao();const c=S.clientes.find(x=>x.id===cliente_id);if(c){U.plano.devedor={nome:c.nome,cpf:c.cnpj||c.cpf_titular||"",endereco:c.endereco||"",cidade:c.cidade||"",uf:c.uf||""}}S.tab="superendividamento";render()}};
+window.PP_SUPERENDIVIDAMENTO={calcular,abrir,gerarCom:(plano,ent,tipo,escritorio)=>{U.plano=plano;U.ent=ent;if(escritorio)U.escritorio=escritorio;U.res=calcular(ent);return gerar(tipo)},novo:(cliente_id)=>{U.plano={titulo:"",cliente_id:cliente_id||null,devedor:{},status:"rascunho"};U.ent=entradasPadrao();const c=S.clientes.find(x=>x.id===cliente_id);if(c){U.plano.devedor={nome:c.nome,cpf:c.cnpj||c.cpf_titular||"",endereco:c.endereco||"",cidade:c.cidade||"",uf:c.uf||""}}S.tab="superendividamento";render()}};
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^superendividamento\/([0-9a-f-]{36})$/i.exec(h);if(m)abrir(m[1]);return _h.apply(this,arguments)}}
 {const _r=render;render=function(){_r();const v=$("#view-superendividamento");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="superendividamento")S.tab="clientes";v.hidden=S.tab!=="superendividamento";if(S.tab==="superendividamento")renderSE()}}
 })();
