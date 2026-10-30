@@ -78,8 +78,8 @@ html = html.replace('{tab:"historico",label:"Base de acordos",cls:"area-juridico
 html = html.replace('const temAtivo=n.itens.some(ativo),fechado=!!fechados[n.grupo]&&!temAtivo;', 'const temAtivo=n.itens.some(ativo),fechado=(fechados[n.grupo]??!!n.fechadoPadrao)&&!temAtivo;');
 html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"painel",label:"Hoje",cls:"edit-only"}');
 
-// [espelho] página do cliente: 7 pastas (Dossiê · Cadastro · Passivos · Jurídico · Negocial · Tarefas · Financeiro) em vez de 9 abas
-if(ESPELHO){
+// página do cliente: 7 pastas (Dossiê · Cadastro · Passivos · Jurídico · Negocial · Tarefas · Financeiro) em vez de 9 abas (consolidado do beta em 30/10)
+{
   must('  const SUBS=[["resumo","Resumo"],');
   const ini = html.indexOf('  const SUBS=[["resumo","Resumo"],');
   const fimMarca = '  if(S.sub==="notas"){';
@@ -140,8 +140,8 @@ must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
 must('/*NAV_GRUPOS*/');
 html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"leads",label:"Leads (CRM)",cls:"area-comercial"},{tab:"automacoes",label:"Automações",cls:"area-comercial"},{tab:"comercial",label:"Metas do mês",cls:"area-comercial"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"atendimento",label:"Atendimento",cls:"edit-only area-atendimento",itens:[{tab:"atendimento",label:"Conversas (WhatsApp)",cls:"area-atendimento"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:[{tab:"financeiro",label:"Cobranças (Asaas)",cls:"area-financeiro"},{tab:"faturamento",label:"Contratos e faturamento",cls:"area-financeiro"},{tab:"estoque",label:"Estoque",cls:"area-financeiro"},{tab:"inventario",label:"Inventário",cls:"area-financeiro"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-financeiro",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",label:"Colaboradores",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto",cls:"area-equipe"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"},{tab:"espelho",label:"Espelho (beta)",cls:"admin-only espelho-only"},{tab:"importar-advbox",label:"Importar do ADVBox",cls:"admin-only"}]}');
-// [espelho] hubs: Jurídico e Financeiro viram um item só no menu, com abas internas (passivos/hubs.js)
-if(ESPELHO){
+// hubs: Jurídico e Financeiro viram um item só no menu, com abas internas (passivos/hubs.js) (consolidado do beta em 30/10)
+{
   const reJur = /\{grupo:"juridico",label:"Jurídico",cls:"edit-only grp-juridico",itens:\[[^\]]*\]\},/;
   if(!reJur.test(html)) throw new Error('grupo juridico não encontrado');
   html = html.replace(reJur, '{tab:"processos",tabs:["processos","publicacoes","negociacoes","historico"],label:"Jurídico",cls:"edit-only grp-juridico area-juridico"},');
