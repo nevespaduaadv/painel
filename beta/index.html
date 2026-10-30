@@ -300,7 +300,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 @media (max-width:600px){.userbox #userName,.userbox a.btn{display:none}}
 .pendente{text-align:center;padding:48px 20px;color:var(--muted)}
 .pendente h2{color:var(--fg);margin-bottom:8px}
-.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}.espelho-only{display:none!important}</style>
+.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}.espelho-only{display:none!important}.grp.hub .grp-h{cursor:pointer}.grp.hub.ativo .grp-h span{color:var(--gold)}</style>
 </head>
 <body data-espelho="1">
 
@@ -751,7 +751,7 @@ function renderNav(){
   let fechados={};try{fechados=JSON.parse(localStorage.getItem("pp-grupos")||"{}")}catch(_){}
   for(const n of NAV){
     if(n.link){fim.push(n);continue}
-    if(n.tab){nav.append(itemNav(n,ativo(n)));continue}
+    if(n.tab&&n.tabs){const on=ativo(n);nav.append(el("div",{class:"grp hub "+(n.cls||"")+(on?" ativo":"")},el("button",{class:"grp-h",type:"button",onclick:()=>{S.tab=n.tab;S.sel=null;location.hash="#"+n.tab;render()}},el("span",{},n.label),el("i",{class:"chev",style:"transform:rotate(-90deg)"}))));continue}if(n.tab){nav.append(itemNav(n,ativo(n)));continue}
     const temAtivo=n.itens.some(ativo),fechado=(fechados[n.grupo]??!!n.fechadoPadrao)&&!temAtivo;
     const g=el("div",{class:"grp "+(n.cls||"")+(fechado?" fechado":"")},
       el("button",{class:"grp-h",type:"button","aria-expanded":String(!fechado),onclick:()=>{fechados[n.grupo]=!g.classList.contains("fechado");g.classList.toggle("fechado",fechados[n.grupo]);g.firstChild.setAttribute("aria-expanded",String(!fechados[n.grupo]));try{localStorage.setItem("pp-grupos",JSON.stringify(fechados))}catch(_){}}},el("span",{},n.label),el("i",{class:"chev"})),
@@ -1349,7 +1349,7 @@ async function renderUsuarios(){
 </script>
 <div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div><script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["passagem","core"],["hubs","core"]];PP.MODULOS_V="?v=mvtywww6";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["passagem","core"],["hubs","core"]];PP.MODULOS_V="?v=mvuygo8i";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
