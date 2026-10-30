@@ -182,6 +182,6 @@ function openAcessoForm(c,x={}){
 
 /* ---------- Integração ---------- */
 window.PP_MOD=window.PP_MOD||{};
-window.PP_MOD.resumo=renderResumo;
+window.PP_MOD.resumo=(c,host,ind)=>{if(S.sub==="dossie"||S.sub==="financeiro")return;renderResumo(c,host,ind)};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("ficha");for(const t of ["contatos","bens","documentos","acessos_sistemas"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
 })();

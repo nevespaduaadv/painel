@@ -71,14 +71,92 @@ html = html.replace('const NAV=[{tab:"clientes",label:"Clientes"},', 'const NAV=
 must('/*NAV_JURIDICO*/');
 html = html.replace('{tab:"historico",label:"Base de acordos"}', '{tab:"historico",label:"Base de acordos",cls:"area-juridico"}');
 html = html.replace('{grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[', '{grupo:"juridico",label:"Jurídico",cls:"edit-only grp-juridico",itens:[');
-html = html.replace('{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}', '');
-html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos",cls:"area-juridico"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},');
+html = html.replace('{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}', '');
+html = html.replace('/*NAV_JURIDICO*/', '{tab:"processos",label:"Processos e pastas",cls:"area-juridico"},{tab:"publicacoes",label:"Publicações (DJEN)",cls:"area-juridico controle-only"},{tab:"negociacoes",label:"Negociações",cls:"area-juridico"},');
+// [espelho] ferramentas jurídicas em grupo próprio, fechado por padrão (menu mais curto)
+html = html.replace('{tab:"historico",label:"Base de acordos",cls:"area-juridico"},]},', '{tab:"historico",label:"Base de acordos",cls:"area-juridico"}]},\n  {grupo:"juridico-ferr",label:"Ferramentas jurídicas",cls:"edit-only grp-juridico",fechadoPadrao:true,itens:[{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)}]},');
+html = html.replace('const temAtivo=n.itens.some(ativo),fechado=!!fechados[n.grupo]&&!temAtivo;', 'const temAtivo=n.itens.some(ativo),fechado=(fechados[n.grupo]??!!n.fechadoPadrao)&&!temAtivo;');
+html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"painel",label:"Hoje",cls:"edit-only"}');
+
+// página do cliente: 7 pastas (Dossiê · Cadastro · Passivos · Jurídico · Negocial · Tarefas · Financeiro) em vez de 9 abas (consolidado do beta em 30/10)
+{
+  must('  const SUBS=[["resumo","Resumo"],');
+  const ini = html.indexOf('  const SUBS=[["resumo","Resumo"],');
+  const fimMarca = '  if(S.sub==="notas"){';
+  const fim0 = html.indexOf(fimMarca, ini);
+  const fim = html.indexOf('    m.append(sec);return;\n  }\n', fim0) + '    m.append(sec);return;\n  }\n'.length;
+  const antigo = html.slice(ini, fim);
+  const novo = `  const EQ=!readOnly();
+  const SUBS=EQ?[["dossie","Dossiê"],["cliente","Cadastro"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],["financeiro","Financeiro"]]
+    :[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline","Andamento",cnt.timeline],["processos","Processos",cnt.processos]];
+  if(EQ){const mapa={resumo:"dossie",timeline:"dossie",notas:"cliente",geral:"passivos",contratos:"passivos",reserva:"passivos"};if(mapa[S.sub]){if(["geral","contratos","reserva"].includes(S.sub))S.sub2=S.sub;S.sub=mapa[S.sub]}}
+  if(!S.sub||!SUBS.some(s=>s[0]===S.sub))S.sub=EQ?"dossie":(MOD.resumo?"resumo":"geral");
+  m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
+  if(S.sub==="resumo"||S.sub==="dossie"||S.sub==="cliente"||S.sub==="financeiro"){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);
+    if(MOD.resumo)MOD.resumo(c,host,{ks,ativos,saldoTotal,saldoNeg,acordoTotal,reservaTotal});else{S.sub=EQ?"passivos":"geral";render();return}
+    if(S.sub==="cliente"){
+      const sec=el("section",{class:"card section edit-only"},el("div",{class:"section-h"},el("h2",{},"Notas internas"),el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar")));
+      sec.append(c.notasInternas?el("div",{style:"white-space:pre-wrap"},c.notasInternas):el("div",{class:"note"},"Nenhuma nota interna. Prefira registrar no Dossiê (tipo “Informação do cliente”, fixada) — este campo é o legado."));
+      const kn=ks.filter(k=>k.notas);if(kn.length)sec.append(el("h3",{style:"margin-top:8px"},"Notas por contrato"),el("ul",{style:"margin:0;padding-left:18px"},kn.map(k=>el("li",{},el("b",{},shortName(k)),": ",k.notas))));
+      host.append(sec);
+    }
+    return;
+  }
+  let sub2=EQ&&S.sub==="passivos"?(S.sub2||"geral"):S.sub;
+  if(EQ&&S.sub==="passivos")m.append(el("div",{class:"actions",style:"justify-content:flex-start;margin:-4px 0 10px"},...[["geral","Visão geral"],["contratos","Contratos"],["reserva","Reserva de quitação"]].map(([k,l])=>el("button",{class:"btn sm"+(sub2===k?" primary":""),onclick:()=>{S.sub2=k;render()}},l))));
+  if(sub2==="contratos"){
+    const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Contratos"),el("span",{class:"note"},\`Projeção baseada em \${acordos.length} acordos reais do escritório · estágio conforme Res. CMN 4.966/2021 · provisão mínima conforme Res. BCB 352/2023\`)));
+    if(!ks.length)sec.append(el("div",{class:"empty"},"Nenhum contrato cadastrado para este cliente."));
+    else sec.append(el("div",{class:"contracts"},ks.map(k=>contractCard(k,projetar(k,R,acordos),R))));
+    m.append(sec,disclaimer());return;
+  }
+  if(sub2==="reserva"){m.append(renderReserva(c,neg,fora,R,acumulada,alvoTotal,reservaTotal,mesesMax),disclaimer());return}
+  if(S.sub==="timeline"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.timeline)MOD.timeline(c,host);else legacyTimeline(c,host);
+    return;
+  }
+  if(S.sub==="processos"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.processos)MOD.processos(c,host);else host.append(el("div",{class:"empty"},el("h3",{},"Processos"),el("div",{},"Disponível na versão do painel conectada ao banco de dados.")));
+    return;
+  }
+  if(S.sub==="tarefas"){
+    const host=el("section",{class:"card section"});m.append(host);
+    if(MOD.tarefas)MOD.tarefas(c,host);else host.append(el("div",{class:"empty"},"Disponível na versão do painel conectada ao banco de dados."));
+    return;
+  }
+  if(S.sub==="negociacoes"){
+    const host=el("div",{class:"main",style:"gap:14px"});m.append(host);if(MOD.negociacoes)MOD.negociacoes(c,host);else host.append(el("div",{class:"empty"},"Módulo de negociações não carregado."));return;
+  }
+`;
+  html = html.slice(0, ini) + novo + html.slice(fim);
+  html = html.replace('negociacoes:"Negociações",notas:"Notas internas"}', 'negociacoes:"Negocial",notas:"Notas internas",dossie:"Dossiê",cliente:"Cadastro",passivos:"Passivos",financeiro:"Financeiro"}');
+  console.log('[espelho] página do cliente reorganizada (', antigo.length, '→', novo.length, ')');
+}
 if(ESPELHO){ must('<title>Sistema interno — Neves Pádua Advocacia</title>'); html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>ESPELHO (beta) — Neves Pádua Advocacia</title>'); html = html.replace('</style>', '.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}</style>',1); html = html.replace('<body', '<body data-espelho="1"',1); html = html.replace('</style>', '.espelho-only{display:none!important}</style>',1); html = html.replace('</body>', '<div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div></body>'); }
 must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
 must('/*NAV_GRUPOS*/');
-html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"leads",label:"Leads (CRM)",cls:"area-comercial"},{tab:"automacoes",label:"Automações",cls:"area-comercial"},{tab:"comercial",label:"Metas do mês",cls:"area-comercial"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"atendimento",label:"Atendimento",cls:"edit-only area-atendimento",itens:[{tab:"atendimento",label:"Conversas (WhatsApp)",cls:"area-atendimento"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:[{tab:"financeiro",label:"Cobranças (Asaas)",cls:"area-financeiro"},{tab:"estoque",label:"Estoque",cls:"area-financeiro"},{tab:"inventario",label:"Inventário",cls:"area-financeiro"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-financeiro",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",label:"Colaboradores",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto",cls:"area-equipe"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"},{tab:"espelho",label:"Espelho (beta)",cls:"admin-only espelho-only"}]}');
-html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-painel" hidden class="main"></div>\n  <div id="view-atendimento" hidden class="main"></div>\n  <div id="view-espelho" hidden class="main"></div>\n  <div id="view-automacoes" hidden class="main"></div>\n  <div id="view-processos" hidden class="main"></div>\n  <div id="view-superendividamento" hidden class="main"></div>\n  <div id="view-growth" hidden class="main"></div>\n  <div id="view-visao" hidden class="main"></div>\n  <div id="view-feriados" hidden class="main"></div>\n  <div id="view-agenda" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>\n  <div id="view-marketing" hidden class="main"></div>\n  <div id="view-comercial" hidden class="main"></div>\n  <div id="view-leads" hidden class="main"></div>\n  <div id="view-revisional" hidden class="main"></div>\n  <div id="view-pecas" hidden class="main"></div>\n  <div id="view-financeiro" hidden class="main"></div>\n  <div id="view-perfil" hidden class="main"></div>\n  <div id="view-avisos" hidden class="main"></div>\n  <div id="view-ponto" hidden class="main"></div>\n  <div id="view-estoque" hidden class="main"></div>\n  <div id="view-inventario" hidden class="main"></div>');
+html = html.replace('/*NAV_GRUPOS*/', '{grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"leads",label:"Leads (CRM)",cls:"area-comercial"},{tab:"automacoes",label:"Automações",cls:"area-comercial"},{tab:"comercial",label:"Metas do mês",cls:"area-comercial"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"atendimento",label:"Atendimento",cls:"edit-only area-atendimento",itens:[{tab:"atendimento",label:"Conversas (WhatsApp)",cls:"area-atendimento"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:[{tab:"financeiro",label:"Cobranças (Asaas)",cls:"area-financeiro"},{tab:"faturamento",label:"Contratos e faturamento",cls:"area-financeiro"},{tab:"estoque",label:"Estoque",cls:"area-financeiro"},{tab:"inventario",label:"Inventário",cls:"area-financeiro"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-financeiro",hash:"#conhecimento/area:financeiro",sel:()=>window.PP_KB?.area==="financeiro"}]},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",label:"Colaboradores",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto",cls:"area-equipe"},{tab:"usuarios",label:"Usuários",cls:"admin-only"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"},{tab:"espelho",label:"Espelho (beta)",cls:"admin-only espelho-only"},{tab:"importar-advbox",label:"Importar do ADVBox",cls:"admin-only"}]}');
+// hubs: Jurídico e Financeiro viram um item só no menu, com abas internas (passivos/hubs.js) (consolidado do beta em 30/10)
+{
+  const reJur = /\{grupo:"juridico",label:"Jurídico",cls:"edit-only grp-juridico",itens:\[[^\]]*\]\},/;
+  if(!reJur.test(html)) throw new Error('grupo juridico não encontrado');
+  html = html.replace(reJur, '{tab:"processos",tabs:["processos","publicacoes","negociacoes","historico"],label:"Jurídico",cls:"edit-only grp-juridico area-juridico"},');
+  const reFin = /\{grupo:"financeiro",label:"Financeiro",cls:"edit-only area-financeiro",itens:\[[^\]]*\]\},/;
+  if(!reFin.test(html)) throw new Error('grupo financeiro não encontrado');
+  html = html.replace(reFin, '{tab:"financeiro",tabs:["financeiro","faturamento","estoque","inventario"],label:"Financeiro",cls:"edit-only area-financeiro"},');
+  must('const ativo=i=>S.tab===i.tab&&(!i.sel||i.sel());');
+  html = html.replace('const ativo=i=>S.tab===i.tab&&(!i.sel||i.sel());', 'const ativo=i=>(i.tabs?i.tabs.includes(S.tab):S.tab===i.tab)&&(!i.sel||i.sel());');
+  // hubs (Jurídico, Financeiro) se apresentam como cabeçalho de área, não como subitem do grupo anterior
+  must('if(n.tab){nav.append(itemNav(n,ativo(n)));continue}');
+  html = html.replace('if(n.tab){nav.append(itemNav(n,ativo(n)));continue}', 'if(n.tab&&n.tabs){const on=ativo(n);nav.append(el("div",{class:"grp hub "+(n.cls||"")+(on?" ativo":"")},el("button",{class:"grp-h",type:"button",onclick:()=>{S.tab=n.tab;S.sel=null;location.hash="#"+n.tab;render()}},el("span",{},n.label),el("i",{class:"chev",style:"transform:rotate(-90deg)"}))));continue}if(n.tab){nav.append(itemNav(n,ativo(n)));continue}');
+  must('</style>');
+  html = html.replace('</style>', '.grp.hub .grp-h{cursor:pointer}.grp.hub.ativo .grp-h span{color:var(--gold)}</style>');
+}
+html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<div id="view-calibracao" hidden class="main"></div>\n  <div id="view-painel" hidden class="main"></div>\n  <div id="view-atendimento" hidden class="main"></div>\n  <div id="view-espelho" hidden class="main"></div>\n  <div id="view-automacoes" hidden class="main"></div>\n  <div id="view-processos" hidden class="main"></div>\n  <div id="view-superendividamento" hidden class="main"></div>\n  <div id="view-growth" hidden class="main"></div>\n  <div id="view-visao" hidden class="main"></div>\n  <div id="view-feriados" hidden class="main"></div>\n  <div id="view-agenda" hidden class="main"></div>\n  <div id="view-usuarios" hidden class="main"></div>\n  <div id="view-tarefas" hidden class="main"></div>\n  <div id="view-horas" hidden class="main"></div>\n  <div id="view-equipe" hidden class="main"></div>\n  <div id="view-negociacoes" hidden class="main"></div>\n  <div id="view-monitoramento" hidden class="main"></div>\n  <div id="view-publicacoes" hidden class="main"></div>\n  <div id="view-conhecimento" hidden class="main"></div>\n  <div id="view-autenticador" hidden class="main"></div>\n  <div id="view-marketing" hidden class="main"></div>\n  <div id="view-comercial" hidden class="main"></div>\n  <div id="view-leads" hidden class="main"></div>\n  <div id="view-revisional" hidden class="main"></div>\n  <div id="view-pecas" hidden class="main"></div>\n  <div id="view-financeiro" hidden class="main"></div>\n  <div id="view-faturamento" hidden class="main"></div>\n  <div id="view-importar-advbox" hidden class="main"></div>\n  <div id="view-perfil" hidden class="main"></div>\n  <div id="view-avisos" hidden class="main"></div>\n  <div id="view-ponto" hidden class="main"></div>\n  <div id="view-estoque" hidden class="main"></div>\n  <div id="view-inventario" hidden class="main"></div>');
 
 // 3) Tela de login (antes de tudo) + runtime
 must('<script>');
@@ -163,6 +241,7 @@ async function carregar(col){
   }
   return data.map(r=>{const d={id:r.id,...r.dados};
     if(col==="clientes"){for(const [k,v] of Object.entries(r)){if(!["id","dados","token","acesso_por_token","created_by","updated_by"].includes(k)&&v!=null)d[k]=v}} // colunas da ficha (0008)
+    if(col==="contratos"&&r.pasta_numero!=null)d.pasta_numero=r.pasta_numero; // [espelho] pasta do contrato (beta 0005)
     if(NOTA_CAMPO[col]){const n=notas[(col==="clientes"?"cliente:":"contrato:")+r.id];if(n!=null)d[NOTA_CAMPO[col]]=n}return d});
 }
 async function notificar(col){
@@ -251,7 +330,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
-    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin"};
+    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
     PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
     for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
@@ -259,7 +338,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(!PP.temAcesso(S.tab))S.tab="painel";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     await PP.carregarModulos();
-    window.PP_ROTAS.push("espelho","atendimento","painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro","perfil","avisos","ponto","estoque","inventario");
+    window.PP_ROTAS.push("espelho","atendimento","painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro","perfil","avisos","ponto","estoque","inventario","faturamento","importar-advbox");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -322,12 +401,12 @@ html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;
 const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
-  ['publicacoes','juridico'],['processos','juridico'],['autenticador','juridico','clientes'],['marketing','marketing'],
-  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],
+  ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
+  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['faturamento','financeiro'],['dossie','core'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
-  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['passagem','core'],['clientes-visao','clientes'],['hubs','core'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();

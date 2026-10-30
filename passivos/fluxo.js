@@ -227,7 +227,7 @@ function openMonForm(cid,m){
 /* ---------- Integração ---------- */
 window.PP_MOD=window.PP_MOD||{};
 window.PP_MOD.negociacoes=renderNegCliente;
-{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly())return;garantir();const card=cardFluxo(c);const first=host.children[0];if(first&&first.nextSibling)host.insertBefore(card,first.nextSibling);else host.append(card);card.after(cardOnboarding(c))}}
+{const _r=window.PP_MOD.resumo;window.PP_MOD.resumo=(c,host,ind)=>{_r&&_r(c,host,ind);if(readOnly()||S.sub==="dossie"||S.sub==="financeiro")return;garantir();const card=cardFluxo(c);const first=host.children[0];if(first&&first.nextSibling)host.insertBefore(card,first.nextSibling);else host.append(card);card.after(cardOnboarding(c))}}
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};if(!readOnly()&&X.ok)r.negociacoes=X.neg.filter(n=>n.cliente_id===c.id&&n.etapa!=="concluido").length;return r}}
 {const _r=render;render=function(){_r();const vn=$("#view-negociacoes"),vm=$("#view-monitoramento");if(!vn)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&(S.tab==="negociacoes"||S.tab==="monitoramento"))S.tab="clientes";vn.hidden=S.tab!=="negociacoes";vm.hidden=S.tab!=="monitoramento";if(S.tab==="negociacoes")renderNegociacoes();if(S.tab==="monitoramento")renderMonitoramento()}}
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("fluxo");for(const t of ["negociacoes","monitoramentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
