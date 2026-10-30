@@ -5,6 +5,8 @@
 -- dossiê e frentes · andamentos sem duplicidade · dossiê = trabalho do escritório + anexos em tarefa · entrada nas três frentes e
 -- ficha de passagem · timesheet por frente. Rodar inteiro, uma vez, no SQL Editor (pode levar ~1 min).
 set client_min_messages = warning;
+-- trava: roda uma vez só (a segunda execução falharia ao recriar views que mudam de formato ao longo do arquivo)
+do $$ begin if to_regclass('public.cliente_passagem') is not null then raise exception '0080 já foi aplicada neste banco.'; end if; end $$;
 
 -- ===== rpc de importação em lote (admin; sem gatilhos; ignora duplicadas) — usada pelo importador do ADVBox =====
 create or replace function public.espelho_importar(p_tabela text, p_linhas jsonb, p_omitir text[] default '{}')
