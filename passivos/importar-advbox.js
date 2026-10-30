@@ -16,7 +16,7 @@
   const classificar = (it) => { const c = it.cls; if (/no_rows|more|registered|deleted|edited/.test(c)) return "ignorar"; if (/stage/.test(c)) return "etapa"; if (/pending/.test(c)) return "tarefa_aberta"; if (/completed/.test(c)) return it.titulo === "Comentário" ? "registro" : "tarefa_feita"; return "ignorar"; };
   async function carregarBruto() {
     const { data, error } = await SB.from("importacao_bruta").select("id,chave,parte,created_at").eq("origem", "advbox").order("created_at", { ascending: false }); if (error) { toast(error.message); return; }
-    A.lotes = [...new Set((data || []).map((r) => r.chave))]; if (!A.chave) A.chave = A.lotes[0] || ""; render();
+    A.lotes = [...new Set((data || []).map((r) => r.chave))]; A.carregado = true; if (!A.chave || !A.lotes.includes(A.chave)) A.chave = A.lotes[0] || ""; render();
   }
   async function abrirLote() {
     const { data, error } = await SB.from("importacao_bruta").select("parte,dados").eq("origem", "advbox").eq("chave", A.chave).order("parte"); if (error) { toast(error.message); return; }
@@ -73,11 +73,27 @@
     } catch (e) { log("ERRO: " + e.message); toast(e.message); }
     A.rodando = false; render();
   }
+  // Deposita um arquivo JSON da extração (baixado do beta ou gerado pelo extrator) em importacao_bruta, em partes.
+  async function carregarArquivo(inp) {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const txt = await f.text(); try { const j = JSON.parse(txt); if (!j || typeof j !== "object" || !Object.keys(j).length) throw new Error("vazio"); } catch (e) { toast("Arquivo não é um JSON válido da extração: " + e.message); return; }
+    const m = /advbox-pj-\d{4}-\d{2}-\d{2}/.exec(f.name); const chave = m ? m[0] : ("advbox-pj-" + new Date().toISOString().slice(0, 10));
+    if (A.lotes.includes(chave) && !confirm(`Já existe o lote ${chave}. Substituir pelo arquivo?`)) return;
+    A.rodando = true; render();
+    try {
+      const del = await SB.from("importacao_bruta").delete().eq("origem", "advbox").eq("chave", chave); if (del.error) throw del.error;
+      const TAM = 400000; let parte = 0;
+      for (let i = 0; i < txt.length; i += TAM) { parte++; const { error } = await SB.from("importacao_bruta").insert({ origem: "advbox", chave, parte, dados: txt.slice(i, i + TAM) }); if (error) throw error; }
+      toast(`Lote ${chave} depositado (${parte} parte(s), ${txt.length.toLocaleString("pt-BR")} caracteres)`); A.carregado = false; A.chave = chave; A.bruto = null; A.prev = null;
+    } catch (e) { toast("Erro ao depositar: " + e.message); }
+    A.rodando = false; render();
+  }
   function renderAba(v) {
-    if (!A.lotes.length && !A.bruto) { carregarBruto(); v.append(el("div", { class: "note" }, "Carregando lotes…")); return; }
-    const sl = sel(Object.fromEntries(A.lotes.map((l) => [l, l])), A.chave); sl.onchange = () => { A.chave = sl.value; A.bruto = null; A.prev = null; render(); };
-    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Lote extraído do ADVBox"), el("div", { class: "actions" }, sl, el("button", { class: "btn sm primary", onclick: abrirLote }, "Analisar"))),
-      el("div", { class: "note" }, "O lote é a extração feita no navegador (processos dos clientes PJ com todo o histórico de tarefas e comentários). Analisar casa os clientes e mostra o que seria importado; nada é gravado até clicar em Importar.")));
+    if (!A.carregado) { carregarBruto(); v.append(el("div", { class: "note" }, "Carregando lotes…")); return; }
+    const sl = sel(A.lotes.length ? Object.fromEntries(A.lotes.map((l) => [l, l])) : { "": "— nenhum lote —" }, A.chave); sl.onchange = () => { A.chave = sl.value; A.bruto = null; A.prev = null; render(); };
+    const inp = el("input", { type: "file", accept: ".json,application/json", style: "display:none", onchange: () => carregarArquivo(inp) });
+    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Lote extraído do ADVBox"), el("div", { class: "actions" }, sl, el("button", { class: "btn sm primary", onclick: abrirLote }, "Analisar"), inp, el("button", { class: "btn sm", disabled: A.rodando ? "" : null, onclick: () => inp.click() }, "Carregar arquivo…"))),
+      el("div", { class: "note" }, "O lote é a extração feita no navegador (processos dos clientes PJ com todo o histórico de tarefas e comentários). “Carregar arquivo…” deposita um JSON de extração (advbox-pj-AAAA-MM-DD.json) como novo lote. Analisar casa os clientes e mostra o que seria importado; nada é gravado até clicar em Importar.")));
     if (!A.bruto || !A.prev) return;
     const p = A.prev; const nomes = Object.keys(p.porCliente).sort();
     const opts = { "": "— ignorar (não importar) —", ...Object.fromEntries([...S.clientes].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => [c.id, c.nome])) };
