@@ -5,9 +5,9 @@
 create or replace function public.num_br(t text) returns numeric language sql immutable as $$
   select case
     when t is null or btrim(t) = '' then null
-    when t ~ '^-?\d+(\.\d+)?$' then t::numeric                                  -- já numérico (ponto decimal)
     when t ~ ',' then replace(replace(regexp_replace(t, '[^0-9,.\-]', '', 'g'), '.', ''), ',', '.')::numeric  -- 5.239,93
-    when t ~ '^-?\d{1,3}(\.\d{3})+$' then replace(t, '.', '')::numeric           -- 5.239 (milhar sem centavos)
+    when t ~ '^-?\d{1,3}(\.\d{3})+$' then replace(t, '.', '')::numeric           -- 5.239 (milhar sem centavos, formato BR)
+    when t ~ '^-?\d+(\.\d+)?$' then t::numeric                                  -- já numérico (ponto decimal)
     else nullif(regexp_replace(t, '[^0-9.\-]', '', 'g'), '')::numeric end
 $$;
 
