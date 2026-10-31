@@ -7,7 +7,10 @@
 "use strict";
 const U={lista:[],ok:false,carregando:false,plano:null,ent:null,res:null,escritorio:null};
 const PISO_MINIMO=600; // Decreto 11.150/2022 (art. 3º): R$ 600 — parâmetro editável na tela
-const num=x=>{const v=parseFloat(String(x??"").replace(/\./g,"").replace(",","."));return Number.isFinite(v)?v:null};
+const num=x=>{let t=String(x??"").trim().replace(/[R$\s]/g,"");if(!t)return null;if(t.includes(","))t=t.replace(/\./g,"").replace(",",".");else if(/^-?\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,"");const v=parseFloat(t);return Number.isFinite(v)?v:null};
+// campo de dinheiro: ao sair do campo, mostra no formato brasileiro (1000 → 1.000,00) e guarda o número
+const fmtBR=v=>v==null?"":v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const dinheiro=(i,onValor)=>{if(i.value&&num(i.value)!=null)i.value=fmtBR(num(i.value));i.addEventListener("blur",()=>{const v=num(i.value);if(v!=null)i.value=fmtBR(v)});i.onchange=()=>{const v=num(i.value);onValor(v==null?i.value:String(v));if(v!=null)i.value=fmtBR(v)};return i};
 const numSimples=x=>{const v=parseFloat(String(x??"").replace(",","."));return Number.isFinite(v)?v:null};
 const brl2=v=>v==null?"—":v.toLocaleString("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=v=>v==null?"—":(v*100).toLocaleString("pt-BR",{maximumFractionDigits:2})+"%";
@@ -117,13 +120,13 @@ function renderPlano(v){
   const tit=inp("text",p.titulo||"",{placeholder:"Ex.: Plano — Fulano · out/2026"});tit.oninput=()=>{p.titulo=tit.value};
   v.append(el("div",{class:"card section"},el("h2",{},"1. Devedor"),el("div",{class:"form"},field("se-tit","Nome do cálculo",tit),field("se-cli","Cliente da base",cli),dv("nome","Nome completo"),dv("cpf","CPF","000.000.000-00"),dv("rg","RG"),dv("nacionalidade","Nacionalidade","brasileiro(a)"),dv("estado_civil","Estado civil"),dv("profissao","Profissão"),dv("endereco","Endereço completo","Rua, nº, bairro, cidade/UF, CEP"))));
   // ---- 2. Situação atual
-  const nf=(k,label,help,attrs={})=>{const i=inp("text",e[k]??"",{placeholder:"0,00",...attrs});i.onchange=()=>{e[k]=i.value;rec()};return field("se-"+k,label,i,help)};
+  const nf=(k,label,help,attrs={})=>{const i=inp("text",e[k]??"",{placeholder:"0,00",...attrs});if(k==="renda"||k==="minimoPiso")dinheiro(i,v=>{e[k]=v;rec()});else i.onchange=()=>{e[k]=i.value;rec()};return field("se-"+k,label,i,help)};
   const sec2=el("div",{class:"card section"},el("h2",{},"2. Situação atual"));
   const dataC=inp("date",e.dataCalculo||hojeISO());dataC.onchange=()=>{e.dataCalculo=dataC.value;rec()};
   sec2.append(el("div",{class:"form"},nf("renda","Renda mensal líquida (R$)","Salário/benefício líquido, após descontos obrigatórios."),field("se-data","Data do cálculo",dataC),nf("comarca","Comarca do processo","Opcional — entra na petição.",{placeholder:"Ex.: Franca/SP"}),nf("processo","Nº do processo","Opcional — petição de juntada.",{placeholder:"0000000-00.0000.0.00.0000"})));
   const tb=el("div",{class:"tbl"});
   const linhasDiv=()=>{tb.replaceChildren(el("table",{},el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"CNPJ"),el("th",{},"Descrição"),el("th",{},"Tipo"),el("th",{class:"r"},"Saldo devedor"),el("th",{class:"r"},"Parcela atual"),el("th",{},"Consignado"),el("th",{}))),
-    el("tbody",{},e.dividas.map((dv,idx)=>{const c=(k,w,ph)=>{const i=inp("text",dv[k]||"",{placeholder:ph||"",style:`width:${w}px`});i.onchange=()=>{dv[k]=i.value;rec()};return i};const t=sel(TIPOS,dv.tipo||"outro");t.style.width="150px";t.onchange=()=>{dv.tipo=t.value;dv.consignado=t.value==="consignado"?true:dv.consignado;linhasDiv();rec()};
+    el("tbody",{},e.dividas.map((dv,idx)=>{const c=(k,w,ph)=>{const i=inp("text",dv[k]||"",{placeholder:ph||"",style:`width:${w}px`});if(k==="saldo"||k==="parcela")dinheiro(i,v=>{dv[k]=v;rec()});else i.onchange=()=>{dv[k]=i.value;rec()};return i};const t=sel(TIPOS,dv.tipo||"outro");t.style.width="150px";t.onchange=()=>{dv.tipo=t.value;dv.consignado=t.value==="consignado"?true:dv.consignado;linhasDiv();rec()};
       const ck=el("input",{type:"checkbox"});ck.checked=!!dv.consignado;ck.onchange=()=>{dv.consignado=ck.checked;rec()};
       return el("tr",{},el("td",{},c("credor",170,"Banco…")),el("td",{},c("cnpj",140,"00.000.000/0001-00")),el("td",{},c("descricao",160,"Contrato nº…")),el("td",{},t),el("td",{class:"r"},c("saldo",110,"0,00")),el("td",{class:"r"},c("parcela",100,"0,00")),el("td",{},ck),
         el("td",{},el("button",{class:"btn sm icon",title:"Remover",onclick:()=>{e.dividas.splice(idx,1);if(!e.dividas.length)e.dividas.push({credor:"",tipo:"outro"});linhasDiv();rec()},html:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'})))}))))};
