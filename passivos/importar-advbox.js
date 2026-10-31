@@ -21,10 +21,13 @@
   async function abrirLote() {
     const { data, error } = await SB.from("importacao_bruta").select("parte,dados").eq("origem", "advbox").eq("chave", A.chave).order("parte"); if (error) { toast(error.message); return; }
     const txt = (data || []).map((r) => r.dados).join(""); try { A.bruto = JSON.parse(txt); } catch (e) { toast("JSON inválido: " + e.message); return; }
-    const [c, t, e, p] = await Promise.all([SB.from("colaboradores").select("id,nome,ativo"), SB.from("tarefas").select("id,descricao").like("descricao", "%(ADVBox #%"), SB.from("entradas_timeline").select("id_externo").like("id_externo", "advbox:%"), SB.from("processos").select("id,numero_cnj,cliente_id,id_externo")]);
-    const [tv, ev] = await Promise.all([SB.from("tarefas").select("cliente_id,titulo,prazo").like("descricao", "%(importado do ADVBox)"), SB.from("entradas_timeline").select("cliente_id").like("id_externo", "advbox:%:tl:%")]);
+    const [c, t, e, p] = await Promise.all([SB.from("colaboradores").select("id,nome,ativo"), SB.from("tarefas").select("id,descricao,status").like("descricao", "%(ADVBox #%"), SB.from("entradas_timeline").select("id_externo").like("id_externo", "advbox:%"), SB.from("processos").select("id,numero_cnj,cliente_id,id_externo")]);
+    const [tv, ev] = await Promise.all([SB.from("tarefas").select("id,cliente_id,titulo,prazo,status").like("descricao", "%(importado do ADVBox)"), SB.from("entradas_timeline").select("cliente_id").like("id_externo", "advbox:%:tl:%")]);
     A.colab = c.data || []; A.existentes = { tar: new Set((t.data || []).map((x) => /\(ADVBox #(\d+)\)/.exec(x.descricao || "")?.[1]).filter(Boolean)), tl: new Set((e.data || []).map((x) => x.id_externo)), proc: p.data || [],
-      velhasTar: new Set((tv.data || []).map((x) => x.cliente_id + "|" + norm(x.titulo) + "|" + (x.prazo || ""))), velhosCli: new Set((ev.data || []).map((x) => x.cliente_id)) };
+      velhasTar: new Set((tv.data || []).map((x) => x.cliente_id + "|" + norm(x.titulo) + "|" + (x.prazo || ""))), velhosCli: new Set((ev.data || []).map((x) => x.cliente_id)),
+      // tarefas ainda abertas no sistema que vieram do ADVBox: por id (#) e pela chave antiga (cliente|título|prazo)
+      abertasId: Object.fromEntries((t.data || []).filter((x) => x.status === "aberta" || x.status === "em_andamento").map((x) => [/\(ADVBox #(\d+)\)/.exec(x.descricao || "")?.[1], x.id]).filter((x) => x[0])),
+      abertasVelhas: Object.fromEntries((tv.data || []).filter((x) => x.status === "aberta" || x.status === "em_andamento").map((x) => [x.cliente_id + "|" + norm(x.titulo) + "|" + (x.prazo || ""), x.id])) };
     // mapa automático de clientes
     const nomes = [...new Set(Object.values(A.bruto).map((v) => v.cliente))];
     const GEN = new Set(["COMERCIO", "SERVICO", "SERVICOS", "ARTIGOS", "ACESSORIOS", "CENTRO", "TRANSPORTES", "ENERGIA", "SOLAR", "LOCACAO", "IMOVEIS", "SILVA", "SANTOS", "OLIVEIRA", "SOUZA", "ALMEIDA", "MARIA", "JOSE", "CARLOS", "PEREIRA", "FERREIRA", "AUTOMOTIVA", "AUTOMOTIVO", "INDUSTRIA", "PRODUTOR", "RURAL", "LANCHERIA", "CAMPOS", "ALVES", "LUCIA", "CRISTINA"]);
@@ -36,8 +39,20 @@
   }
   const CORTE = "2026-10-08"; // data da importação anterior (0013): o que é anterior e já veio para clientes daquela leva não entra de novo
   const jaVelho = (k, it, cid) => { const d = dhBR(it.hora)?.slice(0, 10) || dBR(it.dataComp) || ""; if (k === "tarefa_aberta") return A.existentes.velhasTar.has(cid + "|" + norm(it.titulo) + "|" + (dBR(it.dataComp) || "")); return A.existentes.velhosCli.has(cid) && d && d < CORTE; };
+  // tarefa aberta no sistema que corresponde a este item do ADVBox (por id ou pela chave da importação antiga)
+  const abertaDe = (it, cid) => (it.id && A.existentes.abertasId[it.id]) || A.existentes.abertasVelhas[cid + "|" + norm(it.titulo) + "|" + (dBR(it.dataComp) || "")] || null;
+  // o que fechar: item concluído/excluído no ADVBox, ou versão antiga (editada) de tarefa reagendada, cuja cópia segue aberta aqui
+  function fechamentos() {
+    const out = []; const vistos = new Set();
+    for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; if (!cid) continue;
+      for (const it of v.itens) { const c = it.cls || ""; const tid = abertaDe(it, cid); if (!tid || vistos.has(tid)) continue;
+        if (/completed/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "concluida", quando: (dBR(it.dataComp) ? dBR(it.dataComp) + "T18:00:00-03:00" : dhBR(it.hora)) || new Date().toISOString(), titulo: it.titulo }); }
+        else if (/deleted/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "cancelada", quando: dhBR(it.hora) || new Date().toISOString(), titulo: it.titulo, nota: "excluída no ADVBox" }); }
+        else if (/edited/.test(c) && !/active|pending|completed/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "cancelada", quando: dhBR(it.hora) || new Date().toISOString(), titulo: it.titulo, nota: "reagendada no ADVBox (versão antiga)" }); } } }
+    return out;
+  }
   function prever() {
-    const p = { porCliente: {}, processosNovos: [], tar: 0, feitas: 0, reg: 0, etapas: 0, ign: 0, jaImportado: 0, semCliente: 0 };
+    const p = { porCliente: {}, processosNovos: [], tar: 0, feitas: 0, reg: 0, etapas: 0, ign: 0, jaImportado: 0, semCliente: 0, fechar: fechamentos() };
     for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; const pc = p.porCliente[v.cliente] = p.porCliente[v.cliente] || { cid, lids: 0, tar: 0, feitas: 0, reg: 0, etapas: 0, nums: [] }; pc.lids++; if (v.num) pc.nums.push(v.num);
       if (cid && v.num && !A.existentes.proc.some((x) => x.numero_cnj === v.num)) p.processosNovos.push({ cliente: v.cliente, cid, num: v.num, tipo: v.tipo, lid: v.lid });
       for (const it of v.itens) { const k = classificar(it); if (k === "ignorar") { p.ign++; continue; } if (!cid) { p.semCliente++; continue; } const ja = ((k === "tarefa_aberta" || k === "tarefa_feita") ? A.existentes.tar.has(it.id) : A.existentes.tl.has("advbox:" + (it.id || (v.lid + ":" + it.hora + ":" + it.texto.slice(0, 40))))) || jaVelho(k, it, cid); if (ja) { p.jaImportado++; continue; }
@@ -67,6 +82,10 @@
             const desc = k === "etapa" ? "ADVBox — " + it.texto : it.texto; if (!desc.trim()) continue;
             regs.push({ cliente_id: cid, processo_id: pid, data: (criado || "").slice(0, 10), tipo: k === "etapa" ? "mudanca_estagio" : "registro", descricao: desc.slice(0, 4000), responsavel_id: ca?.id || null, visivel_cliente: false, automatica: k === "etapa", fonte: "advbox", id_externo: ext, frente: "juridico", created_at: criado }); } } }
       await imp("tarefas", tarefas); log(`${tarefas.length} tarefa(s) (${tarefas.filter((t) => t.status === "concluida").length} concluídas retroativas)`);
+      // 2b) fecha no sistema o que já foi fechado/reagendado no ADVBox
+      let nf = 0; for (const f of A.prev.fechar) { const { error } = await SB.from("tarefas").update(f.status === "concluida" ? { status: "concluida", concluida_em: f.quando } : { status: "cancelada" }).eq("id", f.id); if (error) { log("não fechou " + f.titulo + ": " + error.message); continue; } nf++;
+        eventos.push({ tarefa_id: f.id, tipo: f.status === "concluida" ? "concluida" : "cancelada", de: null, para: null, nota: f.nota || "concluída no ADVBox", autor_nome: "ADVBox", criado_em: f.quando }); }
+      if (A.prev.fechar.length) log(`${nf} tarefa(s) fechadas (${A.prev.fechar.filter((f) => f.status === "concluida").length} concluídas, ${A.prev.fechar.filter((f) => f.status === "cancelada").length} canceladas)`);
       await imp("tarefa_eventos", eventos); log(`${eventos.length} evento(s) de tarefa`);
       await imp("entradas_timeline", regs); log(`${regs.length} registro(s) no dossiê`);
       log("Concluído."); toast("Importação concluída"); A.existentes = null; await abrirLote();
@@ -100,8 +119,8 @@
     v.append(el("div", { class: "card section" }, el("h2", {}, "Clientes do ADVBox → clientes do sistema"), el("div", { class: "note" }, "Confira o casamento automático. Quem ficar em “ignorar” não entra. Clientes que ainda não existem no sistema precisam ser cadastrados antes (Clientes → + Cliente) e depois escolhidos aqui."),
       el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "No ADVBox"), el("th", {}, "Processos"), el("th", {}, "No sistema"), el("th", { class: "r" }, "A fazer"), el("th", { class: "r" }, "Feitas"), el("th", { class: "r" }, "Registros"), el("th", { class: "r" }, "Etapas"))),
         el("tbody", {}, ...nomes.map((n) => { const pc = p.porCliente[n]; const s = sel(opts, A.mapa[n] || ""); s.onchange = () => { A.mapa[n] = s.value; A.prev = prever(); render(); }; return el("tr", { style: A.mapa[n] ? "" : "background:var(--gold-soft)" }, el("td", {}, el("b", {}, n), el("div", { class: "note" }, pc.lids + " pasta(s)")), el("td", { class: "note" }, pc.nums.join(", ") || "sem nº"), el("td", {}, s), el("td", { class: "r num" }, String(pc.tar)), el("td", { class: "r num" }, String(pc.feitas)), el("td", { class: "r num" }, String(pc.reg)), el("td", { class: "r num" }, String(pc.etapas))); }))))));
-    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Prévia"), el("button", { class: "btn primary", disabled: A.rodando ? "" : null, onclick: () => { if (confirm(`Importar agora? ${p.processosNovos.length} processo(s), ${p.tar} tarefa(s) abertas, ${p.feitas} concluídas, ${p.reg} registro(s) e ${p.etapas} mudança(s) de etapa.`)) importar(); } }, A.rodando ? "Importando…" : "Importar")),
-      el("div", { class: "kpis" }, ...[["Processos novos", p.processosNovos.length], ["Tarefas a fazer", p.tar], ["Tarefas feitas (retroativas)", p.feitas], ["Registros no dossiê", p.reg], ["Mudanças de etapa", p.etapas], ["Já importados (pulam)", p.jaImportado], ["Sem cliente (pulam)", p.semCliente], ["Ignorados (editados/excluídos)", p.ign]].map(([l, n]) => el("div", { class: "card kpi" }, el("div", { class: "l" }, l), el("div", { class: "v" }, String(n))))),
+    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Prévia"), el("button", { class: "btn primary", disabled: A.rodando ? "" : null, onclick: () => { if (confirm(`Importar agora? ${p.processosNovos.length} processo(s), ${p.tar} tarefa(s) abertas, ${p.feitas} concluídas, ${p.reg} registro(s), ${p.etapas} mudança(s) de etapa e ${p.fechar.length} tarefa(s) a fechar.`)) importar(); } }, A.rodando ? "Importando…" : "Importar")),
+      el("div", { class: "kpis" }, ...[["Processos novos", p.processosNovos.length], ["Tarefas a fazer", p.tar], ["Tarefas feitas (retroativas)", p.feitas], ["Registros no dossiê", p.reg], ["Mudanças de etapa", p.etapas], ["A fechar (já fechadas no ADVBox)", p.fechar.length], ["Já importados (pulam)", p.jaImportado], ["Sem cliente (pulam)", p.semCliente], ["Ignorados (editados/excluídos)", p.ign]].map(([l, n]) => el("div", { class: "card kpi" }, el("div", { class: "l" }, l), el("div", { class: "v" }, String(n))))),
       p.processosNovos.length ? el("div", { class: "note", style: "margin-top:8px" }, "Processos a criar: " + p.processosNovos.map((x) => x.num + " (" + x.cliente.split(" ").slice(0, 2).join(" ") + ")").join(" · ")) : null,
       A.log.length ? el("pre", { style: "margin-top:10px;font-size:12px;white-space:pre-wrap" }, A.log.join("\n")) : null));
   }
