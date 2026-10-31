@@ -73,10 +73,12 @@ async function carregar(){
   if(S.tab==="superendividamento")render();
 }
 const garantir=()=>{if(!U.ok&&!U.carregando)carregar();return U.ok};
+// grava os valores em formato numérico (a view v_planos_superendividamento faz cast para numeric; "5.239,93" quebrava a listagem)
+function normalizarEntradas(e){const n=x=>{const v=num(x);return v==null?(x??""):String(v)};return {...e,renda:n(e.renda),dividas:(e.dividas||[]).map(d=>({...d,saldo:n(d.saldo),parcela:n(d.parcela)}))}}
 function entradasPadrao(){return {renda:"",limitePct:"30",minimoPiso:String(PISO_MINIMO),dividas:[{credor:"",cnpj:"",descricao:"",tipo:"consignado",saldo:"",parcela:"",consignado:true}],prazo:"60",carenciaDias:"0",juros:"0",dataCalculo:hojeISO(),comarca:"",processo:""}}
 async function salvar(concluir){
   const p=U.plano;const e=U.ent;const r=calcular(e);
-  const row={titulo:p.titulo||`${p.devedor?.nome||"Plano"} · ${fmtISO(e.dataCalculo)}`,cliente_id:p.cliente_id||null,devedor:p.devedor||{},entradas:e,resultado:{cinco:{parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,cabe:r.cinco.cabe},cabe:{parcela:r.cabe.parcela,meses:r.cabe.meses,quitaEm60:r.cabe.quitaEm60},desidia:{parcela:r.desidia.parcela,meses:r.desidia.meses,total:r.desidia.total,remanescente:r.desidia.remanescente},disponivel:r.disponivel,minimo:r.minimo,saldo:r.saldo,descontoNecessario:r.descontoNecessario},status:concluir?"concluido":(p.status||"rascunho")};
+  const row={titulo:p.titulo||`${p.devedor?.nome||"Plano"} · ${fmtISO(e.dataCalculo)}`,cliente_id:p.cliente_id||null,devedor:p.devedor||{},entradas:normalizarEntradas(e),resultado:{cinco:{parcela:r.cinco.parcela,meses:r.cinco.meses,total:r.cinco.total,cabe:r.cinco.cabe},cabe:{parcela:r.cabe.parcela,meses:r.cabe.meses,quitaEm60:r.cabe.quitaEm60},desidia:{parcela:r.desidia.parcela,meses:r.desidia.meses,total:r.desidia.total,remanescente:r.desidia.remanescente},disponivel:r.disponivel,minimo:r.minimo,saldo:r.saldo,descontoNecessario:r.descontoNecessario},status:concluir?"concluido":(p.status||"rascunho")};
   const q=p.id?SB.from("planos_superendividamento").update(row).eq("id",p.id).select("id").single():SB.from("planos_superendividamento").insert(row).select("id").single();
   const {data,error}=await q;if(error){toast("Não foi possível salvar: "+error.message);return false}
   p.id=data.id;p.status=row.status;toast(concluir?"Plano concluído":"Plano salvo");U.ok=false;garantir();return true;
