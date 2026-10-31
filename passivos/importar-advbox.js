@@ -44,8 +44,10 @@
   // o que fechar: item concluído/excluído no ADVBox, ou versão antiga (editada) de tarefa reagendada, cuja cópia segue aberta aqui
   function fechamentos() {
     const out = []; const vistos = new Set();
-    for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; if (!cid) continue;
-      for (const it of v.itens) { const c = it.cls || ""; const tid = abertaDe(it, cid); if (!tid || vistos.has(tid)) continue;
+    // concluídas primeiro: uma tarefa reagendada e depois concluída tem versões "editadas" e uma "completed" — vale a conclusão
+    const itens = []; for (const v of Object.values(A.bruto)) { const cid = A.mapa[v.cliente]; if (!cid) continue; for (const it of v.itens) itens.push([it, cid]); }
+    const peso = (c) => /completed/.test(c) ? 0 : /deleted/.test(c) ? 1 : 2; itens.sort((a, b) => peso(a[0].cls || "") - peso(b[0].cls || ""));
+    for (const [it, cid] of itens) { { const c = it.cls || ""; const tid = abertaDe(it, cid); if (!tid || vistos.has(tid)) continue;
         if (/completed/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "concluida", quando: (dBR(it.dataComp) ? dBR(it.dataComp) + "T18:00:00-03:00" : dhBR(it.hora)) || new Date().toISOString(), titulo: it.titulo }); }
         else if (/deleted/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "cancelada", quando: dhBR(it.hora) || new Date().toISOString(), titulo: it.titulo, nota: "excluída no ADVBox" }); }
         else if (/edited/.test(c) && !/active|pending|completed/.test(c)) { vistos.add(tid); out.push({ id: tid, status: "cancelada", quando: dhBR(it.hora) || new Date().toISOString(), titulo: it.titulo, nota: "reagendada no ADVBox (versão antiga)" }); } } }
