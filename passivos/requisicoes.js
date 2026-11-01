@@ -57,7 +57,7 @@ function linha(r,{gestor=false}={}){
 /* tela Requisições: gestores veem tudo (fila pendente primeiro); demais veem as suas */
 function renderTela(){
   const v=$("#view-requisicoes");if(!v)return;v.replaceChildren();const gestor=aprova();const meu=meuColab();
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Equipe"),el("h1",{},"Requisições"),el("div",{class:"sub"},gestor?"Pedidos da equipe (férias, folgas, horário reduzido, ausências) para aprovar. Tudo fica registrado.":"Seus pedidos à administração: férias, folga, horário reduzido, ausência, atestado, home office.")),
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Equipe"),el("h1",{},"Requisições"),el("div",{class:"sub"},"Pedidos da equipe (férias, folgas, horário reduzido, ausências) para aprovar, alterar e consultar. Os seus ficam em Meu perfil.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:nova},"+ Requisição"))));
   if(!R.ok){if(!R.carregando&&!R.erro)carregar();v.append(el("div",{class:"note"},R.erro?"Não foi possível carregar (o banco ainda não tem a tabela de requisições — rode a migração 0085).":"Carregando…"));return}
   const minhas=R.lista.filter(r=>meu&&r.colaborador_id===meu.id);
@@ -68,6 +68,15 @@ function renderTela(){
   }
   if(!gestor||minhas.length)v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Minhas requisições"),el("span",{class:"note"},String(minhas.length))),minhas.length?el("div",{class:"list"},minhas.map(r=>linha(r))):el("div",{class:"empty"},"Você ainda não fez nenhuma requisição.")));
 }
+/* seção em Meu perfil: as requisições da própria pessoa */
+function secaoPerfil(){
+  const meu=meuColab();const sec=el("section",{class:"card section rq-perfil"});
+  sec.append(el("div",{class:"section-h"},el("div",{},el("h2",{},"Minhas requisições"),el("div",{class:"note"},"Férias, folga, horário reduzido, ausência, atestado, home office. A administração aprova e você recebe a resposta aqui e no sino.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:nova},"+ Requisição"))));
+  if(!R.ok){if(!R.carregando&&!R.erro)carregar();sec.append(el("div",{class:"note"},R.erro?"Indisponível no momento.":"Carregando…"));return sec}
+  const minhas=R.lista.filter(r=>meu&&r.colaborador_id===meu.id);
+  sec.append(minhas.length?el("div",{class:"list"},minhas.slice(0,30).map(r=>linha(r))):el("div",{class:"empty"},"Você ainda não fez nenhuma requisição."));
+  return sec;
+}
 /* card no Hoje para quem aprova: pendentes */
 function cardHoje(){
   if(!aprova())return null;if(!R.ok){if(!R.carregando&&!R.erro)carregar();return null}
@@ -76,6 +85,7 @@ function cardHoje(){
     el("div",{class:"list"},pend.slice(0,6).map(r=>el("button",{class:"row",onclick:()=>{S.tab="requisicoes";try{localStorage.setItem("pp-tab","requisicoes")}catch(_){}render()}},el("div",{style:"min-width:0"},el("div",{class:"n"},r.colaborador_nome+" · "+r.tipo_nome),el("div",{class:"s"},periodo(r)+(r.detalhe?" — "+r.detalhe.slice(0,120):""))),el("span",{class:"note num"},fmtDT(r.created_at).slice(0,5))))));
 }
 {const _r=render;render=function(){_r();const v=$("#view-requisicoes");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="requisicoes")S.tab="clientes";v.hidden=S.tab!=="requisicoes";if(S.tab==="requisicoes")renderTela();
-  if(S.tab==="painel"&&eq){const vp=$("#view-painel");const old=vp?.querySelector(".rq-hoje");if(old)old.remove();const c=cardHoje();const grid=vp?.querySelector(".kpis");if(c&&grid)grid.after(c)}}}
+  if(S.tab==="painel"&&eq){const vp=$("#view-painel");const old=vp?.querySelector(".rq-hoje");if(old)old.remove();const c=cardHoje();const grid=vp?.querySelector(".kpis");if(c&&grid)grid.after(c)}
+  if(S.tab==="perfil"&&eq){const vp=$("#view-perfil");if(vp&&!vp.querySelector(".note")?.textContent?.startsWith("Carregando")){vp.querySelector(".rq-perfil")?.remove();vp.append(secaoPerfil())}}}}
 window.PP_REQUISICOES={invalidar,nova};
 })();
