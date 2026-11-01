@@ -9,14 +9,15 @@ const fmtDT=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleDateString("
 async function carregar(){
   if(D.carregando)return;D.carregando=true;
   try{
-    const [p,t,c,e,l]=await Promise.all([
+    const [p,t,c,e,l,tk]=await Promise.all([
       SB.from("v_prazos").select("*").order("prazo"),
       SB.from("v_tarefas").select("id,titulo,status,prazo,prazo_fatal,responsavel_id,responsavel_nome,cliente_nome,faixa,created_by").in("status",["aberta","em_andamento"]),
       SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo"),
       SB.from("tarefa_eventos").select("*").order("criado_em",{ascending:false}).limit(80),
-      SB.from("v_leads").select("id,nome,empresa,status,atraso,tarefas_vencidas,proprietario_id,fase_nome").eq("status","Aberto")]);
+      SB.from("v_leads").select("id,nome,empresa,status,atraso,tarefas_vencidas,proprietario_id,fase_nome").eq("status","Aberto"),
+      SB.from("v_tickets").select("*")]);
     if(p.error)throw p.error;
-    D.prazos=p.data||[];D.tarefas=t.data||[];D.colab=c.data||[];D.eventos=e.data||[];D.leads=l.error?null:(l.data||[]);D.ok=true;
+    D.prazos=p.data||[];D.tarefas=t.data||[];D.colab=c.data||[];D.eventos=e.data||[];D.leads=l.error?null:(l.data||[]);D.tickets=tk?.data||[];D.ok=true;
   }catch(err){console.warn("painel",err);toast("Não foi possível carregar o painel")}
   finally{D.carregando=false}
   if(S.tab==="painel")render();
@@ -133,6 +134,13 @@ function renderPainel(){
     K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas"))));
   // Carteira e Leads atrasados ficam nas próprias áreas (Clientes e Comercial) — pedido de 31/10
   const duas=el("div",{style:"display:grid;grid-template-columns:1.5fr 1fr;gap:18px"});
+  /* Tickets aguardando a(s) minha(s) área(s) */
+  if(D.tickets?.length){const AR={juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",atendimento:"Atendimento",administrativo:"Administrativo",socios:"Sócias"};const p=PP.perfil||{};const minhas=p.papel==="admin"?Object.keys(AR):[...(p.acessos||[]),...((p.acessos||[]).includes("equipe")?["administrativo"]:[])];
+    const meus=D.tickets.filter(x=>minhas.includes(x.aguardando_area));
+    if(meus.length)duas.append(el("div",{class:"card",style:"grid-column:1 / -1;border-color:var(--gold)"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Tickets aguardando a sua área"),el("span",{class:"note"},`${meus.length} · responda pela tarefa`)),
+      el("div",{class:"list"},meus.sort((a,b)=>b.dias_aguardando-a.dias_aguardando).map(x=>{const d=Math.floor(+x.dias_aguardando||0);return el("button",{class:"row",onclick:()=>window.PP_TAREFAS?.abrir(x.id)},
+        el("div",{style:"min-width:0"},el("div",{class:"n"},el("span",{class:"pill "+(d>=5?"e3":d>=2?"e2":"c"),style:"margin-right:8px"},AR[x.aguardando_area]||x.aguardando_area),x.titulo),el("div",{class:"s"},[x.aguardando_por_nome?"pedido de "+x.aguardando_por_nome:null,x.cliente_nome].filter(Boolean).join(" · ")+(x.aguardando_motivo?" — "+x.aguardando_motivo.slice(0,140):""))),
+        el("span",{class:"note num",style:"white-space:nowrap"},d?`há ${d}d`:"hoje"))}))));}
   /* Prazos fatais de hoje: regra da controladoria — protocolo até meio-dia e confirmação do protocolo */
   const fataisHoje=D.tarefas.filter(minhas).filter(z=>z.prazo_fatal&&z.faixa==="hoje");
   if(fataisHoje.length){const tarde=new Date().getHours()>=12;

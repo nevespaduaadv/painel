@@ -4,6 +4,24 @@
 "use strict";
 const NUCLEOS={juridico:"Jurídico",acordos:"Acordos",acompanhamento_pj:"Acompanhamento PJ",pos_vendas:"Pós-vendas",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo",rh:"RH",socios:"Sócios"};
 const STATUS={aberta:"A fazer",em_andamento:"Fazendo",concluida:"Feita",cancelada:"Cancelada"};
+/* Tickets entre áreas: a tarefa fica "aguardando" outra área até alguém de lá responder */
+const AREAS_TICKET={juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",atendimento:"Atendimento",administrativo:"Administrativo",socios:"Sócias"};
+const minhasAreas=()=>{const p=PP.perfil||{};if(p.papel==="admin")return Object.keys(AREAS_TICKET);const a=new Set(p.acessos||[]);if(a.has("equipe"))a.add("administrativo");return Object.keys(AREAS_TICKET).filter(k=>a.has(k))};
+const ticketDe=t=>T.tickets?.[t.id]||null;
+const diasAg=tk=>tk?.aguardando_desde?Math.floor((Date.now()-new Date(tk.aguardando_desde))/86400000):0;
+const pillTicket=t=>{const tk=ticketDe(t);if(!tk)return null;const d=diasAg(tk);return el("span",{class:"pill "+(d>=5?"e3":d>=2?"e2":"c"),title:tk.aguardando_motivo||""},"Aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:""))};
+function encaminharArea(t,depois){
+  const area=sel(AREAS_TICKET,minhasAreas().includes("financeiro")?"socios":"financeiro");const motivo=el("textarea",{rows:3,placeholder:"O que você precisa que a área faça ou decida? Ex.: aprovar a proposta de 40% do Itaú; confirmar se o boleto de outubro foi pago."});
+  const body=el("div",{class:"form"},field("tk-area","Encaminhar para a área",area),el("div",{class:"f full"},el("label",{},"O que você precisa (obrigatório)"),motivo,el("div",{class:"help"},"A tarefa fica marcada como “aguardando” essa área, com o tempo parado visível para todos. Quem atende a área recebe aviso no sino e responde aqui mesmo. Você continua responsável pela tarefa.")));
+  modal("Abrir ticket: "+t.titulo,body,async()=>{if(!motivo.value.trim())throw new Error("Diga o que você precisa da área");const {error}=await SB.rpc("tarefa_encaminhar",{p_tarefa:t.id,p_area:area.value,p_motivo:motivo.value.trim()});if(error)throw new Error(error.message);toast("Ticket aberto para "+AREAS_TICKET[area.value]);T.tickets=null;depois?.()});
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Abrir ticket";
+}
+function responderTicket(t,depois){
+  const tk=ticketDe(t);const resp=el("textarea",{rows:3,placeholder:"Resposta/decisão da área. Ex.: aprovado até 45%; boleto pago em 30/10."});
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"Pedido de "+(tk?.aguardando_por_nome||"—")+" para "+(AREAS_TICKET[tk?.aguardando_area]||"")),el("div",{style:"white-space:pre-wrap;padding:8px 10px;background:var(--bg-soft,#f6f5f2);border-radius:8px"},tk?.aguardando_motivo||"")),el("div",{class:"f full"},el("label",{},"Resposta (obrigatório)"),resp,el("div",{class:"help"},"Libera a tarefa; quem pediu e o responsável recebem a resposta no sino e no histórico.")));
+  modal("Responder ticket: "+t.titulo,body,async()=>{if(!resp.value.trim())throw new Error("Escreva a resposta");const {error}=await SB.rpc("tarefa_responder",{p_tarefa:t.id,p_resposta:resp.value.trim()});if(error)throw new Error(error.message);toast("Ticket respondido");T.tickets=null;depois?.()});
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Responder";
+}
 const PRIORIDADE={1:"Alta",2:"Normal",3:"Baixa"};
 const FAIXAS=[["atrasada","Atrasadas","e3"],["hoje","Hoje","e3"],["d7","Até 7 dias","e2"],["d15","Até 15 dias","g"],["d30","Até 30 dias","g"],["depois","Depois de 30 dias",""],["sem_prazo","Sem prazo",""],["fechada","Concluídas / canceladas",""]];
 const TIPOS_ATIV={solicitacao_documentos:"Solicitação de documentos",requerimento_bacen:"Requerimento ao Bacen",analise_contrato:"Análise de contrato",parecer_tecnico:"Parecer técnico",contato_banco:"Contato com jurídico do banco",proposta_acordo:"Proposta de acordo",reuniao_cliente:"Reunião com cliente",ata:"Ata",protocolo:"Protocolo",andamento:"Andamento processual",peticao:"Petição",audiencia:"Audiência",atendimento:"Atendimento",interno:"Interno / administrativo",outro:"Outro"};
@@ -19,9 +37,9 @@ const T={tarefas:[],colab:[],processos:[],ok:false,carregando:false,f:{status:"a
 async function carregar(){
   if(T.carregando)return;T.carregando=true;
   try{
-    const [t,c,p]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria")]);
+    const [t,c,p,tk]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*")]);
     if(t.error)throw t.error;
-    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.ok=true;
+    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.ok=true;
   }catch(e){console.warn("tarefas",e);toast("Não foi possível carregar as tarefas")}
   finally{T.carregando=false}
   render();
@@ -49,7 +67,8 @@ function csv(nome,linhas,colunas){
 const escopoOk=t=>{const e=PP.escopoTarefas?.()||{tudo:true};if(e.tudo)return true;const meu=T.colab.find(c=>c.perfil_id===PP.perfil?.id);const minha=(meu&&t.responsavel_id===meu.id)||t.created_by===PP.perfil?.id;return minha||(e.nucleos||[]).includes(t.nucleo)};
 function filtrar(lista,f){
   return lista.filter(t=>escopoOk(t)&&(f.status==="abertas"?t.status==="aberta"||t.status==="em_andamento":f.status==="todas"?true:t.status===f.status)
-    &&(!f.resp||t.responsavel_id===f.resp)&&(!f.nucleo||t.nucleo===f.nucleo)&&(!f.cliente||t.cliente_id===f.cliente)&&(!f.fatais||t.prazo_fatal));
+    &&(!f.resp||t.responsavel_id===f.resp)&&(!f.nucleo||t.nucleo===f.nucleo)&&(!f.cliente||t.cliente_id===f.cliente)&&(!f.fatais||t.prazo_fatal)
+    &&(!f.tickets||(f.tickets==="minhas"?(ticketDe(t)&&minhasAreas().includes(ticketDe(t).aguardando_area)):!!ticketDe(t))));
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
   const done=el("input",{type:"checkbox",title:"Concluir",style:"width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex:none;margin-top:3px"});done.checked=t.status==="concluida";
@@ -61,8 +80,8 @@ function linhaTarefa(t,{mostrarCliente=true}={}){
     el("div",{style:"display:flex;gap:10px;align-items:flex-start;min-width:0;flex:1"},done,
       el("div",{style:"min-width:0;cursor:pointer",title:"Abrir a tarefa",onclick:()=>openTarefa(t)},el("div",{class:"n",style:t.status==="concluida"||t.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px"},"Alta"):null,t.titulo),
         el("div",{class:"s"},meta),trilha?el("div",{class:"s",style:"color:var(--faint);font-size:12px"},trilha):null,t.descricao?el("div",{class:"s",style:"white-space:pre-wrap;margin-top:2px"},t.descricao):null)),
-    el("div",{style:"display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end"},prazo,
-      t.status==="em_andamento"?el("span",{class:"pill c"},"Fazendo"):null,
+    el("div",{style:"display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end"},prazo,pillTicket(t),
+      t.status==="em_andamento"&&!ticketDe(t)?el("span",{class:"pill c"},"Fazendo"):null,
       el("button",{class:"btn sm primary",onclick:()=>openTarefa(t)},"Abrir")));
 }
 function listaAgrupada(lista,opts){
@@ -89,8 +108,10 @@ function renderTarefas(){
   const f=T.f;
   const fStatus=sel({abertas:"A fazer e fazendo",aberta:"Só a fazer",em_andamento:"Só fazendo",concluida:"Feitas",cancelada:"Canceladas",todas:"Todas"},f.status),fResp=selColab(f.resp,"Todos os responsáveis"),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes"),fFat=check("Só prazos fatais",f.fatais);
   fStatus.onchange=()=>{f.status=fStatus.value;render()};fResp.onchange=()=>{f.resp=fResp.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};fFat.input.onchange=()=>{f.fatais=fFat.input.checked;render()};fFat.wrap.className="";
+  const nTk=Object.keys(T.tickets||{}).length,nMeus=Object.values(T.tickets||{}).filter(x=>minhasAreas().includes(x.aguardando_area)).length;
+  const fTk=sel({"":"Tickets: todos os estados",minhas:`Aguardando a minha área (${nMeus})`,todas:`Aguardando alguma área (${nTk})`},f.tickets||"");fTk.onchange=()=>{f.tickets=fTk.value;render()};
   const escT=PP.escopoTarefas?.()||{tudo:true};
-  v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
+  v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,fTk,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
   v.append(listaAgrupada(filtrar(T.tarefas,f)));
 }
 function renderTarefasCliente(c,host){
@@ -103,7 +124,7 @@ function renderTarefasCliente(c,host){
   const fechadas=ts.filter(t=>t.status==="concluida"||t.status==="cancelada");
   if(fechadas.length){const d=el("details",{},el("summary",{style:"cursor:pointer;color:var(--muted)"},`Ver ${fechadas.length} concluída${fechadas.length===1?"":"s"}/cancelada${fechadas.length===1?"":"s"}`),el("div",{class:"card list",style:"margin-top:8px"},fechadas.map(t=>linhaTarefa(t,{mostrarCliente:false}))));host.append(d)}
 }
-const EVENTO={criada:"abriu a tarefa",reatribuida:"passou a tarefa",prazo_alterado:"alterou o prazo",status:"mudou o status",concluida:"concluiu",reaberta:"reabriu",cancelada:"cancelou",comentario:"comentou",editada:"editou título/descrição/prioridade"};
+const EVENTO={criada:"abriu a tarefa",reatribuida:"passou a tarefa",prazo_alterado:"alterou o prazo",status:"mudou o status",concluida:"concluiu",reaberta:"reabriu",cancelada:"cancelou",comentario:"comentou",editada:"editou título/descrição/prioridade",encaminhada:"abriu ticket para",respondida:"respondeu pelo(a)"};
 const fmtDT=v=>{if(!v)return"";const d=new Date(v);return fmtD(d)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 function linhaEvento(e){
   const quem=e.autor_nome||"Alguém";
@@ -112,6 +133,9 @@ function linhaEvento(e){
   else if(e.tipo==="reatribuida")txt+=` de ${e.de||"—"} para ${e.para||"—"}`;
   else if(e.tipo==="prazo_alterado")txt+=` de ${e.de||"sem prazo"} para ${e.para||"sem prazo"}`;
   else if(e.tipo==="status")txt+=` de ${STATUS[e.de]||e.de} para ${STATUS[e.para]||e.para}`;
+  else if(e.tipo==="encaminhada")txt+=` ${e.para||""}`;
+  else if(e.tipo==="respondida")txt+=` ${e.de||""}`;
+  if(e.tipo==="encaminhada"||e.tipo==="respondida")return el("li",{class:"ev-humano"},el("div",{class:"d"},fmtDT(e.criado_em)+" · "+txt),el("div",{style:"white-space:pre-wrap;margin-top:2px;padding:8px 12px;background:var(--surface-2);border-left:3px solid var(--gold);border-radius:8px;font-size:13.5px;line-height:1.45"},e.nota||""));
   if(e.tipo==="comentario"||e.tipo==="concluida"&&e.nota)return el("li",{class:"ev-humano"},el("div",{class:"d"},fmtDT(e.criado_em)+" · "+quem+(e.tipo==="concluida"?" · concluiu":"")),el("div",{style:"white-space:pre-wrap;margin-top:2px;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:13.5px;line-height:1.45"},e.nota));
   return el("li",{class:"ev-sistema"},el("div",{class:"d"},fmtDT(e.criado_em)+" · "+txt,e.nota?el("div",{style:"white-space:pre-wrap;margin-top:2px"},e.nota):null));
 }
@@ -182,7 +206,7 @@ function openTarefa(t){
   const pill=(cls,txt)=>el("span",{class:"pill "+cls},txt);
   const cab=el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"},
     pill(t.status==="concluida"?"g":t.status==="em_andamento"?"c":t.status==="cancelada"?"":"e2",STATUS[t.status]||t.status),t.prioridade===1?pill("e3","Prioridade alta"):null,t.prazo_fatal?pill("e3","PRAZO FATAL"):null,
-    pill(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g","Prazo: "+prazoTxt));
+    pill(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g","Prazo: "+prazoTxt),pillTicket(t));
   const meta=el("div",{class:"tf-meta"},
     el("div",{},el("b",{},"Responsável"),el("div",{},t.responsavel_nome||"— ninguém —")),
     el("div",{},el("b",{},"Cliente"),el("div",{},t.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(t.cliente_id),onclick:close},t.cliente_nome||t.cliente_id):"—")),
@@ -227,6 +251,8 @@ function openTarefa(t){
     aberta?trabalho:el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}},"Reabrir"),
     el("span",{class:"sp",style:"flex:1"}),
     aberta?el("button",{class:"btn sm",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
+    aberta&&!ticketDe(t)?el("button",{class:"btn sm",title:"Precisa de uma decisão ou informação de outra área? Abra um ticket: a tarefa fica aguardando a área e o tempo parado aparece para todos.",onclick:()=>encaminharArea(t,reabrirTela)},"⇄ Ticket para área…"):null,
+    aberta&&ticketDe(t)?el("button",{class:"btn sm primary",onclick:()=>responderTicket(t,reabrirTela)},"Responder ticket ("+(AREAS_TICKET[ticketDe(t).aguardando_area]||"")+")"):null,
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
     t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,
     el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar"));
