@@ -118,6 +118,7 @@ html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"
     return;
   }
   if(S.sub==="processos"){
+    if(window.PP_PROVIDENCIAS)m.append(window.PP_PROVIDENCIAS.secao(c));
     const host=el("section",{class:"card section"});m.append(host);
     if(MOD.processos)MOD.processos(c,host);else host.append(el("div",{class:"empty"},el("h3",{},"Processos"),el("div",{},"Disponível na versão do painel conectada ao banco de dados.")));
     return;
@@ -403,7 +404,7 @@ const MODULOS = [
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
   ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['faturamento','financeiro'],['dossie','core'],
-  ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['chat','core'],
+  ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
   ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['hubs','core'],

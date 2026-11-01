@@ -816,6 +816,7 @@ function renderMain(){
     return;
   }
   if(S.sub==="processos"){
+    if(window.PP_PROVIDENCIAS)m.append(window.PP_PROVIDENCIAS.secao(c));
     const host=el("section",{class:"card section"});m.append(host);
     if(MOD.processos)MOD.processos(c,host);else host.append(el("div",{class:"empty"},el("h3",{},"Processos"),el("div",{},"Disponível na versão do painel conectada ao banco de dados.")));
     return;
@@ -1209,7 +1210,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mvxs00on"></script>
-<script src="../passivos/ficha.js?v=mvxs00on"></script>
+<script src="../passivos/carteira.js?v=mvxs2qm4"></script>
+<script src="../passivos/ficha.js?v=mvxs2qm4"></script>
 </body>
 </html>
