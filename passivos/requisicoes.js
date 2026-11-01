@@ -14,10 +14,10 @@ const periodo=r=>r.data_inicio===r.data_fim?fmtD(r.data_inicio):fmtD(r.data_inic
 async function carregar(){
   if(R.carregando)return;R.carregando=true;
   try{const {data,error}=await SB.from("v_requisicoes").select("*").order("created_at",{ascending:false}).limit(300);if(error)throw error;R.lista=data||[];R.ok=true}
-  catch(e){console.warn("requisicoes",e);toast("Não foi possível carregar as requisições")}finally{R.carregando=false}
+  catch(e){console.warn("requisicoes",e);R.erro=e.message||"erro";toast("Não foi possível carregar as requisições")}finally{R.carregando=false}
   render();
 }
-const invalidar=()=>{R.ok=false;render()};
+const invalidar=()=>{R.ok=false;R.erro=null;render()};
 /* nova requisição (qualquer pessoa da equipe) */
 function nova(){
   const meu=meuColab();if(!meu){toast("Seu usuário ainda não está vinculado a um colaborador — peça à administração.");return}
@@ -59,7 +59,7 @@ function renderTela(){
   const v=$("#view-requisicoes");if(!v)return;v.replaceChildren();const gestor=aprova();const meu=meuColab();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Equipe"),el("h1",{},"Requisições"),el("div",{class:"sub"},gestor?"Pedidos da equipe (férias, folgas, horário reduzido, ausências) para aprovar. Tudo fica registrado.":"Seus pedidos à administração: férias, folga, horário reduzido, ausência, atestado, home office.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:nova},"+ Requisição"))));
-  if(!R.ok){if(!R.carregando)carregar();v.append(el("div",{class:"note"},"Carregando…"));return}
+  if(!R.ok){if(!R.carregando&&!R.erro)carregar();v.append(el("div",{class:"note"},R.erro?"Não foi possível carregar (o banco ainda não tem a tabela de requisições — rode a migração 0085).":"Carregando…"));return}
   const minhas=R.lista.filter(r=>meu&&r.colaborador_id===meu.id);
   if(gestor){
     const pend=R.lista.filter(r=>r.status==="pendente"),hist=R.lista.filter(r=>r.status!=="pendente");
@@ -70,7 +70,7 @@ function renderTela(){
 }
 /* card no Hoje para quem aprova: pendentes */
 function cardHoje(){
-  if(!aprova())return null;if(!R.ok){if(!R.carregando)carregar();return null}
+  if(!aprova())return null;if(!R.ok){if(!R.carregando&&!R.erro)carregar();return null}
   const pend=R.lista.filter(r=>r.status==="pendente");if(!pend.length)return null;
   return el("div",{class:"card rq-hoje",style:"grid-column:1 / -1"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Requisições para aprovar"),el("span",{class:"note"},String(pend.length))),
     el("div",{class:"list"},pend.slice(0,6).map(r=>el("button",{class:"row",onclick:()=>{S.tab="requisicoes";try{localStorage.setItem("pp-tab","requisicoes")}catch(_){}render()}},el("div",{style:"min-width:0"},el("div",{class:"n"},r.colaborador_nome+" · "+r.tipo_nome),el("div",{class:"s"},periodo(r)+(r.detalhe?" — "+r.detalhe.slice(0,120):""))),el("span",{class:"note num"},fmtDT(r.created_at).slice(0,5))))));
