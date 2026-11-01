@@ -9,8 +9,9 @@ declare s record; n integer := 0; nl integer; na integer; np integer;
 begin
   perform public.comercial_semanas_garantir(p_mes);
   for s in select * from public.comercial_semanas where mes = p_mes loop
+    -- leads da meta = quem preencheu o formulário do Meta e caiu na planilha (origem 'planilha'); ChatGuru/site não contam
     select count(*) into nl from public.leads l
-     where (l.data_entrada at time zone 'America/Sao_Paulo')::date between s.inicio and s.fim;
+     where l.origem = 'planilha' and (l.data_entrada at time zone 'America/Sao_Paulo')::date between s.inicio and s.fim;
     select count(distinct h.lead_id) into na from public.historico_fases h
      where h.para_fase_id = 4 and (h.created_at at time zone 'America/Sao_Paulo')::date between s.inicio and s.fim;
     select count(distinct h.lead_id) into np from public.historico_fases h
