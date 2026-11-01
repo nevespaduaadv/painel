@@ -133,6 +133,13 @@ function renderPainel(){
     K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas"))));
   // Carteira e Leads atrasados ficam nas próprias áreas (Clientes e Comercial) — pedido de 31/10
   const duas=el("div",{style:"display:grid;grid-template-columns:1.5fr 1fr;gap:18px"});
+  /* Prazos fatais de hoje: regra da controladoria — protocolo até meio-dia e confirmação do protocolo */
+  const fataisHoje=D.tarefas.filter(minhas).filter(z=>z.prazo_fatal&&z.faixa==="hoje");
+  if(fataisHoje.length){const tarde=new Date().getHours()>=12;
+    duas.append(el("div",{class:"card",style:"grid-column:1 / -1;border-color:var(--crit)"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{style:"color:var(--crit)"},"Prazos fatais de hoje"),el("span",{class:"note"},tarde?"já passou do meio-dia — protocolar e confirmar agora":"protocolar até meio-dia")),
+      el("div",{class:"list"},fataisHoje.map(z=>el("div",{class:"row",style:"display:flex;gap:10px;align-items:center;justify-content:space-between"},
+        el("button",{class:"row",style:"flex:1;text-align:left;padding:0;border:0;background:none",onclick:()=>window.PP_TAREFAS?.abrir(z.id)},el("div",{class:"n"},z.titulo),el("div",{class:"s"},[z.cliente_nome,z.responsavel_nome].filter(Boolean).join(" · "))),
+        el("button",{class:"btn sm primary",style:"flex:none",onclick:()=>window.PP_TAREFAS?.concluirComNota?.(z)},"Confirmar protocolo"))))));}
   duas.append(cardPrazos([...atrasadas,...hoje,...d7],"Vence até 7 dias","Nada vencendo nos próximos 7 dias."));
   const col=el("div",{style:"display:flex;flex-direction:column;gap:18px"});
   col.append(cardCalendario(prazos,meu));

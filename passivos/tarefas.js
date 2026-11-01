@@ -53,7 +53,7 @@ function filtrar(lista,f){
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
   const done=el("input",{type:"checkbox",title:"Concluir",style:"width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex:none;margin-top:3px"});done.checked=t.status==="concluida";
-  done.onchange=async()=>{const {error}=await SB.from("tarefas").update({status:done.checked?"concluida":"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=!done.checked;return}toast(done.checked?"Tarefa concluída":"Tarefa reaberta");if(done.checked)comentarConclusao(t)};
+  done.onchange=async()=>{if(done.checked){done.checked=false;concluirComNota(t);return}const {error}=await SB.from("tarefas").update({status:"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=true;return}toast("Tarefa reaberta")};
   const prazo=t.prazo?el("span",{class:"pill "+(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g")},fmtD(parseD(t.prazo)),t.hora?" "+String(t.hora).slice(0,5).replace(":","h"):"",t.prazo_fatal?" · FATAL":"",t.faixa==="atrasada"?` · ${-t.dias_para_prazo}d atrás`:t.faixa==="hoje"?" · hoje":t.dias_para_prazo<=30?` · em ${t.dias_para_prazo}d`:""):el("span",{class:"note"},"sem prazo");
   const meta=[mostrarCliente?t.cliente_nome:null,t.responsavel_nome,NUCLEOS[t.nucleo],t.numero_cnj?"Proc. "+t.numero_cnj:null,t.horas_apontadas>0?horasFmt(t.horas_apontadas)+" apontadas":null].filter(Boolean).join(" · ");
   const trilha=[t.criado_por_nome?`aberta por ${t.criado_por_nome} em ${fmtDT(t.created_at)}`:t.created_at?`aberta em ${fmtDT(t.created_at)}`:null,t.status==="concluida"&&t.concluida_em?`concluída${t.concluida_por_nome?" por "+t.concluida_por_nome:""} em ${fmtDT(t.concluida_em)}`:null].filter(Boolean).join(" · ");
@@ -150,11 +150,14 @@ function mencoes(ta){
     if(!lista.length){fechar();return}if(!pop.parentNode)ta.insertAdjacentElement("afterend",pop);pop.replaceChildren(...lista.map(c=>el("button",{type:"button",class:"item",onclick:()=>{const nome=c.apelido||c.nome.split(" ")[0];ta.value=ta.value.slice(0,a.ini)+"@"+nome+" "+ta.value.slice(ta.selectionStart);fechar();ta.focus()}},c.nome)));pop.hidden=false};
   ta.addEventListener("input",render);ta.addEventListener("keyup",e=>{if(e.key==="Escape")fechar()});ta.addEventListener("blur",()=>setTimeout(fechar,150));
 }
-function comentarConclusao(t){
-  const ta=el("textarea",{placeholder:"Ex.: petição protocolada; aguardando intimação.",rows:3});
-  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito? (opcional — fica no histórico da tarefa e quem abriu é avisado)"),ta));
-  modal("Tarefa concluída: "+t.titulo,body,async()=>{if(ta.value.trim())await comentar(t.id,ta.value.trim())});
+/* concluir a partir da lista: "o que foi feito" é obrigatório (regra da controladoria — toda conclusão alimenta o histórico) */
+function concluirComNota(t){
+  const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:3});const arq=el("input",{type:"file",multiple:""});
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do histórico e do dossiê; quem abriu a tarefa é avisado.")),el("div",{class:"f full"},el("label",{},"Anexar (opcional)"),arq));
+  modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída")});
+  const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Concluir tarefa";
 }
+const comentarConclusao=concluirComNota;
 /* ---------- Tela da tarefa: o que fazer, para quem passar, o que já aconteceu ---------- */
 async function mudarStatus(t,status,nota,files){
   const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);if(error)throw new Error("Não foi possível atualizar");
@@ -264,6 +267,11 @@ function openTarefaForm(t={}){
     field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),field("tf-hora","Horário (opcional)",hora,"Audiência, reunião, perícia… Entra na agenda."),fatal.wrap,
     window.PP_PRAZOS?(()=>{const d=el("details",{class:"f full"},el("summary",{style:"cursor:pointer;color:var(--muted);font-size:13px"},"Calcular prazo a partir de uma publicação/intimação…"));d.addEventListener("toggle",()=>{if(d.open&&!d.dataset.ok){d.dataset.ok="1";const pr=T.processos.find(x=>x.id===pro.value);d.append(window.PP_PRAZOS.campo({alvo:prazo,base:hojeISO(),uf:window.PP_PRAZOS.ufDoCnj(pr?.numero_cnj),dias:15}))}});return d})():null,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
     field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."));
+  /* reagendar exige justificativa (controladoria): o campo aparece quando o prazo de uma tarefa já salva muda */
+  const motivo=el("textarea",{rows:2,placeholder:"Ex.: cliente ainda não enviou os documentos; audiência remarcada pelo juízo; não deu tempo hoje."});
+  const motivoWrap=el("div",{class:"f full",style:"display:none;border-left:3px solid var(--warn);padding-left:10px"},el("label",{},"Motivo do reagendamento (obrigatório)"),motivo,el("div",{class:"help"},"Fica no histórico da tarefa e no relatório de reagendamentos da controladoria."));
+  if(t.id&&t.prazo){const prazoOrig=t.prazo;const chk=()=>{motivoWrap.style.display=prazo.value&&prazo.value!==prazoOrig?"":"none"};prazo.addEventListener("input",chk);prazo.addEventListener("change",chk);
+    const pos=body.querySelector("#tf-prazo")?.closest(".f");if(pos)pos.after(motivoWrap);else body.append(motivoWrap)}
   if(t.id){
     const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));const com=el("textarea",{rows:2,placeholder:"Comentar (ex.: liguei para o cliente, aguardando documentos)"});
     const btnCom=el("button",{class:"btn sm",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Comentário registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Comentar");
@@ -276,7 +284,9 @@ function openTarefaForm(t={}){
     if(!titulo.value.trim())throw new Error("Informe o título");
     const row={titulo:titulo.value.trim(),descricao:desc.value.trim()||null,cliente_id:cli.value||null,contrato_id:kon.value||null,processo_id:pro.value||null,responsavel_id:resp.value||null,nucleo:nuc.value||null,prazo:prazo.value||null,hora:prazo.value&&hora.value?hora.value:null,prazo_fatal:fatal.input.checked,prioridade:+pri.value,status:status.value};
     let id=t.id;
-    if(id){const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw error}
+    if(id){const reag=t.prazo&&row.prazo!==t.prazo;if(reag){if(!motivo.value.trim())throw new Error("Informe o motivo do reagendamento");row.motivo_reagendamento=motivo.value.trim()}
+      if(row.status==="concluida"&&t.status!=="concluida")throw new Error("Para concluir, use o botão “Concluir” e registre o que foi feito");
+      const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw new Error(/motivo do reagendamento/.test(error.message)?"Informe o motivo do reagendamento":error.message)}
     else{const {data,error}=await SB.from("tarefas").insert(row).select("id").single();if(error)throw error;id=data.id;
       if(+hr.value>0){if(!meu)throw new Error("Tarefa salva, mas você não tem registro de colaborador para apontar horas");const {error:e2}=await SB.from("apontamentos_horas").insert({colaborador_id:meu.id,data:hojeISO(),horas:+hr.value,cliente_id:cli.value||null,tarefa_id:id,tipo_atividade:"outro",descricao:titulo.value.trim()});if(e2)throw e2}}
     toast("Tarefa salva");
@@ -290,11 +300,13 @@ async function carregarHoras(){
   if(!ap.colab)ap.colab=meuColab()?.id||null;
   ap.semana=semanaDe(ap.data);
   if(!ap.periodoIni){const h=hojeISO();ap.periodoIni=h.slice(0,8)+"01";ap.periodoFim=h}
-  const [l,r,p]=await Promise.all([
+  const [l,r,p,rg,ts]=await Promise.all([
     ap.colab?SB.from("v_apontamentos").select("*").eq("colaborador_id",ap.colab).gte("data",ap.semana.ini).lte("data",ap.semana.fim).order("data").order("created_at"):{data:[]},
     SB.from("v_apontamentos").select("colaborador_id,colaborador_nome,nucleo,cliente_id,cliente_nome,tipo_atividade,horas,data").gte("data",ap.periodoIni).lte("data",ap.periodoFim),
-    SB.from("v_tarefas_pontualidade").select("*")]);
-  ap.lista=l.data||[];ap.rel=r.data||[];ap.pont=p.data||[];
+    SB.from("v_tarefas_pontualidade").select("*"),
+    SB.from("v_reagendamentos_mes").select("*").eq("mes",hojeISO().slice(0,8)+"01"),
+    PP.perfil?.papel==="admin"||PP.temAcesso?.("equipe")?SB.rpc("ts_dias_sem_lancamento",{p_ini:semanaDe(hojeISO()).ini,p_fim:semanaDe(hojeISO()).fim}):{data:[]}]);
+  ap.lista=l.data||[];ap.rel=r.data||[];ap.pont=p.data||[];ap.reag=rg?.data||[];ap.semanaPend=(ts?.data||[]).filter(x=>(x.dias_faltando||[]).length);
   if(S.tab==="horas")render();
 }
 function renderHoras(){
@@ -332,11 +344,18 @@ function renderHoras(){
   rel.append(el("div",{class:"note"},`${fmtD(parseD(ap.periodoIni))} – ${fmtD(parseD(ap.periodoFim))} · ${horasFmt(totP)} · ${ap.rel.length} lançamento${ap.rel.length===1?"":"s"}`),
     el("div",{style:"display:flex;gap:16px;flex-wrap:wrap"},agrupar("colaborador_nome","Por colaborador"),agrupar("cliente_nome","Por cliente"),agrupar("tipo_atividade","Por tipo de atividade")));
   v.append(rel);
+  /* Timesheet da semana: quem ainda não lançou (regra: semana fechada até sexta; segunda a controladoria confere) */
+  if(ap.semanaPend?.length){const fmtDia=d=>d.slice(8,10)+"/"+d.slice(5,7);
+    v.append(el("section",{class:"card section",style:"border-color:var(--warn)"},el("div",{class:"section-h"},el("h2",{},"Timesheet da semana em aberto"),el("span",{class:"note"},`${ap.semanaPend.length} colaborador(es) · semana de ${fmtDia(semanaDe(hojeISO()).ini)}`)),
+      el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Colaborador"),el("th",{class:"r"},"Dias úteis"),el("th",{class:"r"},"Lançados"),el("th",{},"Faltando"),el("th",{class:"r"},"Horas"))),
+        el("tbody",{},ap.semanaPend.map(x=>el("tr",{},el("td",{},x.colaborador_nome),el("td",{class:"r num"},String(x.dias_uteis)),el("td",{class:"r num"},String(x.dias_lancados)),el("td",{style:"color:var(--warn)"},(x.dias_faltando||[]).map(fmtDia).join(", ")),el("td",{class:"r num"},horasFmt(+x.horas||0)||"0h")))))),
+      el("div",{class:"note",style:"margin-top:8px"},"Aviso automático no sino toda sexta às 16h para quem estiver com dias em aberto.")));}
   /* Pontualidade */
   const pont=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Tarefas: no prazo × atrasadas"),el("span",{class:"note"},"por responsável e núcleo, acumulado")));
-  const agg=new Map();for(const r of ap.pont){const k=r.responsavel_nome||"Sem responsável";const a=agg.get(k)||{abertas:0,atrasadas:0,fatais_7d:0,concluidas:0,concluidas_no_prazo:0,concluidas_com_atraso:0};for(const f of Object.keys(a))a[f]+=+r[f]||0;agg.set(k,a)}
-  pont.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Responsável"),el("th",{class:"r"},"Abertas"),el("th",{class:"r"},"Atrasadas"),el("th",{class:"r"},"Fatais 7d"),el("th",{class:"r"},"Concluídas"),el("th",{class:"r"},"No prazo"),el("th",{class:"r"},"Com atraso"))),
-    el("tbody",{},agg.size?[...agg.entries()].map(([k,a])=>el("tr",{},el("td",{},k),el("td",{class:"r num"},String(a.abertas)),el("td",{class:"r num",style:a.atrasadas?"color:var(--crit);font-weight:600":""},String(a.atrasadas)),el("td",{class:"r num"},String(a.fatais_7d)),el("td",{class:"r num"},String(a.concluidas)),el("td",{class:"r num"},String(a.concluidas_no_prazo)),el("td",{class:"r num"},String(a.concluidas_com_atraso)))):el("tr",{},el("td",{colspan:7,class:"note"},"Nenhuma tarefa ainda"))))));
+  const agg=new Map();for(const r of ap.pont){const k=r.responsavel_nome||"Sem responsável";const a=agg.get(k)||{abertas:0,atrasadas:0,fatais_7d:0,concluidas:0,concluidas_no_prazo:0,concluidas_com_atraso:0,reag:0,reag_sem:0};for(const f of ["abertas","atrasadas","fatais_7d","concluidas","concluidas_no_prazo","concluidas_com_atraso"])a[f]+=+r[f]||0;agg.set(k,a)}
+  for(const r of (ap.reag||[])){const k=r.colaborador_nome||"Sistema";const a=agg.get(k)||{abertas:0,atrasadas:0,fatais_7d:0,concluidas:0,concluidas_no_prazo:0,concluidas_com_atraso:0,reag:0,reag_sem:0};a.reag+=+r.reagendamentos||0;a.reag_sem+=+r.sem_motivo||0;agg.set(k,a)}
+  pont.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Responsável"),el("th",{class:"r"},"Abertas"),el("th",{class:"r"},"Atrasadas"),el("th",{class:"r"},"Fatais 7d"),el("th",{class:"r"},"Concluídas"),el("th",{class:"r"},"No prazo"),el("th",{class:"r"},"Com atraso"),el("th",{class:"r",title:"Reagendamentos feitos por esta pessoa no mês (prazo alterado em tarefas já com prazo)"},"Reagendou (mês)"))),
+    el("tbody",{},agg.size?[...agg.entries()].map(([k,a])=>el("tr",{},el("td",{},k),el("td",{class:"r num"},String(a.abertas)),el("td",{class:"r num",style:a.atrasadas?"color:var(--crit);font-weight:600":""},String(a.atrasadas)),el("td",{class:"r num"},String(a.fatais_7d)),el("td",{class:"r num"},String(a.concluidas)),el("td",{class:"r num"},String(a.concluidas_no_prazo)),el("td",{class:"r num"},String(a.concluidas_com_atraso)),el("td",{class:"r num",style:a.reag>=3?"color:var(--warn);font-weight:600":""},String(a.reag)+(a.reag_sem?` (${a.reag_sem} sem motivo)`:"")))):el("tr",{},el("td",{colspan:8,class:"note"},"Nenhuma tarefa ainda"))))));
   v.append(pont);
 }
 function openHorasForm({ap,tarefa,data}={}){
@@ -369,6 +388,6 @@ window.PP_MOD.tarefas=renderTarefasCliente;
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={lista:()=>T.tarefas,abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
+window.PP_TAREFAS={lista:()=>T.tarefas,concluirComNota,abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
 window.__PP_LOGIN.then(()=>{if(equipe())tempoReal()});
 })();
