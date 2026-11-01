@@ -11,15 +11,15 @@ const ticketDe=t=>T.tickets?.[t.id]||null;
 const diasAg=tk=>tk?.aguardando_desde?Math.floor((Date.now()-new Date(tk.aguardando_desde))/86400000):0;
 const pillTicket=t=>{const tk=ticketDe(t);if(!tk)return null;const d=diasAg(tk);return el("span",{class:"pill "+(d>=5?"e3":d>=2?"e2":"c"),title:tk.aguardando_motivo||""},"Aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:""))};
 function encaminharArea(t,depois){
-  const area=sel(AREAS_TICKET,minhasAreas().includes("financeiro")?"socios":"financeiro");const motivo=el("textarea",{rows:3,placeholder:"O que você precisa que a área faça ou decida? Ex.: aprovar a proposta de 40% do Itaú; confirmar se o boleto de outubro foi pago."});
-  const body=el("div",{class:"form"},field("tk-area","Encaminhar para a área",area),el("div",{class:"f full"},el("label",{},"O que você precisa (obrigatório)"),motivo,el("div",{class:"help"},"A tarefa fica marcada como “aguardando” essa área, com o tempo parado visível para todos. Quem atende a área recebe aviso no sino e responde aqui mesmo. Você continua responsável pela tarefa.")));
-  modal("Abrir ticket: "+t.titulo,body,async()=>{if(!motivo.value.trim())throw new Error("Diga o que você precisa da área");const {error}=await SB.rpc("tarefa_encaminhar",{p_tarefa:t.id,p_area:area.value,p_motivo:motivo.value.trim()});if(error)throw new Error(error.message);toast("Ticket aberto para "+AREAS_TICKET[area.value]);T.tickets=null;depois?.()});
+  const area=sel(AREAS_TICKET,minhasAreas().includes("financeiro")?"socios":"financeiro");const motivo=el("textarea",{rows:3,placeholder:"O que você precisa que a área faça ou decida? Ex.: aprovar a proposta de 40% do Itaú; confirmar se o boleto de outubro foi pago."});const arq=el("input",{type:"file",multiple:""});
+  const body=el("div",{class:"form"},field("tk-area","Encaminhar para a área",area),el("div",{class:"f full"},el("label",{},"O que você precisa (obrigatório)"),motivo,el("div",{class:"help"},"A tarefa fica marcada como “aguardando” essa área, com o tempo parado visível para todos. Quem atende a área recebe aviso no sino e responde aqui mesmo. Você continua responsável pela tarefa.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a minuta para aprovação)"),arq));
+  modal("Abrir ticket: "+t.titulo,body,async()=>{if(!motivo.value.trim())throw new Error("Diga o que você precisa da área");const {error}=await SB.rpc("tarefa_encaminhar",{p_tarefa:t.id,p_area:area.value,p_motivo:motivo.value.trim()});if(error)throw new Error(error.message);if(arq.files.length)await comentar(t.id,"Anexo do ticket: "+[...arq.files].map(f=>f.name).join(", "),[...arq.files]);toast("Ticket aberto para "+AREAS_TICKET[area.value]);T.tickets=null;depois?.()});
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Abrir ticket";
 }
 function responderTicket(t,depois){
-  const tk=ticketDe(t);const resp=el("textarea",{rows:3,placeholder:"Resposta/decisão da área. Ex.: aprovado até 45%; boleto pago em 30/10."});
-  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"Pedido de "+(tk?.aguardando_por_nome||"—")+" para "+(AREAS_TICKET[tk?.aguardando_area]||"")),el("div",{style:"white-space:pre-wrap;padding:8px 10px;background:var(--bg-soft,#f6f5f2);border-radius:8px"},tk?.aguardando_motivo||"")),el("div",{class:"f full"},el("label",{},"Resposta (obrigatório)"),resp,el("div",{class:"help"},"Libera a tarefa; quem pediu e o responsável recebem a resposta no sino e no histórico.")));
-  modal("Responder ticket: "+t.titulo,body,async()=>{if(!resp.value.trim())throw new Error("Escreva a resposta");const {error}=await SB.rpc("tarefa_responder",{p_tarefa:t.id,p_resposta:resp.value.trim()});if(error)throw new Error(error.message);toast("Ticket respondido");T.tickets=null;depois?.()});
+  const tk=ticketDe(t);const resp=el("textarea",{rows:3,placeholder:"Resposta/decisão da área. Ex.: aprovado até 45%; boleto pago em 30/10."});const arq=el("input",{type:"file",multiple:""});
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"Pedido de "+(tk?.aguardando_por_nome||"—")+" para "+(AREAS_TICKET[tk?.aguardando_area]||"")),el("div",{style:"white-space:pre-wrap;padding:8px 10px;background:var(--bg-soft,#f6f5f2);border-radius:8px"},tk?.aguardando_motivo||"")),el("div",{class:"f full"},el("label",{},"Resposta (obrigatório)"),resp,el("div",{class:"help"},"Libera a tarefa; quem pediu e o responsável recebem a resposta no sino e no histórico.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a minuta corrigida)"),arq));
+  modal("Responder ticket: "+t.titulo,body,async()=>{if(!resp.value.trim())throw new Error("Escreva a resposta");const {error}=await SB.rpc("tarefa_responder",{p_tarefa:t.id,p_resposta:resp.value.trim()});if(error)throw new Error(error.message);if(arq.files.length)await comentar(t.id,"Anexo da resposta: "+[...arq.files].map(f=>f.name).join(", "),[...arq.files]);toast("Ticket respondido");T.tickets=null;depois?.()});
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Responder";
 }
 const PRIORIDADE={1:"Alta",2:"Normal",3:"Baixa"};
@@ -281,6 +281,7 @@ document.head.append(el("style",{},`.tf-meta{display:grid;grid-template-columns:
 .tl li.ev-sistema{padding:2px 0 8px;opacity:.75}.tl li.ev-sistema::before{background:var(--line);width:8px;height:8px;left:-22px;top:9px}.tl li.ev-humano{padding:6px 0 12px}`));
 function openTarefaForm(t={}){
   const meu=meuColab();
+  let anexoForm=null;
   const titulo=inp("text",t.titulo||"",{placeholder:"Ex.: Protocolar embargos à execução"}),desc=el("textarea",{},t.descricao||""),cli=selCliente(t.cliente_id),
         kon=sel({"":"— sem vínculo —"},""),pro=sel({"":"— sem vínculo —"},""),resp=selColab(t.responsavel_id||meu?.id),nuc=sel({"":"—",...NUCLEOS},t.nucleo||meu?.nucleo||""),
         prazo=inp("date",t.prazo||""),hora=inp("time",(t.hora||"").slice(0,5)),fatal=check("Prazo fatal",t.prazo_fatal,"Prazo processual ou contratual improrrogável."),pri=sel(PRIORIDADE,String(t.prioridade||2)),status=sel(STATUS,t.status||"aberta"),
@@ -292,7 +293,8 @@ function openTarefaForm(t={}){
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"tf-tit"},"Título"),Object.assign(titulo,{id:"tf-tit"})),field("tf-cli","Cliente",cli),field("tf-resp","Responsável",resp),field("tf-nuc","Núcleo",nuc),
     field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),field("tf-hora","Horário (opcional)",hora,"Audiência, reunião, perícia… Entra na agenda."),fatal.wrap,
     window.PP_PRAZOS?(()=>{const d=el("details",{class:"f full"},el("summary",{style:"cursor:pointer;color:var(--muted);font-size:13px"},"Calcular prazo a partir de uma publicação/intimação…"));d.addEventListener("toggle",()=>{if(d.open&&!d.dataset.ok){d.dataset.ok="1";const pr=T.processos.find(x=>x.id===pro.value);d.append(window.PP_PRAZOS.campo({alvo:prazo,base:hojeISO(),uf:window.PP_PRAZOS.ufDoCnj(pr?.numero_cnj),dias:15}))}});return d})():null,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
-    field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."));
+    field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."),
+    (()=>{anexoForm=el("input",{type:"file",multiple:""});return el("div",{class:"f full"},el("label",{},"Anexar arquivo (PDF, Word, imagem…)"),anexoForm,el("div",{class:"help"},"Ex.: a petição inicial para o responsável corrigir; o despacho que gerou a tarefa. Fica no histórico da tarefa, visível para quem a recebe."))})());
   /* reagendar exige justificativa (controladoria): o campo aparece quando o prazo de uma tarefa já salva muda */
   const motivo=el("textarea",{rows:2,placeholder:"Ex.: cliente ainda não enviou os documentos; audiência remarcada pelo juízo; não deu tempo hoje."});
   const motivoWrap=el("div",{class:"f full",style:"display:none;border-left:3px solid var(--warn);padding-left:10px"},el("label",{},"Motivo do reagendamento (obrigatório)"),motivo,el("div",{class:"help"},"Fica no histórico da tarefa e no relatório de reagendamentos da controladoria."));
@@ -315,6 +317,7 @@ function openTarefaForm(t={}){
       const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw new Error(/motivo do reagendamento/.test(error.message)?"Informe o motivo do reagendamento":error.message)}
     else{const {data,error}=await SB.from("tarefas").insert(row).select("id").single();if(error)throw error;id=data.id;
       if(+hr.value>0){if(!meu)throw new Error("Tarefa salva, mas você não tem registro de colaborador para apontar horas");const {error:e2}=await SB.from("apontamentos_horas").insert({colaborador_id:meu.id,data:hojeISO(),horas:+hr.value,cliente_id:cli.value||null,tarefa_id:id,tipo_atividade:"outro",descricao:titulo.value.trim()});if(e2)throw e2}}
+    if(anexoForm&&anexoForm.files.length)await comentar(id,"Arquivo anexado: "+[...anexoForm.files].map(f=>f.name).join(", "),[...anexoForm.files]);
     toast("Tarefa salva");
   },extra);
 }

@@ -21,20 +21,27 @@ const invalidar=()=>{R.ok=false;R.erro=null;render()};
 /* nova requisição (qualquer pessoa da equipe) */
 function nova(){
   const meu=meuColab();if(!meu){toast("Seu usuário ainda não está vinculado a um colaborador — peça à administração.");return}
-  const tipo=sel(TIPOS,"folga"),ini=inp("date",""),fim=inp("date",""),det=el("textarea",{rows:3,placeholder:"Ex.: semana de provas — preciso sair às 16h de segunda a sexta. / Consulta médica na quinta à tarde."});
+  const tipo=sel(TIPOS,"folga"),ini=inp("date",""),fim=inp("date",""),det=el("textarea",{rows:3,placeholder:"Ex.: semana de provas — preciso sair às 16h de segunda a sexta. / Consulta médica na quinta à tarde."}),arq=el("input",{type:"file",multiple:"",accept:".pdf,.jpg,.jpeg,.png,.doc,.docx"});
   ini.onchange=()=>{if(!fim.value||fim.value<ini.value)fim.value=ini.value};
-  const body=el("div",{class:"form"},field("rq-tipo","Tipo",tipo),field("rq-ini","De",ini),field("rq-fim","Até",fim),el("div",{class:"f full"},el("label",{},"Detalhe"),det,el("div",{class:"help"},"Vai para a administração/sócias aprovar. Você recebe a resposta no sino e aqui. Férias, folga, ausência, atestado e home office aprovados entram na sua agenda.")));
+  const body=el("div",{class:"form"},field("rq-tipo","Tipo",tipo),field("rq-ini","De",ini),field("rq-fim","Até",fim),el("div",{class:"f full"},el("label",{},"Detalhe"),det,el("div",{class:"help"},"Vai para a administração/sócias aprovar. Você recebe a resposta no sino e aqui. Férias, folga, ausência, atestado e home office aprovados entram na sua agenda.")),
+    el("div",{class:"f full"},el("label",{},"Anexar (atestado, comprovante, declaração da faculdade…)"),arq,el("div",{class:"help"},"Só você e quem aprova veem o arquivo.")));
   modal("Nova requisição",body,async()=>{
     if(!ini.value)throw new Error("Informe a data inicial");if(!fim.value||fim.value<ini.value)throw new Error("Data final inválida");
     if(tipo.value==="outro"&&!det.value.trim())throw new Error("Descreva o pedido");
-    const {error}=await SB.from("requisicoes").insert({colaborador_id:meu.id,tipo:tipo.value,data_inicio:ini.value,data_fim:fim.value,detalhe:det.value.trim()||null});
-    if(error)throw new Error(error.message);toast("Requisição enviada");invalidar();
+    if(tipo.value==="atestado"&&!arq.files.length)throw new Error("Anexe o atestado");
+    const {data,error}=await SB.from("requisicoes").insert({colaborador_id:meu.id,tipo:tipo.value,data_inicio:ini.value,data_fim:fim.value,detalhe:det.value.trim()||null}).select("id").single();
+    if(error)throw new Error(error.message);
+    for(const f of arq.files){const nome=f.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_");const caminho=`requisicoes/${data.id}/${Date.now().toString(36)}-${nome}`;
+      const up=await SB.storage.from("anexos").upload(caminho,f,{contentType:f.type||undefined});if(up.error)throw new Error("Falha ao enviar "+f.name+": "+up.error.message);
+      const ins=await SB.from("anexos").insert({requisicao_id:data.id,nome:f.name,caminho_storage:caminho,tamanho:f.size,mime:f.type||null});if(ins.error)throw new Error(ins.error.message)}
+    toast("Requisição enviada");invalidar();
   });
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Enviar";
 }
 async function decidir(r,status){
   const ta=el("textarea",{rows:3,placeholder:status==="aprovada"?"Opcional. Ex.: combinado; compense as horas na semana seguinte.":"Obrigatório. Ex.: período coincide com a audiência do dia 12 — pode ser na semana seguinte?"});
-  const body=el("div",{class:"form"},el("div",{class:"f full"},el("b",{},r.colaborador_nome+" · "+r.tipo_nome+" · "+periodo(r)),r.detalhe?el("div",{class:"note",style:"white-space:pre-wrap;margin-top:4px"},r.detalhe):null),el("div",{class:"f full"},el("label",{},"Resposta"),ta));
+  const body=el("div",{class:"form"},el("div",{class:"f full"},el("b",{},r.colaborador_nome+" · "+r.tipo_nome+" · "+periodo(r)),r.detalhe?el("div",{class:"note",style:"white-space:pre-wrap;margin-top:4px"},r.detalhe):null,
+    (r.anexos||[]).length?el("div",{style:"display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"},...(r.anexos||[]).map(a=>el("button",{class:"btn sm",type:"button",onclick:async()=>{const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}},"📎 "+a.nome))):null),el("div",{class:"f full"},el("label",{},"Resposta"),ta));
   modal((status==="aprovada"?"Aprovar":"Negar")+" requisição",body,async()=>{
     if(status==="negada"&&!ta.value.trim())throw new Error("Diga o motivo");
     const {error}=await SB.from("requisicoes").update({status,resposta:ta.value.trim()||null}).eq("id",r.id);if(error)throw new Error(error.message);
@@ -48,6 +55,7 @@ function linha(r,{gestor=false}={}){
   return el("div",{class:"row",style:"cursor:default;align-items:flex-start"},
     el("div",{style:"min-width:0;flex:1"},el("div",{class:"n"},gestor?el("b",{},r.colaborador_nome+" · "):null,r.tipo_nome,el("span",{class:"pill "+cls,style:"margin-left:8px"},st)),
       el("div",{class:"s"},periodo(r)+" · pedido em "+fmtDT(r.created_at)),r.detalhe?el("div",{class:"s",style:"white-space:pre-wrap"},r.detalhe):null,
+      (r.anexos||[]).length?el("div",{class:"s",style:"display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"},...(r.anexos||[]).map(a=>el("button",{class:"btn sm",style:"padding:1px 8px;font-size:12px",onclick:async()=>{const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}},"📎 "+a.nome))):null,
       r.decidido_em?el("div",{class:"s",style:"color:var(--muted)"},(r.status==="aprovada"?"Aprovada":"Negada")+(r.decidido_por_nome?" por "+r.decidido_por_nome:"")+" em "+fmtDT(r.decidido_em)+(r.resposta?" — "+r.resposta:"")):null),
     el("div",{style:"display:flex;gap:6px;flex:none;flex-wrap:wrap;justify-content:flex-end"},
       gestor&&r.status==="pendente"?el("button",{class:"btn sm primary",onclick:()=>decidir(r,"aprovada")},"Aprovar"):null,
