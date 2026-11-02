@@ -2,7 +2,7 @@
    Lê v_prazos (tarefas + processos + negociações), v_tarefas, v_leads (resumo), tarefa_eventos e os dados já carregados (S.clientes/S.contratos). */
 (()=>{
 "use strict";
-const D={ok:false,carregando:false,prazos:[],tarefas:[],colab:[],eventos:[],leads:null,escopo:"minhas",cal:{ref:null,chave:null,agenda:[],carregando:false,dia:null}};
+const D={ok:false,carregando:false,prazos:[],tarefas:[],colab:[],eventos:[],leads:null,escopo:"minhas",cal:{ref:null,chave:null,agenda:[],carregando:false,dia:null},foco:{dia:null,modo:"dia"}};
 try{D.escopo=localStorage.getItem("pp-painel-escopo")||"minhas"}catch(_){}
 const meuColab=()=>D.colab.find(c=>c.perfil_id===PP.perfil?.id);
 const fmtDT=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
@@ -46,6 +46,57 @@ async function carregarAgendaMes(ini,fim){
   catch(e){console.warn("painel agenda",e)}finally{D.cal.carregando=false}
   if(S.tab==="painel")render();
 }
+/* itens (prazos + compromissos) por dia — base do "O que fazer" e do calendário */
+function itensPorDia(prazos,meu){
+  const hoje=isoD(hojeD());const comEvento=new Set(D.cal.agenda.filter(e=>e.tarefa_id).map(e=>e.tarefa_id));
+  const evs=D.cal.agenda.filter(e=>D.escopo==="equipe"?true:(!meu||e.colaborador_id===meu.id||!e.colaborador_id));
+  const porDia={};const add=(k,item)=>{(porDia[k]=porDia[k]||[]).push(item)};
+  prazos.filter(z=>z.prazo&&!(z.origem==="tarefa"&&comEvento.has(z.id))).forEach(z=>add(z.prazo,{k:"prazo",z,titulo:z.descricao,sub:[z.cliente_nome,z.responsavel_nome].filter(Boolean).join(" · "),atrasada:z.faixa==="atrasada",fatal:z.prazo_fatal,dia:z.prazo}));
+  evs.forEach(e=>{const s0=new Date(e.inicio);add(isoD(s0),{k:"evento",e,titulo:e.titulo,hora:e.dia_inteiro?null:String(s0.getHours()).padStart(2,"0")+":"+String(s0.getMinutes()).padStart(2,"0"),sub:[e.colaborador_nome,e.cliente_nome].filter(Boolean).join(" · "),atrasada:e.tipo==="prazo"&&isoD(s0)<hoje,fatal:e.tipo==="prazo",dia:isoD(s0)})});
+  return porDia;
+}
+function abrirItemDia(i){if(i.k==="prazo"){const z=i.z;if(z.origem==="tarefa"){window.PP_TAREFAS?.abrir(z.id);return}if(z.cliente_id){try{history.pushState(null,"","#clientes/"+encodeURIComponent(z.cliente_id)+"/"+(z.origem==="processo"?"processos":"negociacoes"))}catch(_){}if(aplicarHash())render()}return}
+  const e=i.e;if(e.origem==="tarefa"&&e.tarefa_id){window.PP_TAREFAS?.abrir(e.tarefa_id);return}if(e.lead_id){location.hash="#leads/"+e.lead_id;return}window.PP_AGENDA?.ir(new Date(e.inicio),"dia")}
+const linhaItem=(i,{comDia=false}={})=>el("button",{class:"row",onclick:()=>abrirItemDia(i)},
+  el("div",{style:"display:flex;gap:10px;align-items:flex-start;min-width:0"},el("i",{style:`width:9px;height:9px;border-radius:50%;flex:none;margin-top:7px;background:${i.atrasada||i.fatal?"var(--crit)":i.k==="evento"?"var(--info)":"var(--warn)"}`}),
+    el("div",{style:"min-width:0"},el("div",{class:"n"},i.hora?el("b",{},i.hora+" "):null,i.titulo,i.fatal?el("span",{class:"pill e3",style:"margin-left:8px"},"fatal"):null,i.atrasada?el("span",{class:"pill e3",style:"margin-left:8px"},"atrasado"):null),i.sub?el("div",{class:"s"},i.sub):null)),
+  comDia?el("span",{class:"note num",style:"white-space:nowrap"},i.dia.slice(8,10)+"/"+i.dia.slice(5,7)):null);
+/* "O que fazer": hoje (com atrasados), ‹ › dia a dia, e visão da semana e do mês */
+function cardFazer(prazos,meu){
+  const hoje=isoD(hojeD());if(!D.foco.dia)D.foco.dia=hoje;const f=D.foco;const dsel=parseD(f.dia);
+  // o calendário/agenda carregada acompanha o mês em foco
+  if(!D.cal.ref||D.cal.ref.getMonth()!==dsel.getMonth()||D.cal.ref.getFullYear()!==dsel.getFullYear()){D.cal.ref=new Date(dsel.getFullYear(),dsel.getMonth(),1);D.cal.chave=null}
+  const porDia=itensPorDia(prazos,meu);const ord=l=>[...l].sort((a,b)=>(a.atrasada?0:1)-(b.atrasada?0:1)||((a.hora||"99")<(b.hora||"99")?-1:1));
+  const seg=(()=>{const x=new Date(dsel);x.setDate(x.getDate()-((x.getDay()+6)%7));return x})();
+  const semDias=[...Array(7)].map((_,i)=>isoD(addDia(seg,i)));const mesK=f.dia.slice(0,7);
+  const atrasados=Object.entries(porDia).filter(([k])=>k<hoje).flatMap(([,l])=>l.filter(i=>i.atrasada));
+  const passo=f.modo==="dia"?1:f.modo==="semana"?7:0;
+  const mover=n=>{const d=parseD(f.dia);if(f.modo==="mes")d.setMonth(d.getMonth()+n);else d.setDate(d.getDate()+n*passo);f.dia=isoD(d);render()};
+  const tituloFoco=f.modo==="dia"?(f.dia===hoje?"Hoje":f.dia===isoD(addDia(hojeD(),1))?"Amanhã":f.dia===isoD(addDia(hojeD(),-1))?"Ontem":dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase()))
+    :f.modo==="semana"?`Semana de ${seg.getDate()}/${String(seg.getMonth()+1).padStart(2,"0")} a ${addDia(seg,6).getDate()}/${String(addDia(seg,6).getMonth()+1).padStart(2,"0")}`
+    :dsel.toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase());
+  const sub=f.modo==="dia"&&f.dia===hoje?dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}):"";
+  const modos=el("div",{class:"tabs",style:"font-size:12px"},[["dia","Dia"],["semana","Semana"],["mes","Mês"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(f.modo===k),onclick:()=>{f.modo=k;render()}},l)));
+  const nav=el("div",{style:"display:flex;align-items:center;gap:4px"},el("button",{class:"btn sm",title:"Anterior",onclick:()=>mover(-1)},"‹"),el("button",{class:"btn sm",onclick:()=>{f.dia=hoje;render()}},"Hoje"),el("button",{class:"btn sm",title:"Próximo",onclick:()=>mover(1)},"›"));
+  const card=el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px"},el("div",{},el("h2",{},tituloFoco),sub?el("div",{class:"note"},sub):null),el("div",{class:"actions",style:"gap:8px"},modos,nav)));
+  const bloco=(titulo,lista,vazio,opts)=>{const b=el("div",{});b.append(el("div",{class:"eyebrow",style:"padding:10px 18px 0"},titulo+(lista.length?" · "+lista.length:"")));b.append(lista.length?el("div",{class:"list"},lista.map(i=>linhaItem(i,opts))):el("div",{class:"empty",style:"padding:10px 18px"},vazio));return b};
+  if(f.modo==="dia"){
+    if(f.dia===hoje&&atrasados.length)card.append(bloco("Atrasados — resolver primeiro",ord(atrasados),"",{comDia:true}));
+    card.append(bloco(f.dia===hoje?"Para hoje":"Neste dia",ord(porDia[f.dia]||[]),f.dia===hoje?"Nada vence hoje. Bom momento para adiantar a semana.":"Nada neste dia."));
+    const prox=[1,2,3].map(n=>isoD(addDia(dsel,n))).flatMap(k=>porDia[k]||[]);
+    if(f.dia===hoje&&prox.length)card.append(bloco("Próximos 3 dias",ord(prox),"",{comDia:true}));
+  }else if(f.modo==="semana"){
+    if(semDias.includes(hoje)&&atrasados.length)card.append(bloco("Atrasados",ord(atrasados),"",{comDia:true}));
+    semDias.forEach(k=>{const l=porDia[k]||[];const d=parseD(k);const lbl=d.toLocaleDateString("pt-BR",{weekday:"short",day:"numeric"}).replace(".","")+(k===hoje?" · hoje":"");if(l.length||k===hoje)card.append(bloco(lbl,ord(l),"Nada."))});
+    const tot=semDias.flatMap(k=>porDia[k]||[]).length;if(!tot)card.append(el("div",{class:"empty"},"Nada nesta semana."));
+  }else{
+    const dias=Object.keys(porDia).filter(k=>k.slice(0,7)===mesK).sort();const tot=dias.flatMap(k=>porDia[k]).length;
+    card.append(el("div",{class:"note",style:"padding:10px 18px 0"},`${tot} item(ns) no mês · ${dias.length} dia(s) com algo marcado`));
+    dias.forEach(k=>{const d=parseD(k);card.append(bloco(d.toLocaleDateString("pt-BR",{weekday:"short",day:"numeric"}).replace(".","")+(k===hoje?" · hoje":""),ord(porDia[k]),"",))});
+    if(!tot)card.append(el("div",{class:"empty"},"Nada marcado neste mês."));
+  }
+  return card;
+}
 function cardCalendario(prazos,meu){
   if(!D.cal.ref){const h=hojeD();D.cal.ref=new Date(h.getFullYear(),h.getMonth(),1)}
   const ref=D.cal.ref,hoje=isoD(hojeD());
@@ -59,7 +110,7 @@ function cardCalendario(prazos,meu){
   const nav=el("div",{style:"display:flex;align-items:center;gap:4px"},el("button",{class:"btn sm",onclick:()=>{D.cal.ref=new Date(ref.getFullYear(),ref.getMonth()-1,1);D.cal.dia=null;render()}},"‹"),el("button",{class:"btn sm",onclick:()=>{const h=hojeD();D.cal.ref=new Date(h.getFullYear(),h.getMonth(),1);D.cal.dia=hoje;render()}},"Hoje"),el("button",{class:"btn sm",onclick:()=>{D.cal.ref=new Date(ref.getFullYear(),ref.getMonth()+1,1);D.cal.dia=null;render()}},"›"));
   const g=el("div",{class:"mc-grade"});["S","T","Q","Q","S","S","D"].forEach(d=>g.append(el("div",{class:"mc-h"},d)));
   for(let d=new Date(ini);d<fim;d=addDia(d,1)){const k=isoD(d),lista=porDia[k]||[];const crit=lista.some(i=>i.atrasada||i.fatal),prazo=lista.some(i=>i.k==="prazo"||i.e?.tipo==="prazo");
-    const cel=el("button",{class:"mc-d"+(d.getMonth()!==ref.getMonth()?" fora":"")+(k===hoje?" hoje":"")+(D.cal.dia===k?" sel":""),onclick:()=>{D.cal.dia=D.cal.dia===k?null:k;render()},title:lista.length?lista.length+" item(ns)":""},
+    const cel=el("button",{class:"mc-d"+(d.getMonth()!==ref.getMonth()?" fora":"")+(k===hoje?" hoje":"")+(D.cal.dia===k?" sel":""),onclick:()=>{D.cal.dia=D.cal.dia===k?null:k;D.foco.dia=k;D.foco.modo="dia";render()},title:lista.length?lista.length+" item(ns)":""},
       el("span",{class:"mc-n"},String(d.getDate())),lista.length?el("span",{class:"mc-b "+(crit?"crit":prazo?"warn":"info")},String(lista.length)):null);g.append(cel)}
   const noMes=Object.entries(porDia).filter(([k])=>k.slice(0,7)===isoD(ref).slice(0,7)).flatMap(([,l])=>l);
   const seg=(()=>{const h=hojeD();const x=new Date(h);x.setDate(x.getDate()-((x.getDay()+6)%7));return x})(),semIni=isoD(seg),semFim=isoD(addDia(seg,7));
@@ -148,11 +199,9 @@ function renderPainel(){
       el("div",{class:"list"},fataisHoje.map(z=>el("div",{class:"row",style:"display:flex;gap:10px;align-items:center;justify-content:space-between"},
         el("button",{class:"row",style:"flex:1;text-align:left;padding:0;border:0;background:none",onclick:()=>window.PP_TAREFAS?.abrir(z.id)},el("div",{class:"n"},z.titulo),el("div",{class:"s"},[z.cliente_nome,z.responsavel_nome].filter(Boolean).join(" · "))),
         el("button",{class:"btn sm primary",style:"flex:none",onclick:()=>window.PP_TAREFAS?.concluirComNota?.(z)},"Confirmar protocolo"))))));}
-  duas.append(cardPrazos([...atrasadas,...hoje,...d7],"Vence até 7 dias","Nada vencendo nos próximos 7 dias."));
+  duas.append(cardFazer(prazos,meu));
   const col=el("div",{style:"display:flex;flex-direction:column;gap:18px"});
   col.append(cardCalendario(prazos,meu));
-  const prox=prazos.filter(z=>z.faixa==="d15"||z.faixa==="d30");
-  col.append(cardPrazos(prox,"Próximos 30 dias","Nada entre 8 e 30 dias."));
   const SETORES={"":"Todos",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo"};const SETOR_DE={juridico:"juridico",acordos:"juridico",acompanhamento_pj:"juridico",comercial:"comercial",marketing:"marketing",administrativo:"administrativo",pos_vendas:"comercial",rh:"administrativo",socios:"administrativo"};
   const escAtv=PP.escopoTarefas?.()||{tudo:true};D.atvSetor=D.atvSetor??(()=>{try{return localStorage.getItem("pp-painel-atv")||""}catch(_){return ""}})();
   const atvOk=e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);if(escAtv.tudo)return !D.atvSetor||(t&&SETOR_DE[t.nucleo]===D.atvSetor);if(!t)return false;const minha=(meu&&t.responsavel_id===meu.id)||t.created_by===PP.perfil?.id||e.autor===PP.perfil?.id;return minha||(escAtv.nucleos||[]).includes(t.nucleo)};
