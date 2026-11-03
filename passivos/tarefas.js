@@ -264,10 +264,11 @@ function openTarefa(t){
   /* ---- concluir: o que foi feito é obrigatório; se o cronômetro desta tarefa estiver rodando, grava o tempo antes ---- */
   /* concluir sem janela extra: o texto da caixa "Andamento" (abaixo) é o registro do que foi feito e é obrigatório */
   let com,arqCom;const btnsConcluir=[];
+  let temRegistro=false; // já existe andamento registrado por alguém nesta tarefa? então pode concluir sem escrever de novo
   const concluir=async()=>{
-    const txt=(com?.value||"").trim();if(!txt){toast("Escreva na caixa de andamento o que foi feito antes de concluir");com?.focus();return}
+    const txt=(com?.value||"").trim();if(!txt&&!temRegistro){toast("Escreva na caixa de andamento o que foi feito antes de concluir");com?.focus();return}
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      await mudarStatus(t,"concluida",txt,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();T.ok=false;await carregar()}catch(e){toast(e.message)}
+      await mudarStatus(t,"concluida",txt||null,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();T.ok=false;await carregar()}catch(e){toast(e.message)}
   };
   const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
   /* "Feito": encerra o que estava fazendo agora (pausa o cronômetro e grava o tempo; registra o texto da caixa de andamento, se houver) — a tarefa continua aberta */
@@ -310,19 +311,20 @@ function openTarefa(t){
   if(!window.PP_TS&&aberta)acoes.prepend(btnFeito("btn primary"));
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
   const hist=el("div",{},el("div",{class:"note"},"Carregando…"));
-  com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:aberta?"O que você fez? (obrigatório para concluir) — ou avise alguém com @ (ex.: @Natasha o banco respondeu). Ctrl+Enter registra.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
+  com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:aberta?"O que você fez? Vai para o histórico ao clicar em Feito ou Concluir (ou Ctrl+Enter para só registrar). Pode avisar alguém com @.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
   arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.textContent=arqCom.files.length?`📎 ${arqCom.files.length}`:"📎"};
-  const liberar=()=>{const ok=!!com.value.trim();btnsConcluir.forEach(b=>{b.disabled=!ok;b.title=ok?"Concluir com este registro":"Escreva o que foi feito na caixa de andamento para liberar"})};com.addEventListener("input",liberar);
+  const liberar=()=>{const ok=!!com.value.trim()||temRegistro;btnsConcluir.forEach(b=>{b.disabled=!ok;b.title=ok?(com.value.trim()?"Concluir com este registro":"Concluir (já há andamento registrado)"):"Escreva o que foi feito na caixa de andamento para liberar"})};com.addEventListener("input",liberar);
+  SB.from("tarefa_eventos").select("id").eq("tarefa_id",t.id).eq("tipo","comentario").limit(1).then(({data})=>{temRegistro=!!(data&&data.length);liberar();const n=card.querySelector(".tf-nota-concluir");if(n)n.textContent=temRegistro?"Já há andamento registrado — pode concluir direto ou acrescentar um registro.":"Concluir exige o andamento preenchido (o que foi feito)."});
   const btnArq=el("button",{class:"btn sm",title:"Anexar arquivo ao registro",onclick:()=>arqCom.click()},"📎");
-  const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.textContent="📎";toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Registrar");
-  com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))btnCom.click()});
+  const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.textContent="📎";temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
+  com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))registrar()});
   mencoes(com);
   const body=el("div",{class:"tf"},cab,meta,desc,acoes,
     el("div",{class:"tf-h"},"Andamento"),
-    el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnArq,arqCom,btnCom),hist);
+    el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnArq,arqCom),hist);
   const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px;position:relative"},el("button",{class:"btn sm",title:"Fechar (Esc)",style:"position:absolute;top:12px;right:12px;padding:2px 9px;font-size:16px;line-height:1",onclick:close},"×"),
     el("h2",{style:(t.status==="concluida"?"text-decoration:line-through;color:var(--muted);":"")+"padding-right:40px"},t.titulo),body,
-    el("div",{class:"actions"},aberta?el("span",{class:"note",style:"margin-right:auto"},"Concluir exige o andamento preenchido (o que foi feito)."):null,aberta?btnConcluir("btn primary"):el("button",{class:"btn",onclick:close},"Fechar")));
+    el("div",{class:"actions"},aberta?el("span",{class:"note tf-nota-concluir",style:"margin-right:auto"},"Concluir exige o andamento preenchido (o que foi feito)."):null,aberta?btnConcluir("btn primary"):el("button",{class:"btn",onclick:close},"Fechar")));
   const esc=e=>{if(e.key==="Escape"){close();document.removeEventListener("keydown",esc)}};document.addEventListener("keydown",esc);
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
   historico(t.id,hist);
