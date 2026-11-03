@@ -270,6 +270,11 @@ function openTarefa(t){
       await mudarStatus(t,"concluida",txt,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();T.ok=false;await carregar()}catch(e){toast(e.message)}
   };
   const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
+  /* "Feito": encerra o que estava fazendo agora (pausa o cronômetro e grava o tempo; registra o texto da caixa de andamento, se houver) — a tarefa continua aberta */
+  const feito=async()=>{try{const txt=(com?.value||"").trim();if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
+      if(txt||arqCom?.files?.length){await comentar(t.id,txt||"(anexo)",[...(arqCom?.files||[])]);com.value="";if(arqCom){arqCom.value="";btnArq.textContent="📎"}liberar()}
+      toast(txt?"Andamento registrado — tarefa continua aberta":"Tempo gravado — tarefa continua aberta");cron=null;setTimeout(reabrirTela,200)}catch(e){toast(e.message)}};
+  const btnFeito=(cls)=>el("button",{class:cls,title:"Encerra o que você estava fazendo agora (grava o tempo e o andamento) sem concluir a tarefa",onclick:feito},"✓ Feito");
   /* ---- trabalho: cronômetro dentro da tarefa (iniciar = em andamento; pausar grava o tempo; concluir grava e encerra) ---- */
   let cron=null,ativSel=null;const cronDaTarefa=()=>cron&&cron.tarefa_id===t.id?cron:null;
   const trabalho=el("div",{class:"tf-trab"});
@@ -282,13 +287,13 @@ function openTarefa(t){
       ativSel=sel({outro:"Atividade…"},"outro");window.PP_TS.atividades().then(as=>{ativSel.replaceChildren(...as.map(a=>el("option",{value:a.codigo},a.nome)));ativSel.value=as.some(a=>a.codigo===(c.tipo_atividade||""))?c.tipo_atividade:(as.find(a=>a.codigo==="outro")?"outro":as[0]?.codigo)});
       trabalho.append(el("span",{class:"pill e2"},"● trabalhando"),rel,el("span",{class:"note"},"desde "+fmtDT(c.inicio)),ativSel,
         el("button",{class:"btn",onclick:async()=>{try{await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel.value});toast("Tempo gravado — tarefa continua em andamento");cron=null;setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"⏸ Pausar"),
-        btnConcluir("btn primary"));
+        btnFeito("btn primary"));
     }else{
       trabalho.append(el("button",{class:"btn primary",onclick:async()=>{try{
           if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);if(!confirm(`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Pausar lá e começar aqui?`))return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
           cron=await window.PP_TS.iniciarDireto(t);if(t.status==="aberta")await SB.from("tarefas").update({status:"em_andamento"}).eq("id",t.id);
           toast("Cronômetro ligado");setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"▶ Iniciar trabalho"),
-        btnConcluir("btn"),
+        btnFeito("btn"),
         el("span",{class:"note"},t.status==="em_andamento"?"Em andamento (cronômetro pausado). Iniciar retoma a contagem.":"Iniciar liga o cronômetro e marca a tarefa como em andamento."));
     }
   };
@@ -302,7 +307,7 @@ function openTarefa(t){
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
     t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,
     el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar"));
-  if(!window.PP_TS&&aberta)acoes.prepend(btnConcluir("btn primary"));
+  if(!window.PP_TS&&aberta)acoes.prepend(btnFeito("btn primary"));
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
   const hist=el("div",{},el("div",{class:"note"},"Carregando…"));
   com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:aberta?"O que você fez? (obrigatório para concluir) — ou avise alguém com @ (ex.: @Natasha o banco respondeu). Ctrl+Enter registra.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
@@ -315,8 +320,10 @@ function openTarefa(t){
   const body=el("div",{class:"tf"},cab,meta,desc,acoes,
     el("div",{class:"tf-h"},"Andamento"),
     el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnArq,arqCom,btnCom),hist);
-  const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px"},el("h2",{style:t.status==="concluida"?"text-decoration:line-through;color:var(--muted)":""},t.titulo),body,
-    el("div",{class:"actions"},el("button",{class:"btn",onclick:close},"Fechar")));
+  const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px;position:relative"},el("button",{class:"btn sm",title:"Fechar (Esc)",style:"position:absolute;top:12px;right:12px;padding:2px 9px;font-size:16px;line-height:1",onclick:close},"×"),
+    el("h2",{style:(t.status==="concluida"?"text-decoration:line-through;color:var(--muted);":"")+"padding-right:40px"},t.titulo),body,
+    el("div",{class:"actions"},aberta?el("span",{class:"note",style:"margin-right:auto"},"Concluir exige o andamento preenchido (o que foi feito)."):null,aberta?btnConcluir("btn primary"):el("button",{class:"btn",onclick:close},"Fechar")));
+  const esc=e=>{if(e.key==="Escape"){close();document.removeEventListener("keydown",esc)}};document.addEventListener("keydown",esc);
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
   historico(t.id,hist);
 }
