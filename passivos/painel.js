@@ -143,23 +143,19 @@ async function carregarAgora(meu){
   AG.sf=f.data?{n:f.data.length,valor:f.data.reduce((s,x)=>s+(+x.valor_total||0),0)}:null;AG.horas=h.data?h.data.reduce((s,x)=>s+(+x.horas||0),0):null;
   render();
 }
-function faixaAgora(meu){
+function cardsAgora(meu){
   if(!AG.ok)carregarAgora(meu);
   const irTab=t=>()=>{S.tab=t;try{localStorage.setItem("pp-tab",t)}catch(_){}render()};
-  const box=el("div",{class:"card",style:"padding:12px 16px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:14px;border-color:var(--gold)"});
-  const hFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
-  if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("b",{style:"font-size:20px;font-variant-numeric:tabular-nums"},"00:00:00");
-    const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
-    box.append(el("div",{style:"display:flex;gap:10px;align-items:center"},el("span",{class:"pill e2"},"● trabalhando"),rel,el("div",{},el("b",{},t?t.titulo:(AG.cron.descricao||"atividade")),el("div",{class:"note"},(S.clientes||[]).find(c=>c.id===AG.cron.cliente_id)?.nome||"")),
-      t?el("button",{class:"btn sm primary",onclick:()=>window.PP_TAREFAS?.abrir(t.id)},"Abrir tarefa"):null,el("button",{class:"btn sm",onclick:async()=>{try{await window.PP_TS?.pararDireto({});toast("Tempo gravado");AG.ok=false;render()}catch(e){toast(e.message)}}},"⏸ Pausar")));}
-  else box.append(el("div",{class:"note"},meu?"Nenhum cronômetro rodando — abra uma tarefa e clique em “Iniciar trabalho”.":"Seu usuário não está vinculado a um colaborador."));
-  const K=(l,v,cls,on)=>el("button",{class:"btn sm",style:"display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:6px 12px;line-height:1.2"+(cls?";border-color:var(--"+cls+")":""),onclick:on},el("span",{class:"note",style:"font-size:11px"},l),el("b",{},v));
-  const dir=el("div",{style:"display:flex;gap:8px;margin-left:auto;flex-wrap:wrap"});
-  if(AG.horas!=null)dir.append(K("Horas na semana",hFmt(AG.horas),"",irTab("horas")));
-  if(AG.pub)dir.append(K("Publicações a tratar",String(AG.pub.total)+(AG.pub.vencidas?` · ${AG.pub.vencidas} vencidas`:""),AG.pub.vencidas?"crit":"",irTab("publicacoes")));
-  if(AG.sf)dir.append(K("Faturamento em análise",`${AG.sf.n} · ${BRL(AG.sf.valor)}`,AG.sf.n?"warn":"",irTab("faturamento")));
-  dir.prepend(el("button",{class:"btn sm primary",style:"align-self:center",onclick:()=>{const cli=sel({"":"— cliente —",...Object.fromEntries([...(S.clientes||[])].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},"");modal("Registrar — escolha o cliente",el("div",{class:"form"},field("rg-cli","Cliente",cli)),async()=>{if(!cli.value)throw new Error("Escolha o cliente");setTimeout(()=>window.PP_CARTEIRA?.registrar(cli.value,{}),50)});const b=$("#modalHost button.btn.primary");if(b)b.textContent="Continuar"}},"+ Registrar"));
-  box.append(dir);return box;
+  const K=(l,val,h,cls,onclick)=>el("button",{class:"card kpi",style:"text-align:left;cursor:pointer;border-color:var(--line)",onclick},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},val),el("div",{class:"h"},h));
+  const out=[];
+  if(AG.pub)out.push(K("Publicações a tratar",String(AG.pub.total),AG.pub.vencidas?`${AG.pub.vencidas} vencidas`:"nenhuma vencida",AG.pub.vencidas?"crit":"",irTab("publicacoes")));
+  if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("span",{style:"font-variant-numeric:tabular-nums"},"00:00:00");
+    const tick=()=>{const s0=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s0/3600)).padStart(2,"0")}:${String(Math.floor(s0%3600/60)).padStart(2,"0")}:${String(s0%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
+    const card=el("div",{class:"card kpi",style:"border-color:var(--gold);cursor:pointer",onclick:()=>{if(t)window.PP_TAREFAS?.abrir(t.id)}},el("div",{class:"l"},el("span",{class:"pill e2",style:"font-size:10px;margin-right:6px"},"● trabalhando"),"Agora"),el("div",{class:"v"},rel),
+      el("div",{class:"h",style:"white-space:nowrap;overflow:hidden;text-overflow:ellipsis",title:t?t.titulo:(AG.cron.descricao||"")},(t?t.titulo:(AG.cron.descricao||"atividade"))+((S.clientes||[]).find(c=>c.id===AG.cron.cliente_id)?.nome?" · "+(S.clientes||[]).find(c=>c.id===AG.cron.cliente_id).nome:"")),
+      el("div",{style:"display:flex;gap:6px;margin-top:6px"},t?el("button",{class:"btn sm primary",onclick:e=>{e.stopPropagation();window.PP_TAREFAS?.abrir(t.id)}},"Abrir"):null,el("button",{class:"btn sm",onclick:async e=>{e.stopPropagation();try{await window.PP_TS?.pararDireto({});toast("Tempo gravado");AG.ok=false;render()}catch(err){toast(err.message)}}},"⏸ Pausar")));
+    out.push(card)}
+  return out;
 }
 function renderPainel(){
   const v=$("#view-painel");v.replaceChildren();
@@ -171,7 +167,7 @@ function renderPainel(){
     el("div",{class:"actions"},escopo,el("button",{class:"btn",title:"Envia agora, no seu Discord/WhatsApp (conforme a sua ficha), o mesmo resumo que chega às 8h",onclick:enviarResumo},"Receber resumo agora"),el("button",{class:"btn primary",onclick:()=>window.PP_TAREFAS?.nova?.()},"+ Tarefa"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const meu=meuColab();
-  v.append(faixaAgora(meu));const minhas=z=>D.escopo==="equipe"?(esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id)):(!meu||z.responsavel_id===meu.id);
+  const minhas=z=>D.escopo==="equipe"?(esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id)):(!meu||z.responsavel_id===meu.id);
   const prazos=D.prazos.filter(minhas);
   const atrasadas=prazos.filter(z=>z.faixa==="atrasada"),hoje=prazos.filter(z=>z.faixa==="hoje"),d7=prazos.filter(z=>z.faixa==="d7"),fatais=prazos.filter(z=>z.prazo_fatal&&["atrasada","hoje","d7"].includes(z.faixa));
   const tarefas=D.tarefas.filter(minhas);
@@ -182,7 +178,7 @@ function renderPainel(){
   v.append(el("div",{class:"kpis"},
     K("Tarefas abertas",tarefas.length,D.escopo==="equipe"?(esc.tudo?"de toda a equipe":"do jurídico"):"atribuídas a você","",irTab("tarefas")),
     K("Atrasadas",atrasadas.length,"prazo já passou",atrasadas.length?"crit":"",irTab("tarefas")),
-    K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas"))));
+    K("Fatais em 7 dias",fatais.length,"inclui atrasados",fatais.length?"crit":"",irTab("tarefas")),...cardsAgora(meu)));
   // Carteira e Leads atrasados ficam nas próprias áreas (Clientes e Comercial) — pedido de 31/10
   const duas=el("div",{style:"display:grid;grid-template-columns:1.5fr 1fr;gap:18px"});
   /* Tickets aguardando a(s) minha(s) área(s) */
