@@ -9,7 +9,14 @@ const AREAS_TICKET={juridico:"Jurídico",comercial:"Comercial",marketing:"Market
 const minhasAreas=()=>{const p=PP.perfil||{};if(p.papel==="admin")return Object.keys(AREAS_TICKET);const a=new Set(p.acessos||[]);if(a.has("equipe"))a.add("administrativo");return Object.keys(AREAS_TICKET).filter(k=>a.has(k))};
 const ticketDe=t=>T.tickets?.[t.id]||null;
 const diasAg=tk=>tk?.aguardando_desde?Math.floor((Date.now()-new Date(tk.aguardando_desde))/86400000):0;
-const pillTicket=t=>{const tk=ticketDe(t);if(!tk)return null;const d=diasAg(tk);return el("span",{class:"pill "+(d>=5?"e3":d>=2?"e2":"c"),title:tk.aguardando_motivo||""},"Aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:""))};
+const pillTicket=t=>{const tk=ticketDe(t);if(!tk)return null;const d=diasAg(tk);const sit=tk.sla_situacao||(d>=5?"critico":d>=2?"vencido":"no_prazo");return el("span",{class:"pill "+(sit==="critico"?"e3":sit==="vencido"?"e2":"c"),title:(tk.aguardando_motivo||"")+(tk.sla_dias!=null?` · SLA ${tk.sla_dias}d`:"")},"Aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:"")+(sit==="vencido"?" · SLA vencido":sit==="critico"?" · crítico":""))};
+/* motivo de reagendamento: lista cadastrada pela gestão/controladoria (+ complemento quando o motivo pede) */
+function campoMotivo(){
+  const lista=T.motivos||[];const selM=sel({"":"— escolha o motivo —",...Object.fromEntries(lista.map(m=>[m.id,m.motivo]))},"");const comp=el("textarea",{rows:2,placeholder:"Complemento (opcional, ou obrigatório para “Outro”)",style:"margin-top:6px"});
+  const wrap=el("div",{class:"f full",style:"display:none;border-left:3px solid var(--warn);padding-left:10px"},el("label",{},"Motivo do reagendamento (obrigatório)"),lista.length?selM:el("div",{class:"note"},"Nenhum motivo cadastrado — a gestão cadastra em Gestão → Configurações."),comp,el("div",{class:"help"},"Fica no histórico da tarefa; gestão e controladoria recebem o aviso."));
+  const valor=()=>{const m=lista.find(x=>x.id===selM.value);if(!m)return null;if(m.exige_complemento&&!comp.value.trim())return null;return m.motivo+(comp.value.trim()?": "+comp.value.trim():"")};
+  return {wrap,valor,mostrar:v=>{wrap.style.display=v?"":"none"}};
+}
 function encaminharArea(t,depois){
   const area=sel(AREAS_TICKET,minhasAreas().includes("financeiro")?"socios":"financeiro");const motivo=el("textarea",{rows:3,placeholder:"O que você precisa que a área faça ou decida? Ex.: aprovar a proposta de 40% do Itaú; confirmar se o boleto de outubro foi pago."});const arq=el("input",{type:"file",multiple:""});
   const body=el("div",{class:"form"},field("tk-area","Encaminhar para a área",area),el("div",{class:"f full"},el("label",{},"O que você precisa (obrigatório)"),motivo,el("div",{class:"help"},"A tarefa fica marcada como “aguardando” essa área, com o tempo parado visível para todos. Quem atende a área recebe aviso no sino e responde aqui mesmo. Você continua responsável pela tarefa.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a minuta para aprovação)"),arq));
@@ -37,9 +44,9 @@ const T={tarefas:[],colab:[],processos:[],ok:false,carregando:false,f:{status:"a
 async function carregar(){
   if(T.carregando)return;T.carregando=true;
   try{
-    const [t,c,p,tk]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*")]);
+    const [t,c,p,tk,mo]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
     if(t.error)throw t.error;
-    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.ok=true;
+    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;
   }catch(e){console.warn("tarefas",e);toast("Não foi possível carregar as tarefas")}
   finally{T.carregando=false}
   render();
@@ -72,7 +79,7 @@ function filtrar(lista,f){
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
   const done=el("input",{type:"checkbox",title:"Concluir",style:"width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex:none;margin-top:3px"});done.checked=t.status==="concluida";
-  done.onchange=async()=>{if(done.checked){done.checked=false;concluirComNota(t);return}const {error}=await SB.from("tarefas").update({status:"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=true;return}toast("Tarefa reaberta")};
+  done.onchange=async()=>{if(done.checked){done.checked=false;openTarefa(t);setTimeout(()=>$("#modalHost textarea")?.focus(),300);return}const {error}=await SB.from("tarefas").update({status:"aberta"}).eq("id",t.id);if(error){toast("Não foi possível atualizar");done.checked=true;return}toast("Tarefa reaberta")};
   const prazo=t.prazo?el("span",{class:"pill "+(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g")},fmtD(parseD(t.prazo)),t.hora?" "+String(t.hora).slice(0,5).replace(":","h"):"",t.prazo_fatal?" · FATAL":"",t.faixa==="atrasada"?` · ${-t.dias_para_prazo}d atrás`:t.faixa==="hoje"?" · hoje":t.dias_para_prazo<=30?` · em ${t.dias_para_prazo}d`:""):el("span",{class:"note"},"sem prazo");
   const meta=[mostrarCliente?t.cliente_nome:null,t.responsavel_nome,NUCLEOS[t.nucleo],t.numero_cnj?"Proc. "+t.numero_cnj:null,t.horas_apontadas>0?horasFmt(t.horas_apontadas)+" apontadas":null].filter(Boolean).join(" · ");
   const trilha=[t.criado_por_nome?`aberta por ${t.criado_por_nome} em ${fmtDT(t.created_at)}`:t.created_at?`aberta em ${fmtDT(t.created_at)}`:null,t.status==="concluida"&&t.concluida_em?`concluída${t.concluida_por_nome?" por "+t.concluida_por_nome:""} em ${fmtDT(t.concluida_em)}`:null].filter(Boolean).join(" · ");
@@ -112,8 +119,33 @@ function renderTarefas(){
   const fTk=sel({"":"Tickets: todos os estados",minhas:`Aguardando a minha área (${nMeus})`,todas:`Aguardando alguma área (${nTk})`},f.tickets||"");fTk.onchange=()=>{f.tickets=fTk.value;render()};
   const escT=PP.escopoTarefas?.()||{tudo:true};
   v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,fTk,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
+  const vista=T.vista||(()=>{try{return localStorage.getItem("pp-tarefas-vista")||"lista"}catch(_){return "lista"}})();T.vista=vista;
+  const vistaBtns=el("div",{class:"tabs",style:"font-size:12px;margin-left:auto"},[["lista","Lista"],["kanban","Kanban"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(vista===k),onclick:()=>{T.vista=k;try{localStorage.setItem("pp-tarefas-vista",k)}catch(_){}render()}},l)));
+  v.querySelector(".card.section")?.append(vistaBtns);
+  if(vista==="kanban"){const fk={...f,status:"todas"};v.append(kanban(filtrar(T.tarefas,fk)));return}
   v.append(listaAgrupada(filtrar(T.tarefas,f)));
 }
+/* ---------- Kanban: A fazer · Fazendo · Aguardando área · Feitas (7 dias). Arrastar entre A fazer e Fazendo muda o status; para Feitas abre a tarefa (registro obrigatório) ---------- */
+function kanban(lista){
+  const hoje=hojeISO();const d7=addD(hoje,-7);
+  const cols=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=d7]];
+  const prazoPill=t=>t.prazo?el("span",{class:"pill "+(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g"),style:"font-size:11px"},fmtD(parseD(t.prazo))+(t.prazo_fatal?" · FATAL":"")+(t.faixa==="atrasada"?` · ${-t.dias_para_prazo}d atrás`:t.faixa==="hoje"?" · hoje":"")):el("span",{class:"note",style:"font-size:11px"},"sem prazo");
+  const card=t=>{const c=el("div",{class:"kb-card",draggable:"true",onclick:()=>openTarefa(t)},el("div",{class:"n",style:"font-size:13px;font-weight:600;line-height:1.3"},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px;font-size:10px"},"Alta"):null,t.titulo),
+    el("div",{class:"s",style:"font-size:12px;margin-top:3px"},[t.cliente_nome,t.responsavel_nome].filter(Boolean).join(" · ")),el("div",{style:"margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"},prazoPill(t),pillTicket(t)));
+    c.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",t.id);c.classList.add("arrastando")});c.addEventListener("dragend",()=>c.classList.remove("arrastando"));return c};
+  const host=el("div",{class:"kb"});
+  for(const [k,l,fn] of cols){const ts=lista.filter(fn).sort((a,b)=>(a.prazo||"9999").localeCompare(b.prazo||"9999")||a.prioridade-b.prioridade);
+    const col=el("div",{class:"kb-col","data-st":k},el("div",{class:"kb-h"},el("span",{},l),el("span",{class:"note num"},String(ts.length))),el("div",{class:"kb-body"},ts.length?ts.map(card):el("div",{class:"note",style:"padding:10px;text-align:center"},"—")));
+    col.addEventListener("dragover",e=>{e.preventDefault();col.classList.add("sobre")});col.addEventListener("dragleave",()=>col.classList.remove("sobre"));
+    col.addEventListener("drop",async e=>{e.preventDefault();col.classList.remove("sobre");const id=e.dataTransfer.getData("text/plain");const t=T.tarefas.find(x=>x.id===id);if(!t)return;
+      if(k==="aguardando"){if(!ticketDe(t))encaminharArea(t,()=>{T.ok=false;carregar()});return}
+      if(k==="concluida"){if(t.status!=="concluida"){openTarefa(t);setTimeout(()=>{toast("Escreva o que foi feito e clique em Concluir");$("#modalHost textarea")?.focus()},300)}return}
+      if(ticketDe(t)){toast("Responda o ticket antes de mover");return}
+      if(t.status===k)return;const {error}=await SB.from("tarefas").update({status:k}).eq("id",id);if(error){toast(error.message);return}T.ok=false;carregar()});
+    host.append(col)}
+  return host;
+}
+document.head.append(el("style",{},`.kb{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto}.kb-col{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;min-height:120px}.kb-col.sobre{outline:2px dashed var(--gold)}.kb-h{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line)}.kb-body{display:flex;flex-direction:column;gap:8px;padding:8px}.kb-card{background:var(--surface,#fff);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:grab}.kb-card:hover{border-color:var(--gold)}.kb-card.arrastando{opacity:.5}@media(max-width:1100px){.kb{grid-template-columns:repeat(2,minmax(220px,1fr))}}`));
 function renderTarefasCliente(c,host){
   host.append(el("div",{class:"section-h"},el("h2",{},"Tarefas"),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>openTarefaForm({cliente_id:c.id})},"+ Tarefa"))));
   if(!garantir()){host.append(el("div",{class:"note"},"Carregando…"));return}
@@ -190,11 +222,25 @@ async function mudarStatus(t,status,nota,files){
 function passarPara(t,recarregar){
   const meu=meuColab();const para=selColab(t.responsavel_id);const nota=el("textarea",{rows:3,placeholder:"O que a pessoa precisa saber para continuar? (ex.: já liguei para o banco, falta protocolar; prazo fatal 20/10)"});
   const arqP=el("input",{type:"file",multiple:""});
-  const body=el("div",{class:"form"},field("pp-para","Passar para",para),el("div",{class:"f full"},el("label",{},"Recado para quem recebe"),nota,el("div",{class:"help"},"Quem recebe é avisado no sino e vê este recado no histórico da tarefa e no dossiê do cliente. Você continua podendo acompanhar.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a réplica para correção)"),arqP));
+  const manter=check("Manter a data original"+(t.prazo?" ("+fmtD(parseD(t.prazo))+")":""),true);const prazoN=inp("date",t.prazo||"");prazoN.disabled=true;manter.input.onchange=()=>{prazoN.disabled=manter.input.checked;if(manter.input.checked)prazoN.value=t.prazo||""};
+  const concluirMinha=check("Concluir a minha parte: sai da minha lista e abre uma nova tarefa para quem recebe, na data escolhida",false);
+  const body=el("div",{class:"form"},field("pp-para","Passar para",para),
+    el("div",{class:"f"},el("label",{},"Prazo para quem recebe"),prazoN,manter.wrap),
+    el("div",{class:"f full"},concluirMinha.wrap,el("div",{class:"help"},"Desmarcado: a mesma tarefa só muda de responsável (você continua acompanhando). Marcado: a sua fica concluída e quem recebe ganha uma tarefa nova, com o seu recado na descrição.")),
+    el("div",{class:"f full"},el("label",{},"Recado para quem recebe"+(concluirMinha.input.checked?" (obrigatório)":"")),nota,el("div",{class:"help"},"Quem recebe é avisado no sino e vê este recado no histórico da tarefa e no dossiê do cliente.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a réplica para correção)"),arqP));
   modal("Passar a tarefa: "+t.titulo,body,async()=>{
-    if(!para.value)throw new Error("Escolha para quem passar");if(para.value===t.responsavel_id)throw new Error("Essa pessoa já é a responsável");
-    const {error}=await SB.from("tarefas").update({responsavel_id:para.value,status:t.status==="concluida"?"aberta":t.status}).eq("id",t.id);if(error)throw new Error("Não foi possível passar a tarefa");
-    const quem=nomeColab(para.value);await comentar(t.id,`Passei para ${quem}${meu?" (de "+meu.nome.split(" ")[0]+")":""}.`+(nota.value.trim()?"\n"+nota.value.trim():""),[...arqP.files]);
+    if(!para.value)throw new Error("Escolha para quem passar");if(para.value===t.responsavel_id&&!concluirMinha.input.checked)throw new Error("Essa pessoa já é a responsável");
+    const quem=nomeColab(para.value);const novoPrazo=manter.input.checked?null:(prazoN.value||null);
+    if(concluirMinha.input.checked){
+      if(!nota.value.trim())throw new Error("Escreva o que você fez (vai na descrição da nova tarefa)");
+      const {data,error}=await SB.rpc("tarefa_passar_concluindo",{p_tarefa:t.id,p_para:para.value,p_prazo:novoPrazo,p_nota:nota.value.trim()});if(error)throw new Error(error.message);
+      if(arqP.files.length)await comentar(data,"Anexo recebido de "+(meu?.nome||"")+": "+[...arqP.files].map(f=>f.name).join(", "),[...arqP.files]);
+      toast("Sua parte foi concluída; nova tarefa aberta para "+quem);$("#modalHost").replaceChildren();T.ok=false;carregar();return;
+    }
+    const up={responsavel_id:para.value,status:t.status==="concluida"?"aberta":t.status};
+    if(novoPrazo&&novoPrazo!==t.prazo){up.prazo=novoPrazo;up.motivo_reagendamento="Passagem para "+quem+(nota.value.trim()?": "+nota.value.trim().slice(0,120):"")}
+    const {error}=await SB.from("tarefas").update(up).eq("id",t.id);if(error)throw new Error("Não foi possível passar a tarefa: "+error.message);
+    await comentar(t.id,`Passei para ${quem}${meu?" (de "+meu.nome.split(" ")[0]+")":""}.`+(novoPrazo&&novoPrazo!==t.prazo?` Novo prazo: ${fmtD(parseD(novoPrazo))}.`:"")+(nota.value.trim()?"\n"+nota.value.trim():""),[...arqP.files]);
     toast("Tarefa passada para "+quem);setTimeout(recarregar,300);
   });
 }
@@ -216,14 +262,14 @@ function openTarefa(t){
     el("div",{},el("b",{},"Aberta"),el("div",{},[t.criado_por_nome?"por "+t.criado_por_nome:null,t.created_at?"em "+fmtDT(t.created_at):null].filter(Boolean).join(" ")||"—")));
   const desc=t.descricao?el("div",{class:"tf-desc"},t.descricao):el("div",{class:"note"},"Sem descrição.");
   /* ---- concluir: o que foi feito é obrigatório; se o cronômetro desta tarefa estiver rodando, grava o tempo antes ---- */
+  /* concluir sem janela extra: o texto da caixa "Andamento" (abaixo) é o registro do que foi feito e é obrigatório */
+  let com,arqCom;const btnsConcluir=[];
   const concluir=async()=>{
-    const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:4});const arq=el("input",{type:"file",multiple:""});
-    const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do andamento e do dossiê do cliente; quem abriu a tarefa é avisado.")),el("div",{class:"f full"},el("label",{},"Anexar (peça, comprovante, protocolo…)"),arq));
-    modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");
-      if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída");setTimeout(reabrirTela,300)});
-    const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Concluir tarefa";
+    const txt=(com?.value||"").trim();if(!txt){toast("Escreva na caixa de andamento o que foi feito antes de concluir");com?.focus();return}
+    try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
+      await mudarStatus(t,"concluida",txt,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();T.ok=false;await carregar()}catch(e){toast(e.message)}
   };
+  const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
   /* ---- trabalho: cronômetro dentro da tarefa (iniciar = em andamento; pausar grava o tempo; concluir grava e encerra) ---- */
   let cron=null,ativSel=null;const cronDaTarefa=()=>cron&&cron.tarefa_id===t.id?cron:null;
   const trabalho=el("div",{class:"tf-trab"});
@@ -236,13 +282,13 @@ function openTarefa(t){
       ativSel=sel({outro:"Atividade…"},"outro");window.PP_TS.atividades().then(as=>{ativSel.replaceChildren(...as.map(a=>el("option",{value:a.codigo},a.nome)));ativSel.value=as.some(a=>a.codigo===(c.tipo_atividade||""))?c.tipo_atividade:(as.find(a=>a.codigo==="outro")?"outro":as[0]?.codigo)});
       trabalho.append(el("span",{class:"pill e2"},"● trabalhando"),rel,el("span",{class:"note"},"desde "+fmtDT(c.inicio)),ativSel,
         el("button",{class:"btn",onclick:async()=>{try{await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel.value});toast("Tempo gravado — tarefa continua em andamento");cron=null;setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"⏸ Pausar"),
-        el("button",{class:"btn primary",onclick:concluir},"✓ Concluir"));
+        btnConcluir("btn primary"));
     }else{
       trabalho.append(el("button",{class:"btn primary",onclick:async()=>{try{
           if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);if(!confirm(`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Pausar lá e começar aqui?`))return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
           cron=await window.PP_TS.iniciarDireto(t);if(t.status==="aberta")await SB.from("tarefas").update({status:"em_andamento"}).eq("id",t.id);
           toast("Cronômetro ligado");setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"▶ Iniciar trabalho"),
-        el("button",{class:"btn",onclick:concluir},"✓ Concluir"),
+        btnConcluir("btn"),
         el("span",{class:"note"},t.status==="em_andamento"?"Em andamento (cronômetro pausado). Iniciar retoma a contagem.":"Iniciar liga o cronômetro e marca a tarefa como em andamento."));
     }
   };
@@ -256,11 +302,12 @@ function openTarefa(t){
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
     t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,
     el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar"));
-  if(!window.PP_TS&&aberta)acoes.prepend(el("button",{class:"btn primary",onclick:concluir},"✓ Concluir"));
+  if(!window.PP_TS&&aberta)acoes.prepend(btnConcluir("btn primary"));
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
   const hist=el("div",{},el("div",{class:"note"},"Carregando…"));
-  const com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:"Registrar o que você fez, ou avisar alguém com @ (ex.: @Natasha o banco respondeu). Ctrl+Enter envia."});
-  const arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.textContent=arqCom.files.length?`📎 ${arqCom.files.length}`:"📎"};
+  com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:aberta?"O que você fez? (obrigatório para concluir) — ou avise alguém com @ (ex.: @Natasha o banco respondeu). Ctrl+Enter registra.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
+  arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.textContent=arqCom.files.length?`📎 ${arqCom.files.length}`:"📎"};
+  const liberar=()=>{const ok=!!com.value.trim();btnsConcluir.forEach(b=>{b.disabled=!ok;b.title=ok?"Concluir com este registro":"Escreva o que foi feito na caixa de andamento para liberar"})};com.addEventListener("input",liberar);
   const btnArq=el("button",{class:"btn sm",title:"Anexar arquivo ao registro",onclick:()=>arqCom.click()},"📎");
   const btnCom=el("button",{class:"btn sm primary",onclick:async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.textContent="📎";toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Registrar");
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))btnCom.click()});
@@ -296,9 +343,8 @@ function openTarefaForm(t={}){
     field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."),
     (()=>{anexoForm=el("input",{type:"file",multiple:""});return el("div",{class:"f full"},el("label",{},"Anexar arquivo (PDF, Word, imagem…)"),anexoForm,el("div",{class:"help"},"Ex.: a petição inicial para o responsável corrigir; o despacho que gerou a tarefa. Fica no histórico da tarefa, visível para quem a recebe."))})());
   /* reagendar exige justificativa (controladoria): o campo aparece quando o prazo de uma tarefa já salva muda */
-  const motivo=el("textarea",{rows:2,placeholder:"Ex.: cliente ainda não enviou os documentos; audiência remarcada pelo juízo; não deu tempo hoje."});
-  const motivoWrap=el("div",{class:"f full",style:"display:none;border-left:3px solid var(--warn);padding-left:10px"},el("label",{},"Motivo do reagendamento (obrigatório)"),motivo,el("div",{class:"help"},"Fica no histórico da tarefa e no relatório de reagendamentos da controladoria."));
-  if(t.id&&t.prazo){const prazoOrig=t.prazo;const chk=()=>{motivoWrap.style.display=prazo.value&&prazo.value!==prazoOrig?"":"none"};prazo.addEventListener("input",chk);prazo.addEventListener("change",chk);
+  const motivoC=campoMotivo();const motivoWrap=motivoC.wrap;
+  if(t.id&&t.prazo){const prazoOrig=t.prazo;const chk=()=>motivoC.mostrar(prazo.value&&prazo.value!==prazoOrig);prazo.addEventListener("input",chk);prazo.addEventListener("change",chk);
     const pos=body.querySelector("#tf-prazo")?.closest(".f");if(pos)pos.after(motivoWrap);else body.append(motivoWrap)}
   if(t.id){
     const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));const com=el("textarea",{rows:2,placeholder:"Comentar (ex.: liguei para o cliente, aguardando documentos)"});
@@ -312,7 +358,7 @@ function openTarefaForm(t={}){
     if(!titulo.value.trim())throw new Error("Informe o título");
     const row={titulo:titulo.value.trim(),descricao:desc.value.trim()||null,cliente_id:cli.value||null,contrato_id:kon.value||null,processo_id:pro.value||null,responsavel_id:resp.value||null,nucleo:nuc.value||null,prazo:prazo.value||null,hora:prazo.value&&hora.value?hora.value:null,prazo_fatal:fatal.input.checked,prioridade:+pri.value,status:status.value};
     let id=t.id;
-    if(id){const reag=t.prazo&&row.prazo!==t.prazo;if(reag){if(!motivo.value.trim())throw new Error("Informe o motivo do reagendamento");row.motivo_reagendamento=motivo.value.trim()}
+    if(id){const reag=t.prazo&&row.prazo!==t.prazo;if(reag){const mv=motivoC.valor();if(!mv)throw new Error("Escolha o motivo do reagendamento (e descreva, se for “Outro”)");row.motivo_reagendamento=mv}
       if(row.status==="concluida"&&t.status!=="concluida")throw new Error("Para concluir, use o botão “Concluir” e registre o que foi feito");
       const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw new Error(/motivo do reagendamento/.test(error.message)?"Informe o motivo do reagendamento":error.message)}
     else{const {data,error}=await SB.from("tarefas").insert(row).select("id").single();if(error)throw error;id=data.id;
