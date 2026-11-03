@@ -11,10 +11,10 @@ const check=(label,checked,help)=>{const i=el("input",{type:"checkbox",style:"wi
 const pode=()=>PP.perfil?.papel==="admin"||(PP.perfil?.acessos||[]).includes("equipe");
 async function carregar(){
   if(G.carregando)return;G.carregando=true;
-  try{const [m,s]=await Promise.all([SB.from("motivos_reagendamento").select("*").order("ordem").order("motivo"),SB.from("sla_tickets").select("*")]);G.motivos=m.data||[];G.slas=s.data||[];if(m.error||s.error)toast((m.error||s.error).message)}
+  try{const [m,s,md]=await Promise.all([SB.from("motivos_reagendamento").select("*").order("ordem").order("motivo"),SB.from("sla_tickets").select("*"),SB.from("medidas_operacionais").select("*").order("ordem")]);G.motivos=m.data||[];G.slas=s.data||[];G.medidas=md.data||[];if(m.error||s.error)toast((m.error||s.error).message)}
   finally{G.carregando=false}render();
 }
-const invalidar=()=>{G.motivos=null;G.slas=null;render()};
+const invalidar=()=>{G.motivos=null;G.slas=null;G.medidas=null;render()};
 function formMotivo(m){
   const txt=inp("text",m?.motivo||"",{placeholder:"Ex.: Aguardando documentos do cliente"}),comp=check("Exige complemento escrito (ex.: “Outro”)",!!m?.exige_complemento),ativo=check("Ativo (aparece na lista)",m?m.ativo!==false:true),ordem=inp("number",m?.ordem??((G.motivos||[]).length+1)*10,{min:0});
   const body=el("div",{class:"form"},field("mt-txt","Motivo",txt),field("mt-ord","Ordem",ordem),el("div",{class:"f full"},comp.wrap),el("div",{class:"f full"},ativo.wrap));
@@ -26,11 +26,19 @@ function renderTela(){
   const v=$("#view-config-gestao");if(!v)return;v.replaceChildren();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Configurações"),el("div",{class:"sub"},"Regras que a gestão e a controladoria definem e a equipe usa no dia a dia: motivos de reagendamento e SLAs dos tickets."))));
   if(!pode()){v.append(el("div",{class:"note"},"Acesso restrito à gestão."));return}
-  if(!G.motivos||!G.slas){if(!G.carregando)carregar();v.append(el("div",{class:"note"},"Carregando…"));return}
+  if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(el("div",{class:"note"},"Carregando…"));return}
   // motivos
   v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Motivos de reagendamento"),el("div",{class:"note"},"Ao mudar o prazo de uma tarefa, a pessoa escolhe um destes motivos (obrigatório). Gestão e controladoria recebem o aviso.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formMotivo()},"+ Motivo"))),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Motivo"),el("th",{},"Complemento"),el("th",{},"Situação"),el("th",{}))),
       el("tbody",{},G.motivos.length?G.motivos.map(m=>el("tr",{},el("td",{class:"num"},String(m.ordem)),el("td",{},m.motivo),el("td",{},m.exige_complemento?"obrigatório":"opcional"),el("td",{},el("span",{class:"pill "+(m.ativo?"g":"")},m.ativo?"Ativo":"Inativo")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formMotivo(m)},"Editar")))):el("tr",{},el("td",{colspan:5,class:"note"},"Nenhum motivo cadastrado.")))))));
+  // medidas operacionais (proteção)
+  const formMedida=m=>{const nome=inp("text",m?.nome||"",{placeholder:"Ex.: Conta escrow"}),cod=inp("text",m?.codigo||"",{placeholder:"código curto, sem espaços (ex.: escrow)"}),desc=el("textarea",{rows:2},m?.descricao||""),ordem=inp("number",m?.ordem??((G.medidas||[]).length+1)*10),ativo=check("Ativa (aparece no cadastro dos clientes)",m?m.ativo!==false:true);if(m)cod.disabled=true;
+    const body=el("div",{class:"form"},field("md-nome","Medida",nome),field("md-cod","Código",cod),field("md-ord","Ordem",ordem),el("div",{class:"f full"},el("label",{},"Descrição (ajuda para a equipe)"),desc),el("div",{class:"f full"},ativo.wrap));
+    modal(m?"Editar medida":"Nova medida operacional",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),descricao:desc.value.trim()||null,ordem:+ordem.value||0,ativo:ativo.input.checked};if(!m){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_")}
+      const q=m?SB.from("medidas_operacionais").update(row).eq("id",m.id):SB.from("medidas_operacionais").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar();window.PP_PROTECAO?.invalidar?.()})};
+  v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"note"},"Checklist que aparece em Cadastro → Proteção patrimonial e operacional de cada cliente PJ (escrow, gestora, CNPJ espelho…). Desativar esconde sem apagar o histórico.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formMedida()},"+ Medida"))),
+    el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Medida"),el("th",{},"Descrição"),el("th",{},"Situação"),el("th",{}))),
+      el("tbody",{},(G.medidas||[]).length?G.medidas.map(m=>el("tr",{},el("td",{class:"num"},String(m.ordem)),el("td",{},el("b",{},m.nome),el("div",{class:"note"},m.codigo)),el("td",{class:"note"},m.descricao||"—"),el("td",{},el("span",{class:"pill "+(m.ativo?"g":"")},m.ativo?"Ativa":"Inativa")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formMedida(m)},"Editar")))):el("tr",{},el("td",{colspan:5,class:"note"},"Nenhuma medida cadastrada (rode a migração 0092).")))))));
   // SLAs
   const linhas=Object.entries(AREAS).map(([k,l])=>{const s=G.slas.find(x=>x.area===k)||{area:k,dias_resposta:2,dias_critico:5};const r=inp("number",s.dias_resposta,{min:0,max:60,style:"width:80px"}),c=inp("number",s.dias_critico,{min:0,max:90,style:"width:80px"}),o=inp("text",s.observacao||"",{placeholder:"opcional"});
     const salvar=async()=>{const {error}=await SB.from("sla_tickets").upsert({area:k,dias_resposta:+r.value||0,dias_critico:Math.max(+c.value||0,+r.value||0),observacao:o.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id},{onConflict:"area"});if(error){toast(error.message);return}toast("SLA de "+l+" salvo");G.slas=null;render()};
