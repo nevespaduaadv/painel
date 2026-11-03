@@ -148,7 +148,6 @@ function cardsAgora(meu){
   const irTab=t=>()=>{S.tab=t;try{localStorage.setItem("pp-tab",t)}catch(_){}render()};
   const K=(l,val,h,cls,onclick)=>el("button",{class:"card kpi",style:"text-align:left;cursor:pointer;border-color:var(--line)",onclick},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},val),el("div",{class:"h"},h));
   const out=[];
-  if(AG.pub)out.push(K("Publicações a tratar",String(AG.pub.total),AG.pub.vencidas?`${AG.pub.vencidas} vencidas`:"nenhuma vencida",AG.pub.vencidas?"crit":"",irTab("publicacoes")));
   if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("span",{style:"font-variant-numeric:tabular-nums"},"00:00:00");
     const tick=()=>{const s0=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s0/3600)).padStart(2,"0")}:${String(Math.floor(s0%3600/60)).padStart(2,"0")}:${String(s0%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
     const card=el("div",{class:"card kpi",style:"border-color:var(--gold);cursor:pointer",onclick:()=>{if(t)window.PP_TAREFAS?.abrir(t.id)}},el("div",{class:"l"},el("span",{class:"pill e2",style:"font-size:10px;margin-right:6px"},"● trabalhando"),"Agora"),el("div",{class:"v"},rel),
