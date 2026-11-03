@@ -76,12 +76,10 @@ function renderResumo(c,host,ind){
   else if(ok)bens.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Tipo"),el("th",{},"Descrição"),el("th",{},"Titular"),el("th",{},"Ônus"),el("th",{class:"r"},"Valor est."),el("th",{},""))),
     el("tbody",{},F.bens.map(b=>el("tr",{},el("td",{},TIPOS_BEM[b.tipo]||b.tipo),el("td",{},b.descricao,b.observacoes?el("div",{class:"note"},b.observacoes):null),el("td",{},TITULARES_BEM[b.titular]||"—"),el("td",{},b.onus||"—"),el("td",{class:"r num"},b.valor_estimado?BRL(+b.valor_estimado):"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openBemForm(c,b)},"Editar"))))))));
   host.append(bens);
-  // Documentos
-  const docs=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Documentos"),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openDocForm(c)},"+ Documento"))));
-  if(ok&&!F.documentos.length)docs.append(el("div",{class:"note"},"Nenhum documento vinculado. Cole o link do Drive (contratos, pareceres, onboarding, cartão CNPJ)."));
-  else if(ok)docs.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Título"),el("th",{},"Tipo"),el("th",{},"Data"),el("th",{},"Vínculo"),el("th",{},"Cliente vê"),el("th",{},""))),
-    el("tbody",{},F.documentos.map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},TIPOS_DOC[d.tipo]||"—"),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))));
-  host.append(docs);
+  // Documentos: no Cadastro fica só o resumo + botão; a lista completa tem página própria (espelho da pasta do cliente no Drive)
+  const nDocs=F.documentos.length,nCli=F.documentos.filter(d=>d.visivel_cliente).length;
+  host.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Documentos"),el("div",{class:"note"},ok?(nDocs?`${nDocs} documento(s) vinculado(s) · ${nCli} visível(is) ao cliente`:"Nenhum documento vinculado ainda."):"Carregando…")),
+    el("div",{class:"actions"},c.pasta_drive_url?el("a",{class:"btn sm",href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"Pasta no Drive ↗"):null,el("button",{class:"btn sm primary",onclick:()=>{S.sub="documentos";render()}},"Abrir documentos →")))));
   // Acessos a sistemas (gov.br etc.) — só equipe; senha oculta até clicar
   const ac=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Acessos a sistemas"),el("div",{class:"note"},"gov.br, e-CAC, bancos — informados pelo cliente. Senhas e segredos 2FA ficam no cofre criptografado; cada consulta é registrada. Fora da área do cliente e do BI.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openAcessoForm(c)},"+ Acesso"))));
   if(ok&&!F.acessos.length)ac.append(el("div",{class:"note"},"Nenhum acesso cadastrado."));
@@ -97,7 +95,7 @@ function openFichaForm(c){
   const nome=inp("text",c.nome||""),fant=inp("text",c.nome_fantasia||""),tipo=sel({PJ:"Pessoa jurídica",PF:"Pessoa física"},c.tipo_pessoa||"PJ"),cnpj=inp("text",c.cnpj||"",{placeholder:"00.000.000/0001-00"}),cpf=inp("text",c.cpf_titular||""),
         cidade=inp("text",c.cidade||""),uf=sel({"":"—",...Object.fromEntries(UFS.map(u=>[u,u]))},c.uf||""),seg=inp("text",c.segmento||"",{placeholder:"Ex.: transportes, varejo de calçados"}),fat=inp("number",c.faturamento_mensal||"",{step:"1000"}),func=inp("number",c.funcionarios||"",{min:0}),
         resp=inp("text",c.responsavel||""),closer=inp("text",c.closer||""),origem=dl("f-origem",c.origem||"",ORIGENS),plano=dl("f-plano",c.plano||"",PLANOS),status=sel(STATUS,c.status||"ativo"),
-        dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),
+        dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),pdrive=inp("url",c.pasta_drive_url||"",{placeholder:"https://drive.google.com/drive/folders/…"}),
         hist=el("textarea",{placeholder:"O que aconteceu com a empresa: expansão, queda de faturamento, inadimplência, execuções… em poucas linhas."},c.historia||""),sit=el("textarea",{placeholder:"Opera? Fatura? Em que conta recebe? Negativado?"},c.situacao_atual||""),
         neg=tri(c.negativado),maq=tri(c.usa_maquininha),cons=tri(c.tem_consorcio),outros=inp("text",c.outros_cnpjs||""),ass=inp("text",c.assuntos_interesse||""),disp=inp("text",c.disponibilidade||""),obs=el("textarea",{},c.observacoes_onboarding||""),
         res=inp("number",c.reservaAcumulada||0,{step:"100"}),
@@ -106,14 +104,14 @@ function openFichaForm(c){
     el("div",{class:"f full"},el("label",{for:"f-ender"},"Endereço completo (usado nas peças)"),Object.assign(ender,{id:"f-ender"})),field("f-rep","Representante legal",rep),field("f-repcpf","CPF do representante",repcpf),field("f-repq","Qualificação do representante",repq,"Nacionalidade, estado civil, profissão — entra na qualificação da peça."),
     field("f-cid","Cidade",cidade),field("f-uf","UF",uf),field("f-seg","Segmento",seg),field("f-fat","Faturamento mensal (R$)",fat),field("f-func","Funcionários",func),
     field("f-resp","Responsável no escritório",resp),field("f-closer","Closer",closer),field("f-origem","Origem",origem.wrap),field("f-plano","Plano / serviço",plano.wrap),field("f-status","Status",status),
-    field("f-dfech","Data do fechamento",dfech),field("f-donb","Data do onboarding",donb),field("f-prox","Próxima reunião",prox),field("f-res","Reserva acumulada (R$)",res),
+    field("f-dfech","Data do fechamento",dfech),field("f-donb","Data do onboarding",donb),field("f-prox","Próxima reunião",prox),field("f-pdrive","Pasta do cliente no Drive",pdrive),field("f-res","Reserva acumulada (R$)",res),
     field("f-neg","Negativado",neg),field("f-maq","Usa maquininha",maq),field("f-cons","Tem consórcio",cons),field("f-outros","Outros CNPJs",outros),
     field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs));
   modal("Ficha do cliente",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
     const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
       faturamento_mensal:fat.value===""?null:+fat.value,funcionarios:func.value===""?null:+func.value,closer:closer.value.trim()||null,origem:origem.input.value.trim()||null,plano:plano.input.value.trim()||null,status:status.value,
-      data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
+      data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,pasta_drive_url:pdrive.value.trim()||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
       negativado:triVal(neg),usa_maquininha:triVal(maq),tem_consorcio:triVal(cons),outros_cnpjs:outros.value.trim()||null,assuntos_interesse:ass.value.trim()||null,disponibilidade:disp.value.trim()||null,observacoes_onboarding:obs.value.trim()||null};
     // nome, responsável, reserva e cnpj também vivem no jsonb (motor e páginas do cliente)
     const {data:cur}=await SB.from("clientes").select("dados").eq("id",c.id).single();
@@ -181,6 +179,22 @@ function openAcessoForm(c,x={}){
 }
 
 /* ---------- Integração ---------- */
+
+/* ---------- Página Documentos do cliente (aberta pelo botão do Cadastro) ---------- */
+function paginaDocumentos(c,host){
+  const ok=garantir(c.id);
+  host.append(el("div",{class:"actions",style:"justify-content:flex-start;margin:-4px 0 6px"},el("button",{class:"btn sm",onclick:()=>{S.sub="cliente";render()}},"← Cadastro")));
+  const docs=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Documentos de "+(c.nome_fantasia||c.nome)),el("div",{class:"note"},"Espelho da pasta do cliente: cada item aponta para o arquivo no Drive (contratos, pareceres, onboarding, cartão CNPJ, transcrições). Marque “cliente vê” para aparecer na área do cliente.")),
+    el("div",{class:"actions edit-only"},c.pasta_drive_url?el("a",{class:"btn sm",href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"Pasta no Drive ↗"):null,el("button",{class:"btn sm primary",onclick:()=>openDocForm(c)},"+ Documento"))));
+  if(!ok)docs.append(el("div",{class:"note"},"Carregando…"));
+  else if(!F.documentos.length)docs.append(el("div",{class:"empty"},"Nenhum documento vinculado. Cole o link do Drive (contratos, pareceres, onboarding, cartão CNPJ)."));
+  else{const grupos={};F.documentos.forEach(d=>{(grupos[TIPOS_DOC[d.tipo]||"Outros"]=grupos[TIPOS_DOC[d.tipo]||"Outros"]||[]).push(d)});
+    for(const [g,lista] of Object.entries(grupos).sort()){docs.append(el("div",{class:"eyebrow",style:"margin-top:10px"},g+" · "+lista.length));
+      docs.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Título"),el("th",{},"Data"),el("th",{},"Vínculo"),el("th",{},"Cliente vê"),el("th",{},""))),
+        el("tbody",{},lista.sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))))}}
+  host.append(docs);
+}
+window.PP_FICHA=Object.assign(window.PP_FICHA||{},{paginaDocumentos});
 window.PP_MOD=window.PP_MOD||{};
 window.PP_MOD.resumo=(c,host,ind)=>{if(S.sub==="dossie"||S.sub==="financeiro")return;renderResumo(c,host,ind)};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("ficha");for(const t of ["contatos","bens","documentos","acessos_sistemas"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
