@@ -13,7 +13,7 @@
   const dhBR = (s) => { const m = /(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2}):(\d{2})?/.exec(s || ""); return m ? `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5] || "00"}:00-03:00` : (dBR(s) ? dBR(s) + "T12:00:00-03:00" : null); };
   const quem = (it) => { const u = (it.users || []).map((x) => x.replace(/^Enviada por\s*/i, "")); const l = /por (.+)$/.exec(it.lens || "")?.[1]; return { autor: u[0] || null, resp: l || u[0] || null }; };
   const colabPor = (nome) => { if (!nome) return null; const n = norm(nome).split(" ")[0]; return A.colab.find((c) => norm(c.nome).split(" ")[0] === n) || null; };
-  const classificar = (it) => { const c = it.cls; if (/no_rows|more|registered|deleted|edited/.test(c)) return "ignorar"; if (/stage/.test(c)) return "etapa"; if (/pending/.test(c)) return "tarefa_aberta"; if (/completed/.test(c)) return it.titulo === "Comentário" ? "registro" : "tarefa_feita"; return "ignorar"; };
+  const classificar = (it) => { const c = it.cls; if (/no_rows|more|registered|deleted|edited/.test(c)) return "ignorar"; if (/stage/.test(c)) return "etapa"; if (/pending/.test(c)) return it.titulo === "Comentário" ? "registro" : "tarefa_aberta"; if (/completed/.test(c)) return it.titulo === "Comentário" ? "registro" : "tarefa_feita"; return "ignorar"; };
   async function carregarBruto() {
     const { data, error } = await SB.from("importacao_bruta").select("id,chave,parte,created_at").eq("origem", "advbox").order("created_at", { ascending: false }); if (error) { toast(error.message); return; }
     A.lotes = [...new Set((data || []).map((r) => r.chave))]; A.carregado = true; if (!A.chave || !A.lotes.includes(A.chave)) A.chave = A.lotes[0] || ""; render();
