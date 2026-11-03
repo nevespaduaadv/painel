@@ -90,6 +90,7 @@
       if (A.prev.fechar.length) log(`${nf} tarefa(s) fechadas (${A.prev.fechar.filter((f) => f.status === "concluida").length} concluídas, ${A.prev.fechar.filter((f) => f.status === "cancelada").length} canceladas)`);
       await imp("tarefa_eventos", eventos); log(`${eventos.length} evento(s) de tarefa`);
       await imp("entradas_timeline", regs); log(`${regs.length} registro(s) no dossiê`);
+      { const { data: cofre, error: ce } = await SB.rpc("advbox_cofre_senhas"); if (ce) log("cofre de senhas: " + ce.message + " (rode a migração 0097)"); else log(`${cofre?.acessos || 0} login(s)/senha(s) levados para Cadastro → Acessos a sistemas; ${cofre?.textos || 0} texto(s) limpos`); }
       log("Concluído."); toast("Importação concluída"); A.existentes = null; await abrirLote();
     } catch (e) { log("ERRO: " + e.message); toast(e.message); }
     A.rodando = false; render();
