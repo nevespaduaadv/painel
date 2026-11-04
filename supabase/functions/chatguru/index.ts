@@ -772,6 +772,13 @@ async function asaasAcao(acao: string, corpo: Dict, jwt: string): Promise<Respon
   const pf = await rest("rpc/pode_financeiro", jwt, { method: "POST", body: "{}" });
   if (!pf.ok || (await pf.json().catch(() => null)) !== true) return json(403, { ok: false, erro: "Sem permissão para o financeiro." });
   const c = await asaasBase(); if (typeof c === "string") return json(500, { ok: false, erro: c });
+  if (acao === "asaas_conta") { // dados da conta, saldo e taxas (parâmetros gerais de recebimento) — só leitura
+    const [conta, saldo, taxas] = await Promise.all([asaas(c, "myAccount"), asaas(c, "finance/balance"), asaas(c, "myAccount/fees")]);
+    if (!conta.ok) return json(502, { ok: false, erro: `Asaas recusou (${conta.status}): ${asaasErro(conta.dados)}` });
+    const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10); const ini = hoje.slice(0, 8) + "01";
+    const est = await asaas(c, `finance/payment/statistics?dueDate[ge]=${ini}&dueDate[le]=${hoje}`);
+    return json(200, { ok: true, ambiente: c.url.includes("sandbox") ? "sandbox" : "produção", conta: conta.dados, saldo: saldo.ok ? saldo.dados : null, taxas: taxas.ok ? taxas.dados : null, estatisticas_mes: est.ok ? est.dados : null });
+  }
   if (acao === "asaas_testar") { const r = await asaas(c, "myAccount"); return r.ok ? json(200, { ok: true, conta: { nome: r.dados.name, email: r.dados.email, cnpj: r.dados.cpfCnpj }, ambiente: c.url.includes("sandbox") ? "sandbox" : "produção" }) : json(502, { ok: false, erro: `Asaas recusou (${r.status}): ${asaasErro(r.dados)}` }); }
   if (acao === "asaas_sincronizar") {
     try { return json(200, await asaasSincronizar(Number(corpo.dias ?? 0), null)); } catch (e) { return json(502, { ok: false, erro: e instanceof Error ? e.message : String(e) }); }
@@ -798,6 +805,11 @@ async function asaasAcao(acao: string, corpo: Dict, jwt: string): Promise<Respon
       await rest("rpc/asaas_cliente_gravar", jwt, { method: "POST", body: JSON.stringify({ p_cliente: clienteId, p_asaas: cust }) });
     }
     const body: Dict = { customer, billingType: forma, dueDate: venc, description: descricao || undefined, externalReference: `${clienteId}|${tipo}` };
+    { // parâmetros gerais de recebimento (Financeiro → Conta Asaas): multa, juros e desconto padrão
+      const rc = await rest("escritorio?id=eq.financeiro&select=dados", service()); const cfg = rc.ok ? (((await rc.json()) as Dict[])[0]?.dados as Dict | undefined)?.recebimento as Dict | undefined : undefined;
+      const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+      if (cfg) { if (n(cfg.multa_pct) > 0) body.fine = { value: n(cfg.multa_pct), type: "PERCENTAGE" }; if (n(cfg.juros_mes_pct) > 0) body.interest = { value: n(cfg.juros_mes_pct) }; if (n(cfg.desconto_pct) > 0) body.discount = { value: n(cfg.desconto_pct), dueDateLimitDays: n(cfg.desconto_dias), type: "PERCENTAGE" }; }
+    }
     if (parcelas > 1) { body.installmentCount = parcelas; body.totalValue = valor; } else body.value = valor;
     const pr = await asaas(c, "payments", { method: "POST", body });
     if (!pr.ok) return json(502, { ok: false, erro: `Asaas não criou a cobrança: ${asaasErro(pr.dados)}` });
