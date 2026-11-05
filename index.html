@@ -212,6 +212,7 @@ tr:hover .hover-acts,.row:hover .hover-acts,.hover-acts:focus-within{opacity:1}
 .tip{position:fixed;pointer-events:none;background:var(--navy);color:#fff;font-size:12.5px;padding:7px 10px;border-radius:6px;z-index:40;max-width:260px;box-shadow:0 6px 20px rgba(0,0,0,.25);line-height:1.35}
 .hit:hover{opacity:.85}
 .note{font-size:13px;color:var(--muted)}
+.alerta-bem{border:1px solid #c0392b;border-left:4px solid #c0392b;background:rgba(192,57,43,.08);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.4;margin-bottom:6px}.alerta-bem b{color:#b91c1c;display:block;margin-bottom:3px}
 .disclaimer{border-left:3px solid var(--gold);padding:10px 14px;background:var(--surface);font-size:13px;color:var(--muted)}
 
 /* Timeline */
@@ -588,10 +589,15 @@ const REGRAS_PADRAO = {
   fatorParcelado:-15,         // cenário parcelado = à vista − 15 p.p. (quando não há referência parcelada)
   tetoDesconto:97,
   margemReserva:10,           // reserva mensal = valor alvo × (1+10%) / meses
-  prazoReservaPadrao:6,
+  prazoReservaPadrao:6,       // usado só quando não há data de início do atraso (senão o prazo é automático: até a janela típica de acordo)
+  janelaMesesPrivado:6,       // bancos privados: janela típica de proposta ~6 meses de atraso
+  janelaMesesPublico:12,      // BB/Caixa/BNB: ~12 meses
+  prazoReservaMinimo:3,       // nunca sugerir reserva em menos de 3 meses
+  descontoGarantiaReal:15,    // garantia real (alienação fiduciária/hipoteca): projeção conservadora — desconto provável de 15%
+  amplitudeGarantiaReal:10,
   diasSemRegistro:15,        // alerta de gestão: cliente sem registro na timeline há mais de X dias
   atualizacaoMensal:1.0,      // % a.m. de atualização do saldo em atraso (juros de mora + correção) para estimar a dívida na data-alvo
-  fatoresGarantia:{nenhuma:0,aval:-5,recebiveis:-10,real_movel:-5,hipoteca:"travar",real_imovel:"travar",fundo:"travar",fianca_bancaria:"travar"},
+  fatoresGarantia:{nenhuma:0,aval:-5,recebiveis:-10,real_movel:"risco",hipoteca:"risco",real_imovel:"risco",fundo:"travar",fianca_bancaria:"travar"},
   fatoresProduto:{giro:0,cheque:0,contagar:0,cartao:0,receb:-5,pronampe:0,rural_custeio:-5,rural_invest:-5,veiculo:0,imovel:0,leasing:0,ccb:0,outro:0},
   fatoresSituacao:{emdia:0,cobranca:0,negativado:0,ajuizado:0,prejuizo:5,cedido:0,acordo:0,quitado:0},
   fatoresTitular:{PJ:-5,PF:0},
@@ -617,6 +623,17 @@ function provisao(carteira,dias){
   return Math.min(1,k.A+k.B*meses);
 }
 function mesesInad(dias){return dias>90?Math.floor((dias-90)/30):0}
+const BANCOS_PUBLICOS=["banco","caixa","bnb","basa","banrisul","brb","bndes"];
+function bancoPublico(nome){const n=(nome||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return /banco do brasil|^bb\b|caixa|nordeste|bnb|amazonia|basa|banrisul|brb|bndes|banestes|desenvolve/.test(n)}
+// prazo de reserva: manual (campo do contrato) ou automático = meses que faltam até a janela típica de acordo
+// (6 meses de atraso em banco privado, 12 em banco público), com mínimo de 3 meses. Sem atraso informado: prazo padrão.
+function prazoReserva(c,R,dias){
+  if(+c.prazoReservaMeses>0)return +c.prazoReservaMeses;
+  if(!c.dataInicioAtraso)return R.prazoReservaPadrao||6;
+  const janela=(bancoPublico(c.banco)?R.janelaMesesPublico:R.janelaMesesPrivado)||6;
+  const faltam=Math.ceil(Math.max(0,janela*30-(dias||0))/30);
+  return Math.max(R.prazoReservaMinimo||3,faltam);
+}
 
 /* Referências: histórico de acordos (base do escritório) + acordos fechados nos clientes do painel. */
 function referencias(){
@@ -632,8 +649,10 @@ function projetar(c,R,refsAll,ref=hoje()){
   const cart=c.carteiraOverride||carteiraAuto(c.produto,c.garantia);
   const prov=provisao(cart,dias);
   const est=estagio(dias);
-  const fg=R.fatoresGarantia[c.garantia]??0;
-  const travado=fg==="travar";
+  const fg0=R.fatoresGarantia[c.garantia]??0;
+  const riscoBem=fg0==="risco";           // garantia real: bem alienado/hipotecado — risco de perda, desconto baixo
+  const fg=(typeof fg0==="number")?fg0:0;
+  const travado=fg0==="travar";
   const abertura=parseD(c.dataInicioAtraso)?addDays(parseD(c.dataInicioAtraso),R.minDiasAtraso):null;
   const janelaAberta=dias>=R.minDiasAtraso;
   const grupo=grupoBanco(c.banco);
@@ -660,16 +679,21 @@ function projetar(c,R,refsAll,ref=hoje()){
     const max=pool.length>=3?clamp(quartil(pool,.75)+ajusteComum,0,teto):clamp(avista+R.amplitude/100,0,teto);
     faixa={min:Math.min(min,avista),provavel:avista,max:Math.max(max,avista),parcelado};
     base={fonte,n:pool.length,mediana:pool.length?mediana(pool):null};
+    if(riscoBem){ // garantia real: ignora mediana/provisão e usa a faixa conservadora das regras
+      const pv=clamp((R.descontoGarantiaReal??15)/100,0,teto),am=(R.amplitudeGarantiaReal??10)/100;
+      faixa={min:clamp(pv-am,0,teto),provavel:pv,max:clamp(pv+am,0,teto),parcelado:clamp(pv+R.fatorParcelado/100,0,teto)};
+      base={fonte:"garantia_real",n:0,mediana:null};
+    }
   }
   const saldo=+c.saldoAtual||+c.valorOriginal||0;
-  const meses=+c.prazoReservaMeses||R.prazoReservaPadrao;
+  const meses=prazoReserva(c,R,dias);
   // Cenário na data-alvo (hoje + prazo de reserva): saldo atualizado e provisão do banco nessa data
   const dataAlvo=new Date(ref);dataAlvo.setMonth(dataAlvo.getMonth()+meses);
   const diasAlvo=c.dataInicioAtraso?dias+meses*30:0;
   const provAlvo=provisao(cart,diasAlvo);
   const taxa=(c.atualizacaoMensal!=null&&c.atualizacaoMensal!==""?+c.atualizacaoMensal:R.atualizacaoMensal)/100;
   const saldoAlvo=c.dataInicioAtraso?saldo*Math.pow(1+taxa,meses):saldo;
-  if(faixa&&base.fonte==="provisao"){ // base regulatória: refaz a faixa com a provisão da data-alvo
+  if(faixa&&base.fonte==="provisao"&&!riscoBem){ // base regulatória: refaz a faixa com a provisão da data-alvo
     const teto=R.tetoDesconto/100;const ajusteComum=((fg||0)+(R.fatoresProduto[c.produto]??0)+(R.fatoresSituacao[c.situacao]??0)+(R.fatoresTitular[c.titular||"PJ"]??0)+(R.fatoresBanco[c.banco]??0))/100;
     const av=clamp(provAlvo+(R.descontoBase+(R.fatoresGrupo[grupo]??0))/100+ajusteComum,0,teto);
     faixa={min:clamp(av-R.amplitude/100,0,teto),provavel:av,max:clamp(av+R.amplitude/100,0,teto),parcelado:clamp(av+R.fatorParcelado/100,0,teto)};
@@ -681,7 +705,7 @@ function projetar(c,R,refsAll,ref=hoje()){
   const reservaMensal=valorAcordo!=null?valorAcordo*(1+R.margemReserva/100)/meses:null;
   const nSim=refsBanco.length;
   const conf=nSim>=5?"alta":nSim>=2?"média":refsGrupo.length>=5?"média":"baixa";
-  return {dias,cart,prov,est,travado,janelaAberta,abertura,faixa,base,grupo,saldo,saldoAlvo,dataAlvo,diasAlvo,provAlvo,janelaNoPrazo,valorAcordo,valorAcordoHoje,valorParcelado,meses,reservaMensal,conf,nSim,nGrupo:refsGrupo.length};
+  return {dias,cart,prov,est,travado,riscoBem,janelaAberta,abertura,faixa,base,grupo,saldo,saldoAlvo,dataAlvo,diasAlvo,provAlvo,janelaNoPrazo,valorAcordo,valorAcordoHoje,valorParcelado,meses,reservaMensal,conf,nSim,nGrupo:refsGrupo.length};
 }
 function curva(c,cart,mesesAFrente=18){
   const d0=parseD(c.dataInicioAtraso);if(!d0)return [];
@@ -1091,7 +1115,7 @@ function contractCard(k,p,R){
   const quitado=k.situacao==="quitado";
   const card=el("article",{class:"card ct"});
   card.append(el("div",{class:"ct-h"},
-    el("div",{},el("div",{class:"bank"},k.banco||"Banco",k.titular==="PF"?el("span",{class:"pill g",style:"margin-left:8px;vertical-align:middle"},"CPF do sócio"):null),el("div",{class:"prod"},PRODUTOS[k.produto]||k.produto," · ",GARANTIAS[k.garantia]||"")),
+    el("div",{},el("div",{class:"bank"},k.banco||"Banco",k.titular==="PF"?el("span",{class:"pill g",style:"margin-left:8px;vertical-align:middle"},"CPF do sócio"):null,p.riscoBem&&!quitado?el("span",{class:"pill e3",style:"margin-left:8px;vertical-align:middle"},"Risco de perda do bem"):null),el("div",{class:"prod"},PRODUTOS[k.produto]||k.produto," · ",GARANTIAS[k.garantia]||"")),
     el("div",{style:"display:flex;flex-direction:column;gap:4px;align-items:flex-end"},el("span",{class:`pill e${p.est}`},quitado?"Quitado":`Estágio ${p.est}`),el("span",{class:"pill c"},p.cart))));
   card.append(el("div",{class:"ct-b"},
     kv("Valor original",BRL(+k.valorOriginal)),kv("Saldo atual",BRL(p.saldo)),
@@ -1103,6 +1127,13 @@ function contractCard(k,p,R){
   if(quitado){proj.append(el("div",{class:"note"},"Contrato encerrado."))}
   else if(k.acordo&&k.acordo.fechado){
     proj.append(el("div",{class:"eyebrow"},"Acordo fechado"),el("div",{class:"range"},el("span",{class:"big num"},BRL(+k.acordo.valorPago)),el("span",{class:"mm"},`desconto obtido ${pct(+k.acordo.descontoObtido/100)} em ${fmtD(parseD(k.acordo.data))}`)));
+  } else if(p.riscoBem&&k.dataInicioAtraso){
+    const b=p.base;
+    proj.append(el("div",{class:"alerta-bem"},el("b",{},"⚠ Garantia real — risco alto de perda do bem"),el("div",{},`Alienação fiduciária/hipoteca: o banco pode consolidar a propriedade ou buscar e apreender o bem. Acordos costumam sair com desconto baixo${(+k.saldoAtual||0)>=100000?" — ainda mais neste montante":""}. Priorizar defesa, substituição de garantia e manter o bem; a projeção abaixo é conservadora.`)));
+    proj.append(el("div",{class:"eyebrow"},`Previsão conservadora em ${fmtD(p.dataAlvo)} · ${p.meses} meses`),
+      el("div",{class:"range"},el("span",{class:"big num"},BRL(p.valorAcordo)),el("span",{class:"mm num"},`à vista · desconto provável ${pct(p.faixa.provavel)} · faixa ${pct(p.faixa.min)} a ${pct(p.faixa.max)}`)),
+      el("div",{class:"note num"},`Dívida estimada nessa data: ${BRL(p.saldoAlvo)} · provisão mínima do banco: ${pct(p.provAlvo)} (com garantia real a provisão pesa pouco na negociação)`),
+      el("div",{class:"range"},el("span",{class:"num",style:"font-weight:700"},`Reserva: ${BRL(p.reservaMensal)}/mês`),el("span",{class:"mm"},`por ${p.meses} meses, com margem de ${R.margemReserva}%`)));
   } else if(p.travado){
     proj.append(el("div",{class:"eyebrow"},"Acordo por provisão: não projetado"),el("div",{class:"note"},"Com garantia real ou fundo garantidor, o banco recupera o crédito pela garantia e a provisão pesa pouco. A negociação segue por outra via (defesa, substituição de garantia, FGO pós-honra). Reserva sugerida: definir manualmente."));
   } else if(!k.dataInicioAtraso){
@@ -1155,11 +1186,16 @@ function renderRegras(){
     numF("Amplitude da faixa (± p.p.)","amplitude",R.amplitude,"Com 3+ referências a faixa vira o intervalo interquartil."),
     numF("Teto de desconto (%)","tetoDesconto",R.tetoDesconto,""),
     numF("Margem de segurança da reserva (%)","margemReserva",R.margemReserva,""),
-    numF("Prazo padrão de reserva (meses)","prazoReservaPadrao",R.prazoReservaPadrao,"Pode ser alterado por contrato. Define a data-alvo da previsão."),
+    numF("Prazo de reserva sem data de atraso (meses)","prazoReservaPadrao",R.prazoReservaPadrao,"Com data de atraso o prazo é automático: meses até a janela típica de acordo. Pode ser fixado por contrato."),
+    numF("Janela típica de acordo — banco privado (meses de atraso)","janelaMesesPrivado",R.janelaMesesPrivado,""),
+    numF("Janela típica de acordo — banco público (meses de atraso)","janelaMesesPublico",R.janelaMesesPublico,"BB, Caixa, BNB, Banrisul…"),
+    numF("Prazo mínimo de reserva (meses)","prazoReservaMinimo",R.prazoReservaMinimo,""),
+    numF("Garantia real: desconto provável (%)","descontoGarantiaReal",R.descontoGarantiaReal,"Alienação fiduciária/hipoteca: projeção conservadora e alerta de risco de perda do bem."),
+    numF("Garantia real: amplitude da faixa (p.p.)","amplitudeGarantiaReal",R.amplitudeGarantiaReal,""),
     numF("Alerta: dias sem registro na timeline","diasSemRegistro",R.diasSemRegistro,"Usado pelo dashboard de gestão para apontar clientes parados."),
     numF("Atualização do saldo em atraso (% a.m.)","atualizacaoMensal",R.atualizacaoMensal,"Juros de mora + correção para estimar a dívida na data-alvo. Padrão 1% a.m.; pode ser sobrescrito por contrato.")));
   v.append(g);
-  v.append(fatorTable("Fator por garantia","fatoresGarantia",GARANTIAS,"“travar” desliga a projeção para aquele contrato. Veículo com alienação fiduciária fechou com 83–89% no histórico, por isso não está travado."));
+  v.append(fatorTable("Fator por garantia","fatoresGarantia",GARANTIAS,"“risco” = garantia real (alienação fiduciária/hipoteca): alerta de perda do bem e projeção conservadora pelo desconto definido acima. “travar” desliga a projeção (fundo garantidor, fiança bancária)."));
   v.append(fatorTable("Fator por grupo de credor (só na base regulatória)","fatoresGrupo",GRUPOS,"Cooperativas negociam muito menos desconto que bancos de varejo (41–67% × 79–97% no histórico)."));
   v.append(fatorTable("Fator por titular","fatoresTitular",TITULARES,"Quase todo o histórico é dívida no CPF do sócio. Para PJ o painel aplica um desconto a menos até haver base própria."));
   v.append(fatorTable("Fator por produto","fatoresProduto",PRODUTOS,""));
@@ -1177,7 +1213,7 @@ function numF(l,key,val,help){return el("div",{class:"f"},el("label",{for:"r-"+k
 function fatorTable(title,key,labels,help){
   const R=S.regras;
   return el("div",{class:"card section"},el("h3",{},title),el("div",{class:"note"},help),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Item"),el("th",{class:"r"},"Ajuste (p.p.)"))),
-    el("tbody",{},Object.entries(labels).map(([k,l])=>{const cur=R[key][k];return el("tr",{},el("td",{},l),el("td",{class:"r"},el("input",{id:`f-${key}-${k}`,value:cur==="travar"?"travar":(cur??0),onchange:e=>{const t=e.target.value.trim().toLowerCase();S.regras[key][k]=t==="travar"?"travar":(+t||0);saveRegras()}})))})))));
+    el("tbody",{},Object.entries(labels).map(([k,l])=>{const cur=R[key][k];return el("tr",{},el("td",{},l),el("td",{class:"r"},el("input",{id:`f-${key}-${k}`,value:(cur==="travar"||cur==="risco")?cur:(cur??0),onchange:e=>{const t=e.target.value.trim().toLowerCase();S.regras[key][k]=(t==="travar"||t==="risco")?t:(+t||0);saveRegras()}})))})))));
 }
 async function saveRegras(){if(!needDb())return;try{await S.db.doc("config/regras").set(S.regras);toast("Regras salvas")}catch(e){toast("Não foi possível salvar as regras")}render()}
 
@@ -1261,7 +1297,7 @@ function confirmInline(body,msg){let box=body.querySelector(".confirm");if(box){
 function openContractForm(k={}){
   const R=S.regras;
   const b=bancoInput(k.banco),prod=sel(PRODUTOS,k.produto||"giro"),gar=sel(GARANTIAS,k.garantia||"nenhuma"),sit=sel(SITUACOES,k.situacao||"cobranca"),tit=sel(TITULARES,k.titular||"PJ");
-  const vo=inp("number",k.valorOriginal,{step:"100"}),sa=inp("number",k.saldoAtual,{step:"100"}),dc=inp("date",k.dataContrato),da=inp("date",k.dataInicioAtraso),pp=inp("number",k.parcelasPagas,{min:0}),pt=inp("number",k.parcelasTotal,{min:0}),pr=inp("number",k.prazoReservaMeses||R.prazoReservaPadrao,{min:1}),am=inp("number",k.atualizacaoMensal??"",{step:"0.1",placeholder:String(R.atualizacaoMensal)});
+  const vo=inp("number",k.valorOriginal,{step:"100"}),sa=inp("number",k.saldoAtual,{step:"100"}),dc=inp("date",k.dataContrato),da=inp("date",k.dataInicioAtraso),pp=inp("number",k.parcelasPagas,{min:0}),pt=inp("number",k.parcelasTotal,{min:0}),pr=inp("number",k.prazoReservaMeses||"",{min:1,placeholder:"automático"}),am=inp("number",k.atualizacaoMensal??"",{step:"0.1",placeholder:String(R.atualizacaoMensal)});
   const cart=sel({"":"Automática","C1":"C1","C2":"C2","C3":"C3","C4":"C4","C5":"C5"},k.carteiraOverride||"");
   const notas=el("textarea",{},k.notas||"");
   const autoNote=el("div",{class:"help"});const upd=()=>{autoNote.textContent="Carteira automática: "+carteiraAuto(prod.value,gar.value)};prod.onchange=gar.onchange=upd;upd();
@@ -1354,7 +1390,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"]];PP.MODULOS_V="?v=mw25scuw";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"]];PP.MODULOS_V="?v=mw3suqxg";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
