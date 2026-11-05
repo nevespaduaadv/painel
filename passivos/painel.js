@@ -181,7 +181,7 @@ function renderPainel(){
   // Carteira e Leads atrasados ficam nas próprias áreas (Clientes e Comercial) — pedido de 31/10
   const duas=el("div",{style:"display:grid;grid-template-columns:1.5fr 1fr;gap:18px"});
   /* Tickets aguardando a(s) minha(s) área(s) */
-  if(D.tickets?.length){const AR={juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",atendimento:"Atendimento",administrativo:"Administrativo",socios:"Sócias"};const p=PP.perfil||{};const minhas=p.papel==="admin"?Object.keys(AR):[...(p.acessos||[]),...((p.acessos||[]).includes("equipe")?["administrativo"]:[])];
+  if(false&&D.tickets?.length){const AR={juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",atendimento:"Atendimento",administrativo:"Administrativo",socios:"Sócias"};const p=PP.perfil||{};const minhas=p.papel==="admin"?Object.keys(AR):[...(p.acessos||[]),...((p.acessos||[]).includes("equipe")?["administrativo"]:[])];
     const meus=D.tickets.filter(x=>minhas.includes(x.aguardando_area));
     if(meus.length)duas.append(el("div",{class:"card",style:"grid-column:1 / -1;border-color:var(--gold)"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Tickets aguardando a sua área"),el("span",{class:"note"},`${meus.length} · responda pela tarefa`)),
       el("div",{class:"list"},meus.sort((a,b)=>b.dias_aguardando-a.dias_aguardando).map(x=>{const d=Math.floor(+x.dias_aguardando||0);return el("button",{class:"row",onclick:()=>window.PP_TAREFAS?.abrir(x.id)},

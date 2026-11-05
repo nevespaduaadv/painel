@@ -7,7 +7,8 @@ const STATUS={aberta:"A fazer",em_andamento:"Fazendo",concluida:"Feita",cancelad
 /* Tickets entre áreas: a tarefa fica "aguardando" outra área até alguém de lá responder */
 const AREAS_TICKET={juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",atendimento:"Atendimento",administrativo:"Administrativo",socios:"Sócias"};
 const minhasAreas=()=>{const p=PP.perfil||{};if(p.papel==="admin")return Object.keys(AREAS_TICKET);const a=new Set(p.acessos||[]);if(a.has("equipe"))a.add("administrativo");return Object.keys(AREAS_TICKET).filter(k=>a.has(k))};
-const ticketDe=t=>T.tickets?.[t.id]||null;
+const TICKETS_ATIVOS=false; // tickets desligados a pedido da gestão (05/11/2026); dados e rpcs continuam no banco
+const ticketDe=t=>TICKETS_ATIVOS?(T.tickets?.[t.id]||null):null;
 const diasAg=tk=>tk?.aguardando_desde?Math.floor((Date.now()-new Date(tk.aguardando_desde))/86400000):0;
 const pillTicket=t=>{const tk=ticketDe(t);if(!tk)return null;const d=diasAg(tk);const sit=tk.sla_situacao||(d>=5?"critico":d>=2?"vencido":"no_prazo");return el("span",{class:"pill "+(sit==="critico"?"e3":sit==="vencido"?"e2":"c"),title:(tk.aguardando_motivo||"")+(tk.sla_dias!=null?` · SLA ${tk.sla_dias}d`:"")},"Aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:"")+(sit==="vencido"?" · SLA vencido":sit==="critico"?" · crítico":""))};
 /* motivo de reagendamento: lista cadastrada pela gestão/controladoria (+ complemento quando o motivo pede) */
@@ -118,7 +119,7 @@ function renderTarefas(){
   const nTk=Object.keys(T.tickets||{}).length,nMeus=Object.values(T.tickets||{}).filter(x=>minhasAreas().includes(x.aguardando_area)).length;
   const fTk=sel({"":"Tickets: todos os estados",minhas:`Aguardando a minha área (${nMeus})`,todas:`Aguardando alguma área (${nTk})`},f.tickets||"");fTk.onchange=()=>{f.tickets=fTk.value;render()};
   const escT=PP.escopoTarefas?.()||{tudo:true};
-  v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,fTk,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
+  v.append(el("div",{class:"card section",style:"flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center"},fStatus,(escT.tudo||escT.nucleos)?fResp:null,fNuc,fCli,fFat.wrap,TICKETS_ATIVOS?fTk:null,(!escT.tudo&&!escT.nucleos)?el("span",{class:"note"},"Você vê as tarefas atribuídas a você ou criadas por você."):(!escT.tudo?el("span",{class:"note"},"Você vê as suas tarefas e as do jurídico (controle)."):null)));
   const vista=T.vista||(()=>{try{return localStorage.getItem("pp-tarefas-vista")||"lista"}catch(_){return "lista"}})();T.vista=vista;
   const vistaBtns=el("div",{class:"tabs",style:"font-size:12px;margin-left:auto"},[["lista","Lista"],["kanban","Kanban"]].map(([k,l])=>el("button",{class:"tab","aria-selected":String(vista===k),onclick:()=>{T.vista=k;try{localStorage.setItem("pp-tarefas-vista",k)}catch(_){}render()}},l)));
   v.querySelector(".card.section")?.append(vistaBtns);
@@ -128,7 +129,7 @@ function renderTarefas(){
 /* ---------- Kanban: A fazer · Fazendo · Aguardando área · Feitas (7 dias). Arrastar entre A fazer e Fazendo muda o status; para Feitas abre a tarefa (registro obrigatório) ---------- */
 function kanban(lista){
   const hoje=hojeISO();const d7=addD(hoje,-7);
-  const cols=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=d7]];
+  const cols=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=d7]].filter(c=>TICKETS_ATIVOS||c[0]!=="aguardando");
   const prazoPill=t=>t.prazo?el("span",{class:"pill "+(t.faixa==="atrasada"||t.faixa==="hoje"?"e3":t.faixa==="d7"?"e2":"g"),style:"font-size:11px"},fmtD(parseD(t.prazo))+(t.prazo_fatal?" · FATAL":"")+(t.faixa==="atrasada"?` · ${-t.dias_para_prazo}d atrás`:t.faixa==="hoje"?" · hoje":"")):el("span",{class:"note",style:"font-size:11px"},"sem prazo");
   const card=t=>{const c=el("div",{class:"kb-card",draggable:"true",onclick:()=>openTarefa(t)},el("div",{class:"n",style:"font-size:13px;font-weight:600;line-height:1.3"},t.prioridade===1?el("span",{class:"pill e3",style:"margin-right:6px;font-size:10px"},"Alta"):null,t.titulo),
     el("div",{class:"s",style:"font-size:12px;margin-top:3px"},[t.cliente_nome,t.responsavel_nome].filter(Boolean).join(" · ")),el("div",{style:"margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"},prazoPill(t),pillTicket(t)));
@@ -138,7 +139,7 @@ function kanban(lista){
     const col=el("div",{class:"kb-col","data-st":k},el("div",{class:"kb-h"},el("span",{},l),el("span",{class:"note num"},String(ts.length))),el("div",{class:"kb-body"},ts.length?ts.map(card):el("div",{class:"note",style:"padding:10px;text-align:center"},"—")));
     col.addEventListener("dragover",e=>{e.preventDefault();col.classList.add("sobre")});col.addEventListener("dragleave",()=>col.classList.remove("sobre"));
     col.addEventListener("drop",async e=>{e.preventDefault();col.classList.remove("sobre");const id=e.dataTransfer.getData("text/plain");const t=T.tarefas.find(x=>x.id===id);if(!t)return;
-      if(k==="aguardando"){if(!ticketDe(t))encaminharArea(t,()=>{T.ok=false;carregar()});return}
+      if(k==="aguardando"){if(!TICKETS_ATIVOS){toast("Tickets desativados");return}if(!ticketDe(t))encaminharArea(t,()=>{T.ok=false;carregar()});return}
       if(k==="concluida"){if(t.status!=="concluida"){openTarefa(t);setTimeout(()=>{toast("Escreva o que foi feito e clique em Concluir");$("#modalHost textarea")?.focus()},300)}return}
       if(ticketDe(t)){toast("Responda o ticket antes de mover");return}
       if(t.status===k)return;const {error}=await SB.from("tarefas").update({status:k}).eq("id",id);if(error){toast(error.message);return}T.ok=false;carregar()});
@@ -303,7 +304,7 @@ function openTarefa(t){
     aberta?trabalho:el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}},"Reabrir"),
     el("span",{class:"sp",style:"flex:1"}),
     aberta?el("button",{class:"btn sm",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
-    aberta&&!ticketDe(t)?el("button",{class:"btn sm",title:"Precisa de uma decisão ou informação de outra área? Abra um ticket: a tarefa fica aguardando a área e o tempo parado aparece para todos.",onclick:()=>encaminharArea(t,reabrirTela)},"⇄ Ticket para área…"):null,
+    aberta&&TICKETS_ATIVOS&&!ticketDe(t)?el("button",{class:"btn sm",title:"Precisa de uma decisão ou informação de outra área? Abra um ticket: a tarefa fica aguardando a área e o tempo parado aparece para todos.",onclick:()=>encaminharArea(t,reabrirTela)},"⇄ Ticket para área…"):null,
     aberta&&ticketDe(t)?el("button",{class:"btn sm primary",onclick:()=>responderTicket(t,reabrirTela)},"Responder ticket ("+(AREAS_TICKET[ticketDe(t).aguardando_area]||"")+")"):null,
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
     t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,

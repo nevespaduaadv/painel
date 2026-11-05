@@ -24,7 +24,7 @@ function formMotivo(m){
 }
 function renderTela(){
   const v=$("#view-config-gestao");if(!v)return;v.replaceChildren();
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Configurações"),el("div",{class:"sub"},"Regras que a gestão e a controladoria definem e a equipe usa no dia a dia: motivos de reagendamento e SLAs dos tickets."))));
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Configurações"),el("div",{class:"sub"},"Regras que a gestão e a controladoria definem e a equipe usa no dia a dia: motivos de reagendamento e medidas de proteção."))));
   if(!pode()){v.append(el("div",{class:"note"},"Acesso restrito à gestão."));return}
   if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(el("div",{class:"note"},"Carregando…"));return}
   // motivos
@@ -39,12 +39,7 @@ function renderTela(){
   v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"note"},"Checklist que aparece em Cadastro → Proteção patrimonial e operacional de cada cliente PJ (escrow, gestora, CNPJ espelho…). Desativar esconde sem apagar o histórico.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formMedida()},"+ Medida"))),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Medida"),el("th",{},"Descrição"),el("th",{},"Situação"),el("th",{}))),
       el("tbody",{},(G.medidas||[]).length?G.medidas.map(m=>el("tr",{},el("td",{class:"num"},String(m.ordem)),el("td",{},el("b",{},m.nome),el("div",{class:"note"},m.codigo)),el("td",{class:"note"},m.descricao||"—"),el("td",{},el("span",{class:"pill "+(m.ativo?"g":"")},m.ativo?"Ativa":"Inativa")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formMedida(m)},"Editar")))):el("tr",{},el("td",{colspan:5,class:"note"},"Nenhuma medida cadastrada (rode a migração 0092).")))))));
-  // SLAs
-  const linhas=Object.entries(AREAS).map(([k,l])=>{const s=G.slas.find(x=>x.area===k)||{area:k,dias_resposta:2,dias_critico:5};const r=inp("number",s.dias_resposta,{min:0,max:60,style:"width:80px"}),c=inp("number",s.dias_critico,{min:0,max:90,style:"width:80px"}),o=inp("text",s.observacao||"",{placeholder:"opcional"});
-    const salvar=async()=>{const {error}=await SB.from("sla_tickets").upsert({area:k,dias_resposta:+r.value||0,dias_critico:Math.max(+c.value||0,+r.value||0),observacao:o.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id},{onConflict:"area"});if(error){toast(error.message);return}toast("SLA de "+l+" salvo");G.slas=null;render()};
-    return el("tr",{},el("td",{},el("b",{},l)),el("td",{},r),el("td",{},c),el("td",{},o),el("td",{class:"r"},el("button",{class:"btn sm",onclick:salvar},"Salvar")))});
-  v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"SLAs dos tickets por área"),el("div",{class:"note"},"Dias que a área tem para responder um ticket. Até o prazo: azul; passou: amarelo (“SLA vencido”); a partir do crítico: vermelho. Vale também como referência para as requisições administrativas."))),
-    el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Área"),el("th",{},"Dias para responder"),el("th",{},"Crítico a partir de"),el("th",{},"Observação"),el("th",{}))),el("tbody",{},linhas)))));
+  // SLAs dos tickets: seção ocultada (tickets desativados em 05/11/2026)
 }
 {const _r=render;render=function(){_r();const v=$("#view-config-gestao");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="config-gestao")S.tab="clientes";v.hidden=S.tab!=="config-gestao";if(S.tab==="config-gestao")renderTela()}}
 window.PP_CONFIG_GESTAO={invalidar};

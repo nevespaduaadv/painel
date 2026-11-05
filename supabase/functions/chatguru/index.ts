@@ -230,6 +230,18 @@ async function siteFormulario(req: Request): Promise<Response> {
   return json(200, { ok: res.ok === true }); // não devolve ids nem motivo ao navegador
 }
 
+// Entrada de leads/respostas de automações externas (gestor de tráfego etc.). Cabeçalho x-api-token = Vault LEADS_API_TOKEN.
+async function leadsApi(req: Request): Promise<Response> {
+  const esperado = await segredo("LEADS_API_TOKEN");
+  const tk = req.headers.get("x-api-token") ?? (/^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1] ?? "");
+  if (!esperado || !igual(tk, esperado)) return json(401, { ok: false, erro: "Token inválido." });
+  const bruto = await lerPayload(req);
+  const r = await rest("rpc/lead_receber_api", service(), { method: "POST", body: JSON.stringify({ p: bruto }) });
+  if (!r.ok) return json(502, { ok: false, erro: `Supabase respondeu ${r.status}: ${(await r.text()).slice(0, 160)}` });
+  const res = (await r.json()) as Dict;
+  return json(res.ok === true ? 200 : 400, res);
+}
+
 async function enviar(req: Request): Promise<Response> {
   const cg = await credenciais();
   const jwt = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
@@ -836,6 +848,7 @@ Deno.serve(async (req) => {
     if (rota === "webhook") return await webhook(req, url);
     if (rota === "enviar") return await enviar(req);
     if (rota === "site") return await siteFormulario(req);
+    if (rota === "leads") return await leadsApi(req);
     if (rota === "automacoes") return await automacoes(req);
     if (rota === "resumo") return await resumo(req);
     if (rota === "growth") return await growth(req);
