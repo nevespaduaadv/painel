@@ -1,6 +1,8 @@
 -- 0099 — Cliente novo: além das tarefas de onboarding (D0, auditoria ONB, monitoramento), abre uma tarefa para o Financeiro
 -- lançar o cliente e as cobranças (entrada e parcelas) no Asaas / sistema de cobrança. Gatilho AFTER INSERT em clientes.
--- Idempotente.
+-- Idempotente. Também passa a aceitar o núcleo 'financeiro' nas tarefas (usado aqui e nas tarefas criadas pela Central de Cobranças).
+alter table public.tarefas drop constraint if exists tarefas_nucleo_check;
+alter table public.tarefas add constraint tarefas_nucleo_check check (nucleo = any (array['juridico','acordos','acompanhamento_pj','pos_vendas','comercial','marketing','administrativo','rh','socios','financeiro']));
 create or replace function public.fluxo_novo_cliente_financeiro() returns trigger language plpgsql security definer set search_path = public as $$
 declare resp uuid;
 begin
