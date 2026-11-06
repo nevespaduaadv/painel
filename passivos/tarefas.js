@@ -245,6 +245,18 @@ function passarPara(t,recarregar){
     toast("Tarefa passada para "+quem);setTimeout(recarregar,300);
   });
 }
+/* Ao concluir "Analisar cabimento": pergunta se cabe. Se não cabe, cancela as demais etapas abertas da cadeia (ficam no histórico). */
+function decidirCadeia(t){return new Promise(res=>{
+  const host=$("#modalHost");const nome=(t.titulo||"").replace(/^Analisar cabimento de /i,"").replace(/ — .*$/,"");
+  const fim=v=>{host.replaceChildren();res(v)};
+  const naoCabe=async()=>{try{const {data}=await SB.from("tarefas").select("id").eq("cadeia_id",t.cadeia_id).neq("id",t.id).in("status",["aberta","em_andamento"]);
+      const ids=(data||[]).map(x=>x.id);if(ids.length){const {error}=await SB.from("tarefas").update({status:"cancelada"}).in("id",ids);if(error)throw new Error(error.message);for(const id of ids)await comentar(id,"Cancelada: na análise foi decidido que não cabe "+nome+".")}
+      toast(ids.length?`Não cabe — ${ids.length} etapa(s) cancelada(s)`:"Não cabe — nada a cancelar");fim(false)}catch(e){toast(e.message);fim(null)}};
+  const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:520px"},el("h2",{},`Cabe ${nome||"a medida"}?`),
+    el("p",{class:"sub",style:"margin:8px 0 14px"},"Se cabe, as etapas Confeccionar → Protocolar → Conferir continuam abertas com as datas já calculadas. Se não cabe, elas são canceladas e ficam registradas no histórico."),
+    el("div",{class:"actions",style:"justify-content:flex-end"},el("button",{class:"btn danger",onclick:naoCabe},"Não cabe — cancelar etapas"),el("button",{class:"btn primary",onclick:()=>{toast("Cadeia mantida");fim(true)}},"Cabe — manter a cadeia")));
+  host.replaceChildren(el("div",{class:"modal"},card));
+})}
 function openTarefa(t){
   const meu=meuColab();const aberta=t.status==="aberta"||t.status==="em_andamento";
   const host=$("#modalHost");host.replaceChildren();const close=()=>{clearInterval(openTarefa._tick);host.replaceChildren()};
@@ -269,7 +281,9 @@ function openTarefa(t){
   const concluir=async()=>{
     const txt=(com?.value||"").trim();if(!txt&&!temRegistro){toast("Escreva na caixa de andamento o que foi feito antes de concluir");com?.focus();return}
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      await mudarStatus(t,"concluida",txt||null,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();T.ok=false;await carregar()}catch(e){toast(e.message)}
+      await mudarStatus(t,"concluida",txt||null,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();
+      if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);
+      T.ok=false;await carregar()}catch(e){toast(e.message)}
   };
   const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
   /* "Feito": encerra o que estava fazendo agora (pausa o cronômetro e grava o tempo; registra o texto da caixa de andamento, se houver) — a tarefa continua aberta */
@@ -320,7 +334,14 @@ function openTarefa(t){
   const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.replaceChildren(ico("clip","Anexar arquivo"));temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))registrar()});
   mencoes(com);
-  const body=el("div",{class:"tf"},cab,meta,desc,acoes,
+  const ETAPA_N={analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
+  const cadeiaBox=t.cadeia_id?el("div",{class:"tf-cadeia"},el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"note"},"Carregando etapas…")):null;
+  if(cadeiaBox)SB.from("v_tarefas").select("id,titulo,prazo,prazo_fatal,status,etapa_codigo,responsavel_nome,faixa,dias_para_prazo").eq("cadeia_id",t.cadeia_id).order("prazo").then(({data})=>{const ts=data||[];
+    cadeiaBox.replaceChildren(el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"tf-cadeia-l"},...ts.map(x=>el("button",{class:"row"+(x.id===t.id?" atual":""),type:"button",onclick:()=>{if(x.id!==t.id){close();openTarefa({...x,cadeia_id:t.cadeia_id})}}},
+      el("span",{class:"pill "+(x.status==="concluida"?"g":x.status==="cancelada"?"":x.faixa==="atrasada"||x.faixa==="hoje"?"e3":x.faixa==="d7"?"e2":"c"),style:"min-width:84px;justify-content:center"},x.prazo?fmtD(parseD(x.prazo)):"—"),
+      el("span",{style:x.status==="concluida"||x.status==="cancelada"?"text-decoration:line-through;color:var(--muted)":""},ETAPA_N[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?" · fatal":""),
+      el("span",{class:"note",style:"margin-left:auto"},x.responsavel_nome||"")))))});
+  const body=el("div",{class:"tf"},cab,meta,cadeiaBox,desc,acoes,
     el("div",{class:"tf-h"},"Andamento"),
     el("div",{style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0 10px"},com,btnArq,arqCom),hist);
   const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:860px;position:relative"},el("button",{class:"btn sm",title:"Fechar (Esc)",style:"position:absolute;top:12px;right:12px;padding:2px 9px;font-size:16px;line-height:1",onclick:close},"×"),
@@ -334,8 +355,18 @@ document.head.append(el("style",{},`.tf-meta{display:grid;grid-template-columns:
 .tf-desc{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:13.5px;line-height:1.45;max-height:260px;overflow:auto}
 .tf-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .tf-h{font-weight:600;margin-top:4px}
+.tf-cadeia{margin:4px 0 10px}.tf-cadeia-l{display:flex;flex-direction:column;gap:2px;margin-top:4px}.tf-cadeia-l .row{display:flex;gap:10px;align-items:center;padding:6px 8px;font-size:13px;border:1px solid transparent;border-radius:8px;background:transparent;text-align:left;width:100%}.tf-cadeia-l .row.atual{border-color:var(--gold);background:var(--surface-2)}
 .tf-trab{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.tf-relogio{font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .tl li.ev-sistema{padding:2px 0 8px;opacity:.75}.tl li.ev-sistema::before{background:var(--line);width:8px;height:8px;left:-22px;top:9px}.tl li.ev-humano{padding:6px 0 12px}`));
+/* Reagendou a etapa Protocolar: as outras etapas abertas da cadeia andam o mesmo número de dias (ajustando para dia útil anterior). */
+async function cascatearCadeia(t,novoPrazo,motivo){
+  try{const delta=Math.round((parseD(novoPrazo)-parseD(t.prazo))/86400000);if(!delta)return;
+    const {data}=await SB.from("tarefas").select("id,prazo,etapa_codigo").eq("cadeia_id",t.cadeia_id).neq("id",t.id).in("status",["aberta","em_andamento"]).neq("etapa_codigo","analisar");
+    let n=0;for(const x of data||[]){if(!x.prazo)continue;let d=parseD(x.prazo);d.setDate(d.getDate()+delta);
+      if(window.PP_PRAZOS){let g=0;while(!window.PP_PRAZOS.ehUtil(d,null)&&g<10){d.setDate(d.getDate()+(x.etapa_codigo==="conferir"?1:-1));g++}}
+      const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const {error}=await SB.from("tarefas").update({prazo:iso,motivo_reagendamento:"Cadeia: "+(motivo||"reagendamento da etapa Protocolar")}).eq("id",x.id);if(!error)n++}
+    if(n)toast(`Cadeia reagendada: ${n} etapa(s) ${delta>0?"adiada(s)":"antecipada(s)"} ${Math.abs(delta)} dia(s)`)}catch(e){toast("Cadeia: "+e.message)}
+}
 function openTarefaForm(t={}){
   const meu=meuColab();
   let anexoForm=null;
@@ -370,7 +401,8 @@ function openTarefaForm(t={}){
     let id=t.id;
     if(id){const reag=t.prazo&&row.prazo!==t.prazo;if(reag){const mv=motivoC.valor();if(!mv)throw new Error("Escolha o motivo do reagendamento (e descreva, se for “Outro”)");row.motivo_reagendamento=mv}
       if(row.status==="concluida"&&t.status!=="concluida")throw new Error("Para concluir, use o botão “Concluir” e registre o que foi feito");
-      const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw new Error(/motivo do reagendamento/.test(error.message)?"Informe o motivo do reagendamento":error.message)}
+      const {error}=await SB.from("tarefas").update(row).eq("id",id);if(error)throw new Error(/motivo do reagendamento/.test(error.message)?"Informe o motivo do reagendamento":error.message)
+      if(reag&&t.cadeia_id&&t.etapa_codigo==="protocolar")await cascatearCadeia(t,row.prazo,row.motivo_reagendamento)}
     else{const {data,error}=await SB.from("tarefas").insert(row).select("id").single();if(error)throw error;id=data.id;
       if(+hr.value>0){if(!meu)throw new Error("Tarefa salva, mas você não tem registro de colaborador para apontar horas");const {error:e2}=await SB.from("apontamentos_horas").insert({colaborador_id:meu.id,data:hojeISO(),horas:+hr.value,cliente_id:cli.value||null,tarefa_id:id,tipo_atividade:"outro",descricao:titulo.value.trim()});if(e2)throw e2}}
     if(anexoForm&&anexoForm.files.length)await comentar(id,"Arquivo anexado: "+[...anexoForm.files].map(f=>f.name).join(", "),[...anexoForm.files]);
