@@ -30,8 +30,9 @@ create policy dj_sel on public.datajud_requisicoes for select to authenticated u
 
 insert into public.regras (id, dados) values ('datajud', jsonb_build_object(
   'chave', 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==',
-  'lote_por_hora', 40, 'horas_entre_consultas', 20, 'visivel_cliente', false, 'avisar_responsavel', true))
+  'lote_por_hora', 20, 'horas_entre_consultas', 20, 'visivel_cliente', false, 'avisar_responsavel', true))
 on conflict (id) do nothing;
+update public.regras set dados = dados || '{"lote_por_hora": 20}'::jsonb where id = 'datajud' and (dados->>'lote_por_hora')::int > 20;
 
 -- alias do índice a partir do número CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO
 create or replace function public.datajud_alias(p_numero text) returns text language plpgsql immutable as $$
@@ -71,7 +72,7 @@ declare cfg jsonb; r record; rid bigint; n integer := 0; lote integer; horas int
 begin
   select dados into cfg from public.regras where id = 'datajud';
   if cfg is null or coalesce(cfg->>'chave','') = '' then return 0; end if;
-  lote := coalesce((cfg->>'lote_por_hora')::int, 40); horas := coalesce((cfg->>'horas_entre_consultas')::int, 20);
+  lote := coalesce((cfg->>'lote_por_hora')::int, 20); horas := coalesce((cfg->>'horas_entre_consultas')::int, 20);
   for r in
     select p.id, p.numero_cnj from public.processos p
      where p.status = 'ativo' and public.datajud_alias(p.numero_cnj) is not null
@@ -85,7 +86,7 @@ begin
       url := 'https://api-publica.datajud.cnj.jus.br/api_publica_' || al || '/_search',
       headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'APIKey ' || (cfg->>'chave'), 'User-Agent', 'NevesPadua-Carteira/1.0'),
       body := jsonb_build_object('size', 1, 'query', jsonb_build_object('match', jsonb_build_object('numeroProcesso', regexp_replace(r.numero_cnj, '[^0-9]', '', 'g')))),
-      timeout_milliseconds := 30000) into rid;
+      timeout_milliseconds := 60000) into rid;
     insert into public.datajud_requisicoes (processo_id, alias, request_id) values (r.id, al, rid);
     update public.processos set datajud_consulta_em = now() where id = r.id;
     n := n + 1;
@@ -111,7 +112,7 @@ begin
     if resp.status_code is distinct from 200 or resp.content is null then
       update public.datajud_requisicoes set status = 'erro', erro = coalesce(resp.error_msg, 'HTTP '||coalesce(resp.status_code::text,'?'))||' '||left(coalesce(resp.content,''),200), processado_em = now() where id = r.id;
       update public.processos set datajud_erro = left(coalesce(resp.error_msg, 'HTTP '||coalesce(resp.status_code::text,'?')), 200),
-             datajud_consulta_em = case when resp.status_code in (429, 500, 502, 503) then now() - interval '18 hours' else datajud_consulta_em end  -- sobrecarga: tenta de novo em ~2h
+             datajud_consulta_em = case when resp.status_code is null or resp.status_code in (408, 429, 500, 502, 503, 504) then now() - interval '18 hours' else datajud_consulta_em end  -- sobrecarga/timeout: tenta de novo em ~2h
        where id = r.processo_id;
       continue;
     end if;
@@ -170,7 +171,7 @@ begin
     if al is null then raise exception 'Número CNJ inválido para consulta no DataJud.'; end if;
     select net.http_post(url := 'https://api-publica.datajud.cnj.jus.br/api_publica_' || al || '/_search',
       headers := jsonb_build_object('Content-Type','application/json','Authorization','APIKey ' || (cfg->>'chave'),'User-Agent','NevesPadua-Carteira/1.0'),
-      body := jsonb_build_object('size',1,'query',jsonb_build_object('match',jsonb_build_object('numeroProcesso', regexp_replace(num,'[^0-9]','','g')))), timeout_milliseconds := 30000) into rid;
+      body := jsonb_build_object('size',1,'query',jsonb_build_object('match',jsonb_build_object('numeroProcesso', regexp_replace(num,'[^0-9]','','g')))), timeout_milliseconds := 60000) into rid;
     insert into public.datajud_requisicoes (processo_id, alias, request_id) values (p_processo, al, rid);
     update public.processos set datajud_consulta_em = now() where id = p_processo; n := 1;
   else
@@ -191,10 +192,10 @@ begin
 exception when others then raise notice 'v_processos não recriada: %', sqlerrm;
 end $$;
 
--- agenda: consultas de hora em hora (7h–19h BRT, dias úteis) e processamento a cada 5 min
+-- agenda: consultas a cada 30 min (7h–19h BRT, dias úteis), em lotes pequenos para não tomar 429 e processamento a cada 5 min
 do $$ begin
   perform cron.unschedule(jobid) from cron.job where jobname in ('datajud_solicitar','datajud_processar');
-  perform cron.schedule('datajud_solicitar', '15 10-22 * * 1-5', $c$select public.datajud_solicitar()$c$);
+  perform cron.schedule('datajud_solicitar', '15,45 10-22 * * 1-5', $c$select public.datajud_solicitar()$c$);
   perform cron.schedule('datajud_processar', '*/5 * * * *', $c$select public.datajud_processar()$c$);
 exception when others then raise notice 'cron indisponível: %', sqlerrm;
 end $$;
