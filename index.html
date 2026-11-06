@@ -49,7 +49,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app{display:grid;grid-template-columns:var(--sbw) minmax(0,1fr);min-height:100vh}
 .app.colapsada{--sbw:64px}
 .sb{background:var(--navy);color:var(--sb-fg-strong);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow:hidden auto;border-right:1px solid rgba(255,255,255,.06);scrollbar-width:thin;scrollbar-color:var(--sb-scroll) transparent}
-.brand{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 14px 10px;color:var(--sb-brand);min-height:62px;flex:0 0 auto}
+.brand{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 14px 12px;color:var(--sb-brand);min-height:62px;flex:0 0 auto}
 .brand .logo{width:128px;height:auto;display:block}
 .brand .mono{display:none;width:24px;height:auto}
 .brand small{color:var(--gold);letter-spacing:.16em;text-transform:uppercase;font-size:12px;font-weight:600;display:block;white-space:nowrap}
@@ -317,7 +317,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 
 <div class="app" id="app">
 <aside class="sb" id="sb">
-  <div class="brand"><img class="logo" src="passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="passivos/img/monograma-branco.png" alt="NP"><small>Sistema interno</small></div>
+  <div class="brand"><img class="logo" src="passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="passivos/img/monograma-branco.png" alt="NP"></div>
   <nav class="tabs" role="tablist" id="nav"></nav>
 </aside>
 <div class="sb-overlay" onclick="document.getElementById('app').classList.remove('sb-aberta')"></div>
@@ -1443,7 +1443,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"]];PP.MODULOS_V="?v=mw508l9u";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"]];PP.MODULOS_V="?v=mw50fdb9";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
