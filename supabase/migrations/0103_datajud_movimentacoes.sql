@@ -54,6 +54,16 @@ begin
     else null end;
 end $$;
 
+-- datas do DataJud vêm como ISO ("2026-07-24T09:08:26.000Z") ou como 14 dígitos ("20260724090826"), conforme o tribunal
+create or replace function public.datajud_ts(p text) returns timestamptz language plpgsql immutable as $$
+begin
+  if p is null or p = '' then return null; end if;
+  if p ~ '^\d{14}$' then return (to_timestamp(p, 'YYYYMMDDHH24MISS') at time zone 'UTC') at time zone 'America/Sao_Paulo'; end if;
+  if p ~ '^\d{8}$' then return to_date(p, 'YYYYMMDD')::timestamptz; end if;
+  return p::timestamptz;
+exception when others then return null;
+end $$;
+
 -- dispara as consultas (lote por hora; cada processo no máximo 1× a cada N horas)
 create or replace function public.datajud_solicitar() returns integer
 language plpgsql security definer set search_path = public as $$
@@ -117,7 +127,7 @@ begin
     select * into p from public.processos where id = r.processo_id;
     v_novos := 0;
     for mv in select * from jsonb_array_elements(coalesce(src->'movimentos','[]'::jsonb)) loop
-      begin d_mov := (mv->>'dataHora')::timestamptz at time zone 'America/Sao_Paulo'; exception when others then d_mov := null; end;
+      d_mov := (public.datajud_ts(mv->>'dataHora') at time zone 'America/Sao_Paulo')::date;
       if d_mov is null then continue; end if;
       select string_agg(coalesce(c->>'descricao', c->>'nome') || ': ' || coalesce(c->>'valor', c->>'nome', ''), '; ' order by c->>'codigo') into comp
         from jsonb_array_elements(coalesce(mv->'complementosTabelados','[]'::jsonb)) c;
@@ -128,14 +138,14 @@ begin
       on conflict (processo_id, data, md5(descricao)) where (fonte <> 'manual') do nothing;
       if found then v_novos := v_novos + 1; prim := coalesce(prim, to_char(d_mov,'DD/MM/YYYY') || ' — ' || txt); end if;
     end loop;
-    begin ult := (src->>'dataHoraUltimaAtualizacao')::timestamptz; exception when others then ult := null; end;
+    ult := public.datajud_ts(src->>'dataHoraUltimaAtualizacao');
     update public.processos set
       datajud_atualizado_em = coalesce(ult, datajud_atualizado_em), datajud_erro = null, datajud_grau = coalesce(src->>'grau', datajud_grau), datajud_consulta_em = now(),
       vara = coalesce(nullif(vara,''), src->'orgaoJulgador'->>'nome'),
       tipo_acao = coalesce(nullif(tipo_acao,''), src->'classe'->>'nome'),
       assunto = coalesce(nullif(assunto,''), src->'assuntos'->0->>'nome'),
       tribunal = coalesce(nullif(tribunal,''), src->>'tribunal'),
-      data_distribuicao = coalesce(data_distribuicao, (nullif(src->>'dataAjuizamento',''))::timestamptz::date)
+      data_distribuicao = coalesce(data_distribuicao, (public.datajud_ts(src->>'dataAjuizamento') at time zone 'America/Sao_Paulo')::date)
      where id = p.id;
     update public.datajud_requisicoes set status = 'ok', novos = v_novos, processado_em = now() where id = r.id;
     if v_novos > 0 and avisar and p.responsavel_id is not null and p.datajud_atualizado_em is not null then  -- na 1ª carga (histórico) não avisa
