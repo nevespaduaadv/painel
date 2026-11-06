@@ -274,7 +274,7 @@ function openTarefa(t){
   const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
   /* "Feito": encerra o que estava fazendo agora (pausa o cronômetro e grava o tempo; registra o texto da caixa de andamento, se houver) — a tarefa continua aberta */
   const feito=async()=>{try{const txt=(com?.value||"").trim();if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      if(txt||arqCom?.files?.length){await comentar(t.id,txt||"(anexo)",[...(arqCom?.files||[])]);com.value="";if(arqCom){arqCom.value="";btnArq.textContent="📎"}liberar()}
+      if(txt||arqCom?.files?.length){await comentar(t.id,txt||"(anexo)",[...(arqCom?.files||[])]);com.value="";if(arqCom){arqCom.value="";btnArq.replaceChildren(ico("clip","Anexar arquivo"))}liberar()}
       toast(txt?"Andamento registrado — tarefa continua aberta":"Tempo gravado — tarefa continua aberta");cron=null;setTimeout(reabrirTela,200)}catch(e){toast(e.message)}};
   const btnFeito=(cls)=>el("button",{class:cls,title:"Encerra o que você estava fazendo agora (grava o tempo e o andamento) sem concluir a tarefa",onclick:feito},"✓ Feito");
   /* ---- trabalho: cronômetro dentro da tarefa (iniciar = em andamento; pausar grava o tempo; concluir grava e encerra) ---- */
@@ -313,11 +313,11 @@ function openTarefa(t){
   /* ---- andamento: registro no topo, comentários em destaque, eventos de sistema discretos ---- */
   const hist=el("div",{},el("div",{class:"note"},"Carregando…"));
   com=el("textarea",{rows:2,style:"flex:1;min-width:0",placeholder:aberta?"O que você fez? Vai para o histórico ao clicar em Feito ou Concluir (ou Ctrl+Enter para só registrar). Pode avisar alguém com @.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
-  arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.textContent=arqCom.files.length?`📎 ${arqCom.files.length}`:"📎"};
+  arqCom=el("input",{type:"file",multiple:"",style:"display:none"});arqCom.onchange=()=>{btnArq.replaceChildren(ico("clip","Anexar arquivo"),arqCom.files.length?" "+arqCom.files.length:"")};
   const liberar=()=>{const ok=!!com.value.trim()||temRegistro;btnsConcluir.forEach(b=>{b.disabled=!ok;b.title=ok?(com.value.trim()?"Concluir com este registro":"Concluir (já há andamento registrado)"):"Escreva o que foi feito na caixa de andamento para liberar"})};com.addEventListener("input",liberar);
   SB.from("tarefa_eventos").select("id").eq("tarefa_id",t.id).eq("tipo","comentario").limit(1).then(({data})=>{temRegistro=!!(data&&data.length);liberar();const n=card.querySelector(".tf-nota-concluir");if(n)n.textContent=temRegistro?"Já há andamento registrado — pode concluir direto ou acrescentar um registro.":"Concluir exige o andamento preenchido (o que foi feito)."});
   const btnArq=el("button",{class:"btn sm",title:"Anexar arquivo ao registro",onclick:()=>arqCom.click()},"📎");
-  const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.textContent="📎";temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
+  const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.replaceChildren(ico("clip","Anexar arquivo"));temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))registrar()});
   mencoes(com);
   const body=el("div",{class:"tf"},cab,meta,desc,acoes,
