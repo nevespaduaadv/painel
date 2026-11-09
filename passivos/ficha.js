@@ -93,7 +93,7 @@ const pill=(l,v,cls)=>v==null?null:el("span",{class:"pill "+(v?cls:"g"),style:v?
 /* ---------- Formulários ---------- */
 function openFichaForm(c){
   const nome=inp("text",c.nome||""),fant=inp("text",c.nome_fantasia||""),tipo=sel({PJ:"Pessoa jurídica",PF:"Pessoa física"},c.tipo_pessoa||"PJ"),cnpj=inp("text",c.cnpj||"",{placeholder:"00.000.000/0001-00"}),cpf=inp("text",c.cpf_titular||""),
-        cidade=inp("text",c.cidade||""),uf=sel({"":"—",...Object.fromEntries(UFS.map(u=>[u,u]))},c.uf||""),seg=inp("text",c.segmento||"",{placeholder:"Ex.: transportes, varejo de calçados"}),grupo=inp("text",c.grupo||"",{placeholder:"Ex.: NASP / M.R. Galera (mesmos sócios, mesmo contrato)"}),fat=inp("number",c.faturamento_mensal||"",{step:"1000"}),func=inp("number",c.funcionarios||"",{min:0}),
+        cidade=inp("text",c.cidade||""),uf=sel({"":"—",...Object.fromEntries(UFS.map(u=>[u,u]))},c.uf||""),seg=inp("text",c.segmento||"",{placeholder:"Ex.: transportes, varejo de calçados"}),grupo=inp("text",c.grupo||c.dados?.grupo||"",{placeholder:"Ex.: NASP / M.R. Galera (mesmos sócios, mesmo contrato)"}),fat=inp("number",c.faturamento_mensal||"",{step:"1000"}),func=inp("number",c.funcionarios||"",{min:0}),
         resp=inp("text",c.responsavel||""),closer=inp("text",c.closer||""),origem=dl("f-origem",c.origem||"",ORIGENS),plano=dl("f-plano",c.plano||"",PLANOS),status=sel(STATUS,c.status||"ativo"),
         dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),pdrive=inp("url",c.pasta_drive_url||"",{placeholder:"https://drive.google.com/drive/folders/…"}),
         hist=el("textarea",{placeholder:"O que aconteceu com a empresa: expansão, queda de faturamento, inadimplência, execuções… em poucas linhas."},c.historia||""),sit=el("textarea",{placeholder:"Opera? Fatura? Em que conta recebe? Negativado?"},c.situacao_atual||""),
@@ -109,13 +109,13 @@ function openFichaForm(c){
     field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs));
   modal("Ficha do cliente",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
-    const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,grupo:grupo.value.trim()||null,
+    const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
       faturamento_mensal:fat.value===""?null:+fat.value,funcionarios:func.value===""?null:+func.value,closer:closer.value.trim()||null,origem:origem.input.value.trim()||null,plano:plano.input.value.trim()||null,status:status.value,
       data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,pasta_drive_url:pdrive.value.trim()||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
       negativado:triVal(neg),usa_maquininha:triVal(maq),tem_consorcio:triVal(cons),outros_cnpjs:outros.value.trim()||null,assuntos_interesse:ass.value.trim()||null,disponibilidade:disp.value.trim()||null,observacoes_onboarding:obs.value.trim()||null};
     // nome, responsável, reserva e cnpj também vivem no jsonb (motor e páginas do cliente)
     const {data:cur}=await SB.from("clientes").select("dados").eq("id",c.id).single();
-    const dados={...(cur?.dados||{}),nome:nome.value.trim(),cnpj:cols.cnpj||"",responsavel:resp.value.trim(),reservaAcumulada:+res.value||0};
+    const dados={...(cur?.dados||{}),nome:nome.value.trim(),cnpj:cols.cnpj||"",responsavel:resp.value.trim(),reservaAcumulada:+res.value||0,grupo:grupo.value.trim()||null};
     const {error}=await SB.from("clientes").update({...cols,dados}).eq("id",c.id);
     if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Ficha salva");notificar("clientes");
