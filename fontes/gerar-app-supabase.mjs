@@ -87,14 +87,14 @@ html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"
   const fim = html.indexOf('    m.append(sec);return;\n  }\n', fim0) + '    m.append(sec);return;\n  }\n'.length;
   const antigo = html.slice(ini, fim);
   const novo = `  const EQ=!readOnly();
-  const SUBS=EQ?[["dossie","Dossiê"],["cliente","Cadastro"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],...(PP.podeFinanceiro?[["financeiro","Financeiro"]]:[])]
+  const SUBS=EQ?[["dossie","Dossiê"],["cliente","Cadastro"],["acompanhamento","Acompanhamento PJ"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],...(PP.podeFinanceiro?[["financeiro","Financeiro"]]:[])]
     :[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline","Andamento",cnt.timeline],["processos","Processos",cnt.processos]];
   if(EQ){const mapa={resumo:"dossie",timeline:"dossie",notas:"cliente",geral:"passivos",contratos:"passivos",reserva:"passivos"};if(mapa[S.sub]){if(["geral","contratos","reserva"].includes(S.sub))S.sub2=S.sub;S.sub=mapa[S.sub]}}
   if(EQ&&S.sub==="financeiro"&&!PP.podeFinanceiro)S.sub="dossie";
   if(!S.sub||!(SUBS.some(s=>s[0]===S.sub)||(EQ&&S.sub==="documentos")))S.sub=EQ?"dossie":(MOD.resumo?"resumo":"geral");
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k||(k==="cliente"&&S.sub==="documentos")),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
   if(EQ&&S.sub==="documentos"){const host=el("div",{class:"main",style:"gap:14px"});m.append(host);if(window.PP_FICHA?.paginaDocumentos)window.PP_FICHA.paginaDocumentos(c,host);else host.append(el("div",{class:"note"},"Carregando…"));return}
-  if(S.sub==="resumo"||S.sub==="dossie"||S.sub==="cliente"||S.sub==="financeiro"){
+  if(S.sub==="resumo"||S.sub==="dossie"||S.sub==="cliente"||S.sub==="financeiro"||(EQ&&S.sub==="acompanhamento")){
     const host=el("div",{class:"main",style:"gap:14px"});m.append(host);
     if(MOD.resumo)MOD.resumo(c,host,{ks,ativos,saldoTotal,saldoNeg,acordoTotal,reservaTotal});else{S.sub=EQ?"passivos":"geral";render();return}
     if(S.sub==="cliente"){
@@ -405,7 +405,7 @@ html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;
 // os de "core" + as áreas da pessoa (admin = todas; cliente = só carteira e ficha).
 const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
-  ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['fluxo','juridico'],
+  ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['acompanhamento-pj','clientes'],['fluxo','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
   ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['faturamento','financeiro'],['dossie','core'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],
