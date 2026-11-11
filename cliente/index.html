@@ -370,6 +370,10 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-revisional" hidden class="main"></div>
   <div id="view-pecas" hidden class="main"></div>
   <div id="view-financeiro" hidden class="main"></div>
+  <div id="view-fin-visao" hidden class="main"></div>
+  <div id="view-fin-regua" hidden class="main"></div>
+  <div id="view-fin-retornos" hidden class="main"></div>
+  <div id="view-fin-recuperacao" hidden class="main"></div>
   <div id="view-faturamento" hidden class="main"></div>
   <div id="view-importar-advbox" hidden class="main"></div>
   <div id="view-perfil" hidden class="main"></div>
@@ -1307,7 +1311,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mw9q7pns"></script>
-<script src="../passivos/ficha.js?v=mw9q7pns"></script>
+<script src="../passivos/carteira.js?v=mwc558n5"></script>
+<script src="../passivos/ficha.js?v=mwc558n5"></script>
 </body>
 </html>
