@@ -17,6 +17,10 @@ function gerar(modo){
 let html = fs.readFileSync(path.join(base,'painel.html'),'utf8');
 const must=(needle)=>{if(!html.includes(needle)){console.error('âncora não encontrada:',needle.slice(0,60));process.exit(1)}};
 
+// 0) Tokens do Design System (fontes/tokens.css) no lugar da âncora /*TOKENS*/ — ver DESIGN.md
+must('/*TOKENS*/');
+html = html.replace('/*TOKENS*/', fs.readFileSync(path.join(base,'tokens.css'),'utf8').trim());
+
 // 1) CSS extra
 must('</style>');
 html = html.replace('</style>', `

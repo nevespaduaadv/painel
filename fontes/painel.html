@@ -13,28 +13,7 @@
 @font-face{font-family:"General Sans";font-weight:600;font-display:swap;src:url(passivos/fontes/general-sans-600.woff2) format("woff2")}
 @font-face{font-family:"General Sans";font-weight:700;font-display:swap;src:url(passivos/fontes/general-sans-700.woff2) format("woff2")}
 /* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
-:root{
-  /* Paleta do site nevespaduaadvocacia.com.br: grafite, off-white, bronze suave e verde na ação principal */
-  --navy:#2A2E31; --navy-2:#202426; --navy-3:#3A3F42; --gold:#A69D84; --gold-soft:#EAD8B4;
-  --bg:#F7F6F2; --surface:#FFFFFF; --surface-2:#F3F1EC; --line:#E8E6E1;
-  --fg:#1A1A18; --muted:#6B6760; --faint:#7D7872;
-  --on-dark:#FFFFFF; --on-gold:#1B1A14; --sb-fg:#CFD3CD; --sb-fg-strong:#D9D4C7; --sb-brand:#F3EFE6; --sb-scroll:#4A5054;
-  --ok:#1B8245; --warn:#B8860B; --crit:#A23B3B; --info:#2F5C8F;
-  --btn-primary:#1B8245; --btn-primary-shadow:rgba(0,0,0,0);
-  --ch-a:#2E6F55; --ch-b:#B08A4A; --ch-grid:#E3E6DF;
-  --display:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --body:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --serif:"EB Garamond",Georgia,"Times New Roman",serif;
-  --r:12px; --r-sm:8px; --shadow:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.04); --shadow-pop:0 8px 30px rgba(0,0,0,.09);
-}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#151412; --surface:#1D1C1A; --surface-2:#262523; --line:#302E2B;
-  --fg:#F2F0EB; --muted:#A8A49F; --faint:#8C8882; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 8px 30px rgba(0,0,0,.5);
-  --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#151412; --surface:#1D1C1A; --surface-2:#262523; --line:#302E2B;
-  --fg:#F2F0EB; --muted:#A8A49F; --faint:#8C8882; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 8px 30px rgba(0,0,0,.5);
-  --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark }
+/*TOKENS*/
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}

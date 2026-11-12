@@ -13,8 +13,116 @@
 @font-face{font-family:"General Sans";font-weight:600;font-display:swap;src:url(../passivos/fontes/general-sans-600.woff2) format("woff2")}
 @font-face{font-family:"General Sans";font-weight:700;font-display:swap;src:url(../passivos/fontes/general-sans-700.woff2) format("woff2")}
 /* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
+/* ============================================================================
+   Neves Pádua — tokens do Design System (V3.1 consolidada)
+   Fonte da verdade: fontes/tokens.css. O gerador (fontes/gerar-app-supabase.mjs)
+   inclui este arquivo no <style> de index.html, cliente/index.html e beta/index.html,
+   no lugar do comentário-âncora TOKENS de fontes/painel.html. (gestao/index.html é só
+   um redirecionamento para #visao e não tem CSS próprio.)
+
+   FASE 0 (este arquivo): acrescenta os tokens novos e mantém os LEGADOS com os
+   valores que já estão em produção. Resultado visual esperado: idêntico.
+   Fases 1+ passam a usar os tokens novos; os legados viram aliases dos novos
+   quando cada módulo migra, e só são removidos na Fase 6.
+   ============================================================================ */
+
+/* ---------- 1. Tema claro (padrão) ---------- */
 :root{
-  /* Paleta do site nevespaduaadvocacia.com.br: grafite, off-white, bronze suave e verde na ação principal */
+  /* superfícies e planos */
+  --np-bg:#F3F3F1;           /* papel da área de trabalho */
+  --np-side:#ECECE8;         /* lateral (um tom abaixo do papel) */
+  --np-surface:#FFFFFF;      /* folha: painel, popover, botões, paleta */
+  --np-surface-2:#F6F6F4;    /* avatar, segmento, campos */
+  --np-line:#E3E3DF;         /* fio padrão */
+  --np-line-2:#D2D2CD;       /* fio forte, bordas de botão */
+  --np-ctrl:#858580;         /* borda de controle (check, pontos) ≥ 3:1 */
+  /* texto */
+  --np-text:#1D2126;
+  --np-text-2:#4D545C;
+  --np-text-3:#5F666E;       /* ≥ 4,5:1 também sobre --np-side */
+  --np-inv:#FFFFFF;          /* texto sobre a tinta */
+  /* tinta e estados de seleção */
+  --np-ink:#2A2E31;
+  --np-ink-2:#3A3F43;
+  --np-sel:rgba(42,46,49,.08);
+  --np-sel-2:rgba(42,46,49,.14);
+  --np-hover:rgba(42,46,49,.05);
+  /* semânticas (texto) */
+  --np-ok:#1E7A4C;
+  --np-att:#93600F;          /* âmbar para texto (4,8:1) */
+  --np-att-s:#B7791F;        /* âmbar para régua e marcadores (não-texto) */
+  --np-crit:#A3302E;         /* fatal */
+  --np-late:#8E2B29;         /* atrasada */
+  --np-info:#2F5C8F;         /* compromisso / fazendo */
+  /* semânticas (fundo) */
+  --np-ok-bg:rgba(30,122,76,.12);
+  --np-att-bg:rgba(183,121,31,.14);
+  --np-crit-bg:rgba(163,48,46,.12);
+  --np-info-bg:rgba(47,92,143,.12);
+  /* elevação */
+  --np-shadow:0 1px 2px rgba(20,22,24,.06),0 12px 32px -12px rgba(20,22,24,.22);
+  --np-focus:0 0 0 2px var(--np-bg),0 0 0 4px var(--np-ink);
+  /* tipografia (famílias já existentes no projeto) */
+  --np-display:"EB Garamond",Georgia,"Times New Roman",serif;
+  --np-ui:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --np-fs-1:12px;   /* kbd, contadores, iniciais — mínimo absoluto */
+  --np-fs-2:13px;   /* secundário da linha, meta */
+  --np-fs-3:14px;   /* corpo, título da linha, navegação */
+  --np-fs-4:15px;   /* título da barra */
+  --np-fs-5:15.5px; /* prazo (serifa) */
+  --np-fs-6:17px;   /* título do painel */
+  --np-fs-7:20px;   /* número do resumo (serifa) */
+  /* forma e medidas */
+  --np-r:6px;        /* controles */
+  --np-r-lg:10px;    /* folhas flutuantes e painel */
+  --np-side-w:244px; --np-rail-w:56px; --np-drawer-w:272px;
+  --np-panel-w:440px; --np-bar-h:48px; --np-row-h:46px;
+  /* movimento (Motion Design System) */
+  --np-d1:90ms; --np-d2:160ms; --np-d3:240ms; --np-d4:360ms;
+  --np-e-in:cubic-bezier(.2,.7,.2,1);      /* chegada */
+  --np-e-out:cubic-bezier(.4,0,1,1);       /* saída */
+  --np-e-move:cubic-bezier(.45,0,.2,1);    /* mover */
+  --np-e-spring:cubic-bezier(.22,1,.36,1); /* mola */
+  --np-slow:1;                             /* multiplicador de revisão (5 = câmera lenta) */
+  /* color-scheme claro fica implícito (igual à produção); o escuro declara color-scheme:dark */
+}
+
+/* ---------- 2. Tema escuro: preferência individual (pp-tema) ou do sistema ---------- */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --np-bg:#141618; --np-side:#1A1C1F; --np-surface:#1E2124; --np-surface-2:#24282C;
+    --np-line:#2B3036; --np-line-2:#3B4147; --np-ctrl:#737B83;
+    --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
+    --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
+    --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
+    --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0;
+    --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
+    --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --np-bg:#141618; --np-side:#1A1C1F; --np-surface:#1E2124; --np-surface-2:#24282C;
+  --np-line:#2B3036; --np-line-2:#3B4147; --np-ctrl:#737B83;
+  --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
+  --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
+  --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
+  --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0;
+  --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
+  --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
+  color-scheme:dark;
+}
+
+/* ---------- 3. Movimento reduzido ---------- */
+@media (prefers-reduced-motion:reduce){
+  :root{--np-d1:0ms;--np-d2:0ms;--np-d3:80ms;--np-d4:80ms}
+}
+
+/* ---------- 4. LEGADOS — valores idênticos aos de produção (Fase 0 não muda nada) ----------
+   Hoje definidos em fontes/painel.html; passam a viver aqui para haver um único lugar.
+   Quando um módulo migrar (Fases 2–5), seus usos trocam para --np-*. Na Fase 6 estes
+   nomes viram aliases (ex.: --muted: var(--np-text-3)) e depois saem. */
+:root{
   --navy:#2A2E31; --navy-2:#202426; --navy-3:#3A3F42; --gold:#A69D84; --gold-soft:#EAD8B4;
   --bg:#F7F6F2; --surface:#FFFFFF; --surface-2:#F3F1EC; --line:#E8E6E1;
   --fg:#1A1A18; --muted:#6B6760; --faint:#7D7872;
@@ -1311,7 +1419,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mwc558n5"></script>
-<script src="../passivos/ficha.js?v=mwc558n5"></script>
+<script src="../passivos/carteira.js?v=mwcwnk8t"></script>
+<script src="../passivos/ficha.js?v=mwcwnk8t"></script>
 </body>
 </html>

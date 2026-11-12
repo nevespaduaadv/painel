@@ -4,8 +4,7 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 
 | Caminho | O que é |
 |---|---|
-| `index.html` | Portal: login único e azulejos por área (Clientes · Jurídico · Comercial · Marketing · Financeiro · Equipe · Gestão), filtrados por perfil. |
-| `passivos/index.html` | App interno "Clientes" (gerado — **não editar à mão**). Navegação por áreas no topo (Clientes · Jurídico ▾ · Equipe ▾ · Gestão), rotas no `#` (`#clientes/<id>/<aba>`, `#tarefas`, `#negociacoes`…) com voltar do navegador e breadcrumb na página do cliente. |
+| `index.html` | Painel interno com login único (gerado a partir de `fontes/painel.html` — **não editar à mão**). Menu lateral por áreas (Hoje · Tarefas · Clientes · Jurídico · Financeiro · Equipe · Gestão…) filtrado por perfil, rotas no `#` (`#clientes/<id>/<aba>`, `#tarefas`, `#negociacoes`…) com voltar do navegador e breadcrumb na página do cliente. |
 | `passivos/carteira.js` | Módulo da carteira: abas **Timeline** e **Processos** da página do cliente (lê e grava nas tabelas do Supabase). |
 | `passivos/ficha.js` | Aba **Resumo** da ficha do cliente: identificação, história, situação, sócios/contatos, bens, documentos. |
 | `passivos/conhecimento.js` | **Base de conhecimento** (Jurídico): artigos em Markdown por tema (teses, POPs, produtos de crédito, negociação, proteção patrimonial, holding), busca full-text, edição com versões, diagramas mermaid. |
@@ -20,28 +19,36 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `passivos/equipe.js` | Aba **Equipe**: cadastro de colaboradores (cargo, núcleo, admissão, responsabilidades, vínculo com o usuário). |
 | `passivos/tarefas.js` | Abas **Tarefas** (escritório + por cliente) e **Horas** (timesheet e relatórios), sobre `tarefas`, `apontamentos_horas` e as views `v_*`. |
 | `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
-| `gestao/index.html` | Dashboard de gestão (carteira, jurídico, equipe, alertas). Lê só as views `v_*`; página independente, mesma sessão de login. |
+| `gestao/index.html` | Redirecionamento para `../#visao` (o dashboard de gestão vive dentro do painel, em Gestão → Visão geral). |
 | `fontes/painel.html` | Protótipo-fonte do painel (motor de projeção, dashboard, formulários). |
-| `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta login, runtime Supabase, aba Usuários e o `carteira.js`). |
+| `fontes/gerar-app-supabase.mjs` | Gera `index.html` (painel, modo login), `cliente/index.html` (modo token) e, com `PP_ESPELHO=1`, `beta/index.html` + `beta/passivos/`, a partir de `fontes/painel.html` (injeta tokens do Design System, login, runtime Supabase e os módulos). |
+| `fontes/tokens.css` · `DESIGN.md` | Tokens e Design System (ver seção abaixo). |
+| `fontes/verificar-geracao.mjs` · `docs/qa/` | Verificação de geração, segurança das saídas, paridade do menu/permissões e tokens (nunca grava arquivos versionados sem `--gravar-inventario`). |
 | `fontes/importar-onboarding.py` | Gera SQL (fora do repo) com os dados dos formulários de onboarding e o índice de documentos da pasta de cada cliente. |
 | `fontes/gerar-pagina-cliente.mjs` | Legado: gerava a página fixa `alphamec/` a partir de um snapshot do banco antigo. |
 | `alphamec/index.html` | Página fixa do cliente Alphamec (congelada na posição de 07/10/2026). |
 | `supabase/migrations/*.sql` | Modelo de dados versionado. Toda alteração de schema entra aqui. |
 | `docs/plano-etapa-2.md` | Plano da etapa 2 (modelo de dados, telas, ordem dos PRs). |
 
+## Design System
+
+- `fontes/tokens.css` — tokens (claro, escuro, movimento) + tokens legados. O gerador injeta este arquivo no `<style>` de todas as páginas geradas, no lugar do comentário `/*TOKENS*/` de `fontes/painel.html`.
+- `DESIGN.md` — princípios, tipografia, componentes e Motion Design System (V3.1, referência definitiva).
+- `fontes/verificar-geracao.mjs --base main --fase <0|1>` — verificação obrigatória antes de todo PR (gera em pasta temporária, confere saídas, segurança, menu/permissões e tokens; as checagens estritas são só da Fase 0). Detalhes em `docs/qa/README.md`.
+
 ## Rodar localmente
 
 ```bash
 python3 -m http.server 8765        # ou qualquer servidor estático
-# abrir http://localhost:8765/  (portal)  e  http://localhost:8765/passivos/  (painel)
+# abrir http://localhost:8765/  (painel)  e  http://localhost:8765/cliente/?t=…  (área do cliente por token)
 ```
 O login usa o projeto Supabase de produção (chave publicável — pública por design; a RLS é quem protege os dados).
 
 ## Alterar o painel
 
-1. Edite `fontes/painel.html` (lógica e layout), `passivos/carteira.js` (timeline/processos) ou `passivos/tarefas.js` (tarefas/horas).
-2. Regere: `node fontes/gerar-app-supabase.mjs`
-3. Teste localmente e faça commit de **fontes/ + passivos/** juntos.
+1. Edite `fontes/painel.html` (casca e lógica), `fontes/tokens.css` (tokens) ou o módulo em `passivos/*.js`.
+2. Regere: `node fontes/gerar-app-supabase.mjs` (gera `index.html` e `cliente/index.html`).
+3. Rode `node fontes/verificar-geracao.mjs --base main --fase <n>`, teste localmente e faça commit de **fontes/ + passivos/ + index.html + cliente/index.html** juntos.
 
 ## Aplicar migrations
 
