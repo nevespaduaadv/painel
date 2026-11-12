@@ -78,6 +78,9 @@ for (const f of [...SAIDAS, 'beta/index.html']) {
   if (JSON.stringify(mods) !== JSON.stringify(esperados)) falha('cliente/index.html carrega módulos fora do previsto: ' + mods.join(', '));
   else if (bMods && JSON.stringify(bMods) !== JSON.stringify(mods)) falha('cliente/index.html: conjunto de módulos difere de ' + base + ': ' + bMods.join(', '));
   else ok('cliente/index.html (modo token) carrega só ' + mods.join(' e '));
+  // a partir da Fase 1: nada da casca/componentes V3.1 chega ao cliente (CSS, boot ou scripts)
+  if (fase >= 1) { const h = lerTmp('cliente/index.html'); const vaz = ['np-casca-v3', 'np-toolbar', 'np-tree', '#np-side{', 'np-ui.js', 'casca.js'].filter(k => h.includes(k));
+    if (vaz.length) falha('cliente/index.html contém partes da V3.1: ' + vaz.join(', ')); else ok('cliente/index.html (modo token) sem CSS/boot/scripts da V3.1'); }
 }
 
 // ---------- utilidades de menu e tokens ----------
