@@ -20,6 +20,10 @@ const must=(needle)=>{if(!html.includes(needle)){console.error('âncora não enc
 // 0) Tokens do Design System (fontes/tokens.css) no lugar da âncora /*TOKENS*/ — ver DESIGN.md
 must('/*TOKENS*/');
 html = html.replace('/*TOKENS*/', fs.readFileSync(path.join(base,'tokens.css'),'utf8').trim());
+// 0b) Casca V3.1 (Fase 1): CSS sob html.np-casca-v3. (O boot da chave entra no fim de gerar(), porque o gerador
+//     usa o primeiro '<script>' do documento como âncora do login — nada de <script> pode ser inserido antes disso.)
+must('/*CASCA*/'); must('<!--CASCA_BOOT-->');
+html = html.replace('/*CASCA*/', modo==='token' ? '' : fs.readFileSync(path.join(base,'casca.css'),'utf8').trim());
 
 // 1) CSS extra
 must('</style>');
@@ -142,7 +146,7 @@ html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"
   html = html.replace('negociacoes:"Negociações",notas:"Notas internas"}', 'negociacoes:"Negocial",notas:"Notas internas",dossie:"Dossiê",cliente:"Cadastro",passivos:"Passivos",financeiro:"Financeiro"}');
   console.log('[espelho] página do cliente reorganizada (', antigo.length, '→', novo.length, ')');
 }
-if(ESPELHO){ must('<title>Sistema interno — Neves Pádua Advocacia</title>'); html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>ESPELHO (beta) — Neves Pádua Advocacia</title>'); html = html.replace('</style>', '.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/1 var(--body);text-align:center;padding:5px 0;letter-spacing:.08em;text-transform:uppercase}body{padding-top:22px}</style>',1); html = html.replace('<body', '<body data-espelho="1"',1); html = html.replace('</style>', '.espelho-only{display:none!important}</style>',1); html = html.replace('</body>', '<div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div></body>'); }
+if(ESPELHO){ must('<title>Sistema interno — Neves Pádua Advocacia</title>'); html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>ESPELHO (beta) — Neves Pádua Advocacia</title>'); html = html.replace('</style>', '.pp-espelho{position:fixed;left:0;right:0;top:0;z-index:60;background:#B8964A;color:#0C1F38;font:700 12px/22px var(--body);text-align:center;height:22px;padding:0 10px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body{padding-top:22px;--np-topo:22px}</style>',1); html = html.replace('<body', '<body data-espelho="1"',1); html = html.replace('</style>', '.espelho-only{display:none!important}</style>',1); html = html.replace('</body>', '<div class="pp-espelho">Espelho (beta) — ambiente de teste, dados copiados; nada aqui afeta o sistema real</div></body>'); }
 must('const ICONES={');
 html = html.replace('const ICONES={', 'const ICONES={atendimento:\'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>\',');
 must('/*NAV_GRUPOS*/');
@@ -415,7 +419,7 @@ const MODULOS = [
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
-  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['hubs','core'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['hubs','core'],['casca','core'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();
@@ -436,10 +440,15 @@ PP.carregarModulos=async function(extra){
 `;
 html = html.replace('</body>', modo==='token' ? `<script src="../passivos/carteira.js${V}"></script>\n<script src="../passivos/ficha.js${V}"></script>\n</body>` : loader + '</body>');
 if(modo==='token'){
+  { const i = html.indexOf('const NAV=['); if (i < 0) throw new Error('NAV não encontrado'); let k = i + 'const NAV='.length, d = 0; for (; k < html.length; k++) { if (html[k] === '[') d++; else if (html[k] === ']' && --d === 0) break; } html = html.slice(0, i) + 'const NAV=[]' + html.slice(k + 1); }
   html = html.replace('<title>Sistema interno — Neves Pádua Advocacia</title>','<title>Área do cliente — Neves Pádua Advocacia</title>');
   html = html.replace('<div id="view-usuarios" hidden class="main"></div>','');
   html = html.replace(/url\(passivos\/fontes\//g,'url(../passivos/fontes/').replace(/src="passivos\/img\//g,'src="../passivos/img/');
 }
+// Casca V3.1: boot da chave np-casca (só CSS/render; nunca acesso). Modo token não recebe a casca nova.
+// Espelho (/beta/) divide a origem do navegador com o sistema principal: a chave ganha sufixo -beta para que ligar a
+// casca nova no beta não mude a experiência em produção (o casca.js usa o mesmo sufixo via body[data-espelho]).
+html = html.replace('<!--CASCA_BOOT-->', modo==='token' ? '' : `<script>try{if(localStorage.getItem("np-casca${ESPELHO ? '-beta' : ''}")==="v3")document.documentElement.classList.add("np-casca-v3")}catch(_){}</script>`);
 return html;
 }
 

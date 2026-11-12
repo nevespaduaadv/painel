@@ -144,6 +144,7 @@
   --fg:#F2F0EB; --muted:#A8A49F; --faint:#8C8882; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 8px 30px rgba(0,0,0,.5);
   --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark }
 
+
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -420,14 +421,16 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 .pendente{text-align:center;padding:48px 20px;color:var(--muted)}
 .pendente h2{color:var(--fg);margin-bottom:8px}
 .grp.hub .grp-h{cursor:pointer}.grp.hub.ativo .grp-h span{color:var(--gold)}</style>
+
 </head>
 <body>
 
 <div class="app" id="app">
-<aside class="sb" id="sb">
+<aside class="sb" id="sb" data-casca="v2">
   <div class="brand"><img class="logo" src="../passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="../passivos/img/monograma-branco.png" alt="NP"></div>
   <nav class="tabs" role="tablist" id="nav"></nav>
 </aside>
+<aside id="np-side" data-casca="v3" aria-label="Navegação" hidden inert></aside>
 <div class="sb-overlay" onclick="document.getElementById('app').classList.remove('sb-aberta')"></div>
 <div class="app-body">
 <header class="top">
@@ -787,10 +790,7 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
-const NAV=[{tab:"painel",label:"Hoje",cls:"edit-only"},{tab:"tarefas",label:"Tarefas e prazos",cls:"edit-only"},{tab:"agenda",label:"Agenda",cls:"edit-only"},{tab:"perfil",label:"Meu perfil",cls:"edit-only"},{tab:"avisos",label:"Avisos",cls:"edit-only"},{tab:"clientes",label:"Clientes",cls:"area-clientes"},
-  {tab:"processos",tabs:["processos","publicacoes","negociacoes","historico"],label:"Jurídico",cls:"edit-only grp-juridico area-juridico"},
-  {grupo:"juridico-ferr",label:"Ferramentas jurídicas",cls:"edit-only grp-juridico",fechadoPadrao:true,itens:[{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)}]},
-  {grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{tab:"financeiro",tabs:["financeiro","faturamento","estoque","inventario"],label:"Financeiro",cls:"edit-only area-financeiro"},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",alt:["usuarios"],label:"Colaboradores e usuários",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto (gestão)",cls:"area-equipe"},{tab:"requisicoes",label:"Requisições (gestão)",cls:"area-equipe"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"},{tab:"espelho",label:"Espelho (beta)",cls:"admin-only espelho-only"},{tab:"importar-advbox",label:"Importar do ADVBox",cls:"admin-only"},{tab:"config-gestao",label:"Configurações",cls:"area-equipe"}]}];
+const NAV=[];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
 const AREA_DE={};for(const n of NAV){if(n.tab)AREA_DE[n.tab]=n.label;if(n.itens)for(const i of n.itens)AREA_DE[i.tab]=n.label}
 function irPara(tab){if(tab==="clientes"&&!readOnly()){S.sel=null;S.q=""}S.tab=tab;try{localStorage.setItem("pp-tab",tab)}catch(_){}fecharSb();render()}
@@ -1419,7 +1419,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mwcwnk8t"></script>
-<script src="../passivos/ficha.js?v=mwcwnk8t"></script>
+<script src="../passivos/carteira.js?v=mwdwjgo4"></script>
+<script src="../passivos/ficha.js?v=mwdwjgo4"></script>
 </body>
 </html>
