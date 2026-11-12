@@ -4,7 +4,9 @@
    cobranca_marcar_paga, regua_preparar, regua_aprovar, regua_cancelar. */
 (() => {
   "use strict";
-  const C = { ok: false, carregando: false, rows: [], log: [], etapas: [], disparos: [], aba: "hoje", busca: "", reguaF: "todas", logF: "todas", listaF: "todas", dashView: "geral", edit: null, nova: false, detalhe: null };
+  const C = { ok: false, carregando: false, rows: [], log: [], etapas: [], disparos: [], colab: [], hist: [], aba: "hoje", busca: "", reguaF: "todas", reguaEtapa: "todas", logF: "todas", listaF: "todas", negF: "todas", histCli: "", dashView: "geral", edit: null, nova: false, detalhe: null, conta: null, asaasCli: null, asaasQ: "" };
+  const MEIOS = { whatsapp: "WhatsApp", ligacao: "Ligação", email: "E-mail", presencial: "Presencial", sistema: "Sistema", outro: "Outro" };
+  const ACOES_SUGERIDAS = ["Lembrete amigável", "Cobrança formal", "Reenvio do boleto/link", "Proposta de parcelamento", "Proposta de desconto para quitação", "Aviso de suspensão do serviço", "Notificação extrajudicial", "Encaminhado ao jurídico", "Ligação sem atendimento", "Visita/reunião"];
   const podeFin = () => PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("financeiro");
   const R$ = (v) => (v == null || isNaN(v)) ? "—" : (+v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const pad = (n) => String(n).padStart(2, "0");
@@ -18,7 +20,7 @@
   const fmtMes = (m) => `${MESES[+m.slice(5, 7) - 1]}/${m.slice(0, 4)}`;
   const nomeMes = (m) => MESES[+m.slice(5, 7) - 1];
   const norm = (s) => String(s || "").trim().toUpperCase().replace(/\s+/g, " ");
-  const DESF = { RECUPERADO: ["Recuperado", "e1"], NAO_RESPONDE: ["Não responde", "e3"], VERIFICAR_AMANHA: ["Verificar amanhã", "g"], NEGOCIOU: ["Negociou", "c"] };
+  const DESF = { RECUPERADO: ["Recuperado", "e1"], NAO_RESPONDE: ["Não responde", "e3"], VERIFICAR_AMANHA: ["Verificar amanhã", "g"], NEGOCIOU: ["Negociou", "c"], SEM_ACORDO: ["Sem acordo", "e3"] };
   const CAD = { FILA_HOJE: ["Na fila de contato", "g"], MONITORANDO: ["Não responde", "e3"], NEGOCIOU: ["Negociou", "c"], CONTATADA_HOJE: ["Contatado hoje", "e1"] };
   const DISP_ST = { solicitado: ["Solicitado", "g"], aguardando_aprovacao: ["Aguardando aprovação", "e3"], em_andamento: ["Em andamento", "g"], concluida: ["Concluída", "e1"], sem_clientes: ["Sem clientes", "c"], falhou: ["Falhou", "e3"], cancelada: ["Cancelada", "c"] };
   const pill = (t, cls) => el("span", { class: "pill " + (cls || "c") }, t);
@@ -32,15 +34,18 @@
     try {
       const desde = addDias(mesAnterior() + "-01", -1);
       const pag = async (q) => { const out = []; for (let i = 0; i < 10; i++) { const { data, error } = await q.range(i * 1000, i * 1000 + 999); if (error) throw error; out.push(...(data || [])); if ((data || []).length < 1000) break; } return out; };
-      const [ab, pg, lg, et, dp] = await Promise.all([
+      const [ab, pg, lg, et, dp, co, hs] = await Promise.all([
         pag(SB.from("v_central_cobrancas").select("*").eq("paga", false).order("venc_ef")),
         pag(SB.from("v_central_cobrancas").select("*").eq("paga", true).gte("venc_ef", desde).order("venc_ef")),
         SB.from("v_cobranca_contatos").select("*").order("data", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
         SB.from("regua_etapas").select("*").order("dias", { ascending: false }),
         SB.from("regua_disparos").select("*").order("data", { ascending: false }).order("etapa").limit(200),
+        SB.from("colaboradores").select("id,nome,nucleo,ativo").eq("ativo", true).order("nome"),
+        SB.from("v_cobranca_historico").select("*").order("quando", { ascending: false }).limit(3000),
       ]);
       if (lg.error) throw lg.error;
-      C.rows = [...ab, ...pg]; C.log = lg.data || []; C.etapas = et.data || []; C.disparos = dp.data || []; C.ok = true;
+      C.rows = [...ab, ...pg]; C.log = (lg.data || []).filter((l) => !l.origem || ["painel", "migracao"].includes(l.origem)); C.etapas = et.data || []; C.disparos = dp.data || []; C.colab = co.data || []; C.hist = hs.error ? [] : (hs.data || []); C.ok = true;
+      if (hs.error) console.warn("histórico (rode a 0098)", hs.error.message);
     } catch (e) { console.warn("central", e); toast("Não foi possível carregar a Central de Cobranças"); }
     finally { C.carregando = false; }
     renderCentral();
@@ -48,9 +53,22 @@
   const invalidar = () => { C.ok = false; renderCentral(); };
 
   // ---------- regras (porte do artefato) ----------
+  const etapaLabel = (et) => `${et.codigo} · ${et.titulo}`;
   function stageInfo(c) {
     if (c.paga) return { situacao: "Paga", F: null, stage: "Paga", etapa: "Paga", acao: "Pago — nenhuma ação necessária" };
     const F = diasEntre(c.venc_ef, HOJE), situacao = F < 0 ? "Vencida" : "Aguardando";
+    if (c.regua_parada) return { situacao, F, stage: "fora", etapa: "Retirada da régua" + (c.regua_manual_motivo ? " · " + c.regua_manual_motivo : ""), acao: "Fora da régua automática — acompanhar manualmente", manual: true };
+    if (c.regua_etapa_manual) { const et = C.etapas.find((e) => e.codigo === c.regua_etapa_manual); return { situacao, F, stage: c.regua_etapa_manual, etapa: (et ? etapaLabel(et) : c.regua_etapa_manual) + " (fixada)", acao: et?.descricao || "Fixada manualmente nesta etapa", manual: true }; }
+    const ativas = C.etapas.filter((e) => e.ativa);
+    if (ativas.length) {
+      let et = null;
+      if (F >= 0) et = ativas.find((e) => e.dias === F) || null;
+      else { const pos = ativas.filter((e) => e.dias < 0 && e.dias >= F).sort((a, b) => a.dias - b.dias); et = pos[0] || null; }
+      if (et) return { situacao, F, stage: et.codigo, etapa: etapaLabel(et), acao: et.descricao || et.titulo };
+      if (F >= 0) { const prox = ativas.filter((e) => e.dias >= 0 && e.dias < F).sort((a, b) => b.dias - a.dias)[0]; return { situacao, F, stage: "—", etapa: prox ? `Fora da régua (aguardando ${prox.codigo})` : "Fora da régua", acao: prox ? `Próxima ação em ${prox.codigo}, dia ${fmtDM(addDias(c.venc_ef, -prox.dias))}` : "Sem etapa prevista" }; }
+      const prox = ativas.filter((e) => e.dias < 0 && e.dias < F).sort((a, b) => b.dias - a.dias)[0];
+      return { situacao, F, stage: "—", etapa: prox ? `Vencida (aguardando ${prox.codigo})` : "Vencida (sem etapa)", acao: prox ? `Próxima ação em ${prox.codigo}, dia ${fmtDM(addDias(c.venc_ef, -prox.dias))}` : "Sem etapa prevista" };
+    }
     let stage, etapa, acao;
     if (F > 5) { stage = "—"; etapa = "Fora da régua (pré D-5)"; acao = "Próxima ação em D-5, dia " + fmtDM(addDias(c.venc_ef, -5)); }
     else if (F === 5) { stage = "D-5"; etapa = "D-5 · Relatório mensal"; acao = "Enviar mensagem com o relatório mensal sobre o processo (vencimento em 5 dias)"; }
@@ -92,12 +110,14 @@
     const viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
     const pre = rows.filter((r) => !r.c.paga && ["D-5", "D-2", "D-0"].includes(r.info.stage)).length, fila = rows.filter((r) => !r.c.paga && r.info.situacao === "Vencida" && r.cad.status === "FILA_HOJE").length;
     const carry = rows.filter(isCarry).length, prox = rows.filter((r) => r.c.venc_ef.slice(0, 7) > cur && !isCarry(r)).length;
-    v.append(el("div", { class: "tabs", style: "margin:4px 0 10px" }, [["hoje", `Ações de hoje (${pre + fila})`], ["disparos", "Disparos da régua"], ["regua", "Régua de cobrança"], ["cadencia", "Cadência · Histórico"], ["resumo", "Resumo"], ["dashboard", "Dashboard"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String(C.aba === k), onclick: () => { C.aba = k; renderCentral(); } }, t))),
+    v.append(el("div", { class: "tabs", style: "margin:4px 0 10px" }, [["hoje", `Ações de hoje (${pre + fila})`], ["disparos", "Disparos da régua"], ["regua", "Régua de cobrança"], ["negociados", `Negociados (${rows.filter((r) => !r.c.paga && (r.c.vencimento_negociado || r.c.valor_negociado)).length})`], ["historico", "Histórico por cliente"], ["cadencia", "Registros de contato"], ["resumo", "Resumo"], ["dashboard", "Dashboard"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String(C.aba === k), onclick: () => { C.aba = k; renderCentral(); } }, t))),
       el("div", { class: "note", style: "margin-bottom:10px" }, `Mostrando ${fmtMes(cur)}` + (carry ? ` + ${carry} parcela(s) negociada(s) de meses anteriores sem pagamento` : "") + (prox ? ` + ${prox} parcela(s) do próximo mês já na régua (D-5)` : "") + ". Base: cobranças do Asaas (sincronização automática). Meses anteriores ficam no histórico e na exportação."));
     const host = el("div", {}); v.append(host);
     if (C.aba === "hoje") renderHoje(host, rows);
     else if (C.aba === "disparos") renderDisparos(host, all);
     else if (C.aba === "regua") renderRegua(host, rows);
+    else if (C.aba === "negociados") renderNegociados(host, all);
+    else if (C.aba === "historico") renderHistorico(host, all);
     else if (C.aba === "cadencia") renderLog(host, viewLog);
     else if (C.aba === "resumo") renderResumo(host, rows, monthLog);
     else renderDashboard(host, rows, all, monthLog);
@@ -130,7 +150,7 @@
   const linhaBase = (r, extra) => el("div", { style: "display:grid;grid-template-columns:1.6fr .9fr 1fr 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)" }, el("div", {}, el("b", {}, r.c.cliente_nome), el("div", { class: "note" }, r.c.parcela_txt, r.c.descricao && r.c.descricao !== r.c.parcela_txt ? " · " + r.c.descricao : "")), el("div", {}, el("b", { class: "num" }, R$(r.c.valor)), el("div", { class: "note" }, r.info.F < 0 ? `${-r.info.F} dia(s) vencido` : `vence ${fmtD(r.c.venc_ef)}`)), ...extra);
   function itemFila(r) {
     const last = r.cad.last; const slot = el("div", {});
-    const wrap = el("div", {}, linhaBase(r, [el("div", {}, el("div", { class: "note" }, "Última cobrança"), el("div", {}, last ? fmtD(last.data) : "Nunca contatado")), el("div", {}, last ? pill(DESF[last.desfecho][0], DESF[last.desfecho][1]) : pill("—")), el("button", { class: "btn sm primary", onclick: () => { if (slot.childElementCount) { slot.replaceChildren(); return; } slot.replaceChildren(formContato(r, () => slot.replaceChildren())); } }, "Registrar contato")]), slot);
+    const wrap = el("div", {}, linhaBase(r, [el("div", {}, el("div", { class: "note" }, "Última cobrança"), el("div", {}, last ? fmtD(last.data) : "Nunca contatado")), el("div", {}, last ? pill(DESF[last.desfecho][0], DESF[last.desfecho][1]) : pill("—")), el("div", { style: "display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end" }, el("button", { class: "btn sm primary", onclick: () => { if (slot.childElementCount) { slot.replaceChildren(); return; } slot.replaceChildren(formContato(r, () => slot.replaceChildren())); } }, "Registrar contato"), el("button", { class: "btn sm", onclick: () => formTarefa(r) }, "+ Tarefa"), menuRegua(r))]), chipsTarefas(r) ? el("div", { style: "padding:0 12px 6px" }, chipsTarefas(r)) : null, slot);
     return wrap;
   }
   function itemMono(r, neg) {
@@ -141,13 +161,39 @@
   }
   async function rpc(f, args, msg) { const { error } = await SB.rpc(f, args); if (error) { toast(error.message); return false; } toast(msg); invalidar(); return true; }
   function formContato(r, fechar) {
-    let escolhido = null; const data = inp("date", ""), obs = el("textarea", { rows: "2", placeholder: "Observação (opcional)", style: "width:100%" });
-    const negBox = el("div", { hidden: "" }, el("label", { class: "note" }, "Nova data acordada (opcional) ", data));
+    let escolhido = null; const data = inp("date", ""), valorNeg = inp("text", "", { placeholder: "Valor acordado (opcional)", style: "width:170px" }), obs = el("textarea", { rows: "2", placeholder: "Observação interna (opcional)", style: "width:100%" });
+    const meio = sel(MEIOS, "whatsapp"); const acao = inp("text", "", { placeholder: "Medida tomada — ex.: lembrete amigável, proposta de parcelamento…", list: "cc-acoes", style: "flex:1;min-width:220px" });
+    if (!$("#cc-acoes")) document.body.append(el("datalist", { id: "cc-acoes" }, ACOES_SUGERIDAS.map((a) => el("option", { value: a }))));
+    const retorno = el("textarea", { rows: "2", placeholder: "Retorno do cliente — o que ele respondeu (ou \"sem retorno\")", style: "width:100%" });
+    const negBox = el("div", { hidden: "", style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center" }, el("label", { class: "note" }, "Nova data acordada ", data), el("label", { class: "note" }, "Valor acordado ", valorNeg));
     const salvar = el("button", { class: "btn sm primary", disabled: "" }, "Salvar registro");
-    const opts = el("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:6px" }, Object.entries(DESF).map(([k, [t, cls]]) => el("button", { class: "btn sm", onclick: (e) => { escolhido = k; [...opts.children].forEach((b) => b.classList.remove("primary")); e.currentTarget.classList.add("primary"); salvar.disabled = false; negBox.hidden = k !== "NEGOCIOU"; } }, t)));
-    salvar.onclick = async () => { if (!escolhido) return; salvar.disabled = true; if (await rpc("cobranca_registrar_contato", { p_cobranca: r.c.id, p_desfecho: escolhido, p_observacao: obs.value.trim() || null, p_nova_data: escolhido === "NEGOCIOU" && data.value ? data.value : null }, "Contato registrado.")) fechar(); else salvar.disabled = false; };
-    return el("div", { class: "card", style: "margin:6px 12px 10px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)" }, opts, negBox, obs, el("div", { class: "actions" }, salvar, el("button", { class: "btn sm", onclick: fechar }, "Cancelar")));
+    const opts = el("div", { style: "display:grid;grid-template-columns:repeat(5,1fr);gap:6px" }, Object.entries(DESF).map(([k, [t, cls]]) => el("button", { class: "btn sm", onclick: (e) => { escolhido = k; [...opts.children].forEach((b) => b.classList.remove("primary")); e.currentTarget.classList.add("primary"); salvar.disabled = false; negBox.hidden = k !== "NEGOCIOU"; } }, t)));
+    const numBRv = (t) => { const x = String(t || "").replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", "."); const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
+    salvar.onclick = async () => { if (!escolhido) return; if (!acao.value.trim()) { toast("Informe a medida tomada"); return; } salvar.disabled = true;
+      if (await rpc("cobranca_registrar_contato", { p_cobranca: r.c.id, p_desfecho: escolhido, p_observacao: obs.value.trim() || null, p_nova_data: escolhido === "NEGOCIOU" && data.value ? data.value : null, p_meio: meio.value, p_acao: acao.value.trim(), p_retorno: retorno.value.trim() || null, p_valor_negociado: escolhido === "NEGOCIOU" ? numBRv(valorNeg.value) : null }, "Contato registrado.")) fechar(); else salvar.disabled = false; };
+    return el("div", { class: "card", style: "margin:6px 12px 10px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)" },
+      el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, el("span", { class: "note" }, "Meio"), meio, acao), retorno, el("div", { class: "note" }, "Desfecho"), opts, negBox, obs,
+      el("div", { class: "actions" }, salvar, el("button", { class: "btn sm", onclick: fechar }, "Cancelar")));
   }
+  // ----- ações sobre a régua (mover / retirar / devolver) e tarefa -----
+  function menuRegua(r) {
+    const etOpts = Object.fromEntries([["", "— escolher etapa —"], ...C.etapas.filter((e) => e.ativa).map((e) => [e.codigo, etapaLabel(e)])]);
+    const abrir = () => {
+      const s = sel(etOpts, r.c.regua_etapa_manual || ""), motivo = inp("text", r.c.regua_manual_motivo || "", { placeholder: "Motivo (opcional)" });
+      const body = el("div", { class: "form" }, el("div", { class: "f full" }, el("label", {}, "Fixar nesta etapa da régua"), s, el("div", { class: "help" }, "A cobrança passa a receber o disparo dessa etapa, mesmo fora da data. Deixe vazio para voltar ao automático.")), field("mr-mot", "Motivo", motivo));
+      const extra = el("div", { style: "display:flex;gap:6px" }, r.c.regua_parada ? el("button", { class: "btn", onclick: async () => { if (await rpc("cobranca_regua_definir", { p_cobranca: r.c.id, p_etapa: null, p_parada: false, p_motivo: motivo.value.trim() || null }, "Cobrança devolvida à régua.")) $("#modalHost").replaceChildren(); } }, "Devolver à régua") : el("button", { class: "btn danger", onclick: async () => { if (await rpc("cobranca_regua_definir", { p_cobranca: r.c.id, p_etapa: null, p_parada: true, p_motivo: motivo.value.trim() || null }, "Cobrança retirada da régua.")) $("#modalHost").replaceChildren(); } }, "Retirar da régua"));
+      modal(`Régua · ${r.c.cliente_nome} · ${r.c.parcela_txt || ""}`, body, async () => { const { error } = await SB.rpc("cobranca_regua_definir", { p_cobranca: r.c.id, p_etapa: s.value || null, p_parada: s.value ? false : null, p_motivo: motivo.value.trim() || null }); if (error) throw new Error(error.message); toast(s.value ? `Fixada em ${s.value}` : "Voltou ao automático"); invalidar(); }, extra);
+    };
+    return el("button", { class: "btn sm", title: "Mover / retirar da régua", onclick: abrir }, r.c.regua_parada ? "Fora da régua ▾" : r.c.regua_etapa_manual ? `Fixada ${r.c.regua_etapa_manual} ▾` : "Mover ▾");
+  }
+  function formTarefa(r) {
+    const tit = inp("text", `Cobrança: ${r.c.cliente_nome} · ${r.c.parcela_txt || R$(r.c.valor)}`), resp = sel(Object.fromEntries(C.colab.map((c) => [c.id, c.nome + (c.nucleo ? " · " + c.nucleo : "")])), C.colab[0]?.id || ""), prazo = inp("date", addDias(HOJE, 2)), nuc = sel({ financeiro: "Financeiro", juridico: "Jurídico", acordos: "Acordos", acompanhamento_pj: "Acompanhamento PJ", comercial: "Comercial", administrativo: "Administrativo" }, "financeiro"), desc = el("textarea", { rows: "3", placeholder: "O que a pessoa precisa fazer" });
+    resp.onchange = () => { const c = C.colab.find((x) => x.id === resp.value); if (c?.nucleo && nuc.querySelector(`option[value="${c.nucleo}"]`)) nuc.value = c.nucleo; };
+    const body = el("div", { class: "form" }, field("ct-tit", "Título", tit), field("ct-resp", "Responsável (qualquer pessoa)", resp), field("ct-prazo", "Prazo", prazo), field("ct-nuc", "Núcleo", nuc), el("div", { class: "f full" }, el("label", {}, "Descrição"), desc));
+    modal("Criar tarefa a partir da cobrança", body, async () => { if (!tit.value.trim() || !resp.value || !prazo.value) throw new Error("Título, responsável e prazo são obrigatórios"); const { error } = await SB.rpc("cobranca_criar_tarefa", { p_cobranca: r.c.id, p_titulo: tit.value.trim(), p_responsavel: resp.value, p_prazo: prazo.value, p_descricao: desc.value.trim() || null, p_nucleo: nuc.value, p_prioridade: 2 }); if (error) throw new Error(error.message); toast("Tarefa criada"); invalidar(); window.PP_TAREFAS?.invalidar?.(); });
+  }
+  const chipsTarefas = (r) => (r.c.tarefas || []).length ? el("div", { style: "display:flex;gap:4px;flex-wrap:wrap;margin-top:3px" }, (r.c.tarefas || []).map((t) => el("span", { class: "pill " + (t.prazo && t.prazo < HOJE ? "e3" : "g"), title: t.titulo, style: "cursor:pointer", onclick: () => window.PP_TAREFAS?.abrir?.(t.id) }, `📋 ${t.responsavel || "?"} · ${fmtDM(t.prazo)}`))) : null;
+  const btnHist = (r) => el("button", { class: "btn sm", onclick: () => { C.aba = "historico"; C.histCli = r.c.chave_cliente; renderCentral(); } }, "Histórico");
 
   // ----- DISPAROS -----
   function renderDisparos(host, all) {
@@ -241,11 +287,53 @@
 
   // ----- RÉGUA -----
   function renderRegua(host, rows) {
-    host.append(el("div", { class: "filters", style: "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" }, buscaBox(), ...[["todas", "Todas"], ["Vencida", "Vencidas"], ["Aguardando", "Aguardando"], ["Paga", "Pagas"]].map(([k, t]) => el("button", { class: "btn sm" + (C.reguaF === k ? " primary" : ""), onclick: () => { C.reguaF = k; renderCentral(); } }, t))));
-    const lista = rows.filter((r) => (C.reguaF === "todas" || r.info.situacao === C.reguaF) && busca(r.c.cliente_nome)).sort((a, b) => a.c.venc_ef.localeCompare(b.c.venc_ef));
-    host.append(el("div", { class: "note", style: "margin-bottom:6px" }, `${lista.length} cobrança(s)`), el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Cliente", "Descrição", "Vencimento", "Situação", "Estágio", "Valor", ""].map((h) => el("th", {}, h)))),
-      el("tbody", {}, lista.length ? lista.map((r) => el("tr", {}, el("td", {}, el("b", {}, r.c.cliente_nome)), el("td", { class: "note" }, r.c.descricao || r.c.parcela_txt || ""), el("td", {}, fmtD(r.c.venc_ef), r.c.vencimento_negociado ? el("div", { class: "note" }, "negociado (orig. " + fmtD(r.c.vencimento) + ")") : null), el("td", {}, pill(r.info.situacao, r.info.situacao === "Paga" ? "e1" : r.info.situacao === "Vencida" ? "e3" : "g")), el("td", { class: "note" }, r.info.etapa), el("td", { class: "num" }, R$(r.c.valor)), el("td", {}, r.c.paga ? null : el("button", { class: "btn sm", onclick: () => { if (!confirm("Marcar esta cobrança como paga?")) return; r.cad.status === "NEGOCIOU" ? rpc("cobranca_registrar_contato", { p_cobranca: r.c.id, p_desfecho: "RECUPERADO", p_observacao: "Pago após negociação (marcado na Régua de Cobrança)" }, "Cobrança marcada como recuperada.") : rpc("cobranca_marcar_paga", { p_cobranca: r.c.id }, "Cobrança marcada como paga."); } }, "Marcar paga")))) : el("tr", {}, el("td", { colspan: "7", class: "note" }, "Nenhuma cobrança encontrada."))))),
-      el("p", { class: "note", style: "margin-top:8px" }, "\"Marcar paga\" registra uma baixa manual na Central; a baixa oficial continua vindo do Asaas (webhook/sincronização)."));
+    const abertos = rows.filter((r) => !r.c.paga);
+    // posição por etapa (parâmetros da régua) com quem tem tarefa
+    const etapas = C.etapas.filter((e) => e.ativa).sort((a, b) => b.dias - a.dias);
+    const grupos = [...etapas.map((e) => [e.codigo, etapaLabel(e), abertos.filter((r) => r.info.stage === e.codigo)]), ["—", "Fora da régua (sem ação hoje)", abertos.filter((r) => r.info.stage === "—")], ["fora", "Retiradas da régua", abertos.filter((r) => r.info.stage === "fora")]];
+    host.append(el("div", { class: "kpis", style: "grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-bottom:10px" }, grupos.map(([k, l, it]) => { const comT = it.filter((r) => (r.c.tarefas_abertas || 0) > 0).length; return el("div", { class: "card", style: "padding:10px;cursor:pointer" + (C.reguaEtapa === k ? ";outline:2px solid var(--gold)" : ""), onclick: () => { C.reguaEtapa = C.reguaEtapa === k ? "todas" : k; renderCentral(); } }, el("div", { class: "note" }, l), el("div", { style: "display:flex;justify-content:space-between;align-items:baseline" }, el("b", { class: "num", style: "font-size:20px" }, String(it.length)), el("span", { class: "note" }, R$(soma(it)))), comT ? el("div", { class: "note" }, `📋 ${comT} com tarefa aberta`) : null); })));
+    host.append(el("div", { class: "filters", style: "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" }, buscaBox(), ...[["todas", "Todas"], ["Vencida", "Vencidas"], ["Aguardando", "Aguardando"], ["Paga", "Pagas"], ["comTarefa", "Com tarefa"], ["manual", "Fixadas/retiradas"]].map(([k, t]) => el("button", { class: "btn sm" + (C.reguaF === k ? " primary" : ""), onclick: () => { C.reguaF = k; renderCentral(); } }, t)), C.reguaEtapa !== "todas" ? el("button", { class: "btn sm", onclick: () => { C.reguaEtapa = "todas"; renderCentral(); } }, `Etapa: ${C.reguaEtapa} ✕`) : null));
+    const lista = rows.filter((r) => (C.reguaF === "todas" || (C.reguaF === "comTarefa" ? (r.c.tarefas_abertas || 0) > 0 : C.reguaF === "manual" ? r.info.manual : r.info.situacao === C.reguaF)) && (C.reguaEtapa === "todas" || r.info.stage === C.reguaEtapa) && busca(r.c.cliente_nome)).sort((a, b) => a.c.venc_ef.localeCompare(b.c.venc_ef));
+    host.append(el("div", { class: "note", style: "margin-bottom:6px" }, `${lista.length} cobrança(s). Use "Mover" para fixar uma cobrança em qualquer etapa (ou adicionar uma que está fora), retirar ou devolver à régua; "+ Tarefa" cria uma tarefa para qualquer pessoa da equipe a partir da cobrança.`), el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Cliente", "Descrição", "Vencimento", "Situação", "Etapa da régua", "Valor", "Tarefas", ""].map((h) => el("th", {}, h)))),
+      el("tbody", {}, lista.length ? lista.map((r) => el("tr", {}, el("td", {}, el("b", {}, r.c.cliente_nome)), el("td", { class: "note" }, r.c.descricao || r.c.parcela_txt || ""), el("td", {}, fmtD(r.c.venc_ef), r.c.vencimento_negociado ? el("div", { class: "note" }, "negociado (orig. " + fmtD(r.c.vencimento) + ")") : null), el("td", {}, pill(r.info.situacao, r.info.situacao === "Paga" ? "e1" : r.info.situacao === "Vencida" ? "e3" : "g")), el("td", { class: "note" }, r.info.manual ? pill(r.info.etapa, r.c.regua_parada ? "e3" : "e2") : r.info.etapa), el("td", { class: "num" }, R$(r.c.valor)), el("td", {}, chipsTarefas(r) || el("span", { class: "note" }, "—")),
+        el("td", {}, el("div", { style: "display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end" }, r.c.paga ? null : menuRegua(r), r.c.paga ? null : el("button", { class: "btn sm", onclick: () => formTarefa(r) }, "+ Tarefa"), btnHist(r), r.c.paga ? null : el("button", { class: "btn sm", onclick: () => { if (!confirm("Marcar esta cobrança como paga?")) return; r.cad.status === "NEGOCIOU" ? rpc("cobranca_registrar_contato", { p_cobranca: r.c.id, p_desfecho: "RECUPERADO", p_observacao: "Pago após negociação (marcado na Régua de Cobrança)", p_meio: "sistema", p_acao: "Baixa manual" }, "Cobrança marcada como recuperada.") : rpc("cobranca_marcar_paga", { p_cobranca: r.c.id }, "Cobrança marcada como paga."); } }, "Marcar paga"))))) : el("tr", {}, el("td", { colspan: "8", class: "note" }, "Nenhuma cobrança encontrada."))))),
+      el("p", { class: "note", style: "margin-top:8px" }, "\"Marcar paga\" registra uma baixa manual na Central; a baixa oficial continua vindo do Asaas (webhook/sincronização). Os parâmetros da régua (etapas, dias e mensagens) são editados em Disparos da régua."));
+  }
+  // ----- NEGOCIADOS -----
+  function renderNegociados(host, all) {
+    const lista0 = all.filter((r) => r.c.vencimento_negociado || r.c.valor_negociado || r.c.negociada).map((r) => { const sit = r.c.paga ? "cumprida" : r.c.venc_ef < HOJE ? "descumprida" : "a_vencer"; const neg = C.hist.find((h) => h.cobranca_id === r.c.id && h.desfecho === "NEGOCIOU"); return { r, sit, neg }; });
+    const SIT = { a_vencer: ["Aguardando a data", "g"], descumprida: ["Não cumpriu", "e3"], cumprida: ["Pagou", "e1"] };
+    host.append(el("p", { class: "note" }, "Clientes que negociaram nova data ou valor. A situação muda sozinha: paga no Asaas = cumprida; passou da data sem pagar = não cumpriu (volta à fila de cobrança)."));
+    host.append(el("div", { class: "kpis fin-kpis" }, ...Object.entries(SIT).map(([k, [t]]) => { const it = lista0.filter((x) => x.sit === k); return kpi(t, String(it.length), R$(it.reduce((a, x) => a + (+x.r.c.valor_negociado || +x.r.c.valor || 0), 0))); })));
+    host.append(el("div", { class: "filters", style: "display:flex;gap:8px;flex-wrap:wrap;margin:10px 0" }, buscaBox(), ...[["todas", "Todas"], ...Object.entries(SIT).map(([k, [t]]) => [k, t])].map(([k, t]) => el("button", { class: "btn sm" + (C.negF === k ? " primary" : ""), onclick: () => { C.negF = k; renderCentral(); } }, t))));
+    const lista = lista0.filter((x) => (C.negF === "todas" || x.sit === C.negF) && busca(x.r.c.cliente_nome)).sort((a, b) => (a.r.c.venc_ef || "").localeCompare(b.r.c.venc_ef || ""));
+    host.append(el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Cliente", "Parcela", "Venc. original", "Nova data", "Valor", "Valor acordado", "Situação", "Negociado em", "Retorno do cliente", ""].map((h) => el("th", {}, h)))),
+      el("tbody", {}, lista.length ? lista.map(({ r, sit, neg }) => { const slot = el("tr", { hidden: "" }, el("td", { colspan: "10" })); return [el("tr", {}, el("td", {}, el("b", {}, r.c.cliente_nome)), el("td", { class: "note" }, r.c.parcela_txt || r.c.descricao || ""), el("td", {}, fmtD(r.c.vencimento)), el("td", {}, r.c.vencimento_negociado ? el("b", {}, fmtD(r.c.vencimento_negociado)) : "—"), el("td", { class: "num" }, R$(r.c.valor)), el("td", { class: "num" }, r.c.valor_negociado ? R$(r.c.valor_negociado) : "—"), el("td", {}, pill(...SIT[sit])), el("td", { class: "note" }, neg ? fmtD(neg.data) + (neg.por ? " · " + neg.por : "") : "—"), el("td", { class: "note" }, neg?.retorno || neg?.observacao || ""),
+        el("td", {}, el("div", { style: "display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap" }, r.c.paga ? null : el("button", { class: "btn sm primary", onclick: () => { if (slot.hidden) { slot.firstChild.replaceChildren(formContato(r, () => { slot.hidden = true; })); slot.hidden = false; } else slot.hidden = true; } }, "Registrar contato"), btnHist(r), r.c.paga ? null : el("button", { class: "btn sm", onclick: () => { if (!confirm("Marcar como paga (recuperada)?")) return; rpc("cobranca_registrar_contato", { p_cobranca: r.c.id, p_desfecho: "RECUPERADO", p_observacao: "Pago após negociação", p_meio: "sistema", p_acao: "Baixa manual" }, "Cobrança marcada como recuperada."); } }, "Pagou")))), slot]; }).flat() : el("tr", {}, el("td", { colspan: "10", class: "note" }, "Nenhuma negociação registrada."))))));
+  }
+  // ----- HISTÓRICO POR CLIENTE -----
+  function renderHistorico(host, all) {
+    const clientes = {}; for (const r of all) { const g = clientes[r.c.chave_cliente] = clientes[r.c.chave_cliente] || { chave: r.c.chave_cliente, nome: r.c.cliente_nome, aberto: 0, n: 0 }; if (!r.c.paga) { g.aberto += +r.c.valor || 0; g.n++; } }
+    for (const h of C.hist) if (!clientes[h.chave_cliente]) clientes[h.chave_cliente] = { chave: h.chave_cliente, nome: h.cliente_nome, aberto: 0, n: 0 };
+    const lista = Object.values(clientes).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    const s = sel(Object.fromEntries([["", "— escolher cliente —"], ...lista.map((c) => [c.chave, `${c.nome}${c.n ? ` · ${c.n} em aberto (${R$(c.aberto)})` : ""}`])]), C.histCli || ""); s.onchange = () => { C.histCli = s.value; renderCentral(); };
+    host.append(el("div", { class: "filters", style: "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center" }, el("span", { class: "note" }, "Cliente"), s));
+    if (!C.histCli) { host.append(el("div", { class: "note" }, "Escolha um cliente para ver, mês a mês, cada ação de cobrança (manual ou automática), o retorno dado e as negociações.")); return; }
+    const cli = clientes[C.histCli]; const hist = C.hist.filter((h) => h.chave_cliente === C.histCli); const cobs = all.filter((r) => r.c.chave_cliente === C.histCli);
+    host.append(el("div", { class: "kpis fin-kpis" }, kpi("Cobranças em aberto", String(cobs.filter((r) => !r.c.paga).length), R$(soma(cobs.filter((r) => !r.c.paga)))), kpi("Contatos registrados", String(hist.filter((h) => h.tipo === "contato" && h.origem !== "regua" && h.origem !== "tarefa").length), "manuais"), kpi("Mensagens da régua", String(hist.filter((h) => h.tipo === "regua").length), "automáticas enviadas"), kpi("Negociações", String(hist.filter((h) => h.desfecho === "NEGOCIOU").length), "novas datas/valores acordados")));
+    const porMes = {}; for (const h of hist) (porMes[(h.data || "").slice(0, 7)] = porMes[(h.data || "").slice(0, 7)] || []).push(h);
+    const meses = Object.keys(porMes).sort().reverse();
+    if (!meses.length) { host.append(el("div", { class: "note", style: "margin-top:10px" }, "Nenhuma ação de cobrança registrada para este cliente.")); return; }
+    for (const m of meses) {
+      host.append(el("h3", { style: "margin-top:14px" }, fmtMes(m), el("span", { class: "note" }, ` · ${porMes[m].length} ação(ões)`)));
+      host.append(el("div", { class: "card", style: "padding:0" }, porMes[m].map((h) => el("div", { style: "display:grid;grid-template-columns:90px 1fr;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line)" }, el("div", {}, el("b", {}, fmtDM(h.data)), el("div", { class: "note" }, h.tipo === "regua" ? "régua" : MEIOS[h.meio] || h.meio || "—")),
+        el("div", {}, el("div", { style: "display:flex;gap:6px;flex-wrap:wrap;align-items:center" }, h.etapa ? pill(h.etapa, "e2") : null, h.desfecho && h.tipo === "contato" && h.origem !== "regua" && h.origem !== "tarefa" ? pill(...(DESF[h.desfecho] || [h.desfecho, "c"])) : null, el("b", {}, h.acao || h.proxima_acao || "—"), el("span", { class: "note" }, ` · ${h.parcela_txt || h.descricao || ""} · ${R$(h.valor)} · venc. ${fmtD(h.venc_ef)}`)),
+          h.retorno ? el("div", {}, el("span", { class: "note" }, "Retorno do cliente: "), h.retorno) : null,
+          h.nova_data || h.valor_negociado ? el("div", { class: "note" }, "Negociado: " + (h.nova_data ? "nova data " + fmtD(h.nova_data) : "") + (h.valor_negociado ? (h.nova_data ? " · " : "") + "valor " + R$(h.valor_negociado) : "")) : null,
+          h.observacao && h.tipo !== "regua" ? el("div", { class: "note" }, h.observacao) : null,
+          h.tipo === "regua" && h.observacao ? el("details", {}, el("summary", { class: "note" }, "mensagem enviada"), el("div", { class: "note", style: "white-space:pre-wrap" }, h.observacao)) : null,
+          el("div", { class: "note" }, "por " + (h.por || "—")))))));
+    }
   }
 
   // ----- HISTÓRICO -----
@@ -312,10 +400,52 @@
   // ---------- integração com a aba Financeiro ----------
   const S0 = S;
   function barraSub() {
-    return el("div", { class: "tabs", style: "margin-bottom:10px" }, [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
+    return el("div", { class: "tabs", style: "margin-bottom:10px" }, [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
   }
   try { S0.finSub = localStorage.getItem("pp-fin-sub") || "asaas"; } catch (_) { S0.finSub = "asaas"; }
-  { const _r = render; render = function () { _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } vf.prepend(barraSub()); }; }
+  { const _r = render; render = function () { _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } vf.prepend(barraSub()); }; }
+  // ----- CLIENTES DO ASAAS -----
+  async function renderClientesAsaas(v) {
+    v.replaceChildren(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Clientes no Asaas"), el("div", { class: "sub" }, "Todos os clientes cadastrados no Asaas (sincronização diária), o vínculo com a ficha no sistema e a posição de cobrança de cada um.")), el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { C.asaasCli = null; render(); } }, "Atualizar"))));
+    if (!C.asaasCli) { v.append(el("div", { class: "note" }, "Carregando…")); const [a, b] = await Promise.all([SB.from("asaas_contatos").select("*").order("nome"), SB.from("v_central_cobrancas").select("chave_cliente,asaas_cliente_id,cliente_id,valor,venc_ef,paga,status")]); if (a.error) { v.append(el("div", { class: "note" }, a.error.message)); return; } C.asaasCli = { lista: a.data || [], cobs: b.data || [] }; render(); return; }
+    const q = inp("search", C.asaasQ, { placeholder: "Buscar por nome, CPF/CNPJ, telefone…", style: "min-width:260px" }); q.oninput = () => { C.asaasQ = q.value; render(); const n = $("#view-financeiro input[type=search]"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
+    const f = C.asaasQ.toLowerCase(); const hoje = hojeISO();
+    const linhas = C.asaasCli.lista.filter((c) => !f || [c.nome, c.cpf_cnpj, c.telefone, c.email].some((x) => String(x || "").toLowerCase().includes(f))).map((c) => { const cobs = C.asaasCli.cobs.filter((x) => x.asaas_cliente_id === c.asaas_id); const ab = cobs.filter((x) => !x.paga), venc = ab.filter((x) => x.venc_ef < hoje); return { c, ab, venc, pagas: cobs.filter((x) => x.paga).length }; });
+    const semV = linhas.filter((l) => !l.c.cliente_id).length;
+    v.append(el("div", { class: "kpis fin-kpis" }, kpi("Clientes no Asaas", String(C.asaasCli.lista.length)), kpi("Sem ficha vinculada", String(semV), "cobrados só pelo Asaas"), kpi("Com cobrança vencida", String(linhas.filter((l) => l.venc.length).length)), kpi("Em aberto (total)", R$(linhas.reduce((a, l) => a + l.ab.reduce((x, y) => x + (+y.valor || 0), 0), 0)))));
+    v.append(el("div", { class: "filters", style: "margin:10px 0" }, q));
+    v.append(el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Cliente (Asaas)", "CPF/CNPJ", "Telefone", "Ficha no sistema", "Em aberto", "Vencidas", "Pagas", ""].map((h) => el("th", {}, h)))),
+      el("tbody", {}, linhas.length ? linhas.slice(0, 500).map(({ c, ab, venc, pagas }) => { const cli = (S.clientes || []).find((x) => x.id === c.cliente_id); return el("tr", {}, el("td", {}, el("b", {}, c.nome || c.asaas_id), el("div", { class: "note" }, c.email || "")), el("td", { class: "note" }, c.cpf_cnpj || "—"), el("td", { class: "note" }, c.telefone || "—"), el("td", {}, c.cliente_id ? el("a", { href: "#", onclick: (e) => { e.preventDefault(); S.tab = "clientes"; S.sel = c.cliente_id; S.sub = "financeiro"; render(); } }, cli?.nome || c.cliente_id) : pill("sem vínculo", "e3")), el("td", { class: "num" }, ab.length ? `${ab.length} · ${R$(ab.reduce((a, x) => a + (+x.valor || 0), 0))}` : "—"), el("td", { class: "num" }, venc.length ? pill(String(venc.length), "e3") : "—"), el("td", { class: "num" }, String(pagas)),
+        el("td", {}, el("div", { style: "display:flex;gap:4px;justify-content:flex-end" }, el("a", { class: "btn sm", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas"), el("button", { class: "btn sm", onclick: () => { C.aba = "historico"; C.histCli = c.asaas_id; S0.finSub = "central"; render(); } }, "Histórico")))); }) : el("tr", {}, el("td", { colspan: "8", class: "note" }, "Nenhum cliente."))))));
+  }
+  // ----- CONTA ASAAS · PARÂMETROS GERAIS DE RECEBIMENTO -----
+  async function renderConta(v) {
+    v.replaceChildren(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Conta Asaas e parâmetros de recebimento"), el("div", { class: "sub" }, "Dados da conta, saldo e taxas consultados ao vivo no Asaas; e os parâmetros padrão (multa, juros, desconto, forma, vencimento) usados quando o sistema cria uma cobrança.")), el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { C.conta = null; render(); } }, "Consultar agora"))));
+    const host = el("div", { class: "kpis", style: "grid-template-columns:repeat(2,minmax(0,1fr))" }); v.append(host);
+    // parâmetros (nossos)
+    const cfgCard = el("div", { class: "card section" }, el("h3", {}, "Parâmetros gerais de recebimento"), el("div", { class: "note" }, "Carregando…")); host.append(cfgCard);
+    (async () => {
+      const { data } = await SB.from("escritorio").select("dados").eq("id", "financeiro").maybeSingle(); const cfg = { multa_pct: 2, juros_mes_pct: 1, desconto_pct: 0, desconto_dias: 0, forma_padrao: "UNDEFINED", dia_vencimento_padrao: 10, notificacoes_asaas: true, ...((data?.dados || {}).recebimento || {}) };
+      const multa = inp("number", cfg.multa_pct, { step: "0.01", min: 0, max: 10 }), juros = inp("number", cfg.juros_mes_pct, { step: "0.01", min: 0, max: 10 }), desc = inp("number", cfg.desconto_pct, { step: "0.01", min: 0, max: 100 }), descD = inp("number", cfg.desconto_dias, { min: 0, max: 30 }), forma = sel({ UNDEFINED: "Cliente escolhe (boleto, Pix ou cartão)", BOLETO: "Boleto", PIX: "Pix", CREDIT_CARD: "Cartão de crédito" }, cfg.forma_padrao), dia = inp("number", cfg.dia_vencimento_padrao, { min: 1, max: 28 });
+      const notif = el("input", { type: "checkbox", checked: cfg.notificacoes_asaas ? "" : null });
+      cfgCard.replaceChildren(el("h3", {}, "Parâmetros gerais de recebimento"), el("div", { class: "form" }, field("pr-multa", "Multa por atraso (%)", multa, "Aplicada uma vez após o vencimento. Limite legal: 2%."), field("pr-juros", "Juros de mora (% ao mês)", juros, "Limite legal: 1% ao mês."), field("pr-desc", "Desconto por antecipação (%)", desc, "0 = sem desconto."), field("pr-descd", "Desconto válido até (dias antes do vencimento)", descD), field("pr-forma", "Forma de pagamento padrão", forma), field("pr-dia", "Dia de vencimento padrão", dia, "Sugerido ao criar cobranças novas."), el("div", { class: "f full" }, el("label", { style: "display:flex;gap:8px;align-items:center;text-transform:none" }, notif, "Deixar o Asaas enviar as notificações dele (e-mail/SMS) além da nossa régua"))),
+        el("div", { class: "actions", style: "margin-top:8px" }, el("button", { class: "btn primary", onclick: async () => { const novo = { ...(data?.dados || {}), recebimento: { multa_pct: +multa.value || 0, juros_mes_pct: +juros.value || 0, desconto_pct: +desc.value || 0, desconto_dias: +descD.value || 0, forma_padrao: forma.value, dia_vencimento_padrao: +dia.value || 10, notificacoes_asaas: notif.checked } }; const { error } = await SB.from("escritorio").upsert({ id: "financeiro", dados: novo }); if (error) { toast(error.message); return; } toast("Parâmetros salvos — valem para as próximas cobranças criadas pelo sistema"); } }, "Salvar parâmetros")),
+        el("p", { class: "note" }, "Cobranças já existentes no Asaas não mudam. Para alterar juros/multa de uma cobrança específica, edite no Asaas."));
+    })();
+    // conta (ao vivo)
+    const contaCard = el("div", { class: "card section" }, el("h3", {}, "Conta no Asaas"), el("div", { class: "note" }, "Consultando o Asaas…")); host.append(contaCard);
+    if (!C.conta) { try { C.conta = await window.PP_FIN.edge({ acao: "asaas_conta" }); } catch (e) { C.conta = { ok: false, erro: e.message }; } }
+    const r = C.conta;
+    if (!r?.ok) { contaCard.replaceChildren(el("h3", {}, "Conta no Asaas"), el("div", { class: "note", style: "color:var(--warn)" }, r?.erro || "Não foi possível consultar (a função do servidor precisa estar atualizada — Deploy da Edge)")); return; }
+    const ct = r.conta || {}, sd = r.saldo || {}, tx = r.taxas || {}, es = r.estatisticas_mes || {};
+    const linha = (k, val) => el("div", { style: "display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line)" }, el("span", { class: "note" }, k), el("b", {}, val ?? "—"));
+    const pct = (o) => o == null ? "—" : (o.percentage != null ? `${o.percentage}%` : "") + (o.fixedValue != null ? ` + ${R$(o.fixedValue)}` : "") + (o.value != null && o.percentage == null && o.fixedValue == null ? R$(o.value) : "");
+    contaCard.replaceChildren(el("h3", {}, "Conta no Asaas ", pill(r.ambiente, r.ambiente === "produção" ? "e1" : "e3")),
+      linha("Titular", ct.name), linha("CPF/CNPJ", ct.cpfCnpj), linha("E-mail", ct.email), linha("Saldo disponível", sd.balance != null ? R$(sd.balance) : "—"),
+      el("h3", { style: "margin-top:12px" }, "Taxas vigentes"), linha("Boleto", tx.payment?.bankSlip ? R$(tx.payment.bankSlip.defaultValue ?? tx.payment.bankSlip.value) : "—"), linha("Pix", tx.payment?.pix ? pct(tx.payment.pix) : "—"), linha("Cartão (à vista)", tx.payment?.creditCard?.operationValue != null ? `${tx.payment.creditCard.oneInstallmentPercentage ?? ""}% + ${R$(tx.payment.creditCard.operationValue)}` : "—"), linha("Transferência/saque", tx.transfer ? R$(tx.transfer.monthlyTransfersWithoutFee != null ? 0 : tx.transfer.value) + (tx.transfer.monthlyTransfersWithoutFee != null ? ` (${tx.transfer.monthlyTransfersWithoutFee} grátis/mês)` : "") : "—"), linha("Notificações (e-mail/SMS/WhatsApp)", tx.notification ? [tx.notification.emailNotification != null ? "e-mail " + R$(tx.notification.emailNotification) : null, tx.notification.smsNotification != null ? "SMS " + R$(tx.notification.smsNotification) : null, tx.notification.whatsAppNotification != null ? "WhatsApp " + R$(tx.notification.whatsAppNotification) : null].filter(Boolean).join(" · ") || "—" : "—"),
+      el("h3", { style: "margin-top:12px" }, "Mês atual (vencimentos até hoje)"), linha("Quantidade de cobranças", es.quantity != null ? String(es.quantity) : "—"), linha("Valor total", es.value != null ? R$(es.value) : "—"), linha("Valor líquido", es.netValue != null ? R$(es.netValue) : "—"),
+      el("details", { style: "margin-top:8px" }, el("summary", { class: "note" }, "dados completos retornados pelo Asaas"), el("pre", { class: "note", style: "white-space:pre-wrap;font-size:11px;max-height:300px;overflow:auto" }, JSON.stringify({ conta: ct, saldo: sd, taxas: tx, estatisticas: es }, null, 2))));
+  }
   window.PP_CENTRAL = { invalidar, render: renderCentral };
-  window.__PP_LOGIN?.then(() => { if (podeFin()) { const ch = SB.channel("central-cobrancas"); let t; const re = () => { clearTimeout(t); t = setTimeout(() => { if (S0.tab === "financeiro" && S0.finSub === "central") invalidar(); else C.ok = false; }, 800); }; for (const tb of ["cobranca_contatos", "regua_disparos", "regua_etapas", "cobranca_checks"]) ch.on("postgres_changes", { event: "*", schema: "public", table: tb }, re); ch.subscribe(); } });
+  window.__PP_LOGIN?.then(() => { if (podeFin()) { const ch = SB.channel("central-cobrancas"); let t; const re = () => { clearTimeout(t); t = setTimeout(() => { if (S0.tab === "financeiro" && S0.finSub === "central") invalidar(); else C.ok = false; }, 800); }; for (const tb of ["cobranca_contatos", "regua_disparos", "regua_etapas", "cobranca_checks", "cobrancas"]) ch.on("postgres_changes", { event: "*", schema: "public", table: tb }, re); ch.subscribe(); } });
 })();

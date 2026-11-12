@@ -20,8 +20,8 @@ async function carregar(){
   if(C.carregando)return;C.carregando=true;
   if(!C.mes)C.mes=mes1(new Date());
   try{
-    const [m,s]=await Promise.all([SB.from("metas_comerciais").select("*").eq("mes",C.mes),SB.from("comercial_semanas").select("*").eq("mes",C.mes).order("semana")]);
-    if(m.error)throw m.error;C.metas=m.data||[];C.semanas=s.data||[];C.ok=true;
+    const [m,s,f]=await Promise.all([SB.from("metas_comerciais").select("*").eq("mes",C.mes),SB.from("comercial_semanas").select("*").eq("mes",C.mes).order("semana"),SB.from("v_fechamentos_mes").select("*").eq("mes",C.mes).order("data_fechamento")]);
+    if(m.error)throw m.error;C.metas=m.data||[];C.semanas=s.data||[];C.fech=f.error?null:(f.data||[]);C.ok=true;
   }catch(e){console.warn("comercial",e);toast("Não foi possível carregar as metas comerciais")}
   finally{C.carregando=false}
   render();
@@ -71,6 +71,7 @@ function renderComercial(){
   g.append(el("div",{class:"card section"},el("h3",{},"Ritmo da SDR"),sdr(T,A)));
   v.append(g);
   v.append(semanasCard(T,A));
+  v.append(fechamentosCard());
 }
 function funil(T,A){
   const etapas=[["Leads",T.leads,A.leads],["Agendamentos",T.agendamentos,A.agendamentos],["Propostas",T.propostas,A.propostas],["Contratos",T.contratos,A.contratos]];
@@ -92,11 +93,25 @@ function semanasCard(T,A){
     return el("tr",{class:s.lancado?"":"cm-pend"},el("td",{},el("b",{},`S${s.semana}`),el("div",{class:"note"},fmt(s.inicio)+" – "+fmt(s.fim))),ed?el("td",{},f.dias_uteis=inp("number",s.dias_uteis,{min:"0",max:"7",style:"width:60px"})):el("td",{class:"num r"},s.dias_uteis),
       cell("leads"),cell("agendamentos"),cell("propostas"),cell("contratos"),cell("valor","100"),cell("investimento","10"),
       el("td",{class:"r"},!podeEditar?null:ed?[el("button",{class:"btn sm primary",onclick:async()=>{const up={};for(const k in f)up[k]=+f[k].value||0;up.lancado=true;const {error}=await SB.from("comercial_semanas").update(up).eq("id",s.id);if(error){toast(error.message);return}C.edit=null;toast("Semana salva");invalidar()}},"Salvar")," ",el("button",{class:"btn sm",onclick:()=>{C.edit=null;render()}},"Cancelar")]:el("button",{class:"btn sm",onclick:()=>{C.edit=s.id;render()}},s.lancado?"Editar":"Lançar")))});
-  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Semanas em dias corridos (leads e investimento contam sábado e domingo); dias úteis só para o ritmo da SDR. \"Preencher pelo CRM\" lê os leads; só o investimento Meta é digitado. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana.")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):C.semanas.length?el("button",{class:"btn sm",title:"Leads por data de entrada, agendamentos (fase Reunião agendada), propostas (fase Proposta enviada), contratos e valor (Ganho por data de fechamento). O investimento Meta continua manual.",onclick:preencherPeloCRM},"Preencher pelo CRM"):null),
+  return el("div",{class:"card section"},el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Lançamento semanal"),el("p",{class:"note",style:"margin:0"},"Semanas em dias corridos (leads e investimento contam sábado e domingo); dias úteis só para o ritmo da SDR. Tudo é recalculado todo dia às 7h10: leads/agendamentos/propostas pelo CRM, Contratos/Valor pela planilha do financeiro e Investimento pela coleta do Meta Ads. \"Atualizar agora\" força o recálculo. Leads = formulários do Meta · Agendamentos = marcados pela SDR · Propostas = qualificados · Contratos e Valor = só Gestão de Passivos · Investimento = gasto Meta da semana (automático).")),admin()&&!C.semanas.length?el("button",{class:"btn sm",onclick:gerarSemanas},"Gerar semanas do mês"):C.semanas.length?el("button",{class:"btn sm",title:"Leads por data de entrada, agendamentos (fase Reunião agendada), propostas (fase Proposta enviada), contratos e valor (Ganho por data de fechamento). O investimento Meta continua manual.",onclick:async()=>{const {error}=await SB.rpc("comercial_recalcular_tudo");if(error){toast(error.message);return}toast("Metas atualizadas pelo CRM, planilha e Meta");invalidar()}},"Atualizar agora"):null),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},cab.map((h,i)=>el("th",{class:i>0&&i<8?"r":""},h)))),el("tbody",{},rows.length?rows:el("tr",{},el("td",{colspan:"9",class:"note"},"Nenhuma semana cadastrada para este mês."))))),
     T.semanas?el("p",{class:"note"},`${T.semanas} de ${C.semanas.length} semanas lançadas · ${T.diasLan} de ${T.diasTot} dias (${pc(T.ritmo)} do mês) · ${T.diasUteisLan} de ${T.diasUteisTot} dias úteis.`):null);
 }
 
+/* ---------- fechamentos do mês vindos da planilha "Controle de clientes - Financeiro" (Apps Script → 0088) ---------- */
+function fechamentosCard(){
+  const BRL=v=>(+v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});const fd=s=>s?s.slice(8,10)+"/"+s.slice(5,7):"—";
+  const L=C.fech;const gp=(L||[]).filter(x=>x.gestao_passivos);const ult=L?.[0]?.ultima_sincronizacao;
+  const head=el("div",{class:"head",style:"margin:0 0 8px"},el("div",{},el("h3",{},"Fechamentos do mês — planilha do financeiro"),el("p",{class:"note",style:"margin:0"},L===null?"A ligação com a planilha ainda não está ativa (migração 0088 + Apps Script na planilha).":
+    (ult?"Sincronizado em "+new Date(ult).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})+" · ":"Ainda sem sincronização · ")+"\"Controle de clientes - Financeiro\" (aba do mês). Contratos e Valor das semanas acima vêm daqui automaticamente; só Gestão de Passivos conta para a meta.")));
+  const card=el("div",{class:"card section"},head);
+  if(!L||!L.length){card.append(el("div",{class:"note"},L?"Nenhum fechamento lançado na planilha para este mês.":""));return card}
+  card.append(el("div",{class:"kpis cm-kpis",style:"margin-bottom:10px"},el("div",{class:"card kpi"},el("div",{class:"l"},"Contratos (GP)"),el("div",{class:"v"},String(gp.length)),el("div",{class:"h"},`${L.length} no total`)),el("div",{class:"card kpi"},el("div",{class:"l"},"Valor contratado (GP)"),el("div",{class:"v"},BRL(gp.reduce((a,x)=>a+(+x.valor||0),0))),el("div",{class:"h"},"soma dos contratos")),el("div",{class:"card kpi"},el("div",{class:"l"},"Entradas recebidas"),el("div",{class:"v"},String(L.filter(x=>x.entrada_paga).length)+"/"+L.length),el("div",{class:"h"},BRL(L.filter(x=>x.entrada_paga).reduce((a,x)=>a+(+x.entrada||0),0))+" pagos"))));
+  card.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Cliente"),el("th",{},"Origem"),el("th",{},"Fechou"),el("th",{},"Produto"),el("th",{class:"r"},"Contrato"),el("th",{class:"r"},"Entrada"),el("th",{},"Entrada paga"),el("th",{},"No sistema"))),
+    el("tbody",{},L.map(x=>el("tr",{style:x.gestao_passivos?"":"color:var(--muted)"},el("td",{},x.nome),el("td",{},x.origem||"—"),el("td",{class:"num"},fd(x.data_fechamento)),el("td",{},x.produto||"—"),el("td",{class:"r num"},BRL(x.valor)),el("td",{class:"r num"},BRL(x.entrada)),el("td",{},x.entrada_paga===true?el("span",{class:"pill g"},"Sim"):x.entrada_paga===false?el("span",{class:"pill e2"},"Não"):"—"),
+      el("td",{},x.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(x.cliente_id),onclick:e=>{e.preventDefault();S.tab="clientes";S.sel=x.cliente_id;S.sub="cliente";render()}},x.cliente_nome||"abrir"):el("span",{class:"note",title:"Nenhum cliente cadastrado com esse nome"},"não cadastrado"))))))));
+  return card;
+}
 /* ---------- preencher semanas a partir do CRM (leads) ---------- */
 async function preencherPeloCRM(){
   if(!C.semanas.length){toast("Gere as semanas do mês primeiro");return}

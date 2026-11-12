@@ -30,7 +30,7 @@ function renderProcessos(){
     return;
   }
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Processos"),el("div",{class:"sub"},"Todos os processos acompanhados, inclusive os de pessoas fora da base de clientes.")),
-    el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})},"+ Processo"))));
+    el("div",{class:"actions"},btnExportar("processos",()=>P.filtrados||[],[{k:"numero_cnj",t:"Processo"},{k:"pasta_codigo",t:"Pasta"},{k:"cliente_nome",t:"Cliente"},{k:"parte_contraria",t:"Parte contrária"},{k:"banco",t:"Banco"},{k:"tipo_acao",t:"Tipo de ação"},{k:"area",t:"Área"},{k:"polo",t:"Polo"},{k:"tribunal",t:"Tribunal"},{k:"comarca",t:"Comarca"},{k:"uf",t:"UF"},{k:"vara",t:"Vara"},{k:"fase",t:"Fase"},{k:"status",t:"Status"},{k:"valor_causa",t:"Valor da causa",f:v=>v==null?"":String(v).replace(".",",")},{k:"responsavel_nome",t:"Responsável"},{k:"proximo_prazo",t:"Próximo prazo",f:v=>v?v.split("-").reverse().join("/"):""},{k:"prazo_fatal",t:"Fatal",f:v=>v?"sim":""},{k:"ultimo_andamento",t:"Último andamento",f:v=>v?String(v).slice(0,10).split("-").reverse().join("/"):""},{k:"dias_sem_andamento",t:"Dias sem andamento"},{k:"tarefas_abertas",t:"Tarefas abertas"},{k:"data_distribuicao",t:"Distribuição",f:v=>v?v.split("-").reverse().join("/"):""}]),el("button",{class:"btn primary",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})},"+ Processo"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const f=P.f;
   const ativos=P.lista.filter(p=>p.status==="ativo");
@@ -46,6 +46,7 @@ function renderProcessos(){
   const ql=f.q.trim().toLowerCase();
   const lista=P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.area==="__sem"?!p.area:!f.area||p.area===f.area)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)&&(!f.incompleto||(p.campos_faltando||[]).length)
     &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_codigo||(p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):"")].join(" ").toLowerCase().includes(ql)));
+  P.filtrados=lista;
   const fi=el("label",{class:"switch"},el("input",{type:"checkbox",checked:f.incompleto?"":null,onchange:e=>{f.incompleto=e.target.checked;render()}})," Só cadastro incompleto");
   const card=el("div",{class:"card"},el("div",{class:"tbl-tools"},q,fs,fc,fr,fa,fi,el("div",{class:"sp"}),el("span",{class:"note"},`${lista.length} de ${P.lista.length}`)));
   card.append(tabela({cols:[
@@ -66,7 +67,7 @@ function renderProcessos(){
     if(window.PP_PROCESSO?.ficha){v.append(window.PP_PROCESSO.ficha(p,{recarregar:()=>{P.ok=false;garantir()}}));return}
     const ands=P.andsDe===p.id?P.ands:[];
     v.append(el("div",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},p.cliente_nome||"Fora da base"),el("h2",{},p.numero_cnj||"(sem número)"),el("div",{class:"note"},[p.tipo_acao,p.parte_contraria?"× "+p.parte_contraria:null,p.valor_causa?"valor da causa "+BRL(+p.valor_causa):null,p.responsavel_nome?"resp. "+p.responsavel_nome:null].filter(Boolean).join(" · "))),
-        el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,p)},"Editar processo"),el("button",{class:"btn sm",onclick:()=>window.PP_TAREFAS?.nova({processo_id:p.id,cliente_id:p.cliente_id||null,titulo:""})},"+ Tarefa"),el("button",{class:"btn sm primary",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p)},"+ Andamento"))),
+        el("div",{class:"actions"},el("button",{class:"btn sm",title:p.datajud_erro?"DataJud: "+p.datajud_erro:p.datajud_atualizado_em?"Última atualização no DataJud: "+new Date(p.datajud_atualizado_em).toLocaleString("pt-BR"):"Busca as movimentações no DataJud (CNJ). Automático 1× por dia.",onclick:async(e)=>{const b=e.currentTarget;b.disabled=true;try{const {data,error}=await SB.rpc("datajud_atualizar",{p_processo:p.id});if(error)throw error;toast("DataJud: consulta enviada — as movimentações aparecem em alguns minutos");setTimeout(async()=>{await SB.rpc("datajud_atualizar",{p_processo:null}).catch(()=>{});P.ok=false;carregar();window.PP_PROCESSO_FICHA?.recarregar?.(p.id)},20000)}catch(err){toast(err.message||"Não foi possível consultar")}finally{b.disabled=false}}},p.datajud_erro?"DataJud ⚠":"Atualizar (DataJud)"),el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,p)},"Editar processo"),el("button",{class:"btn sm",onclick:()=>window.PP_TAREFAS?.nova({processo_id:p.id,cliente_id:p.cliente_id||null,titulo:""})},"+ Tarefa"),el("button",{class:"btn sm primary",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p)},"+ Andamento"))),
       p.observacoes?el("div",{class:"note",style:"white-space:pre-wrap"},p.observacoes):null,
       window.PP_PASTAS?.secaoProcesso?window.PP_PASTAS.secaoProcesso(p,()=>{P.ok=false;garantir()}):null,
       el("h3",{},`Andamentos (${ands.length})`),

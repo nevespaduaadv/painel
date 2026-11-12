@@ -51,10 +51,23 @@
     const tipo = sel(TT, "prazo"), titulo = inp("text", "", { placeholder: "Ex.: Contestar — prazo de 15 dias" }), resp = sel(colOpts, ""), prazo = inp("date", ""), fatal = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }), pri = sel({ "1": "Alta", "2": "Normal", "3": "Baixa" }, "1");
     const desc = el("textarea", { rows: 3 }, `Publicação de ${fmtD2(p.data_disponibilizacao)} · ${[p.tribunal, p.orgao, p.tipo_documento || p.tipo_comunicacao].filter(Boolean).join(" · ")}\nProcesso ${p.numero_processo || "s/ nº"}${p.cliente_nome ? " · " + p.cliente_nome : ""}\n\n${(p.resumo || "").slice(0, 400)}`);
     const sug = () => { if (!titulo.value.trim() || titulo.dataset.auto === "1") { titulo.value = `${TT[tipo.value]} — ${p.numero_processo || "publicação"}`; titulo.dataset.auto = "1"; } }; titulo.oninput = () => { titulo.dataset.auto = "0"; }; tipo.onchange = sug; sug();
+    // Workflow de prazo fracionado (0102): escolhe o tipo → o sistema abre a cadeia Confeccionar → (Custas) → Protocolar → Conferir
+    const WF = T.workflows || []; const wfSel = sel({ "": "Tarefa simples (sem cadeia)", ...Object.fromEntries(WF.map((w) => [w.codigo, w.nome + " · " + w.dias_legais + " dias"])) }, "");
+    const cadeiaBox = el("div", { class: "help", style: "grid-column:1/-1" });
+    const uf = window.PP_PRAZOS?.ufDoCnj(p.numero_processo); const confereId = T.confereId || null;
+    const addUteis = (iso, n) => { if (!iso) return null; let d = new Date(iso + "T12:00:00"), c = 0, step = n < 0 ? -1 : 1; while (c < Math.abs(n)) { d.setDate(d.getDate() + step); if (!window.PP_PRAZOS || window.PP_PRAZOS.ehUtil(d, uf)) c++; } return d.toISOString().slice(0, 10); };
+    const etapasDe = (w, fim) => { if (!w || !fim) return []; const e = []; e.push({ codigo: "confeccionar", titulo: "Confeccionar — " + w.nome, prazo: addUteis(fim, w.confeccionar_offset), para: "resp" }); if (w.custas) e.push({ codigo: "custas", titulo: "Recolher custas — " + w.nome, prazo: addUteis(fim, -3), para: "resp" }); e.push({ codigo: "protocolar", titulo: "Protocolar — " + w.nome, prazo: addUteis(fim, w.protocolar_offset), fatalEm: fim, para: "resp" }); e.push({ codigo: "conferir", titulo: "Conferir protocolo — " + w.nome, prazo: addUteis(fim, w.conferir_offset), para: "confere" }); return e; };
+    const fmtBR = (iso) => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) : "—";
+    const renderCadeia = () => { const w = WF.find((x) => x.codigo === wfSel.value); if (!w) { cadeiaBox.replaceChildren(); return; } const fim = prazo.value; if (!fim) { cadeiaBox.textContent = "Calcule o prazo legal acima para ver a cadeia."; return; }
+      const et = etapasDe(w, fim); cadeiaBox.replaceChildren(el("b", {}, "Cadeia que será aberta"), el("div", { style: "display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;margin-top:4px" }, ...et.flatMap((x) => [el("span", { class: "note" }, fmtBR(x.prazo)), el("span", {}, x.titulo), el("span", { class: "note" }, x.para === "confere" ? (confereId ? "controladoria" : "controladoria (não configurada → responsável)") : "responsável")])), el("div", { style: "margin-top:4px;color:var(--faint)" }, `Prazo legal: ${fmtBR(fim)} (fatal). Protocolar fica D-2; confeccionar D${w.confeccionar_offset}; conferir D-1.` + (w.decisao_inicial ? " Antes da cadeia, a etapa \"" + w.decisao_inicial + "\" pergunta se cabe." : ""))); };
+    wfSel.onchange = () => { const w = WF.find((x) => x.codigo === wfSel.value); if (w) { nDiasAuto(w); titulo.value = w.nome + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "1"; fatal.checked = true; } renderCadeia(); };
+    const nDiasAuto = (w) => { const n = boxTarefa.querySelector('input[type="number"]'); const t = boxTarefa.querySelector("select"); if (n) { n.value = w.dias_legais; n.dispatchEvent(new Event("change")); } };
+    prazo.addEventListener("change", renderCadeia);
     const boxTarefa = el("div", { class: "f full", style: "display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px" },
-      field("tr-tipo", "Tipo", tipo), field("tr-resp", "Para quem", resp), field("tr-tit", "Título da tarefa", titulo), field("tr-prazo", "Prazo (vencimento)", prazo),
+      field("tr-wf", "Tipo de prazo", wfSel, "Escolha o tipo para o sistema abrir a cadeia (confeccionar → protocolar → conferir) de uma vez."), field("tr-resp", "Para quem", resp), field("tr-tipo", "Tipo (tarefa simples)", tipo), field("tr-tit", "Título da tarefa", titulo), field("tr-prazo", "Prazo legal (vencimento)", prazo),
       window.PP_PRAZOS ? window.PP_PRAZOS.campo({ alvo: prazo, base: p.data_disponibilizacao, uf: window.PP_PRAZOS.ufDoCnj(p.numero_processo), dias: 15, tipo: "uteis" }) : null,
       el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, fatal, "Prazo fatal")), field("tr-pri", "Prioridade", pri),
+      cadeiaBox,
       el("div", { style: "grid-column:1/-1" }, field("tr-desc", "Instruções / comentário", desc, `Quem recebe vê isto na tarefa e é avisado no sino${meu ? " como vindo de " + meu.nome : ""}.`)));
     const fPara = field("tr-para", "Encaminhar para", para);
     const ajustar = () => { boxTarefa.hidden = prov.value !== "gerou_prazo"; fPara.hidden = prov.value !== "encaminhada"; }; prov.onchange = ajustar; ajustar();
@@ -66,8 +79,18 @@
       else if (!processo_id && selCli?.value) { const { data, error } = await SB.from("processos").insert({ cliente_id: selCli.value, numero_cnj: p.numero_processo || null, tribunal: p.tribunal || null, vara: p.orgao || null, tipo_acao: p.classe || null, polo: "passivo", status: "ativo", visivel_cliente: false, fonte: "djen" }).select("id").single(); if (error) throw new Error(error.code === "23505" ? "Já existe processo com esse número — escolha-o na lista" : "Não foi possível criar o processo"); processo_id = data.id; cliente_id = selCli.value; await SB.from("publicacoes").update({ processo_id }).eq("id", p.id); }
       if (prov.value === "gerou_prazo") {
         if (!resp.value) throw new Error("Escolha para quem vai a tarefa"); if (!prazo.value) throw new Error("Informe o prazo da tarefa");
+        const w = WF.find((x) => x.codigo === wfSel.value);
+        if (w) {
+          const cadeia = crypto.randomUUID(); const et = etapasDe(w, prazo.value); const base = { descricao: desc.value.trim() || null, cliente_id: cliente_id || null, processo_id: processo_id || null, nucleo: "juridico", prioridade: +pri.value, status: "aberta", publicacao_id: p.id, cadeia_id: cadeia, workflow_codigo: w.codigo };
+          const rows = [];
+          if (w.decisao_inicial) rows.push({ ...base, titulo: w.decisao_inicial + " — " + (p.numero_processo || "publicação"), responsavel_id: resp.value, prazo: addUteis(p.data_disponibilizacao || prazo.value, 2) || prazo.value, prazo_fatal: false, etapa_codigo: "analisar", descricao: (base.descricao || "") + "\n\nAo concluir, diga no andamento se cabe ou não. A cadeia (confeccionar → protocolar → conferir) já está aberta; se não couber, conclua as demais etapas como \"não cabe\"." });
+          for (const x of et) rows.push({ ...base, titulo: x.titulo, responsavel_id: x.para === "confere" && confereId ? confereId : resp.value, prazo: x.prazo, prazo_fatal: x.codigo === "protocolar", etapa_codigo: x.codigo, descricao: (x.codigo === "protocolar" ? `Prazo legal (fatal): ${fmtBR(x.fatalEm)}. Meta interna: protocolar até ${fmtBR(x.prazo)}.\n\n` : x.codigo === "conferir" ? "Conferir nos autos se o protocolo foi feito e anexar o comprovante.\n\n" : "") + (base.descricao || "") });
+          const { error } = await SB.from("tarefas").insert(rows); if (error) throw new Error("Não foi possível abrir a cadeia: " + error.message);
+          toast(`Cadeia aberta: ${rows.length} tarefas`);
+        } else {
         const row = { titulo: titulo.value.trim() || TT[tipo.value], descricao: desc.value.trim() || null, cliente_id: cliente_id || null, processo_id: processo_id || null, responsavel_id: resp.value, nucleo: "juridico", prazo: prazo.value, prazo_fatal: fatal.checked, prioridade: +pri.value, status: "aberta", publicacao_id: p.id };
         const { error } = await SB.from("tarefas").insert(row); if (error) throw new Error("Não foi possível criar a tarefa");
+        }
         if (obs.value.trim()) await SB.from("publicacoes").update({ observacao_tratamento: obs.value.trim() }).eq("id", p.id);
         toast("Tarefa criada e publicação tratada");
       } else {
@@ -155,5 +178,7 @@
       v.querySelectorAll("section.card.section").forEach((sec) => { if (!sec.querySelector("tbody tr")) sec.remove(); });
     }; }
   window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso };
-  window.__PP_LOGIN?.then(() => { SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome").then(({ data }) => { T.colab = data || []; }); });
+  window.__PP_LOGIN?.then(() => { SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome").then(({ data }) => { T.colab = data || []; });
+    SB.from("workflows_prazo").select("*").eq("ativo", true).order("ordem").then(({ data }) => { T.workflows = data || []; });
+    SB.from("escritorio").select("dados").eq("id", "juridico").maybeSingle().then(({ data }) => { T.confereId = data?.dados?.conferencia_protocolo_id || null; }); });
 })();
