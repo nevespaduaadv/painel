@@ -22,12 +22,20 @@ Frontend estático (HTML/CSS/JS puros) publicado no GitHub Pages, com dados, log
 | `cliente/index.html` | Área do cliente **por link com token** (`cliente/?t=…`), sem login (gerado — não editar à mão). Lê `painel_por_token()`. |
 | `gestao/index.html` | Dashboard de gestão (carteira, jurídico, equipe, alertas). Lê só as views `v_*`; página independente, mesma sessão de login. |
 | `fontes/painel.html` | Protótipo-fonte do painel (motor de projeção, dashboard, formulários). |
-| `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta login, runtime Supabase, aba Usuários e o `carteira.js`). |
+| `fontes/gerar-app-supabase.mjs` | Gera `passivos/index.html` a partir de `fontes/painel.html` (injeta tokens do Design System, login, runtime Supabase, aba Usuários e o `carteira.js`). |
+| `fontes/tokens.css` · `DESIGN.md` | Tokens e Design System (ver seção abaixo). |
+| `fontes/verificar-geracao.mjs` · `docs/qa/` | Verificação de geração e paridade do menu. |
 | `fontes/importar-onboarding.py` | Gera SQL (fora do repo) com os dados dos formulários de onboarding e o índice de documentos da pasta de cada cliente. |
 | `fontes/gerar-pagina-cliente.mjs` | Legado: gerava a página fixa `alphamec/` a partir de um snapshot do banco antigo. |
 | `alphamec/index.html` | Página fixa do cliente Alphamec (congelada na posição de 07/10/2026). |
 | `supabase/migrations/*.sql` | Modelo de dados versionado. Toda alteração de schema entra aqui. |
 | `docs/plano-etapa-2.md` | Plano da etapa 2 (modelo de dados, telas, ordem dos PRs). |
+
+## Design System
+
+- `fontes/tokens.css` — tokens (claro, escuro, movimento) + tokens legados. O gerador injeta este arquivo no `<style>` de todas as páginas geradas, no lugar do comentário `/*TOKENS*/` de `fontes/painel.html`.
+- `DESIGN.md` — princípios, tipografia, componentes e Motion Design System (V3.1, referência definitiva).
+- `fontes/verificar-geracao.mjs --base main` — verificação obrigatória antes de todo PR (gera em pasta temporária, confere paridade das saídas, dos tokens legados e do menu). Detalhes em `docs/qa/README.md`.
 
 ## Rodar localmente
 

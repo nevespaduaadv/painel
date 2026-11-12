@@ -1,0 +1,221 @@
+[
+ {
+  "tab": "painel",
+  "label": "Hoje",
+  "cls": "edit-only",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "tarefas",
+  "label": "Tarefas e prazos",
+  "cls": "edit-only",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "agenda",
+  "label": "Agenda",
+  "cls": "edit-only",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "perfil",
+  "label": "Meu perfil",
+  "cls": "edit-only",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "avisos",
+  "label": "Avisos",
+  "cls": "edit-only",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "clientes",
+  "label": "Clientes",
+  "cls": "area-clientes",
+  "hash": "",
+  "em": null
+ },
+ {
+  "tab": "processos",
+  "label": "Jurídico",
+  "cls": "edit-only grp-juridico area-juridico",
+  "hash": "",
+  "em": null,
+  "tabs": [
+   "processos",
+   "publicacoes",
+   "negociacoes",
+   "historico"
+  ]
+ },
+ {
+  "grupo": "juridico-ferr",
+  "label": "Ferramentas jurídicas",
+  "cls": "edit-only grp-juridico"
+ },
+ {
+  "tab": "revisional",
+  "label": "Revisional de contratos",
+  "cls": "area-juridico",
+  "hash": "",
+  "em": "juridico-ferr"
+ },
+ {
+  "tab": "superendividamento",
+  "label": "Superendividamento",
+  "cls": "area-superendividamento",
+  "hash": "",
+  "em": "juridico-ferr"
+ },
+ {
+  "tab": "pecas",
+  "label": "Modelos de peças",
+  "cls": "area-juridico",
+  "hash": "",
+  "em": "juridico-ferr"
+ },
+ {
+  "tab": "monitoramento",
+  "label": "Monitoramento",
+  "cls": "area-juridico",
+  "hash": "",
+  "em": "juridico-ferr"
+ },
+ {
+  "tab": "autenticador",
+  "label": "Autenticador (2FA)",
+  "cls": "area-juridico",
+  "hash": "",
+  "em": "juridico-ferr"
+ },
+ {
+  "tab": "conhecimento",
+  "label": "Base de conhecimento",
+  "cls": "area-juridico",
+  "hash": "#conhecimento/area:juridico",
+  "em": "juridico-ferr"
+ },
+ {
+  "grupo": "comercial",
+  "label": "Comercial",
+  "cls": "edit-only area-comercial"
+ },
+ {
+  "tab": "conhecimento",
+  "label": "Base de conhecimento",
+  "cls": "area-comercial",
+  "hash": "#conhecimento/area:comercial",
+  "em": "comercial"
+ },
+ {
+  "grupo": "marketing",
+  "label": "Marketing",
+  "cls": "edit-only area-marketing"
+ },
+ {
+  "tab": "marketing",
+  "label": "Pautas de conteúdo",
+  "cls": "area-marketing",
+  "hash": "",
+  "em": "marketing"
+ },
+ {
+  "tab": "conhecimento",
+  "label": "Base de conhecimento",
+  "cls": "area-marketing",
+  "hash": "#conhecimento/area:marketing",
+  "em": "marketing"
+ },
+ {
+  "tab": "financeiro",
+  "label": "Financeiro",
+  "cls": "edit-only area-financeiro",
+  "hash": "",
+  "em": "marketing",
+  "tabs": [
+   "financeiro",
+   "faturamento",
+   "estoque",
+   "inventario"
+  ]
+ },
+ {
+  "grupo": "equipe",
+  "label": "Equipe",
+  "cls": "edit-only area-equipe"
+ },
+ {
+  "tab": "equipe",
+  "label": "Colaboradores e usuários",
+  "cls": "area-equipe",
+  "hash": "",
+  "em": "equipe"
+ },
+ {
+  "tab": "horas",
+  "label": "Horas",
+  "cls": "area-equipe",
+  "hash": "",
+  "em": "equipe"
+ },
+ {
+  "tab": "ponto",
+  "label": "Ponto (gestão)",
+  "cls": "area-equipe",
+  "hash": "",
+  "em": "equipe"
+ },
+ {
+  "tab": "requisicoes",
+  "label": "Requisições (gestão)",
+  "cls": "area-equipe",
+  "hash": "",
+  "em": "equipe"
+ },
+ {
+  "grupo": "gestao",
+  "label": "Gestão",
+  "cls": "edit-only gestao-only"
+ },
+ {
+  "tab": "visao",
+  "label": "Visão geral",
+  "cls": "admin-only",
+  "hash": "",
+  "em": "gestao"
+ },
+ {
+  "tab": "growth",
+  "label": "Growth",
+  "cls": "area-growth",
+  "hash": "",
+  "em": "gestao"
+ },
+ {
+  "tab": "espelho",
+  "label": "Espelho (beta)",
+  "cls": "admin-only espelho-only",
+  "hash": "",
+  "em": "gestao"
+ },
+ {
+  "tab": "importar-advbox",
+  "label": "Importar do ADVBox",
+  "cls": "admin-only",
+  "hash": "",
+  "em": "gestao"
+ },
+ {
+  "tab": "config-gestao",
+  "label": "Configurações",
+  "cls": "area-equipe",
+  "hash": "",
+  "em": "gestao"
+ }
+]
