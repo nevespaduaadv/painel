@@ -14,6 +14,7 @@
 @font-face{font-family:"General Sans";font-weight:700;font-display:swap;src:url(passivos/fontes/general-sans-700.woff2) format("woff2")}
 /* Layout: lista de clientes à esquerda, painel do cliente à direita; stack em telas estreitas. */
 /*TOKENS*/
+/*CASCA*/
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -251,14 +252,16 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 @media (prefers-reduced-motion:no-preference){.row,.btn,.tab{transition:background .12s}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
+<!--CASCA_BOOT-->
 </head>
 <body>
 
 <div class="app" id="app">
-<aside class="sb" id="sb">
+<aside class="sb" id="sb" data-casca="v2">
   <div class="brand"><img class="logo" src="passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="passivos/img/monograma-branco.png" alt="NP"></div>
   <nav class="tabs" role="tablist" id="nav"></nav>
 </aside>
+<aside id="np-side" data-casca="v3" aria-label="Navegação" hidden inert></aside>
 <div class="sb-overlay" onclick="document.getElementById('app').classList.remove('sb-aberta')"></div>
 <div class="app-body">
 <header class="top">

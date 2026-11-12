@@ -1,0 +1,37 @@
+# Verificação de geração em todo PR para main (G1–G3, N1–N3, T1).
+# Não faz deploy, não publica, não escreve no repositório. Sem segredos: o gerador só usa chaves publicáveis já versionadas.
+name: verificar-geracao
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fase do PR (padrão 1; rótulo "fase-0" aplica a comparação estrita)
+        id: fase
+        run: |
+          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=1" >> "$GITHUB_OUTPUT"; fi
+      - name: verificar-geracao
+        run: node fontes/verificar-geracao.mjs --base origin/${{ github.base_ref }} --fase ${{ steps.fase.outputs.fase }}
+      - name: Laboratório da casca (navegação real, dados fictícios, sem rede)
+        run: |
+          npm i -g --no-fund --no-audit playwright@1.49.1 pngjs@7.0.0
+          npx playwright install --with-deps chromium
+          NODE_PATH="$(npm root -g)" node docs/qa/casca-lab.cjs "$RUNNER_TEMP/casca-lab"
+      - name: Guardar relatório e capturas do laboratório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: casca-lab
+          path: ${{ runner.temp }}/casca-lab
+          retention-days: 14

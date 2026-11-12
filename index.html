@@ -143,6 +143,185 @@
   --bg:#151412; --surface:#1D1C1A; --surface-2:#262523; --line:#302E2B;
   --fg:#F2F0EB; --muted:#A8A49F; --faint:#8C8882; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 8px 30px rgba(0,0,0,.5);
   --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark }
+/* ============================================================================
+   Casca V3.1 (Design System — Fase 1). Só vale sob html.np-casca-v3.
+   Ativada pela chave localStorage "np-casca" = "v3" (Meu perfil → Navegação).
+   A chave só escolhe CSS/render: acesso continua em PP.temAcesso, nas classes
+   area-*/*-only e na RLS. Fora da classe, nada aqui se aplica (casca V2 intacta).
+   Camadas (z-index): barra 5 · véu da gaveta 9 · lateral 10/30 · menus 30 ·
+   flyout 70 · dica 80 · modal (existente) acima.
+   ============================================================================ */
+html.np-casca-v3{--sbw:var(--np-side-w)}
+html.np-casca-v3 .app.np-rail{--sbw:var(--np-rail-w)} /* .np-rail = estado derivado (preferência np-trilho ≥1180, ou 901–1179 sem expansão); mantido pelo casca.js */
+html.np-casca-v3 body{font-size:14px}
+/* a casca V2 sai do fluxo e da árvore de acessibilidade (JS também põe inert) */
+html.np-casca-v3 .sb[data-casca="v2"]{display:none!important}
+html.np-casca-v3 #np-side[hidden]{display:none!important}
+/* hidden vence qualquer display da casca (itens, grupos, links, dica) */
+html.np-casca-v3 :is(#np-side,#np-fly,#np-dica,#np-trilha) [hidden],html.np-casca-v3 :is(#np-side,#np-fly)[hidden],html.np-casca-v3 #np-trilha[hidden]{display:none!important}
+
+/* --np-topo: altura de uma faixa fixa acima da casca (a faixa do espelho /beta/ define 22px no body) */
+/* ---------- lateral ---------- */
+html.np-casca-v3 #np-side{background:var(--np-side);color:var(--np-text);position:sticky;top:var(--np-topo,0px);height:calc(100vh - var(--np-topo,0px));display:flex;flex-direction:column;border-right:1px solid var(--np-line);min-width:0;overflow:hidden;z-index:10;transition:width calc(var(--np-d4)*var(--np-slow)) var(--np-e-spring)}
+html.np-casca-v3 .np-ws{display:flex;align-items:center;gap:9px;padding:14px 12px 10px;min-height:52px}
+html.np-casca-v3 .np-ws .np-mono{width:26px;height:26px;border-radius:6px;background:var(--np-ink);color:var(--np-inv);display:grid;place-items:center;font-family:var(--np-display);font-size:13.5px;flex:none}
+html.np-casca-v3 .np-ws b{font-weight:600;font-size:13.5px;white-space:nowrap;display:block}
+html.np-casca-v3 .np-ws small{display:block;font-size:12px;color:var(--np-text-3);white-space:nowrap;line-height:1.1}
+html.np-casca-v3 .np-rot{min-width:0;overflow:hidden;transition:opacity calc(var(--np-d2)*var(--np-slow))}
+html.np-casca-v3 .np-acoes{padding:4px 12px 10px}
+html.np-casca-v3 .np-busca-btn{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:var(--np-r);background:var(--np-surface);border:1px solid var(--np-line);color:var(--np-text-3);font-size:13.5px;width:100%;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;transition:border-color calc(var(--np-d2)*var(--np-slow)),color calc(var(--np-d2)*var(--np-slow))}
+html.np-casca-v3 .np-busca-btn:hover{border-color:var(--np-line-2);color:var(--np-text)}
+html.np-casca-v3 .np-busca-btn kbd{margin-left:auto;font:12px var(--np-ui);color:var(--np-text-3);border:1px solid var(--np-line-2);border-radius:4px;padding:0 5px}
+html.np-casca-v3 .np-ico{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+html.np-casca-v3 #np-tree{flex:1;overflow:auto;padding:2px 8px 8px;scrollbar-width:thin;scrollbar-color:var(--np-line-2) transparent;mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%);-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%)}
+/* itens: reaproveita .tab gerado por itemNav() (button com svg + span [+ .cnt]) */
+html.np-casca-v3 #np-tree .tab{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px 0 10px;border-radius:var(--np-r);border:0;background:transparent;color:var(--np-text-2);font-size:14px;font-weight:400;white-space:nowrap;position:relative;width:100%;text-align:left;cursor:pointer;text-decoration:none;transition:background calc(var(--np-d1)*var(--np-slow)),color calc(var(--np-d1)*var(--np-slow))}
+html.np-casca-v3 #np-tree .tab:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 #np-tree .tab[aria-current="page"]{background:var(--np-sel);color:var(--np-text);font-weight:500}
+html.np-casca-v3 #np-tree .tab[aria-current="page"]::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 2px 2px 0;background:var(--np-ink)}
+html.np-casca-v3 #np-tree .tab svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--np-text-3);opacity:1}
+html.np-casca-v3 #np-tree .tab[aria-current="page"] svg{color:var(--np-text)}
+html.np-casca-v3 #np-tree .tab span{overflow:hidden;text-overflow:ellipsis;transition:opacity calc(var(--np-d2)*var(--np-slow))}
+html.np-casca-v3 #np-tree .tab .cnt{margin-left:auto;background:transparent;color:var(--np-text-3);font-size:12px;font-weight:500;padding:0;border-radius:0;font-variant-numeric:tabular-nums}
+html.np-casca-v3 #np-tree .np-sec{height:8px}
+html.np-casca-v3 #np-tree .np-g{display:flex;flex-direction:column}
+html.np-casca-v3 #np-tree .np-g>.np-gh{display:flex;align-items:center;gap:8px;height:28px;margin-top:8px;padding:0 8px 0 10px;border-radius:var(--np-r);border:0;background:transparent;color:var(--np-text-3);font-size:12.5px;font-weight:600;letter-spacing:.01em;white-space:nowrap;width:100%;text-align:left;cursor:pointer;position:relative;transition:background calc(var(--np-d1)*var(--np-slow)),color calc(var(--np-d1)*var(--np-slow))}
+html.np-casca-v3 #np-tree .np-g>.np-gh:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 #np-tree .np-g.np-ativo>.np-gh{color:var(--np-text-2)}
+html.np-casca-v3 #np-tree .np-g>.np-gh .np-chev{width:12px;height:12px;margin-left:-2px;opacity:.8;transition:transform calc(var(--np-d3)*var(--np-slow)) var(--np-e-move)}
+html.np-casca-v3 #np-tree .np-g[data-aberto="0"]>.np-gh .np-chev{transform:rotate(-90deg)}
+html.np-casca-v3 #np-tree .np-corpo{display:grid;grid-template-rows:1fr;transition:grid-template-rows calc(var(--np-d4)*var(--np-slow)) var(--np-e-move)}
+html.np-casca-v3 #np-tree .np-g[data-aberto="0"] .np-corpo{grid-template-rows:0fr}
+html.np-casca-v3 #np-tree .np-corpo>ul{overflow:hidden;min-height:0}
+html.np-casca-v3 .np-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+html.np-casca-v3 .np-lista>li{display:block;min-width:0}
+html.np-casca-v3 #np-tree .np-sub{margin-left:15px;border-left:1px solid var(--np-line-2);padding-left:6px;display:flex;flex-direction:column;gap:1px}
+html.np-casca-v3 #np-tree .np-sub .tab{height:30px;font-size:13.5px}
+html.np-casca-v3 #np-tree .np-sub .tab[aria-current="page"]{box-shadow:inset 2px 0 0 var(--np-ink)}
+html.np-casca-v3 #np-tree .np-sub .tab[aria-current="page"]::before{display:none}
+html.np-casca-v3 #np-tree .np-g[data-vazio="1"]{display:none}
+html.np-casca-v3 .np-eu{display:flex;align-items:center;gap:9px;padding:8px 8px 10px;border-top:1px solid var(--np-line);font-size:12.5px;white-space:nowrap;overflow:hidden}
+html.np-casca-v3 .np-eu .tab{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:var(--np-r);border:0;background:transparent;color:var(--np-text-2);width:100%;text-align:left;cursor:pointer;font:inherit;min-width:0}
+html.np-casca-v3 .np-eu .tab:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .np-eu .tab[aria-current="page"]{background:var(--np-sel);color:var(--np-text)}
+html.np-casca-v3 .np-eu i{width:26px;height:26px;border-radius:50%;background:var(--np-surface-2);border:1px solid var(--np-line-2);display:grid;place-items:center;font-style:normal;font-weight:600;font-size:12px;flex:none;color:var(--np-text-2)}
+html.np-casca-v3 .np-eu b{display:block;font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+html.np-casca-v3 .np-eu small{display:block;color:var(--np-text-3);font-size:12px}
+html.np-casca-v3 .np-eu .np-links{display:flex;flex-direction:column;gap:1px;padding:0 0 4px}
+html.np-casca-v3 .np-eu .np-links a{font-size:12.5px;color:var(--np-text-3);padding:4px 8px;border-radius:var(--np-r);text-decoration:none}
+html.np-casca-v3 .np-eu .np-links a:hover{background:var(--np-hover);color:var(--np-text)}
+
+/* ---------- trilho (recolhido) ---------- */
+html.np-casca-v3 .np-rail #np-side{overflow:visible}
+html.np-casca-v3 .np-rail .np-ws{justify-content:center;padding:14px 0 8px}
+html.np-casca-v3 .np-rail .np-rot,html.np-casca-v3 .np-rail #np-tree .tab span,html.np-casca-v3 .np-rail #np-tree .np-gh span,html.np-casca-v3 .np-rail #np-tree .np-gh .np-chev,html.np-casca-v3 .np-rail .np-busca-btn span,html.np-casca-v3 .np-rail .np-busca-btn kbd,html.np-casca-v3 .np-rail .np-eu .np-rot,html.np-casca-v3 .np-rail .np-eu .np-links{display:none}
+html.np-casca-v3 .np-rail .np-acoes{padding:4px 10px 10px}
+html.np-casca-v3 .np-rail .np-busca-btn{justify-content:center;padding:0;gap:0;width:36px;margin:0 auto}
+html.np-casca-v3 .np-rail #np-tree{padding:2px 10px;mask-image:none;-webkit-mask-image:none}
+html.np-casca-v3 .np-rail #np-tree .tab,html.np-casca-v3 .np-rail #np-tree .np-g>.np-gh{justify-content:center;padding:0;width:36px;height:36px;margin:1px auto;gap:0}
+html.np-casca-v3 .np-rail #np-tree .np-g>.np-gh{margin-top:6px;color:var(--np-text-2)}
+html.np-casca-v3 .np-rail #np-tree .np-g.np-ativo>.np-gh,html.np-casca-v3 .np-rail #np-tree .np-g.np-fly-on>.np-gh{background:var(--np-sel);color:var(--np-text)}
+html.np-casca-v3 .np-rail #np-tree .np-g.np-ativo>.np-gh::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:0 2px 2px 0;background:var(--np-ink)}
+html.np-casca-v3 .np-rail #np-tree .np-g.np-fly-on>.np-gh::after{content:"";position:absolute;right:-11px;top:50%;width:10px;height:2px;margin-top:-1px;background:var(--np-line-2)}
+html.np-casca-v3 .np-rail #np-tree .np-corpo{display:none}
+html.np-casca-v3 .np-rail #np-tree .tab[aria-current="page"]::before{left:-10px}
+html.np-casca-v3 .np-rail #np-tree .tab .cnt{position:absolute;top:3px;right:3px;margin:0;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:var(--np-surface);border:1px solid var(--np-line-2);padding:0 4px;text-align:center;font-size:11.5px}
+html.np-casca-v3 .np-rail .np-eu{justify-content:center;padding:8px 0 10px}
+html.np-casca-v3 .np-rail .np-eu .tab{width:auto;padding:6px}
+
+/* dica e flyout */
+html.np-casca-v3 #np-dica{position:fixed;z-index:80;background:var(--np-ink);color:var(--np-inv);font-size:12.5px;padding:5px 9px;border-radius:6px;box-shadow:var(--np-shadow);pointer-events:none;opacity:0;transform:translateX(-4px);transition:opacity calc(var(--np-d2)*var(--np-slow)),transform calc(var(--np-d2)*var(--np-slow)) var(--np-e-in);white-space:nowrap}
+html.np-casca-v3 #np-dica.on{opacity:1;transform:none;transition-delay:calc(220ms*var(--np-slow))}
+html.np-casca-v3 #np-fly{position:fixed;z-index:70;left:calc(var(--np-rail-w) - 2px);min-width:236px;background:var(--np-surface);border:1px solid var(--np-line);border-radius:var(--np-r-lg);box-shadow:var(--np-shadow);padding:4px 6px 6px;opacity:0;transform:translateX(-10px) scaleX(.94);transform-origin:left center;pointer-events:none;transition:opacity calc(var(--np-d2)*var(--np-slow)) var(--np-e-in),transform calc(var(--np-d3)*var(--np-slow)) var(--np-e-spring);color:var(--np-text)}
+html.np-casca-v3 #np-fly::before{content:"";position:absolute;left:-14px;top:0;bottom:0;width:14px}
+html.np-casca-v3 #np-fly.on{opacity:1;transform:none;pointer-events:auto}
+html.np-casca-v3 #np-fly .np-orig{display:flex;align-items:center;gap:8px;height:36px;padding:0 8px;margin:0 -2px 4px;border-radius:var(--np-r);background:var(--np-sel);color:var(--np-text);font-weight:600;font-size:13.5px}
+html.np-casca-v3 #np-fly .np-orig .np-k{margin-left:auto;font-weight:400;color:var(--np-text-3);font-size:12px}
+html.np-casca-v3 #np-fly .tab{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:var(--np-r);border:0;background:transparent;font-size:14px;color:var(--np-text-2);position:relative;width:100%;text-align:left;cursor:pointer;white-space:nowrap;text-decoration:none}
+html.np-casca-v3 #np-fly .tab svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--np-text-3)}
+html.np-casca-v3 #np-fly .tab:hover,html.np-casca-v3 #np-fly .tab:focus-visible{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 #np-fly .tab[aria-current="page"]{background:var(--np-sel);color:var(--np-text);font-weight:500}
+html.np-casca-v3 #np-fly .tab[aria-current="page"]::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 2px 2px 0;background:var(--np-ink)}
+html.np-casca-v3 #np-fly .np-sub .tab{padding-left:24px;font-size:13.5px}
+html.np-casca-v3 #np-fly .tab .cnt{margin-left:auto;font-size:12px;color:var(--np-text-3);background:transparent;padding:0}
+
+/* ---------- barra superior (mesmo header.top, 48 px) ---------- */
+html.np-casca-v3 .top{top:var(--np-topo,env(safe-area-inset-top,0px));min-height:var(--np-bar-h);height:var(--np-bar-h);padding:0 16px 0 10px;gap:8px;background:color-mix(in srgb,var(--np-bg) 92%,transparent);backdrop-filter:blur(10px) saturate(1.2);-webkit-backdrop-filter:blur(10px) saturate(1.2);border-bottom:1px solid var(--np-line);color:var(--np-text)}
+html.np-casca-v3 .top .ham{color:var(--np-text-2);width:32px;height:32px;padding:0;border-radius:var(--np-r);flex:none}
+html.np-casca-v3 .top .ham:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .top #np-trilha{font-size:14px;color:var(--np-text-3);white-space:nowrap;display:flex;align-items:center;gap:6px}
+html.np-casca-v3 .top #np-trilha:empty{display:none}
+html.np-casca-v3 .top #np-trilha::after{content:"/";opacity:.6}
+html.np-casca-v3 .top .area{font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--np-text);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
+html.np-casca-v3 .busca{max-width:440px;margin-left:12px;min-width:0}
+html.np-casca-v3 .busca input{min-width:0}
+html.np-casca-v3 .busca input{height:30px;padding:0 12px 0 32px;border-radius:var(--np-r);border:1px solid var(--np-line-2);background:var(--np-surface);font-size:13.5px;color:var(--np-text)}
+html.np-casca-v3 .busca input:focus{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .busca>svg{left:10px;stroke:var(--np-text-3)}
+html.np-casca-v3 .busca .res{border-radius:var(--np-r-lg);border-color:var(--np-line);box-shadow:var(--np-shadow);background:var(--np-surface)}
+html.np-casca-v3 .top .ic{width:30px;height:30px;border-radius:var(--np-r);border:0;background:transparent;color:var(--np-text-2);flex:none}
+html.np-casca-v3 .top .ic:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .top .switch{font-size:13px;color:var(--np-text-2)}
+html.np-casca-v3 .top .switch input{accent-color:var(--np-ink)}
+html.np-casca-v3 .top .userbox{font-size:13px;color:var(--np-text-2)}
+html.np-casca-v3 .top .userbox{flex:none}
+html.np-casca-v3 .top .userbox .btn{height:30px;padding:0 10px;border-radius:var(--np-r);border:1px solid var(--np-line-2);background:var(--np-surface);color:var(--np-text);font-size:13px;font-weight:500}
+html.np-casca-v3 .top .userbox .btn:hover{background:var(--np-surface-2)}
+html.np-casca-v3 .top .userbox #userName{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* véu da gaveta (reaproveita .sb-overlay do #app) */
+html.np-casca-v3 .sb-overlay{background:rgba(10,12,14,.32)}
+
+/* foco visível uniforme na casca */
+html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus-visible{outline:none;box-shadow:var(--np-focus)}
+
+/* ---------- larguras ---------- */
+@media (min-width:901px) and (max-width:1179px){
+  /* trilho automático; expansão por cima com véu */
+  html.np-casca-v3 .app:not(.np-expandida){--sbw:var(--np-rail-w)}
+  html.np-casca-v3 .app.np-expandida #np-side{position:fixed;left:0;top:var(--np-topo,0px);bottom:0;height:auto;width:var(--np-side-w);z-index:30;box-shadow:var(--np-shadow)}
+  html.np-casca-v3 .app.np-expandida .sb-overlay{display:block;z-index:29}
+}
+@media (max-width:900px){
+  html.np-casca-v3 .app{grid-template-columns:1fr}
+  html.np-casca-v3 #np-side{position:fixed;left:0;top:var(--np-topo,0px);bottom:0;height:auto;width:var(--np-drawer-w);z-index:10;transform:translateX(-100%);transition:transform calc(var(--np-d4)*var(--np-slow)) var(--np-e-spring)}
+  html.np-casca-v3 .app.sb-aberta #np-side{transform:none}
+  html.np-casca-v3 .app.sb-aberta .sb-overlay{display:block}
+  html.np-casca-v3 .top{padding:0 10px}
+  html.np-casca-v3 .top .area{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
+  html.np-casca-v3 .top #np-trilha{display:none}
+  html.np-casca-v3 .busca{margin-left:4px}
+  html.np-casca-v3 .top .switch span,html.np-casca-v3 .top .userbox #userName{display:none}
+}
+@media (max-width:600px){
+  html.np-casca-v3 .top{gap:6px;padding:0 8px}
+  /* busca recolhida a um botão de 44 px; expande ao receber foco (toque no ícone ou botão "Buscar" da gaveta) */
+  html.np-casca-v3 .busca{max-width:none;flex:0 0 44px;overflow:hidden;transition:flex-basis calc(var(--np-d3)*var(--np-slow)) var(--np-e-move)}
+  html.np-casca-v3 .busca:focus-within{flex:1 1 auto}
+  html.np-casca-v3 .busca input{padding-left:34px}
+  html.np-casca-v3 .top label.switch{display:none}
+  html.np-casca-v3 .top .area{flex:1 1 auto}
+}
+/* toque: alvos de 44 px (regra do DS); vale para telas sem ponteiro fino */
+@media (pointer:coarse),(hover:none){
+  html.np-casca-v3 #np-tree .tab,html.np-casca-v3 #np-tree .np-g>.np-gh,html.np-casca-v3 #np-fly .tab,html.np-casca-v3 .np-busca-btn,html.np-casca-v3 .np-eu .tab{min-height:44px;height:auto}
+  html.np-casca-v3 #np-tree .np-sub .tab{height:auto}
+  html.np-casca-v3 .np-rail #np-tree .tab,html.np-casca-v3 .np-rail #np-tree .np-g>.np-gh,html.np-casca-v3 .np-rail .np-busca-btn{width:44px;height:44px;min-height:44px}
+  html.np-casca-v3 .np-rail .np-eu .tab{min-width:44px;min-height:44px;justify-content:center}
+  html.np-casca-v3 .np-eu .np-links a{min-height:44px;display:flex;align-items:center}
+  html.np-casca-v3 .top .ic,html.np-casca-v3 .top .ham{width:44px;height:44px}
+  html.np-casca-v3 .top .userbox .btn{min-height:44px}
+  html.np-casca-v3 .top .switch{min-height:44px;display:inline-flex;align-items:center}
+  html.np-casca-v3 .busca input{height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  html.np-casca-v3 #np-side,html.np-casca-v3 #np-fly,html.np-casca-v3 #np-dica,html.np-casca-v3 #np-tree .np-corpo,html.np-casca-v3 #np-tree .np-chev{transition:none!important}
+}
+/* ---------- bloco "Navegação" em Meu perfil ---------- */
+.np-pref{border:1px solid var(--line);border-radius:var(--r,12px);padding:14px 16px;background:var(--surface);margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.np-pref h3{font-size:15px;margin:0 0 2px}
+.np-pref p{margin:0;color:var(--muted);font-size:13px;max-width:60ch}
+.np-pref .btn{margin-left:auto}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -420,14 +599,16 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
 .pendente{text-align:center;padding:48px 20px;color:var(--muted)}
 .pendente h2{color:var(--fg);margin-bottom:8px}
 .grp.hub .grp-h{cursor:pointer}.grp.hub.ativo .grp-h span{color:var(--gold)}</style>
+<script>try{if(localStorage.getItem("np-casca")==="v3")document.documentElement.classList.add("np-casca-v3")}catch(_){}</script>
 </head>
 <body>
 
 <div class="app" id="app">
-<aside class="sb" id="sb">
+<aside class="sb" id="sb" data-casca="v2">
   <div class="brand"><img class="logo" src="passivos/img/logo-branca.png" alt="Neves Pádua Advocacia"><img class="mono" src="passivos/img/monograma-branco.png" alt="NP"></div>
   <nav class="tabs" role="tablist" id="nav"></nav>
 </aside>
+<aside id="np-side" data-casca="v3" aria-label="Navegação" hidden inert></aside>
 <div class="sb-overlay" onclick="document.getElementById('app').classList.remove('sb-aberta')"></div>
 <div class="app-body">
 <header class="top">
@@ -1560,7 +1741,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"]];PP.MODULOS_V="?v=mwcwnk8m";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["casca","core"]];PP.MODULOS_V="?v=mwdwjgnx";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");

@@ -18,7 +18,13 @@ Nunca altera arquivos versionados: o gerador roda numa cópia temporária e o in
 | F0.1 | saídas idênticas à referência **fora do bloco de tokens** (estrito) | só Fase 0 |
 | F0.2 | nenhum consumidor de `--np-*` | só Fase 0 |
 
-A partir da Fase 1 (`--fase 1`), mudanças de frontend são esperadas: F0.* não rodam; G*, N* e T1 continuam segurando regressões de geração, navegação, permissões e tokens. Mudanças intencionais de menu entram com `--gravar-inventario` e explicação no PR.
+A partir da Fase 1 (`--fase 1`), mudanças de frontend são esperadas: F0.* não rodam; G*, N* e T1 continuam segurando regressões de geração, navegação, permissões e tokens. Mudanças intencionais de menu entram com `--gravar-inventario` e explicação no PR. Na Fase 1 o inventário não muda: a V3.1 reorganiza a apresentação, não o `NAV`.
+
+## Laboratório da casca (Fase 1+)
+```bash
+NODE_PATH=<módulos> node docs/qa/casca-lab.cjs
+```
+Playwright com Chromium local: serve o repositório, **intercepta toda chamada a `*.supabase.co`** e responde com fixtures fictícias (perfis `admin` e `colaborador` do Jurídico, 3 clientes inventados) — nenhuma requisição sai da máquina e nada é escrito. Para cada perfil: (1) compara os **destinos efetivos** (itens `.tab[data-tab]` visíveis + abas de hub a que `PP.temAcesso` dá acesso) entre V2 e V3.1 — têm de ser conjuntos iguais; (2) navega por todos os itens da árvore V3.1 e confere módulo aberto, item ativo e título; (3) exercita trilho, flyout, teclado (`/`, ↑/↓, Esc), tema, grupos, `inert` da casca inativa e o card de Meu perfil; (4) 375/768/1024/1440 nos dois temas, com capturas em `/tmp/casca-lab/`; (5) movimento reduzido; (6) **itens sem acesso**: estilo computado, ordem de Tab e snapshot ARIA sem nenhum destino restrito, `hidden` vencendo o `display`, e **falha simulada** de `PP.temAcesso` (erro e ausência) sem liberar nada; (7) ordem de foco (lateral de cima para baixo → barra da esquerda para a direita → conteúdo), Enter/Espaço, anel de foco, Esc na gaveta; (8) **contraste** ≥ 4,5:1 nos textos da casca (dois temas) e **alvos de toque** ≥ 44 px em celular e tablet (`pointer:coarse`); (9) **persistência** de V2/V3.1, trilho e grupos entre recarregamentos; (10) **modo token** da área do cliente com `np-casca=v3` no mesmo navegador; (11) **espelho `/beta/`** gerado na hora com `PP_ESPELHO=1`: `np-casca=v3` do principal não liga a V3.1 no beta, ligar no beta grava só `np-casca-beta`/`np-trilho-beta`, e `pp-tema` segue compartilhado. O repositório é servido por um servidor HTTP local efêmero (só 127.0.0.1) — em `file://` o Chromium perde gravações de `localStorage` feitas logo antes de um reload. Qualquer linha `FALHA` bloqueia o PR; linhas `obs` são registradas no relatório.
 
 ## Comparação visual (opcional, fora do projeto)
 ```bash
