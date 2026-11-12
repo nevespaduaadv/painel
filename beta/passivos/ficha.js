@@ -5,7 +5,7 @@
 const STATUS={prospect:"Prospect",onboarding:"Em onboarding",ativo:"Ativo",encerrado:"Encerrado"};
 const PAPEIS={socio:"Sócio(a)",titular:"Titular",avalista:"Avalista",contador:"Contador(a)",financeiro:"Financeiro",conjuge:"Cônjuge",outro:"Outro"};
 const TIPOS_BEM={veiculo:"Veículo",imovel:"Imóvel",maquinario:"Maquinário / equipamentos",rebanho:"Rebanho",safra:"Safra",consorcio:"Consórcio",outro:"Outro"};
-const TITULARES_BEM={PJ:"Empresa",PF:"Pessoa física",terceiro:"Terceiro"};
+const TITULARES_BEM={PJ:"Empresa",PF:"Sócio / pessoa física",avalista:"Avalista",terceiro:"Terceiro"};
 const TIPOS_DOC={contrato_bancario:"Contrato bancário",contrato_honorarios:"Contrato de honorários",parecer:"Parecer",onboarding:"Onboarding",transcricao:"Transcrição",extrato:"Extrato",cartao_cnpj:"Cartão CNPJ",contrato_social:"Contrato social",procuracao:"Procuração",peticao:"Petição",decisao:"Decisão",acordo:"Acordo",outro:"Outro"};
 const ORIGENS=["Meta Ads","Google","Indicação","Orgânico / Instagram","Parceiro","Base antiga","Outro"];
 const PLANOS=["Gestão de Passivos Bancários PJ","Superendividamento","Revisional","Defesa em execução","Estruturação societária","Outro"];
@@ -37,6 +37,31 @@ const garantir=c=>{if(F.cid!==c.id&&F.carregando!==c.id)carregar(c.id);return F.
 const recarregar=()=>{if(F.cid){const cid=F.cid;F.cid=null;carregar(cid)}};
 
 /* ---------- Resumo ---------- */
+function cardRaioX(c,host,ind){
+  const kv=(k,v)=>el("div",{class:"kv"},el("div",{class:"k"},k),el("div",{class:"v"},v==null||v===""?el("span",{class:"note"},"—"):v));
+  const hist=el("section",{class:"card section"},el("h2",{},"O que aconteceu"),c.historia?el("div",{style:"white-space:pre-wrap"},c.historia):el("div",{class:"note"},"Ainda não registrado. Use “Editar ficha” para contar a história do cliente em poucas linhas — o que levou ao endividamento e o que o closer/onboarding captou."));
+  const sit=el("section",{class:"card section"},el("h2",{},"Situação atual"),c.situacao_atual?el("div",{style:"white-space:pre-wrap"},c.situacao_atual):el("div",{class:"note"},"Opera? Fatura? Está negativado? Registre aqui."),
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},pill("Negativado",c.negativado,"e3"),pill("Maquininha",c.usa_maquininha,"g"),pill("Consórcio",c.tem_consorcio,"g"),c.outros_cnpjs?el("span",{class:"pill g"},"Outros CNPJs: "+c.outros_cnpjs):null),
+    c.assuntos_interesse?el("div",{class:"note"},el("b",{},"Quer discutir: "),c.assuntos_interesse):null,c.disponibilidade?el("div",{class:"note"},el("b",{},"Disponibilidade: "),c.disponibilidade):null);
+  host.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Raio-X da empresa"),el("div",{class:"note"},"Fonte: formulário de onboarding + R1. O que Acordos e Jurídico precisam ver de bate-pronto.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openFichaForm(c,"raio")},"Editar Raio-X"))),
+    el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"},kv("Segmento",c.segmento),kv("Faturamento mensal",c.faturamento_mensal?BRL(+c.faturamento_mensal):null),kv("Funcionários",c.funcionarios),kv("Reserva acumulada",c.reservaAcumulada?BRL(+c.reservaAcumulada):null),kv("Pasta no Drive",c.pasta_drive_url?el("a",{href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"abrir pasta"):null))));
+  host.append(el("div",{class:"row2",style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px"},hist,sit));
+  // Indicadores
+  host.append(el("div",{class:"kpis"},
+    kpi("Saldo em aberto",BRL(ind.saldoTotal),`${ind.ativos.length} contrato${ind.ativos.length===1?"":"s"} ativo${ind.ativos.length===1?"":"s"}`),
+    kpi("Em negociação",BRL(ind.saldoNeg),"em atraso, com projeção"),
+    kpi("Acordo projetado",BRL(ind.acordoTotal),ind.reservaTotal?`reserva sugerida ${BRL(ind.reservaTotal)}/mês`:""),
+    kpi("Reserva acumulada",BRL(+c.reservaAcumulada||0),"informada pelo cliente")));
+}
+function cardBens(c){
+  const ok=garantir(c);const host=el("div");
+  const bens=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Bens declarados"),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openBemForm(c)},"+ Bem"))));
+  if(ok&&!F.bens.length)bens.append(el("div",{class:"note"},"Nenhum bem declarado. Veículos, imóveis, maquinário e consórcios informados no onboarding entram aqui."));
+  else if(ok)bens.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Tipo"),el("th",{},"Descrição"),el("th",{},"Titular"),el("th",{},"Ônus"),el("th",{class:"r"},"Valor est."),el("th",{},""))),
+    el("tbody",{},F.bens.map(b=>el("tr",{},el("td",{},TIPOS_BEM[b.tipo]||b.tipo),el("td",{},b.descricao,b.observacoes?el("div",{class:"note"},b.observacoes):null),el("td",{},TITULARES_BEM[b.titular]||"—"),el("td",{},b.onus||"—"),el("td",{class:"r num"},b.valor_estimado?BRL(+b.valor_estimado):"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openBemForm(c,b)},"Editar"))))))));
+  host.append(bens);
+  return host.firstChild;
+}
 function renderResumo(c,host,ind){
   const cliente=readOnly();
   const kv=(k,v)=>el("div",{class:"kv"},el("div",{class:"k"},k),el("div",{class:"v"},v==null||v===""?el("span",{class:"note"},"—"):v));
@@ -45,24 +70,11 @@ function renderResumo(c,host,ind){
   const ident=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Identificação"),el("div",{class:"note"},[STATUS[c.status]||"Ativo",c.plano].filter(Boolean).join(" · "))),
     cliente?null:el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openFichaForm(c)},"Editar ficha"))));
   ident.append(el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"},
-    kv("Razão social",c.nome),kv("Nome fantasia",c.nome_fantasia),kv(c.tipo_pessoa==="PF"?"CPF":"CNPJ",cnpjMask(c.cnpj)),cliente?null:kv("CPF do titular",cnpjMask(c.cpf_titular)),
-    kv("Cidade",[c.cidade,c.uf].filter(Boolean).join("/")),kv("Segmento",c.segmento),cliente?null:kv("Faturamento mensal",c.faturamento_mensal?BRL(+c.faturamento_mensal):null),cliente?null:kv("Funcionários",c.funcionarios),
-    kv("Responsável no escritório",c.responsavel),cliente?null:kv("Closer",c.closer),cliente?null:kv("Origem",c.origem),cliente?null:kv("Fechamento",c.data_fechamento?fmtD(parseD(c.data_fechamento)):null),
-    kv("Onboarding",c.data_onboarding?fmtD(parseD(c.data_onboarding)):null),kv("Próxima reunião",c.proxima_reuniao?fmtD(parseD(c.proxima_reuniao)):null)));
+    kv("Razão social",c.nome),kv("Nome fantasia",c.nome_fantasia),kv(c.tipo_pessoa==="PF"?"CPF":"CNPJ",cnpjMask(c.cnpj)),cliente?null:kv("Sócio / titular",[c.representante,cnpjMask(c.cpf_titular||c.representante_cpf)].filter(Boolean).join(" · ")),
+    kv("Cidade",[c.cidade,c.uf].filter(Boolean).join("/")),cliente?null:kv("Grupo / vinculadas",c.dados?.grupo||c.grupo),kv("Serviço",c.plano),kv("Status",STATUS[c.status]||c.status),
+    cliente?null:kv("Fechamento",c.data_fechamento?fmtD(parseD(c.data_fechamento)):null),cliente?null:kv("Origem",c.origem),cliente?null:kv("Closer",c.closer),kv("Responsável no escritório",c.responsavel)));
   host.append(ident);
   if(cliente){host.append(el("div",{class:"note"},"Dúvidas sobre o seu cadastro? Fale com o escritório."));return}
-  // História e situação
-  const hist=el("section",{class:"card section"},el("h2",{},"O que aconteceu"),c.historia?el("div",{style:"white-space:pre-wrap"},c.historia):el("div",{class:"note"},"Ainda não registrado. Use “Editar ficha” para contar a história do cliente em poucas linhas — o que levou ao endividamento e o que o closer/onboarding captou."));
-  const sit=el("section",{class:"card section"},el("h2",{},"Situação atual"),c.situacao_atual?el("div",{style:"white-space:pre-wrap"},c.situacao_atual):el("div",{class:"note"},"Opera? Fatura? Está negativado? Registre aqui."),
-    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},pill("Negativado",c.negativado,"e3"),pill("Maquininha",c.usa_maquininha,"g"),pill("Consórcio",c.tem_consorcio,"g"),c.outros_cnpjs?el("span",{class:"pill g"},"Outros CNPJs: "+c.outros_cnpjs):null),
-    c.assuntos_interesse?el("div",{class:"note"},el("b",{},"Quer discutir: "),c.assuntos_interesse):null,c.disponibilidade?el("div",{class:"note"},el("b",{},"Disponibilidade: "),c.disponibilidade):null);
-  host.append(el("div",{class:"row2",style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px"},hist,sit));
-  // Indicadores
-  host.append(el("div",{class:"kpis"},
-    kpi("Saldo em aberto",BRL(ind.saldoTotal),`${ind.ativos.length} contrato${ind.ativos.length===1?"":"s"} ativo${ind.ativos.length===1?"":"s"}`),
-    kpi("Em negociação",BRL(ind.saldoNeg),"em atraso, com projeção"),
-    kpi("Acordo projetado",BRL(ind.acordoTotal),ind.reservaTotal?`reserva sugerida ${BRL(ind.reservaTotal)}/mês`:""),
-    kpi("Reserva acumulada",BRL(+c.reservaAcumulada||0),"informada pelo cliente")));
   // Sócios e contatos
   const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Sócios e contatos"),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openContatoForm(c)},"+ Contato"))));
   if(!ok)sec.append(el("div",{class:"note"},"Carregando…"));
@@ -70,18 +82,10 @@ function renderResumo(c,host,ind){
   else sec.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Nome"),el("th",{},"Papel"),el("th",{},"CPF"),el("th",{},"Cargo"),el("th",{},"E-mail"),el("th",{},"Telefone"),el("th",{},"Login"),el("th",{},""))),
     el("tbody",{},F.contatos.map(x=>el("tr",{},el("td",{},el("b",{},x.nome),x.principal?el("span",{class:"pill g",style:"margin-left:6px"},"principal"):null,x.observacoes?el("div",{class:"note"},x.observacoes):null),el("td",{},PAPEIS[x.papel]||x.papel||"—",x.participacao?` · ${x.participacao}%`:""),el("td",{class:"num"},cnpjMask(x.cpf)||"—"),el("td",{},x.cargo||"—"),el("td",{},x.email||"—"),el("td",{},x.telefone||"—"),el("td",{},x.perfil_id?el("span",{class:"pill e1"},"tem acesso"):"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openContatoForm(c,x)},"Editar"))))))));
   host.append(sec);
-  // Bens
-  const bens=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Bens declarados"),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openBemForm(c)},"+ Bem"))));
-  if(ok&&!F.bens.length)bens.append(el("div",{class:"note"},"Nenhum bem declarado. Veículos, imóveis, maquinário e consórcios informados no onboarding entram aqui."));
-  else if(ok)bens.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Tipo"),el("th",{},"Descrição"),el("th",{},"Titular"),el("th",{},"Ônus"),el("th",{class:"r"},"Valor est."),el("th",{},""))),
-    el("tbody",{},F.bens.map(b=>el("tr",{},el("td",{},TIPOS_BEM[b.tipo]||b.tipo),el("td",{},b.descricao,b.observacoes?el("div",{class:"note"},b.observacoes):null),el("td",{},TITULARES_BEM[b.titular]||"—"),el("td",{},b.onus||"—"),el("td",{class:"r num"},b.valor_estimado?BRL(+b.valor_estimado):"—"),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openBemForm(c,b)},"Editar"))))))));
-  host.append(bens);
-  // Documentos
-  const docs=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Documentos"),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openDocForm(c)},"+ Documento"))));
-  if(ok&&!F.documentos.length)docs.append(el("div",{class:"note"},"Nenhum documento vinculado. Cole o link do Drive (contratos, pareceres, onboarding, cartão CNPJ)."));
-  else if(ok)docs.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Título"),el("th",{},"Tipo"),el("th",{},"Data"),el("th",{},"Vínculo"),el("th",{},"Cliente vê"),el("th",{},""))),
-    el("tbody",{},F.documentos.map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},TIPOS_DOC[d.tipo]||"—"),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))));
-  host.append(docs);
+  // Documentos: no Cadastro fica só o resumo + botão; a lista completa tem página própria (espelho da pasta do cliente no Drive)
+  const nDocs=F.documentos.length,nCli=F.documentos.filter(d=>d.visivel_cliente).length;
+  host.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Documentos"),el("div",{class:"note"},ok?(nDocs?`${nDocs} documento(s) vinculado(s) · ${nCli} visível(is) ao cliente`:"Nenhum documento vinculado ainda."):"Carregando…")),
+    el("div",{class:"actions"},c.pasta_drive_url?el("a",{class:"btn sm",href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"Pasta no Drive ↗"):null,el("button",{class:"btn sm primary",onclick:()=>{S.sub="documentos";render()}},"Abrir documentos →")))));
   // Acessos a sistemas (gov.br etc.) — só equipe; senha oculta até clicar
   const ac=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Acessos a sistemas"),el("div",{class:"note"},"gov.br, e-CAC, bancos — informados pelo cliente. Senhas e segredos 2FA ficam no cofre criptografado; cada consulta é registrada. Fora da área do cliente e do BI.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openAcessoForm(c)},"+ Acesso"))));
   if(ok&&!F.acessos.length)ac.append(el("div",{class:"note"},"Nenhum acesso cadastrado."));
@@ -93,31 +97,34 @@ function renderResumo(c,host,ind){
 const pill=(l,v,cls)=>v==null?null:el("span",{class:"pill "+(v?cls:"g"),style:v?"":"opacity:.6"},l+": "+(v?"sim":"não"));
 
 /* ---------- Formulários ---------- */
-function openFichaForm(c){
+function openFichaForm(c,modo="cadastro"){
   const nome=inp("text",c.nome||""),fant=inp("text",c.nome_fantasia||""),tipo=sel({PJ:"Pessoa jurídica",PF:"Pessoa física"},c.tipo_pessoa||"PJ"),cnpj=inp("text",c.cnpj||"",{placeholder:"00.000.000/0001-00"}),cpf=inp("text",c.cpf_titular||""),
-        cidade=inp("text",c.cidade||""),uf=sel({"":"—",...Object.fromEntries(UFS.map(u=>[u,u]))},c.uf||""),seg=inp("text",c.segmento||"",{placeholder:"Ex.: transportes, varejo de calçados"}),fat=inp("number",c.faturamento_mensal||"",{step:"1000"}),func=inp("number",c.funcionarios||"",{min:0}),
+        cidade=inp("text",c.cidade||""),uf=sel({"":"—",...Object.fromEntries(UFS.map(u=>[u,u]))},c.uf||""),seg=inp("text",c.segmento||"",{placeholder:"Ex.: transportes, varejo de calçados"}),grupo=inp("text",c.grupo||c.dados?.grupo||"",{placeholder:"Ex.: NASP / M.R. Galera (mesmos sócios, mesmo contrato)"}),fat=inp("number",c.faturamento_mensal||"",{step:"1000"}),func=inp("number",c.funcionarios||"",{min:0}),
         resp=inp("text",c.responsavel||""),closer=inp("text",c.closer||""),origem=dl("f-origem",c.origem||"",ORIGENS),plano=dl("f-plano",c.plano||"",PLANOS),status=sel(STATUS,c.status||"ativo"),
-        dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),
+        dfech=inp("date",c.data_fechamento||""),donb=inp("date",c.data_onboarding||""),prox=inp("date",c.proxima_reuniao||""),pdrive=inp("url",c.pasta_drive_url||"",{placeholder:"https://drive.google.com/drive/folders/…"}),
         hist=el("textarea",{placeholder:"O que aconteceu com a empresa: expansão, queda de faturamento, inadimplência, execuções… em poucas linhas."},c.historia||""),sit=el("textarea",{placeholder:"Opera? Fatura? Em que conta recebe? Negativado?"},c.situacao_atual||""),
         neg=tri(c.negativado),maq=tri(c.usa_maquininha),cons=tri(c.tem_consorcio),outros=inp("text",c.outros_cnpjs||""),ass=inp("text",c.assuntos_interesse||""),disp=inp("text",c.disponibilidade||""),obs=el("textarea",{},c.observacoes_onboarding||""),
         res=inp("number",c.reservaAcumulada||0,{step:"100"}),
         ender=inp("text",c.endereco||"",{placeholder:"Rua, nº, bairro, cidade/UF, CEP"}),rep=inp("text",c.representante||""),repcpf=inp("text",c.representante_cpf||"",{placeholder:"000.000.000-00"}),repq=inp("text",c.representante_qualificacao||"",{placeholder:"brasileiro, casado, empresário"});
-  const body=el("div",{class:"form"},field("f-nome","Razão social / nome",nome),field("f-fant","Nome fantasia",fant),field("f-tipo","Tipo",tipo),field("f-cnpj","CNPJ / CPF",cnpj),field("f-cpf","CPF do titular / sócio",cpf),
-    el("div",{class:"f full"},el("label",{for:"f-ender"},"Endereço completo (usado nas peças)"),Object.assign(ender,{id:"f-ender"})),field("f-rep","Representante legal",rep),field("f-repcpf","CPF do representante",repcpf),field("f-repq","Qualificação do representante",repq,"Nacionalidade, estado civil, profissão — entra na qualificação da peça."),
-    field("f-cid","Cidade",cidade),field("f-uf","UF",uf),field("f-seg","Segmento",seg),field("f-fat","Faturamento mensal (R$)",fat),field("f-func","Funcionários",func),
-    field("f-resp","Responsável no escritório",resp),field("f-closer","Closer",closer),field("f-origem","Origem",origem.wrap),field("f-plano","Plano / serviço",plano.wrap),field("f-status","Status",status),
-    field("f-dfech","Data do fechamento",dfech),field("f-donb","Data do onboarding",donb),field("f-prox","Próxima reunião",prox),field("f-res","Reserva acumulada (R$)",res),
+  const CAD=[field("f-nome","Razão social / nome",nome),field("f-fant","Nome fantasia",fant),field("f-tipo","Tipo",tipo),field("f-cnpj","CNPJ / CPF",cnpj),field("f-cpf","CPF do titular / sócio",cpf),
+    el("div",{class:"f full"},el("label",{for:"f-ender"},"Endereço completo (usado nas peças)"),Object.assign(ender,{id:"f-ender"})),field("f-rep","Representante legal",rep),field("f-repcpf","CPF do representante",repcpf),
+    field("f-cid","Cidade",cidade),field("f-uf","UF",uf),field("f-grupo","Grupo / empresas vinculadas",grupo,"Mesmo nome de grupo em cada empresa liga as fichas: o cabeçalho mostra as outras e o dossiê pode incluir os andamentos do grupo."),
+    field("f-plano","Serviço contratado",plano.wrap),field("f-status","Status",status),field("f-dfech","Data do fechamento",dfech),
+    field("f-origem","Origem",origem.wrap),field("f-closer","Closer",closer),field("f-resp","Responsável no escritório",resp)];
+  const RAIO=[field("f-seg","Segmento",seg),field("f-fat","Faturamento mensal (R$)",fat),field("f-func","Funcionários",func),field("f-res","Reserva acumulada (R$)",res),
     field("f-neg","Negativado",neg),field("f-maq","Usa maquininha",maq),field("f-cons","Tem consórcio",cons),field("f-outros","Outros CNPJs",outros),
-    field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs));
-  modal("Ficha do cliente",body,async()=>{
+    field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs),
+    field("f-repq","Qualificação do representante",repq,"Nacionalidade, estado civil, profissão — entra na qualificação da peça."),field("f-pdrive","Pasta do cliente no Drive",pdrive)];
+  const body=el("div",{class:"form"},...(modo==="raio"?RAIO:CAD));
+  modal(modo==="raio"?"Raio-X da empresa":"Ficha cadastral",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
     const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
       faturamento_mensal:fat.value===""?null:+fat.value,funcionarios:func.value===""?null:+func.value,closer:closer.value.trim()||null,origem:origem.input.value.trim()||null,plano:plano.input.value.trim()||null,status:status.value,
-      data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
+      data_fechamento:dfech.value||null,data_onboarding:donb.value||null,proxima_reuniao:prox.value||null,pasta_drive_url:pdrive.value.trim()||null,historia:hist.value.trim()||null,situacao_atual:sit.value.trim()||null,
       negativado:triVal(neg),usa_maquininha:triVal(maq),tem_consorcio:triVal(cons),outros_cnpjs:outros.value.trim()||null,assuntos_interesse:ass.value.trim()||null,disponibilidade:disp.value.trim()||null,observacoes_onboarding:obs.value.trim()||null};
     // nome, responsável, reserva e cnpj também vivem no jsonb (motor e páginas do cliente)
     const {data:cur}=await SB.from("clientes").select("dados").eq("id",c.id).single();
-    const dados={...(cur?.dados||{}),nome:nome.value.trim(),cnpj:cols.cnpj||"",responsavel:resp.value.trim(),reservaAcumulada:+res.value||0};
+    const dados={...(cur?.dados||{}),nome:nome.value.trim(),cnpj:cols.cnpj||"",responsavel:resp.value.trim(),reservaAcumulada:+res.value||0,grupo:grupo.value.trim()||null};
     const {error}=await SB.from("clientes").update({...cols,dados}).eq("id",c.id);
     if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Ficha salva");notificar("clientes");
@@ -181,7 +188,23 @@ function openAcessoForm(c,x={}){
 }
 
 /* ---------- Integração ---------- */
+
+/* ---------- Página Documentos do cliente (aberta pelo botão do Cadastro) ---------- */
+function paginaDocumentos(c,host){
+  const ok=garantir(c.id);
+  host.append(el("div",{class:"actions",style:"justify-content:flex-start;margin:-4px 0 6px"},el("button",{class:"btn sm",onclick:()=>{S.sub="cliente";render()}},"← Cadastro")));
+  const docs=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Documentos de "+(c.nome_fantasia||c.nome)),el("div",{class:"note"},"Espelho da pasta do cliente: cada item aponta para o arquivo no Drive (contratos, pareceres, onboarding, cartão CNPJ, transcrições). Marque “cliente vê” para aparecer na área do cliente.")),
+    el("div",{class:"actions edit-only"},c.pasta_drive_url?el("a",{class:"btn sm",href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"Pasta no Drive ↗"):null,el("button",{class:"btn sm primary",onclick:()=>openDocForm(c)},"+ Documento"))));
+  if(!ok)docs.append(el("div",{class:"note"},"Carregando…"));
+  else if(!F.documentos.length)docs.append(el("div",{class:"empty"},"Nenhum documento vinculado. Cole o link do Drive (contratos, pareceres, onboarding, cartão CNPJ)."));
+  else{const grupos={};F.documentos.forEach(d=>{(grupos[TIPOS_DOC[d.tipo]||"Outros"]=grupos[TIPOS_DOC[d.tipo]||"Outros"]||[]).push(d)});
+    for(const [g,lista] of Object.entries(grupos).sort()){docs.append(el("div",{class:"eyebrow",style:"margin-top:10px"},g+" · "+lista.length));
+      docs.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Título"),el("th",{},"Data"),el("th",{},"Vínculo"),el("th",{},"Cliente vê"),el("th",{},""))),
+        el("tbody",{},lista.sort((a,b)=>(b.data||"").localeCompare(a.data||"")).map(d=>el("tr",{},el("td",{},d.url?el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info);font-weight:600"},"↗ "+d.titulo):d.titulo,d.observacoes?el("div",{class:"note"},d.observacoes):null),el("td",{},d.data?fmtD(parseD(d.data)):"—"),el("td",{},d.contrato_id?(S.contratos.find(k=>k.id===d.contrato_id)?shortName(S.contratos.find(k=>k.id===d.contrato_id)):"contrato"):d.processo_id?"processo":"—"),el("td",{},d.visivel_cliente?el("span",{class:"pill e1"},"sim"):el("span",{class:"pill e2"},"não")),el("td",{},el("button",{class:"btn sm edit-only",onclick:()=>openDocForm(c,d)},"Editar"))))))))}}
+  host.append(docs);
+}
+window.PP_FICHA=Object.assign(window.PP_FICHA||{},{paginaDocumentos,cardRaioX,cardBens,openBemForm,openFichaForm,recarregar});
 window.PP_MOD=window.PP_MOD||{};
-window.PP_MOD.resumo=(c,host,ind)=>{if(S.sub==="dossie"||S.sub==="financeiro")return;renderResumo(c,host,ind)};
+window.PP_MOD.resumo=(c,host,ind)=>{if(S.sub==="dossie"||S.sub==="financeiro"||S.sub==="acompanhamento")return;renderResumo(c,host,ind)};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("ficha");for(const t of ["contatos","bens","documentos","acessos_sistemas"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>recarregar());ch.subscribe()}});
 })();

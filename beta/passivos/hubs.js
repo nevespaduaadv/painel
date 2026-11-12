@@ -6,6 +6,7 @@
   const HUBS = {
     juridico: { label: "Jurídico", tabs: [["processos", "Processos e pastas"], ["publicacoes", "Publicações"], ["negociacoes", "Negociações"], ["historico", "Base de acordos"]] },
     financeiro: { label: "Financeiro", tabs: [["financeiro", "Cobranças"], ["faturamento", "Contratos e faturamento"], ["estoque", "Estoque"], ["inventario", "Inventário"]] },
+    equipe: { label: "Equipe", tabs: [["equipe", "Colaboradores"], ["usuarios", "Usuários e acessos"]] },
   };
   const hubDe = (tab) => Object.entries(HUBS).find(([, h]) => h.tabs.some(([t]) => t === tab))?.[0];
   const acesso = (tab) => { if (PP.perfil?.papel === "admin") return true; if (typeof PP.temAcesso !== "function") return true; try { return PP.temAcesso(tab); } catch (_) { return true; } };
