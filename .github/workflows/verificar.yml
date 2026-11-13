@@ -28,6 +28,8 @@ jobs:
           npm i -g --no-fund --no-audit playwright@1.49.1 pngjs@7.0.0
           npx playwright install --with-deps chromium
           NODE_PATH="$(npm root -g)" node docs/qa/casca-lab.cjs "$RUNNER_TEMP/casca-lab"
+      - name: Laboratório de Tarefas e prazos V3.1
+        run: NODE_PATH="$(npm root -g)" node docs/qa/tarefas-lab.cjs "$RUNNER_TEMP/casca-lab/tarefas"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4

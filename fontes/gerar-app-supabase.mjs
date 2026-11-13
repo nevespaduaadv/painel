@@ -24,6 +24,7 @@ html = html.replace('/*TOKENS*/', fs.readFileSync(path.join(base,'tokens.css'),'
 //     usa o primeiro '<script>' do documento como âncora do login — nada de <script> pode ser inserido antes disso.)
 must('/*CASCA*/'); must('<!--CASCA_BOOT-->');
 html = html.replace('/*CASCA*/', modo==='token' ? '' : fs.readFileSync(path.join(base,'casca.css'),'utf8').trim());
+must('/*NP_UI*/'); html = html.replace('/*NP_UI*/', modo==='token' ? '' : fs.readFileSync(path.join(base,'np-ui.css'),'utf8').trim());  // componentes V3.1 (DESIGN.md §4), só na casca V3.1
 
 // 1) CSS extra
 must('</style>');
@@ -419,7 +420,7 @@ const MODULOS = [
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
-  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['hubs','core'],['casca','core'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['hubs','core'],['np-ui','core'],['casca','core'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();
