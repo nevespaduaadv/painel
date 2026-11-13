@@ -30,6 +30,10 @@ jobs:
           NODE_PATH="$(npm root -g)" node docs/qa/casca-lab.cjs "$RUNNER_TEMP/casca-lab"
       - name: Laboratório de Tarefas e prazos V3.1
         run: NODE_PATH="$(npm root -g)" node docs/qa/tarefas-lab.cjs "$RUNNER_TEMP/casca-lab/tarefas"
+      - name: Laboratório de Negociações V3.1
+        run: NODE_PATH="$(npm root -g)" node docs/qa/negociacoes-lab.cjs "$RUNNER_TEMP/casca-lab/negociacoes"
+      - name: Laboratório de Acompanhamento PJ V3.1
+        run: NODE_PATH="$(npm root -g)" node docs/qa/acompanhamento-lab.cjs "$RUNNER_TEMP/casca-lab/acompanhamento"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4
