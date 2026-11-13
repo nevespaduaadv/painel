@@ -1,6 +1,6 @@
 // Verificação de geração e paridade (Design System).
 //
-// Uso: node fontes/verificar-geracao.mjs --base <ref git> [--fase 0|1] [--gravar-inventario]
+// Uso: node fontes/verificar-geracao.mjs --base <ref git> [--fase 0|1|3] [--gravar-inventario]
 //
 // Nunca altera arquivos versionados: o gerador roda numa cópia temporária do repositório e o inventário
 // do menu só é gravado em docs/qa/nav-inventario.json com --gravar-inventario (sem a opção, é comparado).
@@ -20,6 +20,14 @@
 //
 // A partir da Fase 1 (--fase 1), F0.* não se aplicam: o frontend muda de propósito; o que segura a regressão
 // são G*, N* e T1 (mais as capturas no espelho, fora deste script).
+//
+// A partir da Fase 3 (--fase 3, inclui as da Fase 1) — destinos novos só-V3.1 (ex.: Acompanhamento PJ):
+//  F3.1 com --base: todo item de menu que não existe na referência carrega np-v3-only (não aparece no menu V2) e uma
+//       classe de permissão (area-* / *-only / grp-*) — nenhum destino novo entra "aberto" ou silenciosamente na V2
+//  F3.2 todo tab do NAV tem PP.TAB_AREA (área de permissão) e contêiner <div id="view-<tab>">; todo tab novo está em
+//       window.PP_ROTAS (roteamento por hash) e é conhecido por passivos/casca.js (árvore V3.1)
+//  F3.3 casca.css oculta .np-v3-only fora da casca V3.1
+//  F3.4 cliente/index.html (modo token): sem rotas da equipe (PP_ROTAS.push), sem item de menu dos destinos novos, sem np-v3-only, sem seus scripts
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -98,7 +106,8 @@ function inventario(html) {
   return itens;
 }
 const chave = (i) => i.tab ? `tab:${i.tab}|${i.hash}|${(i.tabs || []).join('+')}` : `grupo:${i.grupo}`;
-const classes = (inv) => new Set(inv.flatMap(i => i.cls.split(/\s+/).filter(Boolean)));
+// classes de PERMISSÃO (area-*, *-only, grp-*…); `np-*` são sinalizadores de apresentação da casca V3.1 (ex.: np-v3-only = item só existe na V3.1) e não entram no conjunto
+const classes = (inv) => new Set(inv.flatMap(i => i.cls.split(/\s+/).filter(Boolean)).filter(c => !/^np-/.test(c)));
 function parseTokens(css) {
   const out = { light: {}, 'media-dark': {}, 'data-dark': {} };
   const re = /(@media \(prefers-color-scheme:\s*dark\)\s*\{\s*)?(:root(?:\[data-theme="dark"\]|:not\(\[data-theme="light"\]\))?)\s*\{([\s\S]*?)\}/g; let m;
@@ -121,6 +130,31 @@ else {
   const vers = JSON.parse(fs.readFileSync(invPath, 'utf8'));
   if (JSON.stringify(vers) === JSON.stringify(inv)) ok(`inventário versionado confere: ${inv.filter(i => i.tab).length} itens, ${inv.filter(i => i.grupo).length} grupos`);
   else { falha('o menu gerado difere de docs/qa/nav-inventario.json — se a mudança é intencional, rode com --gravar-inventario e revise o diff do JSON no PR'); const a = new Set(vers.map(chave)), b = new Set(inv.map(chave)); [...a].filter(x => !b.has(x)).forEach(x => info('saiu: ' + x)); [...b].filter(x => !a.has(x)).forEach(x => info('entrou: ' + x)); }
+}
+
+// ---------- F3 (fase ≥ 3): destinos novos só-V3.1 ----------
+if (fase >= 3 && inv) {
+  console.log('F3 destinos novos só-V3.1');
+  const h = lerTmp('index.html'); const tabs = inv.filter(i => i.tab).map(i => i.tab);
+  const b = base ? lerBase('index.html') : null; const invB = b ? inventario(b) : null; const tabsB = invB ? new Set(invB.filter(i => i.tab).map(i => i.tab)) : null;
+  const novos = tabsB ? inv.filter(i => i.tab && !tabsB.has(i.tab)) : [];
+  // F3.1
+  if (tabsB) { const maus = novos.filter(i => !/\bnp-v3-only\b/.test(i.cls) || !/\b(area-[a-z_-]+|[a-z_-]+-only|grp-[a-z_-]+)\b/.test(i.cls.replace(/\bnp-v3-only\b/, '')));
+    if (maus.length) falha('F3.1 destino(s) novo(s) sem np-v3-only ou sem classe de permissão: ' + maus.map(i => `${i.tab} ("${i.cls}")`).join(', ')); else ok(`F3.1 ${novos.length} destino(s) novo(s) em relação a ${base}${novos.length ? ' (' + novos.map(i => i.tab).join(', ') + ')' : ''}, todos só-V3.1 e com classe de permissão`); }
+  else info('F3.1 sem --base: não dá para identificar destinos novos');
+  // F3.2
+  const mArea = h.match(/PP\.TAB_AREA=\{([^}]*)\}/); const areas = mArea ? new Set([...mArea[1].matchAll(/([a-z_]+):/g)].map(m => m[1])) : new Set();
+  // tabs gerais (Hoje, Tarefas, Agenda…) não têm área por desenho (temAcesso libera sem TAB_AREA); todo destino NOVO precisa ter
+  const semArea = novos.map(i => i.tab).filter(t => !areas.has(t)); if (semArea.length) falha('F3.2 destino(s) novo(s) sem PP.TAB_AREA (entrariam abertos): ' + semArea.join(', ')); else ok(`F3.2 destinos novos com área em PP.TAB_AREA (${novos.map(i => i.tab + '→' + ((mArea && (mArea[1].match(new RegExp(i.tab + ':"([a-z_]+)"')) || [])[1]) || '?')).join(', ') || 'nenhum novo'}); ${tabs.filter(t => areas.has(t)).length}/${tabs.length} tabs com área no total`);
+  const semView = tabs.filter(t => !h.includes(`id="view-${t}"`)); if (semView.length) falha('F3.2 tabs sem contêiner view-*: ' + semView.join(', ')); else ok(`F3.2 ${tabs.length} tabs com contêiner <div id="view-…">`);
+  const mRotas = h.match(/PP_ROTAS\.push\(([^)]*)\)/); const rotas = mRotas ? new Set([...mRotas[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1])) : new Set();
+  const casca = fs.readFileSync(path.join(raiz, 'passivos/casca.js'), 'utf8');
+  for (const i of novos) { if (!rotas.has(i.tab)) falha(`F3.2 destino novo ${i.tab} fora de PP_ROTAS`); else ok(`F3.2 ${i.tab} em PP_ROTAS`); if (!new RegExp(`"${i.tab}"`).test(casca)) falha(`F3.2 destino novo ${i.tab} desconhecido de passivos/casca.js`); else ok(`F3.2 ${i.tab} conhecido pela árvore (casca.js)`); }
+  // F3.3
+  const ccss = fs.readFileSync(path.join(raiz, 'fontes/casca.css'), 'utf8'); if (/html:not\(\.np-casca-v3\)\s*\.np-v3-only\s*\{[^}]*display:\s*none/.test(ccss)) ok('F3.3 casca.css oculta .np-v3-only fora da casca V3.1'); else falha('F3.3 casca.css não oculta .np-v3-only fora da V3.1');
+  // F3.4
+  const hc = lerTmp('cliente/index.html'); const vaz = []; const mRc = hc.match(/PP_ROTAS\.push\(([^)]*)\)/); if (mRc) vaz.push('PP_ROTAS.push(' + mRc[1].slice(0, 40) + '…)'); for (const i of novos) if (new RegExp(`tab:"${i.tab}"`).test(hc)) vaz.push('item de menu ' + i.tab); if (/np-v3-only/.test(hc)) vaz.push('np-v3-only'); for (const i of novos) { if (new RegExp(`passivos/[a-z-]*${i.tab.split('_')[0]}[a-z-]*\\.js`).test(hc)) vaz.push('script de ' + i.tab); }
+  if (vaz.length) falha('F3.4 cliente/index.html contém: ' + vaz.join(', ')); else ok('F3.4 cliente/index.html (modo token) sem rotas, sem np-v3-only e sem scripts dos destinos novos');
 }
 
 // ---------- N2 / N3 / T1 (com --base) ----------

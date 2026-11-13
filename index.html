@@ -322,6 +322,13 @@ html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus
 .np-pref h3{font-size:15px;margin:0 0 2px}
 .np-pref p{margin:0;color:var(--muted);font-size:13px;max-width:60ch}
 .np-pref .btn{margin-left:auto}
+/* item filho de um fixo (Acompanhamento PJ sob Clientes): recuo e tamanho de subnível; no trilho, ícone próprio */
+html.np-casca-v3 #np-tree .tab.np-filho{height:30px;font-size:13.5px;padding-left:30px;position:relative}
+html.np-casca-v3 #np-tree .tab.np-filho::before{content:"";position:absolute;left:19px;top:4px;bottom:4px;width:1px;background:var(--np-line-2)}
+html.np-casca-v3 #np-tree .tab.np-filho[aria-current="page"]::before{background:var(--np-ink)}
+html.np-casca-v3 .np-rail #np-tree .tab.np-filho{padding-left:0}html.np-casca-v3 .np-rail #np-tree .tab.np-filho::before{display:none}
+/* destinos que só existem na casca V3.1 (ex.: Acompanhamento PJ transversal): invisíveis no menu V2 */
+html:not(.np-casca-v3) .np-v3-only{display:none!important}
 /* np-ui.css — componentes V3.1 (DESIGN.md §4). Tudo escopado em html.np-casca-v3; só tokens --np-*. Injetado pelo gerador na âncora NP_UI (ausente no modo token). */
 /* ---------- toolbar (38 px; reflui em duas linhas quando falta largura) ---------- */
 html.np-casca-v3 .np-toolbar{display:flex;align-items:center;gap:14px;min-height:38px;padding:4px 0 6px;border-bottom:1px solid var(--np-line);margin:0 0 10px;flex-wrap:nowrap;position:sticky;top:var(--np-bar-h);background:var(--np-bg);z-index:3}
@@ -331,7 +338,7 @@ html.np-casca-v3 .np-resumo b.crit{color:var(--np-crit)}html.np-casca-v3 .np-res
 html.np-casca-v3 .np-filtros-w{display:flex;align-items:center;flex:1 1 auto;min-width:0;gap:4px}
 html.np-casca-v3 .np-filtros{display:flex;gap:2px;align-items:center;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;padding:2px;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
 html.np-casca-v3 .np-filtros-fixos{flex:none;display:flex;align-items:center}
-html.np-casca-v3 #view-tarefas{container-type:inline-size}
+html.np-casca-v3 #view-tarefas,html.np-casca-v3 .np-v3{container-type:inline-size}
 html.np-casca-v3 .np-filtros::-webkit-scrollbar{display:none}
 html.np-casca-v3 .np-chipf{appearance:none;border:0;background:transparent;color:var(--np-text-2);font:500 var(--np-fs-2)/1 var(--np-ui);padding:7px 9px;border-radius:var(--np-r);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-height:30px;transition:background var(--np-d1) var(--np-e-in),color var(--np-d1) var(--np-e-in)}
 html.np-casca-v3 .np-chipf:hover{background:var(--np-hover);color:var(--np-text)}
@@ -486,7 +493,7 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-toolbar{position:static}
   html.np-casca-v3 .np-resumo{width:100%;gap:12px;overflow-x:auto;scrollbar-width:none}
   html.np-casca-v3 .np-tb-dir{margin-left:0;width:100%;justify-content:space-between}
-  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) fit-content(60%);grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
   html.np-casca-v3 .np-it-chk{grid-area:chk;align-self:start;margin-top:1px}html.np-casca-v3 .np-it-abrir{grid-area:texto;padding-top:0}html.np-casca-v3 .np-it-dir{grid-area:dir;align-self:start;gap:8px}
   html.np-casca-v3 .np-it-prazo{grid-area:prazo;flex-direction:row;gap:7px;align-items:baseline;flex-wrap:wrap;min-height:20px}
   html.np-casca-v3 .np-it-prazo .d{font-size:var(--np-fs-4)}
@@ -509,13 +516,58 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
 }
 @media (pointer:coarse),(hover:none){
   html.np-casca-v3 .np-chipf,html.np-casca-v3 .np-seg button,html.np-casca-v3 .np-btn,html.np-casca-v3 .np-ib,html.np-casca-v3 .np-grp-h,html.np-casca-v3 .np-pop-i{min-height:44px}
-  html.np-casca-v3 .np-ib{width:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-props dd a,html.np-casca-v3 .np-passos a{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-it-chk{min-width:44px;min-height:44px;margin-left:-11px}
   html.np-casca-v3 .np-passos .lnk,html.np-casca-v3 .np-feito .lnk,html.np-casca-v3 .np-vazio .lnk,html.np-casca-v3 .np-erro .lnk{display:inline-flex;align-items:center;min-height:44px}
 }
 @media (prefers-reduced-motion:reduce){
   html.np-casca-v3 .np-grp-c,html.np-casca-v3 .np-grp-h .np-chev,html.np-casca-v3 .np-pop,html.np-casca-v3 .np-chipf{transition:none}
 }
+/* ---------- Fase 3: indicador de etapa, ciclo, valor, tabela compacta ---------- */
+html.np-casca-v3 .np-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html.np-casca-v3 .np-etapa{display:inline-flex;gap:4px;align-items:center;list-style:none;margin:0;padding:0;vertical-align:middle}
+html.np-casca-v3 .np-etapa li{position:relative;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--np-text-3);background:transparent;box-sizing:border-box}
+html.np-casca-v3 .np-etapa li.ok{background:var(--np-text-3);border-color:var(--np-text-3)}
+html.np-casca-v3 .np-etapa li.atual{background:var(--np-ink);border-color:var(--np-ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--np-ink) 22%,transparent)}
+html.np-casca-v3 .np-val{display:inline-flex;align-items:baseline;gap:5px;font:500 var(--np-fs-3)/1.2 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text);white-space:nowrap}
+html.np-casca-v3 .np-val b{font-weight:500}html.np-casca-v3 .np-val b.de{color:var(--np-text-3);text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:color-mix(in srgb,var(--np-text-3) 60%,transparent)}
+html.np-casca-v3 .np-val .seta{color:var(--np-text-3);font-family:var(--np-ui);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-val small{font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-ok)}html.np-casca-v3 .np-val small.sub{color:var(--np-text-3)}
+html.np-casca-v3 .np-val .np-sem{color:var(--np-text-3);font-family:var(--np-ui)}
+html.np-casca-v3 .np-ciclo{display:grid;grid-template-columns:repeat(5,1fr);gap:0;list-style:none;margin:6px 0 0;padding:0;position:relative}
+html.np-casca-v3 .np-ciclo::before{content:"";position:absolute;left:10%;right:10%;top:13px;height:1px;background:var(--np-line-2)}
+html.np-casca-v3 .np-ciclo li{position:relative;text-align:center;padding:0 2px;color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot{width:26px;height:26px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font:500 var(--np-fs-1)/1 var(--np-ui);background:var(--np-surface);border:1.5px solid var(--np-line-2);color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot .np-ico{width:14px;height:14px}
+html.np-casca-v3 .np-ciclo li.ok .dot{background:var(--np-ok);border-color:var(--np-ok);color:#fff}
+html.np-casca-v3 .np-ciclo li.atual .dot{border-color:var(--np-ink);color:var(--np-text);box-shadow:0 0 0 3px color-mix(in srgb,var(--np-ink) 18%,transparent)}
+html.np-casca-v3 .np-ciclo .l{display:block;font:500 var(--np-fs-1)/1.2 var(--np-ui);margin-top:6px;color:var(--np-text-2)}html.np-casca-v3 .np-ciclo li.atual .l{color:var(--np-text)}
+html.np-casca-v3 .np-ciclo .d{display:block;font:500 var(--np-fs-1)/1.2 var(--np-display);color:var(--np-text-3);font-variant-numeric:tabular-nums;margin-top:2px}
+html.np-casca-v3 .np-tab-w{overflow-x:auto;max-width:100%}
+html.np-casca-v3 .np-tab{width:100%;border-collapse:collapse;font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-tab th{text-align:left;font:500 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3);padding:4px 8px 6px 0;border-bottom:1px solid var(--np-line);white-space:nowrap}
+html.np-casca-v3 .np-tab td{padding:6px 8px 6px 0;border-bottom:1px solid var(--np-line);vertical-align:top}
+html.np-casca-v3 .np-tab tr:last-child td{border-bottom:0}
+html.np-casca-v3 .np-tab .num{text-align:right;font-family:var(--np-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+html.np-casca-v3 .np-tab th.num{font-family:var(--np-ui)}
+html.np-casca-v3 .np-tab td.np-sem,html.np-casca-v3 .np-tab .np-sem{color:var(--np-text-3)}
+/* módulos renderizados em V3.1 (`.np-v3` na vista): a faixa de abas do hub (V2) sai — a árvore da casca já tem os destinos */
+html.np-casca-v3 .np-v3 > .hub-tabs{display:none}
+/* celular (≤ 600): a linha vira três faixas — (1) data da reunião/prazo + urgência, (2) título e contexto, (3) marcas · responsável · progresso · valor —
+   nenhum elemento divide a largura com outro de função diferente; todas as informações continuam presentes */
+@media (max-width:600px){
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr);grid-template-areas:"chk prazo" "chk texto" "chk dir";row-gap:3px}
+  html.np-casca-v3 .np-it-prazo{min-height:0}
+  html.np-casca-v3 .np-it-dir{grid-area:dir;justify-content:flex-start;flex-wrap:wrap;gap:4px 10px;white-space:nowrap;margin-top:1px}
+  html.np-casca-v3 .np-it-dir .np-quem{order:-1}
+  html.np-casca-v3 .np-it-dir .np-quem-vazio{font-size:0}html.np-casca-v3 .np-it-dir .np-quem-vazio::before{content:"—";font-size:var(--np-fs-2);color:var(--np-text-3)}
+  html.np-casca-v3 .np-it-dir .np-val{margin-left:auto;font-size:var(--np-fs-2)}
+  html.np-casca-v3 .np-it-dir .np-val b.de,html.np-casca-v3 .np-it-dir .np-val .seta{display:none}
+  html.np-casca-v3 .np-it-prazo .r{white-space:nowrap}
+}
+/* quadro de etapas (Negociações): sempre uma linha de colunas, com rolagem horizontal — como o kanban V2 */
+html.np-casca-v3 .np-quadro-neg{grid-template-columns:repeat(var(--n,7),minmax(200px,1fr));overflow-x:auto;scroll-snap-type:x proximity}html.np-casca-v3 .np-quadro-neg .np-colq{scroll-snap-align:start;min-width:0}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -828,6 +880,7 @@ td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4
   <div id="view-historico" hidden class="main"></div>
   <div id="view-regras" hidden class="main"></div>
   <div id="view-calibracao" hidden class="main"></div>
+  <div id="view-acompanhamento" hidden class="main"></div>
   <div id="view-painel" hidden class="main"></div>
   <div id="view-atendimento" hidden class="main"></div>
   <div id="view-espelho" hidden class="main"></div>
@@ -1002,7 +1055,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
-    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
+    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",acompanhamento:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
     PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
     for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
@@ -1010,7 +1063,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(!PP.temAcesso(S.tab))S.tab="painel";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     await PP.carregarModulos();
-    window.PP_ROTAS.push("espelho","atendimento","painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro","perfil","avisos","ponto","estoque","inventario","faturamento","importar-advbox","requisicoes","config-gestao");
+    window.PP_ROTAS.push("acompanhamento","espelho","atendimento","painel","processos","superendividamento","growth","visao","feriados","agenda","usuarios","tarefas","horas","equipe","negociacoes","monitoramento","publicacoes","conhecimento","autenticador","marketing","comercial","leads","revisional","pecas","financeiro","perfil","avisos","ponto","estoque","inventario","faturamento","importar-advbox","requisicoes","config-gestao");
     if(equipe()&&aplicarHash())setTimeout(()=>{try{render()}catch(_){}},0);
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
     ligarTempoReal();
@@ -1271,6 +1324,8 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"painel",label:"Hoje",cls:"edit-only"},{tab:"tarefas",label:"Tarefas e prazos",cls:"edit-only"},{tab:"agenda",label:"Agenda",cls:"edit-only"},{tab:"perfil",label:"Meu perfil",cls:"edit-only"},{tab:"avisos",label:"Avisos",cls:"edit-only"},{tab:"clientes",label:"Clientes",cls:"area-clientes"},
+  /* Acompanhamento PJ (visão transversal da carteira): só aparece na casca V3.1 (np-v3-only); na V2 o acesso continua pela ficha do cliente */
+  {tab:"acompanhamento",label:"Acompanhamento PJ",cls:"area-clientes edit-only np-v3-only",icone:"acompanhamento"},
   {tab:"processos",tabs:["processos","publicacoes","negociacoes","historico"],label:"Jurídico",cls:"edit-only grp-juridico area-juridico"},
   {grupo:"juridico-ferr",label:"Ferramentas jurídicas",cls:"edit-only grp-juridico",fechadoPadrao:true,itens:[{tab:"revisional",label:"Revisional de contratos",cls:"area-juridico"},{tab:"superendividamento",label:"Superendividamento",cls:"area-superendividamento"},{tab:"pecas",label:"Modelos de peças",cls:"area-juridico"},{tab:"monitoramento",label:"Monitoramento",cls:"area-juridico"},{tab:"autenticador",label:"Autenticador (2FA)",cls:"area-juridico"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-juridico",hash:"#conhecimento/area:juridico",sel:()=>!window.PP_KB||["","juridico"].includes(window.PP_KB.area)}]},
   {grupo:"comercial",label:"Comercial",cls:"edit-only area-comercial",itens:[{tab:"conhecimento",label:"Base de conhecimento",cls:"area-comercial",hash:"#conhecimento/area:comercial",sel:()=>window.PP_KB?.area==="comercial"}]},{grupo:"marketing",label:"Marketing",cls:"edit-only area-marketing",itens:[{tab:"marketing",label:"Pautas de conteúdo",cls:"area-marketing"},{tab:"conhecimento",label:"Base de conhecimento",cls:"area-marketing",hash:"#conhecimento/area:marketing",sel:()=>window.PP_KB?.area==="marketing"}]},{tab:"financeiro",tabs:["financeiro","faturamento","estoque","inventario"],label:"Financeiro",cls:"edit-only area-financeiro"},{grupo:"equipe",label:"Equipe",cls:"edit-only area-equipe",itens:[{tab:"equipe",alt:["usuarios"],label:"Colaboradores e usuários",cls:"area-equipe"},{tab:"horas",label:"Horas",cls:"area-equipe"},{tab:"ponto",label:"Ponto (gestão)",cls:"area-equipe"},{tab:"requisicoes",label:"Requisições (gestão)",cls:"area-equipe"}]},{grupo:"gestao",label:"Gestão",cls:"edit-only gestao-only",itens:[{tab:"visao",label:"Visão geral",cls:"admin-only"},{tab:"growth",label:"Growth",cls:"area-growth"},{tab:"espelho",label:"Espelho (beta)",cls:"admin-only espelho-only"},{tab:"importar-advbox",label:"Importar do ADVBox",cls:"admin-only"},{tab:"config-gestao",label:"Configurações",cls:"area-equipe"}]}];
@@ -1306,6 +1361,7 @@ const ICONES={atendimento:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"
   feriados:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>',
   agenda:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   visao:'<path d="M4 19V9M10 19V5M16 19v-8M22 19H2"/><circle cx="4" cy="6" r="1.5"/>',
+  acompanhamento:'<path d="M3 12h4l2-5 4 10 2-5h6"/>',
   portal:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'
 };
 const icone=k=>{const d=ICONES[k]||'<circle cx="12" cy="12" r="3"/>';const s=document.createElementNS(SVGNS,"svg");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("aria-hidden","true");s.innerHTML=d;return s};
@@ -1935,7 +1991,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwea5es8";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwf1mp1i";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");

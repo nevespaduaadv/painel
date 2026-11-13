@@ -17,10 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Fase do PR (padrão 1; rótulo "fase-0" aplica a comparação estrita)
+      - name: Fase do PR (padrão 3 = todas as verificações; rótulo "fase-0" aplica a comparação estrita)
         id: fase
         run: |
-          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=1" >> "$GITHUB_OUTPUT"; fi
+          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=3" >> "$GITHUB_OUTPUT"; fi
       - name: verificar-geracao
         run: node fontes/verificar-geracao.mjs --base origin/${{ github.base_ref }} --fase ${{ steps.fase.outputs.fase }}
       - name: Laboratório da casca (navegação real, dados fictícios, sem rede)
@@ -30,6 +30,10 @@ jobs:
           NODE_PATH="$(npm root -g)" node docs/qa/casca-lab.cjs "$RUNNER_TEMP/casca-lab"
       - name: Laboratório de Tarefas e prazos V3.1
         run: NODE_PATH="$(npm root -g)" node docs/qa/tarefas-lab.cjs "$RUNNER_TEMP/casca-lab/tarefas"
+      - name: Laboratório de Negociações V3.1
+        run: NODE_PATH="$(npm root -g)" node docs/qa/negociacoes-lab.cjs "$RUNNER_TEMP/casca-lab/negociacoes"
+      - name: Laboratório de Acompanhamento PJ V3.1
+        run: NODE_PATH="$(npm root -g)" node docs/qa/acompanhamento-lab.cjs "$RUNNER_TEMP/casca-lab/acompanhamento"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4

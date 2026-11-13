@@ -7,7 +7,7 @@ html.np-casca-v3 .np-resumo b.crit{color:var(--np-crit)}html.np-casca-v3 .np-res
 html.np-casca-v3 .np-filtros-w{display:flex;align-items:center;flex:1 1 auto;min-width:0;gap:4px}
 html.np-casca-v3 .np-filtros{display:flex;gap:2px;align-items:center;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;padding:2px;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
 html.np-casca-v3 .np-filtros-fixos{flex:none;display:flex;align-items:center}
-html.np-casca-v3 #view-tarefas{container-type:inline-size}
+html.np-casca-v3 #view-tarefas,html.np-casca-v3 .np-v3{container-type:inline-size}
 html.np-casca-v3 .np-filtros::-webkit-scrollbar{display:none}
 html.np-casca-v3 .np-chipf{appearance:none;border:0;background:transparent;color:var(--np-text-2);font:500 var(--np-fs-2)/1 var(--np-ui);padding:7px 9px;border-radius:var(--np-r);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-height:30px;transition:background var(--np-d1) var(--np-e-in),color var(--np-d1) var(--np-e-in)}
 html.np-casca-v3 .np-chipf:hover{background:var(--np-hover);color:var(--np-text)}
@@ -162,7 +162,7 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-toolbar{position:static}
   html.np-casca-v3 .np-resumo{width:100%;gap:12px;overflow-x:auto;scrollbar-width:none}
   html.np-casca-v3 .np-tb-dir{margin-left:0;width:100%;justify-content:space-between}
-  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) fit-content(60%);grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
   html.np-casca-v3 .np-it-chk{grid-area:chk;align-self:start;margin-top:1px}html.np-casca-v3 .np-it-abrir{grid-area:texto;padding-top:0}html.np-casca-v3 .np-it-dir{grid-area:dir;align-self:start;gap:8px}
   html.np-casca-v3 .np-it-prazo{grid-area:prazo;flex-direction:row;gap:7px;align-items:baseline;flex-wrap:wrap;min-height:20px}
   html.np-casca-v3 .np-it-prazo .d{font-size:var(--np-fs-4)}
@@ -185,10 +185,55 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
 }
 @media (pointer:coarse),(hover:none){
   html.np-casca-v3 .np-chipf,html.np-casca-v3 .np-seg button,html.np-casca-v3 .np-btn,html.np-casca-v3 .np-ib,html.np-casca-v3 .np-grp-h,html.np-casca-v3 .np-pop-i{min-height:44px}
-  html.np-casca-v3 .np-ib{width:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-props dd a,html.np-casca-v3 .np-passos a{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-it-chk{min-width:44px;min-height:44px;margin-left:-11px}
   html.np-casca-v3 .np-passos .lnk,html.np-casca-v3 .np-feito .lnk,html.np-casca-v3 .np-vazio .lnk,html.np-casca-v3 .np-erro .lnk{display:inline-flex;align-items:center;min-height:44px}
 }
 @media (prefers-reduced-motion:reduce){
   html.np-casca-v3 .np-grp-c,html.np-casca-v3 .np-grp-h .np-chev,html.np-casca-v3 .np-pop,html.np-casca-v3 .np-chipf{transition:none}
 }
+/* ---------- Fase 3: indicador de etapa, ciclo, valor, tabela compacta ---------- */
+html.np-casca-v3 .np-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html.np-casca-v3 .np-etapa{display:inline-flex;gap:4px;align-items:center;list-style:none;margin:0;padding:0;vertical-align:middle}
+html.np-casca-v3 .np-etapa li{position:relative;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--np-text-3);background:transparent;box-sizing:border-box}
+html.np-casca-v3 .np-etapa li.ok{background:var(--np-text-3);border-color:var(--np-text-3)}
+html.np-casca-v3 .np-etapa li.atual{background:var(--np-ink);border-color:var(--np-ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--np-ink) 22%,transparent)}
+html.np-casca-v3 .np-val{display:inline-flex;align-items:baseline;gap:5px;font:500 var(--np-fs-3)/1.2 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text);white-space:nowrap}
+html.np-casca-v3 .np-val b{font-weight:500}html.np-casca-v3 .np-val b.de{color:var(--np-text-3);text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:color-mix(in srgb,var(--np-text-3) 60%,transparent)}
+html.np-casca-v3 .np-val .seta{color:var(--np-text-3);font-family:var(--np-ui);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-val small{font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-ok)}html.np-casca-v3 .np-val small.sub{color:var(--np-text-3)}
+html.np-casca-v3 .np-val .np-sem{color:var(--np-text-3);font-family:var(--np-ui)}
+html.np-casca-v3 .np-ciclo{display:grid;grid-template-columns:repeat(5,1fr);gap:0;list-style:none;margin:6px 0 0;padding:0;position:relative}
+html.np-casca-v3 .np-ciclo::before{content:"";position:absolute;left:10%;right:10%;top:13px;height:1px;background:var(--np-line-2)}
+html.np-casca-v3 .np-ciclo li{position:relative;text-align:center;padding:0 2px;color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot{width:26px;height:26px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font:500 var(--np-fs-1)/1 var(--np-ui);background:var(--np-surface);border:1.5px solid var(--np-line-2);color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot .np-ico{width:14px;height:14px}
+html.np-casca-v3 .np-ciclo li.ok .dot{background:var(--np-ok);border-color:var(--np-ok);color:#fff}
+html.np-casca-v3 .np-ciclo li.atual .dot{border-color:var(--np-ink);color:var(--np-text);box-shadow:0 0 0 3px color-mix(in srgb,var(--np-ink) 18%,transparent)}
+html.np-casca-v3 .np-ciclo .l{display:block;font:500 var(--np-fs-1)/1.2 var(--np-ui);margin-top:6px;color:var(--np-text-2)}html.np-casca-v3 .np-ciclo li.atual .l{color:var(--np-text)}
+html.np-casca-v3 .np-ciclo .d{display:block;font:500 var(--np-fs-1)/1.2 var(--np-display);color:var(--np-text-3);font-variant-numeric:tabular-nums;margin-top:2px}
+html.np-casca-v3 .np-tab-w{overflow-x:auto;max-width:100%}
+html.np-casca-v3 .np-tab{width:100%;border-collapse:collapse;font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-tab th{text-align:left;font:500 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3);padding:4px 8px 6px 0;border-bottom:1px solid var(--np-line);white-space:nowrap}
+html.np-casca-v3 .np-tab td{padding:6px 8px 6px 0;border-bottom:1px solid var(--np-line);vertical-align:top}
+html.np-casca-v3 .np-tab tr:last-child td{border-bottom:0}
+html.np-casca-v3 .np-tab .num{text-align:right;font-family:var(--np-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+html.np-casca-v3 .np-tab th.num{font-family:var(--np-ui)}
+html.np-casca-v3 .np-tab td.np-sem,html.np-casca-v3 .np-tab .np-sem{color:var(--np-text-3)}
+/* módulos renderizados em V3.1 (`.np-v3` na vista): a faixa de abas do hub (V2) sai — a árvore da casca já tem os destinos */
+html.np-casca-v3 .np-v3 > .hub-tabs{display:none}
+/* celular (≤ 600): a linha vira três faixas — (1) data da reunião/prazo + urgência, (2) título e contexto, (3) marcas · responsável · progresso · valor —
+   nenhum elemento divide a largura com outro de função diferente; todas as informações continuam presentes */
+@media (max-width:600px){
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr);grid-template-areas:"chk prazo" "chk texto" "chk dir";row-gap:3px}
+  html.np-casca-v3 .np-it-prazo{min-height:0}
+  html.np-casca-v3 .np-it-dir{grid-area:dir;justify-content:flex-start;flex-wrap:wrap;gap:4px 10px;white-space:nowrap;margin-top:1px}
+  html.np-casca-v3 .np-it-dir .np-quem{order:-1}
+  html.np-casca-v3 .np-it-dir .np-quem-vazio{font-size:0}html.np-casca-v3 .np-it-dir .np-quem-vazio::before{content:"—";font-size:var(--np-fs-2);color:var(--np-text-3)}
+  html.np-casca-v3 .np-it-dir .np-val{margin-left:auto;font-size:var(--np-fs-2)}
+  html.np-casca-v3 .np-it-dir .np-val b.de,html.np-casca-v3 .np-it-dir .np-val .seta{display:none}
+  html.np-casca-v3 .np-it-prazo .r{white-space:nowrap}
+}
+/* quadro de etapas (Negociações): sempre uma linha de colunas, com rolagem horizontal — como o kanban V2 */
+html.np-casca-v3 .np-quadro-neg{grid-template-columns:repeat(var(--n,7),minmax(200px,1fr));overflow-x:auto;scroll-snap-type:x proximity}html.np-casca-v3 .np-quadro-neg .np-colq{scroll-snap-align:start;min-width:0}

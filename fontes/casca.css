@@ -177,3 +177,10 @@ html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus
 .np-pref h3{font-size:15px;margin:0 0 2px}
 .np-pref p{margin:0;color:var(--muted);font-size:13px;max-width:60ch}
 .np-pref .btn{margin-left:auto}
+/* item filho de um fixo (Acompanhamento PJ sob Clientes): recuo e tamanho de subnível; no trilho, ícone próprio */
+html.np-casca-v3 #np-tree .tab.np-filho{height:30px;font-size:13.5px;padding-left:30px;position:relative}
+html.np-casca-v3 #np-tree .tab.np-filho::before{content:"";position:absolute;left:19px;top:4px;bottom:4px;width:1px;background:var(--np-line-2)}
+html.np-casca-v3 #np-tree .tab.np-filho[aria-current="page"]::before{background:var(--np-ink)}
+html.np-casca-v3 .np-rail #np-tree .tab.np-filho{padding-left:0}html.np-casca-v3 .np-rail #np-tree .tab.np-filho::before{display:none}
+/* destinos que só existem na casca V3.1 (ex.: Acompanhamento PJ transversal): invisíveis no menu V2 */
+html:not(.np-casca-v3) .np-v3-only{display:none!important}
