@@ -2,7 +2,11 @@
    Supabase: avisos, avisos_leituras, v_avisos (0060). Card de não lidos no Meu painel. */
 (()=>{
 "use strict";
-const AV={lista:[],ok:false,carregando:false,sel:null};
+const AV={lista:[],ok:false,carregando:false,sel:null,alvo:null};
+/* #avisos/<id> (links externos — Discord/WhatsApp): o roteador do núcleo normaliza o hash para "#avisos" no primeiro render, antes
+   deste módulo renderizar; por isso o id é capturado aqui, no carregamento, e consumido uma vez (na V2 e na V3.1). */
+try{const [t,id]=(location.hash||"").slice(1).split("/");if(t==="avisos"&&id)AV.alvo=id}catch(_){}
+window.addEventListener("hashchange",()=>{try{const [t,id]=(location.hash||"").slice(1).split("/");if(t==="avisos"&&id)AV.alvo=id}catch(_){}});
 const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe"};
 const admin=()=>PP.perfil?.papel==="admin";
 const fmtDT=iso=>new Date(iso).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
@@ -29,7 +33,7 @@ function renderAvisos(){
     el("div",{class:"actions"},admin()?el("button",{class:"btn primary",onclick:()=>openForm({})},"+ Aviso"):null)));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   if(admin())v.append(cardDiscord());
-  const h=(location.hash||"").split("/")[1];
+  const h=(location.hash||"").split("/")[1]||AV.alvo;AV.alvo=null;
   if(!AV.lista.length){v.append(el("div",{class:"card empty"},"Nenhum aviso publicado."));return}
   v.append(el("div",{style:"display:grid;gap:12px"},...AV.lista.map(a=>cartao(a,false))));
   if(h){const elx=document.getElementById("aviso-"+h);if(elx){elx.scrollIntoView({block:"center"});const a=AV.lista.find(x=>x.id===h);if(a&&!a.lida)marcarLida(a)}}
@@ -83,8 +87,7 @@ document.head.append(el("style",{},`.av.nova{border-left:3px solid var(--gold)}.
    ============================================================================================================ */
 const ctxV3=a=>a.filter(Boolean).flatMap((x,i)=>i?[" · ",x]:[x]);
 const avisosV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
-const V3A={obra:null,painel:null,aberta:null,f:"nao-lidos"};
-try{V3A.f=localStorage.getItem("np-avisos-f")||"nao-lidos"}catch(_){}
+const V3A={obra:null,painel:null,aberta:null,f:"nao-lidos"}; // filtro persistido por NPUI.pref (chave isolada: "-beta" no espelho)
 function linhaAvV3(a){
   const d=new Date(a.publicado_em);const p=NPUI.prazoTxt(d.toISOString().slice(0,10));p.rel="";
   const areas=a.areas?.length?a.areas.map(x=>AREAS[x]||x).join(", "):"todo o escritório";
@@ -105,7 +108,8 @@ function renderAvisosV3(){
   const nl=AV.lista.filter(a=>!a.lida),fx=AV.lista.filter(a=>a.fixado);
   const resumo=NPUI.resumo([{n:nl.length,label:nl.length===1?"não lido":"não lidos",tom:nl.length?"att":"zero"},{n:fx.length,label:fx.length===1?"fixado":"fixados"},{n:AV.lista.length,label:"publicados"}]);
   const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
-  const F=(k,l,n)=>C({label:l,n,on:V3A.f===k,grupo:"f",onclick:()=>{V3A.f=k;try{localStorage.setItem("np-avisos-f",k)}catch(_){}render()}});
+  V3A.f=NPUI.pref.get("np-avisos-f",V3A.f);
+  const F=(k,l,n)=>C({label:l,n,on:V3A.f===k,grupo:"f",onclick:()=>{V3A.f=k;NPUI.pref.set("np-avisos-f",k);render()}});
   F("nao-lidos","Não lidos",nl.length);F("fixados","Fixados",fx.length);F("todos","Todos",AV.lista.length);
   const direita=[admin()?NPUI.btn("Discord",{variante:"ghost",title:"Canal dos avisos e ponte do chat Geral",onclick:()=>{V3A.aberta="discord";V3A.painel.abrir({id:"discord",trilha:[el("span",{},"Avisos"),el("span",{},"Integração")],titulo:"Discord",corpo:[cardDiscord()],pe:[]})}}):null,admin()?NPUI.btn("Aviso",{variante:"pri",icone:"mais",onclick:()=>openForm({})}):null];
   v.append(NPUI.toolbar({resumo,filtros:chips,direita}));NPUI.reancorarPop();
@@ -124,14 +128,14 @@ function renderAvisosV3(){
   obra.append(corpo);v.append(obra);
   V3A.painel=NPUI.painel({obra,label:"Aviso",onClose:()=>{V3A.aberta=null}});
   if(V3A.aberta&&V3A.aberta!=="discord"){const a=AV.lista.find(x=>x.id===V3A.aberta);if(a)abrirPainelAvV3(a,null,{silencioso:true});else V3A.aberta=null}
-  const h=(location.hash||"").split("/")[1];if(h){const a=AV.lista.find(x=>x.id===h);if(a){abrirPainelAvV3(a,null,{silencioso:true});if(!a.lida)marcarLida(a)}}
+  const h=(location.hash||"").split("/")[1]||AV.alvo;AV.alvo=null;if(h){const a=AV.lista.find(x=>x.id===h);if(a){abrirPainelAvV3(a,null,{silencioso:true});if(!a.lida)marcarLida(a)}}
 }
 /* grupo "Avisos" na tela Hoje V3.1 — mesmo conteúdo do cartão da V2 (não lidos + até 2 fixados) */
 function grupoHojeAvV3(){
   if(!garantir())return null;
   const nl=AV.lista.filter(a=>!a.lida);const fix=AV.lista.filter(a=>a.lida&&a.fixado).slice(0,2);
   if(!nl.length&&!fix.length)return null;
-  const abrir=a=>{try{history.pushState(null,"","#avisos/"+a.id)}catch(_){}irPara("avisos")};
+  const abrir=a=>{AV.alvo=a.id;try{history.pushState(null,"","#avisos/"+a.id)}catch(_){}irPara("avisos")};
   const itens=[...nl.slice(0,3),...fix].map(a=>{const d=new Date(a.publicado_em);const p=NPUI.prazoTxt(d.toISOString().slice(0,10));p.rel="";
     return NPUI.linha({id:"aviso:"+a.id,regua:a.lida?null:"att",prazo:{...p,tom:a.lida?"":"att"},titulo:a.titulo,contexto:ctxV3([a.autor_nome||"Direção",String(a.texto||"").replace(/\s+/g," ").slice(0,90)]),direita:[!a.lida?NPUI.marca("novo","att"):null,a.fixado?NPUI.marca("fixado"):null,!a.lida?NPUI.btn("Marcar como lido",{variante:"ghost",onclick:async()=>{await marcarLida(a)}}):null],onOpen:()=>abrir(a),titleAbrir:"Ler o aviso"})});
   const g=NPUI.grupo({id:"avisos",titulo:"Avisos",n:nl.length||fix.length,tom:nl.length?"att":null,aberto:true,itens});g.classList.add("np-hoje-avisos");return g;

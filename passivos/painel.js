@@ -287,15 +287,20 @@ function renderPainelV3(){
     const cli=(S.clientes||[]).find(c=>c.id===AG.cron.cliente_id)?.nome;
     corpo.append(el("div",{class:"np-agora",role:"status"},NPUI.marca("trabalhando agora","ok"),rel,el("span",{class:"tx"},t?t.titulo:(AG.cron.descricao||"atividade")),cli?el("span",{class:"ctx"},cli):null,el("span",{class:"np-agora-a"},t?NPUI.btn("Abrir",{variante:"ghost",onclick:()=>window.PP_TAREFAS?.abrir(t.id)}):null,NPUI.btn("Pausar",{variante:"ghost",onclick:async()=>{try{await window.PP_TS?.pararDireto({});toast("Tempo gravado");AG.ok=false;render()}catch(err){toast(err.message)}}}))))}
   const atrasados=Object.entries(porDia).filter(([k])=>k<hoje).flatMap(([,l])=>l.filter(i=>i.atrasada));
-  const fataisHoje=D.tarefas.filter(minhas).filter(z=>z.prazo_fatal&&z.faixa==="hoje");
+  // prazos fatais de hoje: TODAS as origens de v_prazos (tarefa, processo; negociação nunca é fatal na view). "Confirmar protocolo"
+  // (concluirComNota, regra da controladoria) só existe para tarefa; processo abre a ficha. Esses itens saem de "Para hoje" (sem repetição).
+  const fataisHoje=prazos.filter(z=>z.prazo_fatal&&z.faixa==="hoje");const fatalIds=new Set(fataisHoje.map(z=>"prazo:"+z.origem+":"+z.id));
   const G=[];
   if(f.modo==="dia"){
     if(f.dia===hoje){
       // prazos fatais de hoje — regra da controladoria (protocolo até meio-dia + confirmação) preservada: botão "Confirmar protocolo" chama concluirComNota
-      if(fataisHoje.length){const tarde=new Date().getHours()>=12;const itens=fataisHoje.map(z=>{const p=NPUI.prazoTxt(z.prazo);return NPUI.linha({id:"fatal:"+z.id,regua:"fatal",prazo:{curta:"hoje",rel:tarde?"passou do meio-dia":"até meio-dia",exata:p.exata,tom:"crit"},titulo:z.titulo,contexto:ctxV3([z.cliente_nome]),direita:[NPUI.marca("fatal","crit"),NPUI.quem(z.responsavel_nome),readOnly()?null:NPUI.btn("Confirmar protocolo",{variante:"pri",onclick:()=>window.PP_TAREFAS?.concluirComNota?.(z)})],onOpen:()=>window.PP_TAREFAS?.abrir(z.id),titleAbrir:"Abrir a tarefa"})});
+      if(fataisHoje.length){const tarde=new Date().getHours()>=12;const itens=fataisHoje.map(z=>{const p=NPUI.prazoTxt(z.prazo);const t=z.origem==="tarefa"?D.tarefas.find(x=>x.id===z.id):null;const i={k:"prazo",z,dia:z.prazo,atrasada:false,fatal:true};
+          const acao=t&&!readOnly()?NPUI.btn("Confirmar protocolo",{variante:"pri",onclick:()=>window.PP_TAREFAS?.concluirComNota?.(t)}):z.origem==="processo"?NPUI.btn("Abrir processo",{variante:"ghost",onclick:()=>abrirItemDia(i)}):null;
+          return NPUI.linha({id:"fatal:"+z.origem+":"+z.id,regua:"fatal",prazo:{curta:"hoje",rel:tarde?"passou do meio-dia":"até meio-dia",exata:p.exata,tom:"crit"},titulo:z.descricao,contexto:ctxV3([z.cliente_nome,z.origem==="processo"?"prazo processual":null]),direita:[NPUI.marca("fatal","crit"),z.origem==="processo"?NPUI.marca("processo"):null,NPUI.quem(z.responsavel_nome),acao],onOpen:()=>abrirItemDia(i),titleAbrir:z.origem==="tarefa"?"Abrir a tarefa":"Abrir no cliente"})});
         G.push(NPUI.grupo({id:"fatais",titulo:"Prazos fatais de hoje — protocolar"+(tarde?" e confirmar agora":" até meio-dia"),n:fataisHoje.length,tom:"crit",aberto:true,itens}))}
       if(atrasados.length)G.push(grupoHojeV3("atrasados","Atrasados — resolver primeiro",ord(atrasados),{tom:"crit"}));
-      G.push(grupoHojeV3("hoje","Para hoje",ord(porDia[hoje]||[]),{vazio:"Nada vence hoje. Bom momento para adiantar a semana.",comDia:false}));
+      const hojeSemFatais=(porDia[hoje]||[]).filter(i=>!(i.k==="prazo"&&fatalIds.has("prazo:"+i.z.origem+":"+i.z.id)));
+      G.push(grupoHojeV3("hoje","Para hoje",ord(hojeSemFatais),{vazio:fataisHoje.length?"Além dos prazos fatais, nada mais vence hoje.":"Nada vence hoje. Bom momento para adiantar a semana.",comDia:false}));
       const prox=[1,2,3].map(n=>isoD(addDia(dsel,n))).flatMap(k=>porDia[k]||[]);G.push(grupoHojeV3("prox","Próximos 3 dias",ord(prox),{vazio:"Nada nos próximos três dias."}));
     }else G.push(grupoHojeV3("dia","Neste dia",ord(porDia[f.dia]||[]),{vazio:"Nada neste dia.",comDia:false}));
   }else if(f.modo==="semana"){
@@ -320,7 +325,7 @@ function renderPainelV3(){
   const atvHead=escAtv.tudo?el("div",{class:"np-atv-f"},Object.entries(SETORES).map(([k,l])=>NPUI.chip({label:l,on:D.atvSetor===k,grupo:"setor",onclick:()=>{D.atvSetor=k;try{localStorage.setItem("pp-painel-atv",k)}catch(_){}render()}}))):null;
   const gAtv=NPUI.grupo({id:"atividade",titulo:"Atividade recente"+(escAtv.tudo?"":escAtv.nucleos?" · suas e do jurídico":" · só as suas"),n:eventosVis.length,aberto:NPUI.pref.get("np-hoje-g-atividade","0")==="1",onToggle:ab=>NPUI.pref.set("np-hoje-g-atividade",ab?"1":"0"),itens:itensAtv.length?itensAtv:[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Sem movimentação ainda."))]});
   if(atvHead)gAtv.querySelector(".np-grp-c").prepend(atvHead);corpo.append(gAtv);
-  const tot=Object.values(porDia).flat().length;corpo.append(NPUI.rodape(`${prazos.length} prazo${prazos.length===1?"":"s"} · ${tot} item${tot===1?"":"ns"} no período carregado`,[["crit","fatal"],["late","atrasado"],["att","hoje"]]));
+  const tot=Object.values(porDia).flat().length;corpo.append(NPUI.rodape(`${prazos.length} prazo${prazos.length===1?"":"s"} · ${tot} ${tot===1?"item":"itens"} no período carregado`,[["crit","fatal"],["late","atrasado"],["att","hoje"]]));
   obra.append(corpo);v.append(obra);
   H3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{H3.aberta=null}});
   if(H3.aberta){const [,id]=H3.aberta.split(":");const e=D.cal.agenda.find(x=>x.id===id);if(e){const i={k:"evento",e,atrasada:false};abrirPainelHojeV3(i,null)}else H3.aberta=null}

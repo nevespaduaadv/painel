@@ -15,7 +15,7 @@ const COR={audiencia:"var(--crit)",prazo:"var(--warn)",reuniao:"var(--info)",per
 const DIAS=["seg","ter","qua","qui","sex","sáb","dom"];
 function intervalo(){if(A.modo==="mes"){const ini=segunda(new Date(A.ref.getFullYear(),A.ref.getMonth(),1));return {ini,fim:addD(ini,42)}}const ini=A.modo==="semana"?segunda(A.ref):new Date(A.ref);const fim=addD(ini,A.modo==="semana"?7:1);return {ini,fim}}
 /* prazos (tarefas sem horário, processos, negociações) viram itens de dia inteiro na agenda */
-function prazoParaEvento(z){const d=parseD(z.prazo);return {id:"prazo:"+z.origem+":"+z.id,titulo:(z.prazo_fatal?"PRAZO FATAL: ":"")+z.descricao,inicio:d.toISOString(),fim:addD(d,1).toISOString(),dia_inteiro:true,colaborador_id:z.responsavel_id,colaborador_nome:z.responsavel_nome,cliente_id:z.cliente_id,cliente_nome:z.cliente_nome,processo_id:z.processo_id,tipo:"prazo",origem:"prazo",prazo_origem:z.origem,prazo_id:z.id,prazo_fatal:z.prazo_fatal,atrasada:z.faixa==="atrasada",faixa:z.faixa}}
+function prazoParaEvento(z){const d=parseD(z.prazo);return {id:"prazo:"+z.origem+":"+z.id,titulo:(z.prazo_fatal?"PRAZO FATAL: ":"")+z.descricao,inicio:d.toISOString(),fim:addD(d,1).toISOString(),dia_inteiro:true,colaborador_id:z.responsavel_id,colaborador_nome:z.responsavel_nome,cliente_id:z.cliente_id,cliente_nome:z.cliente_nome,processo_id:z.processo_id,numero_cnj:z.numero_cnj||null,tipo:"prazo",origem:"prazo",prazo_origem:z.origem,prazo_id:z.id,prazo_fatal:z.prazo_fatal,atrasada:z.faixa==="atrasada",faixa:z.faixa}}
 async function carregar(){
   if(A.carregando)return;A.carregando=true;
   try{const {ini,fim}=intervalo();const de=addD(ini,-7),ate=addD(fim,7);
@@ -84,6 +84,20 @@ async function sincronizarAgora(){
   catch(e){toast("Não foi possível sincronizar: "+e.message)}
 }
 
+/* grade de horas (7h–20h) — componente único, usado pela V2 e pelo modo "Grade" da V3.1; clicar numa célula vazia abre o formulário
+   no horário (comportamento existente), clicar num chip abre o compromisso (modal na V2, painel na V3.1) */
+function montarGrade(dias,porDia,evs){
+  const H0=7,H1=20;const grade=el("div",{class:"ag-grade",style:`grid-template-columns:52px repeat(${dias.length},1fr)`});
+  const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
+  const marcaFeriado=d=>{const fs=feriadosDe(d);if(!fs.length)return null;const nac=fs.find(f=>f.tipo==="nacional");const f=nac||fs[0];
+    return el("div",{class:"ag-fer"+(nac?" nac":""),title:fs.map(x=>`${x.nome} (${x.tipo}${x.uf?" "+x.uf:""}${x.comarca?" · "+x.comarca:""})`).join("\n")+(nac?"\nFeriado nacional: folga no escritório":"\nTrabalhamos normalmente; conta para prazos forenses")},(nac?"🏖 ":"⚖ ")+f.nome)};
+  grade.append(el("div",{class:"ag-c"}));dias.forEach(d=>grade.append(el("div",{class:"ag-c ag-h"+(iso(d)===iso(hojeLocal())?" hoje":"")+(feriadosDe(d).some(f=>f.tipo==="nacional")?" folga":"")},el("div",{class:"ag-dow"},DIAS[(d.getDay()+6)%7]),el("div",{class:"ag-dn"},String(d.getDate())),marcaFeriado(d))));
+  grade.append(el("div",{class:"ag-c ag-lbl"},"dia"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-inteiro",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),9,0)})}});porDia(d).filter(e=>e.dia_inteiro).forEach(e=>cel.append(chip(e)));grade.append(cel)});
+  for(let h=H0;h<H1;h++){grade.append(el("div",{class:"ag-c ag-lbl"},String(h).padStart(2,"0")+"h"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-slot",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0)})}});porDia(d).filter(e=>!e.dia_inteiro&&new Date(e.inicio).getHours()===h).forEach(e=>cel.append(chip(e,true)));grade.append(cel)})}
+  const fora=evs.filter(e=>!e.dia_inteiro&&(new Date(e.inicio).getHours()<H0||new Date(e.inicio).getHours()>=H1)&&dias.some(d=>iso(d)===iso(new Date(e.inicio))));
+  return {grade,fora};
+}
+
 /* ---------- render ---------- */
 function renderAgenda(){
   const v=$("#view-agenda");v.replaceChildren();
@@ -101,20 +115,13 @@ function renderAgenda(){
   const dias=[];for(let d=new Date(ini);d<fim;d=addD(d,1))dias.push(d);
   const porDia=d=>{const k=iso(d);return evs.filter(e=>{const s=new Date(e.inicio);return e.dia_inteiro?iso(s)<=k&&iso(addD(new Date(e.fim),-1))>=k:iso(s)===k})};
   if(A.modo==="mes"){renderMes(v,dias,porDia);return}
-  const H0=7,H1=20;const grade=el("div",{class:"ag-grade",style:`grid-template-columns:52px repeat(${dias.length},1fr)`});
-  const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
-  const marcaFeriado=d=>{const fs=feriadosDe(d);if(!fs.length)return null;const nac=fs.find(f=>f.tipo==="nacional");const f=nac||fs[0];
-    return el("div",{class:"ag-fer"+(nac?" nac":""),title:fs.map(x=>`${x.nome} (${x.tipo}${x.uf?" "+x.uf:""}${x.comarca?" · "+x.comarca:""})`).join("\n")+(nac?"\nFeriado nacional: folga no escritório":"\nTrabalhamos normalmente; conta para prazos forenses")},(nac?"🏖 ":"⚖ ")+f.nome)};
-  grade.append(el("div",{class:"ag-c"}));dias.forEach(d=>grade.append(el("div",{class:"ag-c ag-h"+(iso(d)===iso(hojeLocal())?" hoje":"")+(feriadosDe(d).some(f=>f.tipo==="nacional")?" folga":"")},el("div",{class:"ag-dow"},DIAS[(d.getDay()+6)%7]),el("div",{class:"ag-dn"},String(d.getDate())),marcaFeriado(d))));
-  grade.append(el("div",{class:"ag-c ag-lbl"},"dia"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-inteiro",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),9,0)})}});porDia(d).filter(e=>e.dia_inteiro).forEach(e=>cel.append(chip(e)));grade.append(cel)});
-  for(let h=H0;h<H1;h++){grade.append(el("div",{class:"ag-c ag-lbl"},String(h).padStart(2,"0")+"h"));dias.forEach(d=>{const cel=el("div",{class:"ag-c ag-slot",onclick:e=>{if(e.target===cel)formEvento({},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0)})}});porDia(d).filter(e=>!e.dia_inteiro&&new Date(e.inicio).getHours()===h).forEach(e=>cel.append(chip(e,true)));grade.append(cel)})}
-  const fora=evs.filter(e=>!e.dia_inteiro&&(new Date(e.inicio).getHours()<H0||new Date(e.inicio).getHours()>=H1)&&dias.some(d=>iso(d)===iso(new Date(e.inicio))));
+  const {grade,fora}=montarGrade(dias,porDia,evs);
   v.append(el("div",{class:"card",style:"overflow:auto"},grade));
   if(fora.length)v.append(el("div",{class:"note"},"Fora do horário exibido (7h–20h): "+fora.map(e=>`${hm(new Date(e.inicio))} ${e.titulo}`).join(" · ")));
   if(A.modo==="dia"){const lista=porDia(A.ref);v.append(el("div",{class:"card"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Compromissos do dia"),el("span",{class:"note"},String(lista.length))),lista.length?el("div",{class:"list"},lista.map(e=>el("button",{class:"row",onclick:()=>abrir(e)},el("div",{},el("div",{class:"n"},el("i",{style:`display:inline-block;width:9px;height:9px;border-radius:50%;background:${COR[e.tipo]||COR.outro};margin-right:8px`}),e.titulo),el("div",{class:"s"},[e.dia_inteiro?"dia inteiro":hm(new Date(e.inicio))+"–"+hm(new Date(e.fim)),e.colaborador_nome,e.cliente_nome,e.local].filter(Boolean).join(" · "))),el("span",{class:"pill g"},e.origem==="google"?"Google":e.origem==="tarefa"?"tarefa":TIPO[e.tipo]||e.tipo)))):el("div",{class:"empty"},"Nada marcado para este dia.")))}
   v.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google")));
 }
-function renderMes(v,dias,porDia){
+function montarMes(dias,porDia){
   const hoje=iso(hojeLocal()),mes=A.ref.getMonth();
   const g=el("div",{class:"ag-mes"});DIAS.forEach(d=>g.append(el("div",{class:"ag-mh"},d)));
   const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
@@ -124,13 +131,19 @@ function renderMes(v,dias,porDia){
     lista.slice(0,4).forEach(e=>cel.append(chip(e,!e.dia_inteiro)));
     if(lista.length>4)cel.append(el("button",{class:"ag-mais",onclick:e=>{e.stopPropagation();A.modo="dia";A.ref=new Date(d);render()}},"+ "+(lista.length-4)+" mais"));
     g.append(cel)});
-  v.append(el("div",{class:"card",style:"overflow:auto"},g));
   const no=dias.filter(d=>d.getMonth()===mes).flatMap(d=>porDia(d));const atras=no.filter(e=>e.atrasada).length,fat=no.filter(e=>e.prazo_fatal).length;
-  v.append(el("div",{class:"note"},`${no.length} item(ns) no mês · ${no.filter(e=>e.tipo==="prazo").length} prazos${fat?" ("+fat+" fatais)":""} · ${no.filter(e=>e.tipo!=="prazo").length} compromissos${atras?" · "+atras+" atrasado(s)":""}`));
+  const nota=`${no.length} item(ns) no mês · ${no.filter(e=>e.tipo==="prazo").length} prazos${fat?" ("+fat+" fatais)":""} · ${no.filter(e=>e.tipo!=="prazo").length} compromissos${atras?" · "+atras+" atrasado(s)":""}`;
+  return {g,nota};
+}
+function renderMes(v,dias,porDia){
+  const {g,nota}=montarMes(dias,porDia);
+  v.append(el("div",{class:"card",style:"overflow:auto"},g));
+  v.append(el("div",{class:"note"},nota));
   v.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:var(--crit)"}),"atrasado"),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google")));
 }
+const abrirEv=e=>(typeof agendaV3==="function"&&agendaV3()&&G3.painel)?abrirPainelAgV3(e,null):abrir(e);
 function chip(e,comHora){
-  const c=el("button",{class:"ag-ev"+(e.origem==="google"?" google":"")+(e.atrasada?" atrasada":"")+(e.prazo_fatal?" fatal":""),style:`--c:${COR[e.tipo]||COR.outro}`,title:`${e.titulo}\n${fmtQuando(e)}${e.colaborador_nome?"\n"+e.colaborador_nome:""}`,onclick:ev=>{ev.stopPropagation();abrir(e)}},
+  const c=el("button",{class:"ag-ev"+(e.origem==="google"?" google":"")+(e.atrasada?" atrasada":"")+(e.prazo_fatal?" fatal":""),style:`--c:${COR[e.tipo]||COR.outro}`,title:`${e.titulo}\n${fmtQuando(e)}${e.colaborador_nome?"\n"+e.colaborador_nome:""}`,onclick:ev=>{ev.stopPropagation();abrirEv(e)}},
     comHora?el("b",{},hm(new Date(e.inicio))+" "):null,e.titulo,A.quem==="equipe"&&e.colaborador_nome?el("small",{}," · "+e.colaborador_nome.split(" ")[0]):null);
   return c;
 }
@@ -167,24 +180,29 @@ function linhaAgV3(e,{comDia=false}={}){
   if(!e.dia_inteiro&&comDia)p.hora=hmV3(i);
   const regua=e.atrasada?"late":e.prazo_fatal?"fatal":e.tipo==="prazo"?"att":null;
   const dir=[e.prazo_fatal?NPUI.marca("fatal","crit"):e.origem==="prazo"?(e.prazo_origem==="processo"?NPUI.marca("processo"):e.prazo_origem==="negociacao"?NPUI.marca("negociação"):null):TIPO_M[e.tipo]?NPUI.marca(TIPO_M[e.tipo],e.tipo==="audiencia"?"crit":""):null,e.origem==="google"?NPUI.marca("Google"):e.origem==="tarefa"?NPUI.marca("tarefa"):e.origem==="lead"?NPUI.marca("CRM"):null,NPUI.quem(e.colaborador_nome)];
-  const fimTxt=!e.dia_inteiro&&e.fim?"até "+hmV3(new Date(e.fim)):null;
-  return NPUI.linha({id:e.id,regua,prazo:{...p,tom:regua==="late"||regua==="fatal"?"crit":regua==="att"?"att":""},titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),contexto:ctxV3([e.cliente_nome,e.local,fimTxt]),direita:dir,atual:G3.aberta===e.id,onOpen:li=>abrirPainelAgV3(e,li),titleAbrir:"Ver o compromisso"});
+  const fimOk=e.fim&&!isNaN(new Date(e.fim));const fimTxt=!e.dia_inteiro&&fimOk?"até "+hmV3(new Date(e.fim)):null;
+  const nDias=e.dia_inteiro&&fimOk?Math.round((new Date(e.fim)-new Date(e.inicio))/864e5):1;const diasTxt=nDias>1?`${nDias} dias (até ${addD(new Date(e.fim),-1).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})`:null;
+  return NPUI.linha({id:e.id,regua,prazo:{...p,tom:regua==="late"||regua==="fatal"?"crit":regua==="att"?"att":""},titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),contexto:ctxV3([e.cliente_nome,e.local,fimTxt,diasTxt]),direita:dir,atual:G3.aberta===e.id,onOpen:li=>abrirPainelAgV3(e,li),titleAbrir:"Ver o compromisso"});
 }
 function abrirPainelAgV3(e,li,{silencioso}={}){
   if(!G3.painel){abrir(e);return}G3.aberta=e.id;
-  const i=new Date(e.inicio),f=new Date(e.fim);const TIPO_L={compromisso:"Compromisso",audiencia:"Audiência",reuniao:"Reunião",pericia:"Perícia",prazo:"Prazo",outro:"Outro"};
-  const quando=e.dia_inteiro?i.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"}):`${i.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"})} · ${hmV3(i)}–${hmV3(f)}`;
+  const i=new Date(e.inicio),f=e.fim?new Date(e.fim):null;const fimOk=f&&!isNaN(f);const TIPO_L={compromisso:"Compromisso",audiencia:"Audiência",reuniao:"Reunião",pericia:"Perícia",prazo:"Prazo",outro:"Outro"};
+  const dl=d=>d.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  const quando=e.dia_inteiro?(fimOk&&Math.round((f-i)/864e5)>1?`${dl(i)} a ${dl(addD(f,-1))}`:dl(i)):`${dl(i)} · ${hmV3(i)}${fimOk?"–"+hmV3(f):" (sem horário de término)"}`;
   const origem=e.origem==="google"?"Google Calendar (edite por lá; chega aqui na próxima sincronização)":e.origem==="tarefa"?"tarefa com horário":e.origem==="lead"?"reunião marcada no CRM (altere na ficha do lead)":e.origem==="prazo"?(e.prazo_origem==="tarefa"?"prazo de tarefa":e.prazo_origem==="processo"?"prazo processual":"prazo de negociação"):"compromisso do painel";
   const props=NPUI.props([["Quando",quando],["Tipo",e.prazo_fatal?"Prazo fatal":TIPO_L[e.tipo]||e.tipo||"—"],["Responsável",e.colaborador_nome||"—"],e.cliente_nome?["Cliente",e.cliente_nome]:null,e.numero_cnj?["Processo",e.numero_cnj]:null,e.local?["Local",e.local]:null,["Origem",origem]]);
   const desc=e.descricao?NPUI.secao("Observações",el("p",{class:"np-txt"},String(e.descricao).slice(0,1500))):null;
   const pe=[];
+  // prazo processual: tarefas com prazo vinculadas ao mesmo processo (linhas próprias em v_prazos) aparecem aqui como atalho
+  const vinc=e.origem==="prazo"&&e.prazo_origem==="processo"&&e.processo_id?A.prazos.filter(x=>x.prazo_origem==="tarefa"&&x.processo_id===e.processo_id):[];
+  const secVinc=vinc.length?NPUI.secao(`Tarefas do processo (${vinc.length})`,el("ul",{class:"np-vinc"},vinc.map(x=>el("li",{},NPUI.btn(String(x.titulo||"").replace(/^PRAZO FATAL:\s*/,""),{variante:"ghost",onclick:()=>window.PP_TAREFAS?.abrir(x.prazo_id)}),el("span",{class:"np-sem"}," · "+parseD(x.inicio.slice(0,10)).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})))))):null;
   if(e.origem==="prazo"){if(e.prazo_origem==="tarefa")pe.push(NPUI.btn("Abrir a tarefa",{variante:"pri",onclick:()=>window.PP_TAREFAS?.abrir(e.prazo_id)}));else if(e.cliente_id)pe.push(NPUI.btn("Abrir no cliente",{variante:"pri",onclick:()=>{try{history.pushState(null,"","#clientes/"+encodeURIComponent(e.cliente_id)+"/"+(e.prazo_origem==="processo"?"processos":"negociacoes"))}catch(_){}if(aplicarHash())render()}}))}
   else if(e.origem==="tarefa"&&e.tarefa_id)pe.push(NPUI.btn("Abrir a tarefa",{variante:"pri",onclick:()=>window.PP_TAREFAS?.abrir(e.tarefa_id)}));
   else if(e.lead_id)pe.push(NPUI.btn("Abrir o lead",{variante:"pri",onclick:()=>{location.hash="#leads/"+e.lead_id}}));
   else if(e.origem==="google"){if(e.link)pe.push(el("a",{class:"np-btn pri",href:e.link,target:"_blank",rel:"noopener"},"Abrir no Google"))}
   else if(!readOnly())pe.push(NPUI.btn("Editar",{variante:"pri",onclick:()=>formEvento(e)}));
   if(e.cliente_id&&e.origem!=="prazo")pe.push(NPUI.btn("Abrir o cliente",{onclick:()=>{try{history.pushState(null,"","#clientes/"+encodeURIComponent(e.cliente_id))}catch(_){}if(aplicarHash())render()}}));
-  G3.painel.abrir({id:e.id,trilha:[el("span",{},"Agenda"),el("span",{},e.origem==="prazo"?(e.prazo_fatal?"Prazo fatal":"Prazo"):"Compromisso")],titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),corpo:[props,desc],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
+  G3.painel.abrir({id:e.id,trilha:[el("span",{},"Agenda"),el("span",{},e.origem==="prazo"?(e.prazo_fatal?"Prazo fatal":"Prazo"):"Compromisso")],titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),corpo:[props,secVinc,desc],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
 }
 function renderAgendaV3(){
   const v=$("#view-agenda");v.replaceChildren();v.classList.add("np-v3");G3.obra=null;G3.painel=null;
@@ -202,14 +220,22 @@ function renderAgendaV3(){
   if(outros.length){chips.push(NPUI.sepv());const sel0=outros.find(c=>c.id===A.quem);if(sel0)quem(sel0.id,sel0.nome);
     const mais=NPUI.chip({label:"Pessoa…",on:false,grupo:"quem",title:"Agenda de outra pessoa"});mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");mais.onclick=()=>NPUI.pop(mais,outros.map(c=>({label:c.nome,atual:A.quem===c.id,onclick:()=>{A.quem=c.id;try{localStorage.setItem("pp-agenda-quem",c.id)}catch(_){}render()}})),{label:"Agenda de",refoco:()=>document.querySelector('#view-agenda .np-chipf[aria-haspopup]')});chips.push(mais)}
   const seg=NPUI.seg([["dia","Dia"],["semana","Semana"],["mes","Mês"]],A.modo,k=>{A.modo=k;try{localStorage.setItem("pp-agenda-modo",k)}catch(_){}NPUI.vt(()=>render())},"Período");
+  const vista=NPUI.pref.get("np-agenda-vista","lista");const segV=NPUI.seg([["lista","Lista"],["grade","Grade"]],vista,k=>{NPUI.pref.set("np-agenda-vista",k);NPUI.vt(()=>render())},"Visualização");
   const mover=n=>{A.ref=A.modo==="mes"?new Date(A.ref.getFullYear(),A.ref.getMonth()+n,1):addD(A.ref,n*(A.modo==="semana"?7:1));render()};
   const nav=el("span",{class:"np-nav-per",role:"group","aria-label":"Navegar no período"},NPUI.ib("chevE","Anterior",()=>mover(-1)),NPUI.btn("Hoje",{variante:"ghost",onclick:()=>{A.ref=hojeLocal();render()}}),NPUI.ib("chevD","Próximo",()=>mover(1)));
   const sync=meu?.agenda_sync?(meu.agenda_sync_erro?"Google: "+meu.agenda_sync_erro.slice(0,60):meu.agenda_sync_em?"Google sincronizado "+new Date(meu.agenda_sync_em).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Google: aguardando 1ª sincronização"):"Google Calendar desligado para você";
   const mais=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(mais,[{label:"Sincronizar com o Google",title:"Envia os compromissos pendentes ao Google e busca o que mudou lá (automático a cada 15 min)",onclick:sincronizarAgora},{label:"Feriados e suspensões de prazo",onclick:()=>irPara("feriados")},{label:"Exportar CSV",onclick:()=>{const ls=visiveis().slice().sort((x,y)=>x.inicio<y.inicio?-1:1);if(!ls.length){toast("Nada para exportar");return}exportarCSV("agenda",ls,[{k:"inicio",t:"Data",f:v=>v?new Date(v).toLocaleDateString("pt-BR"):""},{k:"inicio",t:"Hora",f:(v,l)=>l.dia_inteiro?"dia inteiro":new Date(v).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})},{k:"tipo",t:"Tipo"},{k:"titulo",t:"Título"},{k:"colaborador_nome",t:"Responsável"},{k:"cliente_nome",t:"Cliente"},{k:"numero_cnj",t:"Processo"},{k:"local",t:"Local"},{k:"origem",t:"Origem"}]);toast(`${ls.length} linha(s) exportada(s)`)}}],{label:"Mais ações",alinhar:"dir",refoco:()=>document.querySelector('#view-agenda .np-ib[aria-label="Mais ações"]')}));mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
-  const direita=[seg,nav,mais,readOnly()?null:NPUI.btn("Compromisso",{variante:"pri",icone:"mais",onclick:()=>formEvento({},{inicio:new Date(A.ref.getFullYear(),A.ref.getMonth(),A.ref.getDate(),9,0)})})];
+  const direita=[segV,seg,nav,mais,readOnly()?null:NPUI.btn("Compromisso",{variante:"pri",icone:"mais",onclick:()=>formEvento({},{inicio:new Date(A.ref.getFullYear(),A.ref.getMonth(),A.ref.getDate(),9,0)})})];
   v.append(NPUI.toolbar({resumo,filtros:chips,direita}));NPUI.reancorarPop();
   const obra=el("div",{class:"np-obra"});G3.obra=obra;const corpo=el("div",{class:"np-corpo"});
   corpo.append(el("div",{class:"np-ag-h"},el("h1",{},rot.replace(/^./,c=>c.toUpperCase())),el("span",{class:"np-ag-s"},sync)));
+  if(vista==="grade"){ // mesma grade da V2 (horários livres, conflitos, sobreposições); chips abrem o painel; célula vazia abre o formulário no horário
+    if(A.modo==="mes"){const {g,nota}=montarMes(dias,porDia);corpo.append(el("div",{class:"np-grade-w"},g),NPUI.rodape(nota,[["crit","fatal / atrasado"],["att","prazo"]]))}
+    else{const {grade,fora}=montarGrade(dias,porDia,evs);corpo.append(el("div",{class:"np-grade-w"},grade));if(fora.length)corpo.append(el("p",{class:"np-sem np-fora"},"Fora do horário exibido (7h–20h): "+fora.map(e=>`${hm(new Date(e.inicio))} ${e.titulo}`).join(" · ")));corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]))}
+    corpo.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google")));
+    obra.append(corpo);v.append(obra);G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
+    if(G3.aberta){const e=[...A.eventos,...A.prazos].find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
+    return}
   const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
   const grupos=[];
   dias.forEach(d=>{const k=iso(d);const l=porDia(d);const fs=feriadosDe(d);const nac=fs.find(f=>f.tipo==="nacional");
@@ -222,12 +248,13 @@ function renderAgendaV3(){
     if(!itens.length)itens.push(el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Nada marcado."+(readOnly()?"":" Clique em Compromisso para marcar."))));
     grupos.push(NPUI.grupo({id:"d"+k,titulo:lbl,n:l.length,tom:nac?"crit":null,aberto:A.modo!=="mes"||k>=hoje,itens}))});
   if(!grupos.length)corpo.append(NPUI.vazio({titulo:"Nada neste período",texto:"Nenhum compromisso, prazo ou feriado."}));grupos.forEach(g=>corpo.append(g));
-  corpo.append(NPUI.rodape(`${no.length} item${no.length===1?"":"ns"} no período · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]));
+  corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]));
   obra.append(corpo);v.append(obra);
   G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
   if(G3.aberta){const e=[...A.eventos,...A.prazos].find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
 }
-document.head.append(el("style",{},`html.np-casca-v3 .np-ag-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-ag-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-ag-s{font:400 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-3)}`));
+document.head.append(el("style",{},`html.np-casca-v3 .np-ag-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-ag-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-ag-s{font:400 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-grade-w{overflow:auto;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);margin:0 0 10px}html.np-casca-v3 .np-fora{margin:0 0 8px;font-size:var(--np-fs-1)}html.np-casca-v3 .np-vinc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}html.np-casca-v3 .np-vinc li{display:flex;align-items:center;gap:4px;flex-wrap:wrap}`));
 
 {const _r=render;render=function(){_r();const v=$("#view-agenda");if(!v)return;v.hidden=S.tab!=="agenda";if(S.tab==="agenda"){if(agendaV3())renderAgendaV3();else{v.classList.remove("np-v3");renderAgenda()}}}}
 window.PP_AGENDA={recarregar,novo:formEvento,sincronizar:sincronizarAgora,v3:agendaV3,abrir:id=>{const e=[...A.eventos,...A.prazos].find(x=>x.id===id);if(e&&agendaV3()&&G3.painel)abrirPainelAgV3(e,null);else if(e)abrir(e)},ir:(d,modo)=>{if(d)A.ref=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(modo){A.modo=modo;try{localStorage.setItem("pp-agenda-modo",modo)}catch(_){}}irPara("agenda")}};
