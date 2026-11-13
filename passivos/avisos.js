@@ -2,7 +2,11 @@
    Supabase: avisos, avisos_leituras, v_avisos (0060). Card de não lidos no Meu painel. */
 (()=>{
 "use strict";
-const AV={lista:[],ok:false,carregando:false,sel:null};
+const AV={lista:[],ok:false,carregando:false,sel:null,alvo:null};
+/* #avisos/<id> (links externos — Discord/WhatsApp): o roteador do núcleo normaliza o hash para "#avisos" no primeiro render, antes
+   deste módulo renderizar; por isso o id é capturado aqui, no carregamento, e consumido uma vez (na V2 e na V3.1). */
+try{const [t,id]=(location.hash||"").slice(1).split("/");if(t==="avisos"&&id)AV.alvo=id}catch(_){}
+window.addEventListener("hashchange",()=>{try{const [t,id]=(location.hash||"").slice(1).split("/");if(t==="avisos"&&id)AV.alvo=id}catch(_){}});
 const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe"};
 const admin=()=>PP.perfil?.papel==="admin";
 const fmtDT=iso=>new Date(iso).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
@@ -29,7 +33,7 @@ function renderAvisos(){
     el("div",{class:"actions"},admin()?el("button",{class:"btn primary",onclick:()=>openForm({})},"+ Aviso"):null)));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   if(admin())v.append(cardDiscord());
-  const h=(location.hash||"").split("/")[1];
+  const h=(location.hash||"").split("/")[1]||AV.alvo;AV.alvo=null;
   if(!AV.lista.length){v.append(el("div",{class:"card empty"},"Nenhum aviso publicado."));return}
   v.append(el("div",{style:"display:grid;gap:12px"},...AV.lista.map(a=>cartao(a,false))));
   if(h){const elx=document.getElementById("aviso-"+h);if(elx){elx.scrollIntoView({block:"center"});const a=AV.lista.find(x=>x.id===h);if(a&&!a.lida)marcarLida(a)}}
@@ -75,8 +79,70 @@ function cardPainel(){
     el("div",{style:"display:grid;gap:8px;margin-top:8px"},...[...nl.slice(0,3),...fix].map(a=>cartao(a,true))));
 }
 document.head.append(el("style",{},`.av.nova{border-left:3px solid var(--gold)}.av.fixado h3::before{content:"📌 "}.av-painel .av{padding:10px 12px}`));
-{const _r=render;render=function(){_r();const v=$("#view-avisos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="avisos")S.tab="clientes";v.hidden=S.tab!=="avisos";if(S.tab==="avisos")renderAvisos();
-  if(S.tab==="painel"&&eq){const vp=$("#view-painel");const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}
-window.PP_AVISOS={invalidar};
+
+/* ============================================================================================================
+   V3.1 (Design System, Fase 4A) — Avisos: mesma leitura (v_avisos), mesma marcação de lido (avisos_leituras upsert, marcarLida),
+   mesmo formulário de admin (openForm). Lista com régua (novo = atenção) e painel com o texto completo. Na tela Hoje V3.1, os
+   não lidos entram como grupo no topo da obra (no lugar do cartão da V2). Ativa só com html.np-casca-v3 + np-ui.
+   ============================================================================================================ */
+const ctxV3=a=>a.filter(Boolean).flatMap((x,i)=>i?[" · ",x]:[x]);
+const avisosV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const V3A={obra:null,painel:null,aberta:null,f:"nao-lidos"}; // filtro persistido por NPUI.pref (chave isolada: "-beta" no espelho)
+function linhaAvV3(a){
+  const d=new Date(a.publicado_em);const p=NPUI.prazoTxt(d.toISOString().slice(0,10));p.rel="";
+  const areas=a.areas?.length?a.areas.map(x=>AREAS[x]||x).join(", "):"todo o escritório";
+  return NPUI.linha({id:a.id,regua:a.lida?null:"att",prazo:{...p,tom:a.lida?"":"att"},titulo:a.titulo,contexto:ctxV3([a.autor_nome||"Direção",areas,a.expira_em?"até "+fmtD(parseD(a.expira_em)):null]),
+    direita:[!a.lida?NPUI.marca("novo","att"):null,a.fixado?NPUI.marca("fixado"):null,admin()?el("span",{class:"np-num",title:"leituras"},`${a.leituras} leitura${+a.leituras===1?"":"s"}`):null],atual:V3A.aberta===a.id,onOpen:li=>abrirPainelAvV3(a,li),titleAbrir:"Ler o aviso"});
+}
+function abrirPainelAvV3(a,li,{silencioso}={}){
+  if(!V3A.painel)return;V3A.aberta=a.id;
+  const areas=a.areas?.length?a.areas.map(x=>AREAS[x]||x).join(", "):"todo o escritório";
+  const props=NPUI.props([["Publicado",fmtDT(a.publicado_em)],["Por",a.autor_nome||"Direção"],["Para",areas],a.expira_em?["Expira",fmtD(parseD(a.expira_em))]:null,admin()?["Leituras",String(a.leituras)]:null]);
+  const texto=NPUI.secao("Aviso",el("p",{class:"np-txt"},a.texto));
+  const pe=[!a.lida?NPUI.btn("Marcar como lido",{variante:"pri",icone:"check",onclick:async()=>{await marcarLida(a)}}):null,admin()?NPUI.btn("Editar",{onclick:()=>openForm(a)}):null];
+  V3A.painel.abrir({id:a.id,trilha:[el("span",{},"Avisos"),el("span",{},a.fixado?"Fixado":a.lida?"Lido":"Novo")],titulo:a.titulo,corpo:[props,texto],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
+}
+function renderAvisosV3(){
+  const v=$("#view-avisos");v.replaceChildren();v.classList.add("np-v3");V3A.obra=null;V3A.painel=null;
+  if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(5));return}
+  const nl=AV.lista.filter(a=>!a.lida),fx=AV.lista.filter(a=>a.fixado);
+  const resumo=NPUI.resumo([{n:nl.length,label:nl.length===1?"não lido":"não lidos",tom:nl.length?"att":"zero"},{n:fx.length,label:fx.length===1?"fixado":"fixados"},{n:AV.lista.length,label:"publicados"}]);
+  const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
+  V3A.f=NPUI.pref.get("np-avisos-f",V3A.f);
+  const F=(k,l,n)=>C({label:l,n,on:V3A.f===k,grupo:"f",onclick:()=>{V3A.f=k;NPUI.pref.set("np-avisos-f",k);render()}});
+  F("nao-lidos","Não lidos",nl.length);F("fixados","Fixados",fx.length);F("todos","Todos",AV.lista.length);
+  const direita=[admin()?NPUI.btn("Discord",{variante:"ghost",title:"Canal dos avisos e ponte do chat Geral",onclick:()=>{V3A.aberta="discord";V3A.painel.abrir({id:"discord",trilha:[el("span",{},"Avisos"),el("span",{},"Integração")],titulo:"Discord",corpo:[cardDiscord()],pe:[]})}}):null,admin()?NPUI.btn("Aviso",{variante:"pri",icone:"mais",onclick:()=>openForm({})}):null];
+  v.append(NPUI.toolbar({resumo,filtros:chips,direita}));NPUI.reancorarPop();
+  const obra=el("div",{class:"np-obra"});V3A.obra=obra;const corpo=el("div",{class:"np-corpo"});
+  const lista=V3A.f==="nao-lidos"?nl:V3A.f==="fixados"?fx:AV.lista;
+  const ordem=l=>[...l].sort((a,b)=>(b.fixado?1:0)-(a.fixado?1:0)||(a.publicado_em<b.publicado_em?1:-1));
+  if(!AV.lista.length)corpo.append(NPUI.vazio({titulo:"Nenhum aviso publicado",texto:admin()?"Publique o primeiro comunicado da direção.":"Quando a direção publicar, aparece aqui e no sino.",acao:admin()?"Novo aviso":null,onAcao:admin()?()=>openForm({}):null}));
+  else if(!lista.length)corpo.append(NPUI.vazio({titulo:V3A.f==="nao-lidos"?"Tudo lido":"Nenhum aviso fixado",texto:V3A.f==="nao-lidos"?"Você já leu todos os avisos.":"Nada em destaque no momento.",acao:"Ver todos",onAcao:()=>{V3A.f="todos";render()}}));
+  else{
+    if(V3A.f==="todos"){const novos=ordem(lista.filter(a=>!a.lida)),lidos=ordem(lista.filter(a=>a.lida));
+      if(novos.length)corpo.append(NPUI.grupo({id:"novos",titulo:"Não lidos",n:novos.length,tom:"att",itens:novos.map(linhaAvV3)}));
+      corpo.append(NPUI.grupo({id:"lidos",titulo:"Lidos",n:lidos.length,aberto:!novos.length||NPUI.pref.get("np-avisos-g-lidos","1")==="1",onToggle:ab=>NPUI.pref.set("np-avisos-g-lidos",ab?"1":"0"),itens:lidos.length?lidos.map(linhaAvV3):[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Nenhum lido ainda."))]}))}
+    else corpo.append(el("ul",{class:"np-lst",role:"list"},ordem(lista).map(linhaAvV3)));
+  }
+  corpo.append(NPUI.rodape(`${lista.length} aviso${lista.length===1?"":"s"} com este filtro`,[["att","não lido"]]));
+  obra.append(corpo);v.append(obra);
+  V3A.painel=NPUI.painel({obra,label:"Aviso",onClose:()=>{V3A.aberta=null}});
+  if(V3A.aberta&&V3A.aberta!=="discord"){const a=AV.lista.find(x=>x.id===V3A.aberta);if(a)abrirPainelAvV3(a,null,{silencioso:true});else V3A.aberta=null}
+  const h=(location.hash||"").split("/")[1]||AV.alvo;AV.alvo=null;if(h){const a=AV.lista.find(x=>x.id===h);if(a){abrirPainelAvV3(a,null,{silencioso:true});if(!a.lida)marcarLida(a)}}
+}
+/* grupo "Avisos" na tela Hoje V3.1 — mesmo conteúdo do cartão da V2 (não lidos + até 2 fixados) */
+function grupoHojeAvV3(){
+  if(!garantir())return null;
+  const nl=AV.lista.filter(a=>!a.lida);const fix=AV.lista.filter(a=>a.lida&&a.fixado).slice(0,2);
+  if(!nl.length&&!fix.length)return null;
+  const abrir=a=>{AV.alvo=a.id;try{history.pushState(null,"","#avisos/"+a.id)}catch(_){}irPara("avisos")};
+  const itens=[...nl.slice(0,3),...fix].map(a=>{const d=new Date(a.publicado_em);const p=NPUI.prazoTxt(d.toISOString().slice(0,10));p.rel="";
+    return NPUI.linha({id:"aviso:"+a.id,regua:a.lida?null:"att",prazo:{...p,tom:a.lida?"":"att"},titulo:a.titulo,contexto:ctxV3([a.autor_nome||"Direção",String(a.texto||"").replace(/\s+/g," ").slice(0,90)]),direita:[!a.lida?NPUI.marca("novo","att"):null,a.fixado?NPUI.marca("fixado"):null,!a.lida?NPUI.btn("Marcar como lido",{variante:"ghost",onclick:async()=>{await marcarLida(a)}}):null],onOpen:()=>abrir(a),titleAbrir:"Ler o aviso"})});
+  const g=NPUI.grupo({id:"avisos",titulo:"Avisos",n:nl.length||fix.length,tom:nl.length?"att":null,aberto:true,itens});g.classList.add("np-hoje-avisos");return g;
+}
+
+{const _r=render;render=function(){_r();const v=$("#view-avisos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="avisos")S.tab="clientes";v.hidden=S.tab!=="avisos";if(S.tab==="avisos"){if(avisosV3())renderAvisosV3();else{v.classList.remove("np-v3");renderAvisos()}}
+  if(S.tab==="painel"&&eq){const vp=$("#view-painel");if(avisosV3()){const old=vp?.querySelector(".np-hoje-avisos");if(old)old.remove();const g=grupoHojeAvV3();const corpo=vp?.querySelector(".np-corpo");const ancora=corpo?.querySelector(".np-hoje-h");if(g&&corpo){const ag=corpo.querySelector(".np-agora");if(ag)ag.after(g);else if(ancora)ancora.after(g);else corpo.prepend(g)}}else{const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}}
+window.PP_AVISOS={invalidar,v3:avisosV3};
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){SB.channel("avisos").on("postgres_changes",{event:"*",schema:"public",table:"avisos"},()=>invalidar()).subscribe()}});
 })();
