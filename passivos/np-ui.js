@@ -1,5 +1,5 @@
 /* np-ui.js — componentes V3.1 do Design System (DESIGN.md §4): toolbar, filtros tipográficos, grupo recolhível, linha com régua,
-   marca itálica, painel de detalhe (split/overlay/tela cheia), props, passos, popover, feedback no lugar, estados, movimento.
+   marca itálica, painel de detalhe (split/overlay/tela cheia), props, passos, etapa/ciclo/valor/tabela (Fase 3), popover, feedback no lugar, estados, movimento.
    Só apresentação: devolve elementos (mesmo el() do painel), não guarda estado global nem fala com o Supabase.
    Os estilos ficam em fontes/np-ui.css, escopados em html.np-casca-v3; os módulos usam NPUI só quando a casca V3.1 está ativa. */
 (() => {
@@ -97,6 +97,37 @@ const props = (pares) => { const dl = el("dl", { class: "np-props" }); for (cons
 const passos = (itens) => el("ol", { class: "np-passos" }, itens.map(p => el("li", { class: p.estado || "" }, p.el || el("span", {}, p.texto), p.sub ? el("small", {}, p.sub) : null)));
 const secao = (titulo, ...kids) => el("section", { class: "np-sec" }, el("h3", {}, titulo), ...kids);
 
+/* ---------- indicador de etapa, valor, ciclo, tabela compacta (DESIGN.md §5; Fase 3) ---------- */
+/* etapa: pontos horizontais — passos: [{k,label}] · atual: k · feitos: Set/array de k concluídos (default: os anteriores ao atual) */
+const etapa = (passos, atual, { feitos } = {}) => {
+  const i = passos.findIndex(p => p.k === atual); const done = new Set(feitos || passos.slice(0, Math.max(i, 0)).map(p => p.k));
+  const ol = el("ol", { class: "np-etapa", "aria-label": i >= 0 ? `etapa ${i + 1} de ${passos.length}: ${passos[i].label}` : `${passos.length} etapas`, title: i >= 0 ? passos[i].label : null });
+  passos.forEach((p, j) => ol.append(el("li", { class: p.k === atual ? "atual" : done.has(p.k) ? "ok" : "", "aria-current": p.k === atual ? "step" : null }, el("span", { class: "np-sr" }, p.label))));
+  return ol;
+};
+/* val: dinheiro em serifa tabular — "cobrado → acordo" com % só quando os dois existem; nunca inventa valor */
+const brl = (v) => (typeof BRL === "function" ? BRL(+v) : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+const val = ({ cobrado, acordo, rotuloAcordo = "acordo", sub } = {}) => {
+  const temC = cobrado != null && cobrado !== "", temA = acordo != null && acordo !== "";
+  const w = el("span", { class: "np-val" });
+  if (temC) w.append(el("b", { class: temA ? "de" : "", title: "valor cobrado" }, brl(cobrado)));
+  if (temC && temA) w.append(el("span", { class: "seta", "aria-hidden": "true" }, "→"));
+  if (temA) w.append(el("b", { title: rotuloAcordo }, brl(acordo)));
+  if (temC && temA && +cobrado > 0) { const pct = Math.round((1 - (+acordo) / (+cobrado)) * 100); if (pct > 0 && pct < 100) w.append(el("small", { title: "desconto sobre o cobrado" }, `−${pct}%`)); }
+  if (!temC && !temA) w.append(el("span", { class: "np-sem" }, "—"));
+  if (sub) w.append(el("small", { class: "sub" }, sub));
+  return w;
+};
+/* ciclo: 5 passos horizontais com data — passos: [{label, data, feita, atual, sub}] */
+const ciclo = (passos) => el("ol", { class: "np-ciclo", "aria-label": "Ciclo de acompanhamento" }, passos.map((p, i) => el("li", { class: (p.feita ? "ok" : "") + (p.atual ? " atual" : ""), "aria-current": p.atual ? "step" : null },
+  el("span", { class: "dot", "aria-hidden": "true" }, p.feita ? svgIco(I.check, "np-ico") : String(i + 1)), el("span", { class: "l" }, p.label), el("span", { class: "d" }, p.data || p.sub || "—"))));
+/* tabela compacta — colunas: [{k,label,num,render}] · linhas: objetos */
+const tabela = (colunas, linhas, { vazio: tv = "—", label } = {}) => {
+  const t = el("table", { class: "np-tab", "aria-label": label || null }, el("thead", {}, el("tr", {}, colunas.map(c => el("th", { class: c.num ? "num" : "", scope: "col" }, c.label)))),
+    el("tbody", {}, linhas.length ? linhas.map(l => el("tr", {}, colunas.map(c => { const v = c.render ? c.render(l) : l[c.k]; return el("td", { class: c.num ? "num" : "" }, v == null || v === "" ? el("span", { class: "np-sem" }, "—") : v); }))) : el("tr", {}, el("td", { colspan: String(colunas.length), class: "np-sem" }, tv))));
+  return el("div", { class: "np-tab-w" }, t);
+};
+
 /* ---------- popover (um por vez) ---------- */
 let popAtual = null;
 function pop(anchor, conteudo, { role = "menu", label, alinhar = "esq", aoFechar, refoco } = {}) {
@@ -131,5 +162,5 @@ const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").f
 const btn = (label, { variante = "", onclick, title, disabled, icone, type = "button", cls = "" } = {}) => el("button", { type, class: ("np-btn " + variante + " " + cls).trim(), onclick, title: title || null, disabled: disabled ? "" : null }, icone ? svgIco(I[icone] || icone) : null, label);
 const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-ib", "aria-label": label, title: label, onclick }, svgIco(I[icone] || icone));
 
-window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

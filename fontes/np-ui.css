@@ -192,3 +192,31 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
 @media (prefers-reduced-motion:reduce){
   html.np-casca-v3 .np-grp-c,html.np-casca-v3 .np-grp-h .np-chev,html.np-casca-v3 .np-pop,html.np-casca-v3 .np-chipf{transition:none}
 }
+/* ---------- Fase 3: indicador de etapa, ciclo, valor, tabela compacta ---------- */
+html.np-casca-v3 .np-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html.np-casca-v3 .np-etapa{display:inline-flex;gap:4px;align-items:center;list-style:none;margin:0;padding:0;vertical-align:middle}
+html.np-casca-v3 .np-etapa li{position:relative;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--np-text-3);background:transparent;box-sizing:border-box}
+html.np-casca-v3 .np-etapa li.ok{background:var(--np-text-3);border-color:var(--np-text-3)}
+html.np-casca-v3 .np-etapa li.atual{background:var(--np-ink);border-color:var(--np-ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--np-ink) 22%,transparent)}
+html.np-casca-v3 .np-val{display:inline-flex;align-items:baseline;gap:5px;font:500 var(--np-fs-3)/1.2 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text);white-space:nowrap}
+html.np-casca-v3 .np-val b{font-weight:500}html.np-casca-v3 .np-val b.de{color:var(--np-text-3);text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:color-mix(in srgb,var(--np-text-3) 60%,transparent)}
+html.np-casca-v3 .np-val .seta{color:var(--np-text-3);font-family:var(--np-ui);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-val small{font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-ok)}html.np-casca-v3 .np-val small.sub{color:var(--np-text-3)}
+html.np-casca-v3 .np-val .np-sem{color:var(--np-text-3);font-family:var(--np-ui)}
+html.np-casca-v3 .np-ciclo{display:grid;grid-template-columns:repeat(5,1fr);gap:0;list-style:none;margin:6px 0 0;padding:0;position:relative}
+html.np-casca-v3 .np-ciclo::before{content:"";position:absolute;left:10%;right:10%;top:13px;height:1px;background:var(--np-line-2)}
+html.np-casca-v3 .np-ciclo li{position:relative;text-align:center;padding:0 2px;color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot{width:26px;height:26px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font:500 var(--np-fs-1)/1 var(--np-ui);background:var(--np-surface);border:1.5px solid var(--np-line-2);color:var(--np-text-3)}
+html.np-casca-v3 .np-ciclo .dot .np-ico{width:14px;height:14px}
+html.np-casca-v3 .np-ciclo li.ok .dot{background:var(--np-ok);border-color:var(--np-ok);color:#fff}
+html.np-casca-v3 .np-ciclo li.atual .dot{border-color:var(--np-ink);color:var(--np-text);box-shadow:0 0 0 3px color-mix(in srgb,var(--np-ink) 18%,transparent)}
+html.np-casca-v3 .np-ciclo .l{display:block;font:500 var(--np-fs-1)/1.2 var(--np-ui);margin-top:6px;color:var(--np-text-2)}html.np-casca-v3 .np-ciclo li.atual .l{color:var(--np-text)}
+html.np-casca-v3 .np-ciclo .d{display:block;font:500 var(--np-fs-1)/1.2 var(--np-display);color:var(--np-text-3);font-variant-numeric:tabular-nums;margin-top:2px}
+html.np-casca-v3 .np-tab-w{overflow-x:auto;max-width:100%}
+html.np-casca-v3 .np-tab{width:100%;border-collapse:collapse;font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-tab th{text-align:left;font:500 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3);padding:4px 8px 6px 0;border-bottom:1px solid var(--np-line);white-space:nowrap}
+html.np-casca-v3 .np-tab td{padding:6px 8px 6px 0;border-bottom:1px solid var(--np-line);vertical-align:top}
+html.np-casca-v3 .np-tab tr:last-child td{border-bottom:0}
+html.np-casca-v3 .np-tab .num{text-align:right;font-family:var(--np-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+html.np-casca-v3 .np-tab th.num{font-family:var(--np-ui)}
+html.np-casca-v3 .np-tab td.np-sem,html.np-casca-v3 .np-tab .np-sem{color:var(--np-text-3)}
