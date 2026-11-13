@@ -73,7 +73,7 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
     if (p.startsWith('/rest/v1/v_negociacoes') || p.startsWith('/rest/v1/v_monitoramentos') || p.startsWith('/rest/v1/v_tickets') || p.startsWith('/rest/v1/processos') || p.startsWith('/rest/v1/bens')) return json([]);
     return unico ? json({ message: 'nenhum', code: 'PGRST116' }, 406) : json([]);
   });
-  const pg = await ctx.newPage(); pg.on('pageerror', e => erros.push(e.message)); pg.on('console', msg => { if (msg.type() === 'error' && !/supabase\.co|net::ERR|Failed to load resource|WebSocket/.test(msg.text())) erros.push('console: ' + msg.text().slice(0, 160)); });
+  const pg = await ctx.newPage(); pg.on('pageerror', e => { erros.push(e.message); pg.evaluate((m) => { (window.__labErros = window.__labErros || []).push(m); }, e.message).catch(() => {}); }); pg.on('console', msg => { if (msg.type() === 'error' && !/supabase\.co|net::ERR|Failed to load resource|WebSocket/.test(msg.text())) erros.push('console: ' + msg.text().slice(0, 160)); });
   await pg.goto(BASE + '/index.html' + hash, { waitUntil: 'load' });
   await pg.waitForFunction(() => typeof PP !== 'undefined' && PP.perfil && document.querySelector('#login')?.hidden && (window.PP_ACOMP || (typeof PP.temAcesso === 'function' && !PP.temAcesso('acompanhamento'))) && (!PP.temAcesso('clientes') || (S.clientes && S.clientes.length > 0)), null, { timeout: 20000 });
   if (esperar) await pg.waitForFunction(() => !document.querySelector('#view-acompanhamento')?.hidden && document.querySelectorAll('#view-acompanhamento li.np-it').length > 0, null, { timeout: 20000 }).catch(() => {});
@@ -82,7 +82,12 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
 }
 const ids = (pg) => pg.evaluate(() => [...document.querySelectorAll('#view-acompanhamento li.np-it[data-id]')].map(e => e.dataset.id).sort());
 /* abre o painel de um cliente e espera os dados dele chegarem (sem esqueleto aria-busy) — no CI o carregamento é mais lento que um tempo fixo */
-const abrirPainel = async (pg, id) => { await pg.click(`li.np-it[data-id="${id}"] .np-it-abrir`); await pg.waitForFunction(() => { const P = document.querySelector('.np-painel'); return P && !P.hidden && !P.querySelector('[aria-busy="true"]'); }, null, { timeout: 15000 }); await pg.waitForTimeout(250); };
+const abrirPainel = async (pg, id) => { await pg.click(`li.np-it[data-id="${id}"] .np-it-abrir`);
+  try { await pg.waitForFunction(() => { const P = document.querySelector('.np-painel'); return P && !P.hidden && !P.querySelector('[aria-busy="true"]'); }, null, { timeout: 20000 }); }
+  catch (e) { // diagnóstico (o CI já falhou aqui sem explicação): estado da cache do cliente, do painel e erros de página
+    const d = await pg.evaluate(() => { const P = document.querySelector('.np-painel'); const A = window.PP_ACOMP?.estado?.() || null; return { painel: P ? { hidden: P.hidden, busy: !!P.querySelector('[aria-busy="true"]'), texto: P.innerText.slice(0, 200) } : null, estado: A, tab: S.tab, erros: (window.__labErros || []).slice(0, 5) }; }).catch(() => null);
+    console.error('abrirPainel(' + id + ') não carregou:', JSON.stringify(d)); throw e; }
+  await pg.waitForTimeout(250); };
 const grupos = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#view-acompanhamento .np-grp')].map(g => [g.dataset.g, [...g.querySelectorAll('li.np-it')].map(l => l.dataset.id)])));
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 (async () => {

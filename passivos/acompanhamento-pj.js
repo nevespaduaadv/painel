@@ -302,5 +302,5 @@ function montarPainelA3(c){
   renderAcompanhamentoV3()}}
 const invalidarLista=()=>{A3.lista=null};
 window.__PP_LOGIN?.then?.(()=>{try{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("acomp-pj");for(const t of ["acompanhamento_pj","atas_reuniao","dividas_raio_x"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{invalidarLista();if(S.tab==="acompanhamento")render()});ch.subscribe()}}catch(_){}});
-window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid),podeVer:podeVerTransversal};
+window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid),podeVer:podeVerTransversal,estado:()=>({esperando:A3.esperando,aberta:A3.aberta,lista:!!A3.lista,carregando:A3.carregando,erro:A3.erro,cache:Object.fromEntries(Object.entries(A.cache).map(([k,v])=>[k,{ok:!!v.ok,carregando:!!v.carregando,erro:v.erro||null,dividas:v.dividas?.length,atas:v.atas?.length}]))})};
 })();
