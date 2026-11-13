@@ -212,6 +212,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   // ---------- 7b. acessibilidade específica: contraste (texto 4,5:1; componentes 3:1) e alvos (44 px) em 375/768/1024/1440 ----------
   rel.push('7b. contraste e alvos de toque dos componentes novos (marcas, valor, etapa, popover, painel, quadro)');
   for (const tema of ['light', 'dark']) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', tema });
+    await pg.evaluate(() => window.PP_NEG.filtro({ escopo: 'todas', concluidas: true })); await pg.waitForTimeout(250); await pg.click('.np-grp[data-g="concluido"] .np-grp-h'); await pg.waitForTimeout(300); // Concluído aberto: a marca "concluída" (ok) tem de existir
     await pg.click(`li.np-it[data-id="${NEGS[0].id}"] .np-it-abrir`); await pg.waitForTimeout(500); await pg.click('.np-p-pe button:has-text("Mover etapa")'); await pg.waitForTimeout(250);
     const pares = [
       { sel: '.np-resumo b', nome: 'número do resumo' }, { sel: '.np-resumo b.crit', nome: 'número crítico' }, { sel: '.np-resumo b.att', nome: 'número atenção' }, { sel: '.np-resumo span', nome: 'rótulo do resumo' },
@@ -227,9 +228,14 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     const m = await medirContraste(pg, pares); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
     await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400);
     const mq = await medirContraste(pg, [{ sel: '.np-cardq .tx', nome: 'título do cartão' }, { sel: '.np-cardq .ctx', nome: 'contexto do cartão' }, { sel: '.np-cardq .pz', nome: 'prazo do cartão' }, { sel: '.np-cardq .pz.late', nome: 'prazo vencido do cartão' }, { sel: '.np-colq h3 > span:first-child', nome: 'título da coluna' }, { sel: '.np-colq h3 .n', nome: 'contagem da coluna' }]);
-    const ruins = [...m.ruins, ...mq.ruins]; const n = m.medidos.length + mq.medidos.length;
-    if (!ruins.length && m.ausentes.length <= 1) ok(`${tema}: ${n} pares medidos ≥ mínimo (texto 4,5:1, componentes 3:1); menor razão ${Math.min(m.minimo, mq.minimo).toFixed(2)}:1${m.ausentes.length ? ' · não encontrados: ' + m.ausentes.join(', ') : ''}`); else falha(`${tema}: contraste insuficiente: ` + ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1 (${p.fg} sobre ${p.bg})`).join('; ') + (m.ausentes.length ? ' · ausentes: ' + m.ausentes.join(', ') : ''));
-    await ctx.close(); }
+    const ruins = [...m.ruins, ...mq.ruins]; const n = m.medidos.length + mq.medidos.length; const faltam = [...m.ausentesObrigatorios, ...mq.ausentesObrigatorios];
+    if (!ruins.length && !faltam.length) ok(`${tema} 1440: ${n} pares obrigatórios encontrados e medidos ≥ mínimo (texto 4,5:1, componentes 3:1); menor razão ${Math.min(m.minimo, mq.minimo).toFixed(2)}:1`); else falha(`${tema}: ` + (ruins.length ? 'contraste insuficiente: ' + ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1 (${p.fg} sobre ${p.bg})`).join('; ') : '') + (faltam.length ? ' · OBRIGATÓRIOS não encontrados: ' + faltam.join(', ') : ''));
+    await ctx.close();
+    // 375 px: o que só existe no celular (relativo junto ao prazo, valor compacto com "proposta", etapa na 3ª faixa)
+    const c375 = await contexto(b, { perfil: 'admin', casca: 'v3', tema, w: 375, h: 812 });
+    const m375 = await medirContraste(c375.pg, [{ sel: '.np-it-prazo .r', nome: 'relativo junto ao prazo (celular)' }, { sel: '.np-it-prazo.late .r', nome: 'relativo vencido (celular)' }, { sel: '.np-it-dir .np-val b', nome: 'valor compacto (celular)' }, { sel: '.np-it-dir .np-val small.sub', nome: '"proposta" (celular)' }, { sel: '.np-it-dir .np-marca', nome: 'marca na 3ª faixa (celular)' }, { sel: '.np-it-dir .np-quem b', nome: 'iniciais (celular)' }]);
+    if (!m375.ruins.length && !m375.ausentesObrigatorios.length) ok(`${tema} 375: ${m375.medidos.length} pares exclusivos do celular medidos; menor ${m375.minimo.toFixed(2)}:1`); else falha(`${tema} 375: ` + m375.ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1`).join('; ') + (m375.ausentesObrigatorios.length ? ' · OBRIGATÓRIOS não encontrados: ' + m375.ausentesObrigatorios.join(', ') : ''));
+    await c375.ctx.close(); }
   for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]]) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h, touch: true });
     const a1 = await medirAlvos(pg, '#view-negociacoes'); await pg.click('li.np-it .np-it-abrir'); await pg.waitForTimeout(500); await pg.click('.np-p-pe button:has-text("Mover etapa")'); await pg.waitForTimeout(250);
     const a2 = await medirAlvos(pg, '.np-painel'); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);

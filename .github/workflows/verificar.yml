@@ -17,10 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Fase do PR (padrão 1; rótulo "fase-0" aplica a comparação estrita)
+      - name: Fase do PR (padrão 3 = todas as verificações; rótulo "fase-0" aplica a comparação estrita)
         id: fase
         run: |
-          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=1" >> "$GITHUB_OUTPUT"; fi
+          if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=3" >> "$GITHUB_OUTPUT"; fi
       - name: verificar-geracao
         run: node fontes/verificar-geracao.mjs --base origin/${{ github.base_ref }} --fase ${{ steps.fase.outputs.fase }}
       - name: Laboratório da casca (navegação real, dados fictícios, sem rede)

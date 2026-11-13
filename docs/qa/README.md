@@ -2,7 +2,7 @@
 
 ## Verificação obrigatória antes de todo PR
 ```bash
-node fontes/verificar-geracao.mjs --base main --fase <0|1>
+node fontes/verificar-geracao.mjs --base main --fase <0|1|3>   # 3 = padrão no CI (inclui F3: destinos novos só-V3.1 com permissão, TAB_AREA, view-*, PP_ROTAS, casca.js; cliente sem rotas)
 ```
 Nunca altera arquivos versionados: o gerador roda numa cópia temporária e o inventário do menu só é gravado com `--gravar-inventario` (faça isso de propósito, em um commit próprio, e revise o diff do JSON).
 
