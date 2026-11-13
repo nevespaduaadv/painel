@@ -302,5 +302,18 @@ function montarPainelA3(c){
   renderAcompanhamentoV3()}}
 const invalidarLista=()=>{A3.lista=null};
 window.__PP_LOGIN?.then?.(()=>{try{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("acomp-pj");for(const t of ["acompanhamento_pj","atas_reuniao","dividas_raio_x"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{invalidarLista();if(S.tab==="acompanhamento")render()});ch.subscribe()}}catch(_){}});
-window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid),podeVer:podeVerTransversal,estado:()=>({esperando:A3.esperando,aberta:A3.aberta,lista:!!A3.lista,carregando:A3.carregando,erro:A3.erro,cache:Object.fromEntries(Object.entries(A.cache).map(([k,v])=>[k,{ok:!!v.ok,carregando:!!v.carregando,erro:v.erro||null,dividas:v.dividas?.length,atas:v.atas?.length}]))})};
+window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>podeVerTransversal()?registrosA3():[],podeVer:podeVerTransversal,
+  estado:()=>({carregado:!!A3.lista,carregando:A3.carregando,erro:A3.erro,vazio:!!A3.lista&&!A3.lista.length,esperando:A3.esperando,aberta:A3.aberta,lista:!!A3.lista,cache:Object.fromEntries(Object.entries(A.cache).map(([k,v])=>[k,{ok:!!v.ok,carregando:!!v.carregando,erro:v.erro||null,dividas:v.dividas?.length,atas:v.atas?.length}]))}),
+  /* ---- contrato público (Fase 4B) — falha-fechado ---- */
+  carregarLista:()=>{if(!podeVerTransversal())return false;carregarLista();return true},
+  // null = sem permissão ou lista ainda não carregada; {iniciado:false} = cliente visível sem acompanhamento; registro completo caso contrário
+  porCliente:cid=>{if(!podeVerTransversal()||!A3.lista||!cid)return null;const r=registrosA3().find(x=>x.c.id===cid);return r||null},
+  // marcos do ciclo com data gravada (previstos/realizados) — só leitura, para a Agenda; nunca cria nada
+  marcos:()=>{if(!podeVerTransversal()||!A3.lista)return null;const out=[];for(const a of A3.lista){const c=(S.clientes||[]).find(x=>x.id===a.cliente_id);if(!c||!a.fase||a.fase==="encerrado")continue;
+      for(const [k,l] of [["onb","Onboarding"],["r1","R1"],["r2","R2"],["r3","R3"]]){const d=diaISO(a[k+"_data"]);if(d)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:k,rotulo:l,data:d,realizada:!!a[k+"_feita"],responsavel_id:c.resp_estrategico_id||null})}
+      if(a.proxima_reuniao)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:"mensal",rotulo:"Mensal",data:diaISO(a.proxima_reuniao),realizada:false,responsavel_id:c.resp_estrategico_id||null})}
+    return out},
+  abrir:cid=>{if(!podeVerTransversal())return false;const c=(S.clientes||[]).find(x=>x.id===cid);if(!c)return false;
+    if(!acompV3()){S.tab="clientes";S.sel=cid;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render();return true}
+    A3.aberta=cid;S.tab="acompanhamento";try{localStorage.setItem("pp-tab","acompanhamento")}catch(_){}if(S.tab==="acompanhamento"&&A3.painel&&A3.lista){abrirPainelA3(cid);return true}render();return true}};
 })();

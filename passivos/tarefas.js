@@ -47,8 +47,8 @@ async function carregar(){
   try{
     const [t,c,p,tk,mo]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
     if(t.error)throw t.error;
-    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;
-  }catch(e){console.warn("tarefas",e);toast("Não foi possível carregar as tarefas")}
+    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;T.erro=null;
+  }catch(e){console.warn("tarefas",e);T.erro=String(e.message||e);toast("Não foi possível carregar as tarefas")}
   finally{T.carregando=false}
   render();
 }
@@ -724,6 +724,11 @@ document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;b
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
+window.PP_TAREFAS={lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
+  /* ---- contrato público (Fase 4B) ---- */
+  estado:()=>({carregado:T.ok,carregando:!!T.carregando,erro:T.erro||null,vazio:T.ok&&!T.tarefas.length}),
+  // null = ainda não carregado; [] = carregado e vazio. Filtra só por campos existentes (cliente_id, nucleo, status); nenhuma relação inferida.
+  porCliente:(cid,{nucleo,abertas=true}={})=>{if(!T.ok||!cid)return null;return T.tarefas.filter(t=>t.cliente_id===cid&&(!nucleo||t.nucleo===nucleo)&&(!abertas||t.status==="aberta"||t.status==="em_andamento"))},
+  carregar:()=>{garantir();return true}};
 window.__PP_LOGIN.then(()=>{if(equipe())tempoReal()});
 })();

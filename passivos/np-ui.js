@@ -165,5 +165,8 @@ const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").f
 const btn = (label, { variante = "", onclick, title, disabled, icone, type = "button", cls = "" } = {}) => el("button", { type, class: ("np-btn " + variante + " " + cls).trim(), onclick, title: title || null, disabled: disabled ? "" : null }, icone ? svgIco(I[icone] || icone) : null, label);
 const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-ib", "aria-label": label, title: label, onclick }, svgIco(I[icone] || icone));
 
-window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+/* Permissão falha-fechada para integrações entre módulos (Fase 4B): só equipe, fora do modo só leitura e com PP.temAcesso(tab)
+   respondendo exatamente true. Função ausente, false, valor não estrito ou exceção ⇒ false. Nunca libera por conta própria. */
+const permite = (tab) => { try { if (typeof equipe !== "function" || !equipe()) return false; if (typeof readOnly === "function" && readOnly()) return false; if (typeof PP?.temAcesso !== "function") return false; return PP.temAcesso(tab) === true; } catch (_) { return false; } };
+window.NPUI = { permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();
