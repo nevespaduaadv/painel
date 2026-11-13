@@ -188,6 +188,7 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
   html.np-casca-v3 .np-props dd a,html.np-casca-v3 .np-passos a{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-it-chk{min-width:44px;min-height:44px;margin-left:-11px}
+  html.np-casca-v3 .np-seg button{min-width:44px} /* rótulos curtos ("Dia") ainda são alvos de 44 px no toque */
   html.np-casca-v3 .np-passos .lnk,html.np-casca-v3 .np-feito .lnk,html.np-casca-v3 .np-vazio .lnk,html.np-casca-v3 .np-erro .lnk{display:inline-flex;align-items:center;min-height:44px}
 }
 @media (prefers-reduced-motion:reduce){
