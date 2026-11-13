@@ -13,7 +13,7 @@ const reduz = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ms = (v) => reduz() ? 0 : v;
 const E_IN = "cubic-bezier(.2,.7,.2,1)", E_MOVE = "cubic-bezier(.45,0,.2,1)";
 const svgIco = (d, cls = "np-ico") => { const s = doc.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", cls); s.setAttribute("aria-hidden", "true"); s.innerHTML = d; return s; };
-const I = { chev: '<path d="m6 9 6 6 6-6"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>', mais: '<path d="M12 5v14M5 12h14"/>', pontos: '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>', check: '<path d="m5 12 4 4L19 6"/>', clip: '<path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.5 3.5 0 0 1 5 5l-8.8 8.8a1.5 1.5 0 0 1-2.1-2.1l8.1-8.1"/>', filtro: '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>' };
+const I = { csv: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>', chev: '<path d="m6 9 6 6 6-6"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>', mais: '<path d="M12 5v14M5 12h14"/>', pontos: '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>', check: '<path d="m5 12 4 4L19 6"/>', clip: '<path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.5 3.5 0 0 1 5 5l-8.8 8.8a1.5 1.5 0 0 1-2.1-2.1l8.1-8.1"/>', filtro: '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>' };
 const campoAtivo = () => { const a = doc.activeElement; return !!(a && (a.closest("input,textarea,select,[contenteditable=''],[contenteditable='true']") || a.closest("#modalHost .modal"))); };
 
 /* ---------- texto: pessoas, prazos, marcas ---------- */
@@ -55,7 +55,7 @@ const grupo = ({ id, titulo, n, tom, aberto = true, onToggle, itens }) => {
 const linha = ({ id, regua, check, prazo, titulo, contexto, direita = [], atual = false, riscado = false, onOpen, onTecla, titleAbrir }) => {
   const li = el("li", { class: "np-it" + (regua ? " r-" + regua : "") + (riscado ? " np-riscado" : ""), "data-id": id, "aria-current": atual ? "true" : null });
   if (check) { const c = el("input", { type: "checkbox", class: "np-check", title: check.title || "Concluir", "aria-label": (check.title || "Concluir") + ": " + titulo }); c.checked = !!check.checked; c.onchange = () => check.onChange(c); li.append(el("span", { class: "np-it-chk" }, c)); }
-  li.append(el("span", { class: "np-it-prazo" + (prazo?.tom ? " " + prazo.tom : ""), title: prazo?.exata || null }, prazo?.curta ? el("span", { class: "d" }, prazo.curta) : el("span", { class: "d np-sem" }, "—"), prazo?.hora ? el("span", { class: "h" }, prazo.hora) : null));
+  li.append(el("span", { class: "np-it-prazo" + (prazo?.tom ? " " + prazo.tom : ""), title: prazo?.exata || null }, prazo?.curta ? el("span", { class: "d" }, prazo.curta) : el("span", { class: "d np-sem" }, "—"), prazo?.hora ? el("span", { class: "h" }, prazo.hora) : null, prazo?.rel ? el("span", { class: "r", "aria-hidden": "true" }, prazo.rel) : null));
   const abrir = el("button", { type: "button", class: "np-it-abrir", title: titleAbrir || "Abrir", onclick: () => onOpen?.(li) }, el("span", { class: "tx" }, titulo), contexto ? el("span", { class: "ctx" }, ...(Array.isArray(contexto) ? contexto : [contexto])) : null);
   if (onTecla) abrir.addEventListener("keydown", (e) => { if (campoAtivo()) return; onTecla(e, li); });
   li.append(abrir, el("span", { class: "np-it-dir" }, ...direita.filter(Boolean)));
@@ -64,7 +64,7 @@ const linha = ({ id, regua, check, prazo, titulo, contexto, direita = [], atual 
 };
 
 /* ---------- feedback no lugar ---------- */
-const feito = (li, { texto, acao, onAcao }) => { const f = el("div", { class: "np-feito", role: "status" }, el("span", {}, texto), acao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null); li.replaceChildren(f); li.classList.add("np-it-feita"); li.animate([{ opacity: .4 }, { opacity: 1 }], { duration: ms(240), easing: E_IN }); return f; };
+const feito = (li, { texto, acao, onAcao }) => { const f = el("div", { class: "np-feito", role: "status" }, el("span", {}, texto), acao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null); li.replaceChildren(f); li.classList.remove("r-fatal", "r-late", "r-att"); li.removeAttribute("aria-current"); li.classList.add("np-it-feita"); li.animate([{ opacity: .4 }, { opacity: 1 }], { duration: ms(240), easing: E_IN }); return f; };
 const faixaErro = ({ texto, quando, acao = "Tentar de novo", onAcao }) => el("div", { class: "np-erro", role: "alert" }, el("i", {}, texto), quando ? el("span", {}, ` Mostrando os dados de ${quando}.`) : null, onAcao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null);
 const vazio = ({ titulo, texto, acao, onAcao }) => el("div", { class: "np-vazio" }, el("h3", {}, titulo), el("p", {}, texto, acao ? [" ", el("button", { type: "button", class: "lnk", onclick: onAcao }, acao)] : null));
 const carregando = (n = 6) => el("div", { class: "np-esqueleto", "aria-busy": "true", "aria-label": "Carregando" }, Array.from({ length: n }, () => el("div", {})));
@@ -115,14 +115,15 @@ function pop(anchor, conteudo, { role = "menu", label, alinhar = "esq", aoFechar
   const tecla = (e) => { if (e.key === "Escape") { e.stopPropagation(); fecharPop(); return; } if (role !== "menu") return; const its = [...p.querySelectorAll('[role="menuitem"]:not([disabled])')]; const i = its.indexOf(doc.activeElement); if (e.key === "ArrowDown") { e.preventDefault(); its[(i + 1) % its.length]?.focus(); } if (e.key === "ArrowUp") { e.preventDefault(); its[(i - 1 + its.length) % its.length]?.focus(); } };
   const fora = (e) => { if (!p.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) fecharPop(); };
   p.addEventListener("keydown", tecla); setTimeout(() => { doc.addEventListener("pointerdown", fora, true); }, 0);
-  popAtual = { p, anchor, fora, aoFechar, refoco };
+  popAtual = { p, anchor, fora, aoFechar, refoco, alinhar };
   return { fechar: fecharPop, el: p };
 }
+function reancorarPop() { if (!popAtual) return false; const { anchor, refoco, p } = popAtual; if (anchor.isConnected) return true; const novo = refoco?.(); if (!novo) { fecharPop(); return false; } popAtual.anchor = novo; novo.setAttribute("aria-expanded", "true"); const r = novo.getBoundingClientRect(); const W = p.offsetWidth; let left = Math.max(8, Math.min(r.right - W, innerWidth - W - 8)); if (popAtual.alinhar !== "dir") left = Math.max(8, Math.min(r.left, innerWidth - W - 8)); p.style.left = left + "px"; return true; }
 function fecharPop() { if (!popAtual) return; const { p, anchor, fora, aoFechar, refoco } = popAtual; popAtual = null; doc.removeEventListener("pointerdown", fora, true); p.remove(); anchor.setAttribute("aria-expanded", "false"); const alvo = anchor.isConnected ? anchor : refoco?.(); if (alvo && !campoAtivo()) alvo.focus(); aoFechar?.(); }
 
 /* ---------- movimento ---------- */
 let vtEmCurso = false;
-const vt = (fn) => { if (reduz() || !doc.startViewTransition || vtEmCurso) { fn(); return Promise.resolve(); } try { vtEmCurso = true; const t = doc.startViewTransition(fn); const fim = t.finished.catch(() => {}); fim.then(() => { vtEmCurso = false; }); return fim; } catch (_) { vtEmCurso = false; fn(); return Promise.resolve(); } };
+const vt = (fn) => { if (reduz() || !doc.startViewTransition || vtEmCurso) { fn(); return Promise.resolve(); } try { vtEmCurso = true; const t = doc.startViewTransition(fn); t.finished.catch(() => {}).then(() => { vtEmCurso = false; }); return t.updateCallbackDone.catch(() => {}); } catch (_) { vtEmCurso = false; fn(); return Promise.resolve(); } };
 /* FLIP: guarda a posição dos itens (por data-id), aplica fn() e anima só o deslocamento; novos entram por opacidade */
 const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").forEach(e => antes[e.dataset.id] = e.getBoundingClientRect()); fn(); if (reduz()) return; host.querySelectorAll(".np-it").forEach(e => { const a = antes[e.dataset.id]; const b = e.getBoundingClientRect(); if (!a) { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: E_IN }); return; } const dy = a.top - b.top; if (Math.abs(dy) > 1 && Math.abs(dy) < 600) e.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 240, easing: E_MOVE }); }); };
 
@@ -130,5 +131,5 @@ const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").f
 const btn = (label, { variante = "", onclick, title, disabled, icone, type = "button", cls = "" } = {}) => el("button", { type, class: ("np-btn " + variante + " " + cls).trim(), onclick, title: title || null, disabled: disabled ? "" : null }, icone ? svgIco(I[icone] || icone) : null, label);
 const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-ib", "aria-label": label, title: label, onclick }, svgIco(I[icone] || icone));
 
-window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, pop, fecharPop, btn, ib, campoAtivo };
+window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

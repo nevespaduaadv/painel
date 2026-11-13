@@ -47,7 +47,7 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
   await ctx.route(/supabase\.co/, async (rota) => {
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
     const json = (b, status = 200, extra = {}) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0', ...extra }, body: JSON.stringify(b) });
-    if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && !p.startsWith('/auth/')) { escritas.push(m + ' ' + p + ' ' + (req.postData() || '').slice(0, 120));
+    if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && !p.startsWith('/auth/')) { escritas.push(m + ' ' + p + u.search + ' ' + (req.postData() || '').slice(0, 120));
       // simula o efeito da escrita na fixture (só em memória do laboratório) para que a tela recarregada reflita a mudança
       if (m === 'PATCH' && p.startsWith('/rest/v1/tarefas')) { try { const corpo = JSON.parse(req.postData() || '{}'); const id = (u.searchParams.get('id') || '').replace('eq.', ''); const t = TAREFAS.find(x => x.id === id); if (t && corpo.status) { t.status = corpo.status; t.faixa = corpo.status === 'concluida' || corpo.status === 'cancelada' ? 'fechada' : faixa(t.dias_para_prazo); t.concluida_em = corpo.status === 'concluida' ? new Date().toISOString() : null; } } catch (_) {} }
       return json(m === 'POST' && /rpc/.test(p) ? null : (m === 'POST' ? [{ id: 'novo-' + Date.now() }] : []), m === 'POST' ? 201 : 200); }
@@ -125,11 +125,24 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     // Concluir libera ao digitar; liga aos mesmos fluxos: mudarStatus/comentar (espiões em SB.from('tarefas').update e insert tarefa_eventos)
     await pg.fill('#view-tarefas .np-painel textarea', 'Protocolado sob o nº 123.'); await pg.waitForTimeout(100);
     const lib = await pg.evaluate(() => !document.querySelector('.np-p-pe .np-btn.pri').disabled); if (lib) ok('Concluir libera ao escrever no andamento (regra da controladoria preservada)'); else falha('Concluir não liberou');
-    const antes = escritas.length; await pg.click('.np-p-pe .np-btn.pri'); await pg.waitForTimeout(900);
-    const esc = escritas.slice(antes);
-    if (esc.some(e => /PATCH \/rest\/v1\/tarefas .*concluida/.test(e)) && esc.some(e => /POST \/rest\/v1\/tarefa_eventos .*comentario/.test(e))) ok('Concluir → mesma sequência da V2: PATCH tarefas{status:concluida} + POST tarefa_eventos{comentario} (interceptados, nada gravado)'); else falha('Concluir: escritas ' + JSON.stringify(esc));
+    const antes = escritas.length; const t0cls = await pg.evaluate((id) => document.querySelector(`.np-it[data-id="${id}"]`).className, t0); await pg.click('.np-p-pe .np-btn.pri'); await pg.waitForTimeout(120);
+    const semRegua = await pg.evaluate((id) => { const li = document.querySelector(`.np-it[data-id="${id}"]`); return li ? { cls: li.className, regua: getComputedStyle(li, '::before').backgroundColor, atual: li.getAttribute('aria-current') } : null; }, t0);
+    if (/r-fatal/.test(t0cls) && semRegua && !/r-fatal/.test(semRegua.cls) && /rgba\(0, 0, 0, 0\)|transparent/.test(semRegua.regua) && !semRegua.atual) ok('fatal recém-concluída perde a régua imediatamente (antes de recarregar) e vira faixa "feita"'); else falha('régua após concluir: ' + JSON.stringify({ t0cls, semRegua }));
+    await pg.waitForTimeout(800); const esc = escritas.slice(antes);
+    if (esc.some(e => /PATCH \/rest\/v1\/tarefas\S* .*concluida/.test(e)) && esc.some(e => /POST \/rest\/v1\/tarefa_eventos\S* .*comentario/.test(e))) ok('Concluir → mesma sequência da V2: PATCH tarefas{status:concluida} + POST tarefa_eventos{comentario} (interceptados, nada gravado)'); else falha('Concluir: escritas ' + JSON.stringify(esc));
     const feito = await pg.evaluate(() => ({ faixa: document.querySelector('.np-it-feita .np-feito')?.textContent, reabrir: !!document.querySelector('.np-it-feita .lnk'), painelFechado: document.querySelector('#view-tarefas .np-painel')?.hidden ?? true }));
     if (feito.faixa && /feita/.test(feito.faixa) && feito.reabrir) ok(`feedback no lugar (sobrevive ao recarregamento): "${feito.faixa.trim()}" com ação Reabrir (fluxo de reabertura existente, não "desfazer")`); else falha('faixa feita não observada: ' + JSON.stringify(feito));
+    // Feito: desabilitado sem nada a gravar; com texto grava andamento (POST tarefa_eventos) e NÃO diz "tempo gravado"
+    await pg.waitForTimeout(500); const tf = await pg.evaluate(() => window.PP_TAREFAS.lista().find(t => t.status === 'aberta' && !t.cadeia_id && t.cliente_id && t.faixa === 'd7').id);
+    await pg.click(`.np-it[data-id="${tf}"] .np-it-abrir`); await pg.waitForTimeout(600);
+    const f0 = await pg.evaluate(() => { const b = [...document.querySelectorAll('.np-p-pe button')].find(x => x.textContent.trim() === 'Feito'); return { desab: b.disabled, title: b.title }; });
+    await pg.fill('#view-tarefas .np-painel textarea', 'Liguei para o banco; aguardando retorno.'); await pg.waitForTimeout(80);
+    const f1 = await pg.evaluate(() => { const b = [...document.querySelectorAll('.np-p-pe button')].find(x => x.textContent.trim() === 'Feito'); return { desab: b.disabled, title: b.title }; });
+    const antesF = escritas.length; await pg.click('.np-p-pe button:has-text("Feito")'); await pg.waitForTimeout(250);
+    const f2 = await pg.evaluate(() => document.querySelector('.np-p-pe [role="status"]')?.textContent || '');
+    const escF = escritas.slice(antesF);
+    if (f0.desab && /Escreva um andamento/.test(f0.title) && !f1.desab && /o andamento/.test(f1.title) && escF.some(e => /POST \/rest\/v1\/tarefa_eventos\S* .*comentario/.test(e)) && !escF.some(e => /PATCH \/rest\/v1\/tarefas/.test(e)) && /^Andamento registrado — tarefa continua aberta$/.test(f2)) ok(`Feito: desabilitado sem nada a gravar ("${f0.title}"); com texto habilita e grava só o andamento; feedback "${f2}" (sem "tempo gravado")`); else falha('Feito: ' + JSON.stringify({ f0, f1, f2, escF }));
+    await pg.waitForTimeout(700);
     // Mais ações: itens e ligação com as funções da V2 (modal abre)
     await pg.waitForTimeout(500); const t1 = await pg.evaluate(() => window.PP_TAREFAS.lista().find(t => t.status === 'aberta' && !t.cadeia_id && t.cliente_id).id);
     await pg.click(`.np-it[data-id="${t1}"] .np-it-abrir`); await pg.waitForTimeout(500);
@@ -146,13 +159,35 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     await pg.waitForTimeout(200); const tc = await pg.evaluate(() => window.PP_TAREFAS.lista().find(t => t.status === 'concluida').id);
     await pg.evaluate(() => { window.PP_TAREFAS.filtro({ status: 'todas' }); }); await pg.waitForTimeout(300);
     const antes2 = escritas.length; await pg.click(`.np-it[data-id="${tc}"] .np-check`); await pg.waitForTimeout(500);
-    if (escritas.slice(antes2).some(e => /PATCH \/rest\/v1\/tarefas .*"status":"aberta"/.test(e))) ok('desmarcar uma feita → PATCH tarefas{status:aberta} (reabrir, como na V2)'); else falha('reabrir: ' + JSON.stringify(escritas.slice(antes2)));
+    if (escritas.slice(antes2).some(e => /PATCH \/rest\/v1\/tarefas\S* .*"status":"aberta"/.test(e))) ok('desmarcar uma feita → PATCH tarefas{status:aberta} (reabrir, como na V2)'); else falha('reabrir: ' + JSON.stringify(escritas.slice(antes2)));
     const ta = await pg.evaluate(() => window.PP_TAREFAS.lista().find(t => t.status === 'aberta' && t.faixa === 'd15').id);
     await pg.click(`.np-it[data-id="${ta}"] .np-check`); await pg.waitForTimeout(500);
     const chk = await pg.evaluate((id) => ({ foco: document.activeElement.tagName, noPainel: !!document.activeElement.closest('.np-painel'), checked: document.querySelector(`.np-it[data-id="${id}"] .np-check`).checked, titulo: document.querySelector('.np-painel h2').textContent }), ta);
     if (chk.foco === 'TEXTAREA' && chk.noPainel && !chk.checked) ok('marcar uma aberta → não conclui direto: abre o painel com foco no andamento (nota obrigatória, como na V2)'); else falha('check: ' + JSON.stringify(chk));
     // Nova tarefa e CSV existem
     const tb = await pg.evaluate(() => [...document.querySelectorAll('#view-tarefas .np-tb-dir button')].map(b => b.textContent.trim())); if (tb.includes('Nova tarefa') && tb.includes('CSV') && tb.includes('Lista') && tb.includes('Quadro')) ok(`toolbar: ${tb.join(' · ')}`); else falha('toolbar dir: ' + JSON.stringify(tb));
+    if (!erros.length) ok('sem erros de página'); else falha('erros: ' + erros.join(' | '));
+    await ctx.close(); }
+  // ---------- 3b. navegação entre etapas da cadeia no painel ----------
+  rel.push('3b. cadeia: trocar de etapa no painel traz o registro completo e as ações seguem funcionando');
+  { const { ctx, pg, erros, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' });
+    const ids = await pg.evaluate(() => { const L = window.PP_TAREFAS.lista(); return { prot: L.find(t => t.etapa_codigo === 'protocolar').id, conf: L.find(t => t.etapa_codigo === 'conferir').id }; });
+    await pg.click(`.np-it[data-id="${ids.prot}"] .np-it-abrir`); await pg.waitForTimeout(600);
+    await pg.click('.np-painel .np-passos li:not(.on) button.lnk'); await pg.waitForTimeout(700);
+    const c1 = await pg.evaluate(() => { const p = document.querySelector('.np-painel'); const props = Object.fromEntries([...p.querySelectorAll('.np-props dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent.trim()])); return { titulo: p.querySelector('h2').textContent, props, on: p.querySelector('.np-passos li.on')?.textContent.trim().slice(0, 20), atual: document.querySelector('.np-it[aria-current="true"]')?.dataset.id, pe: [...p.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()), concluirDesab: p.querySelector('.np-p-pe .np-btn.pri').disabled, hist: p.querySelectorAll('.tl li').length }; });
+    const okC1 = /Conferir protocolo/.test(c1.titulo) && c1.props.Cliente === 'Empresa Alfa Ltda' && /Caio/.test(c1.props.Responsável) && /Maria Eulália/.test(c1.props.Aberta) && /há 1 dia|ontem/.test(c1.props.Prazo) && /^Conferir/.test(c1.on || '') && c1.atual === ids.conf && c1.pe.includes('Concluir') && c1.concluirDesab;
+    if (okC1) ok(`trocar para "Conferir protocolo": título, props completas (cliente, responsável, aberta por, prazo exato), etapa marcada na cadeia, linha correspondente marcada, Concluir exige andamento`); else falha('cadeia 1: ' + JSON.stringify(c1));
+    await pg.fill('.np-painel textarea', 'Conferido no PJe.'); await pg.waitForTimeout(80);
+    await pg.click('.np-p-pe .np-btn.ghost'); await pg.waitForTimeout(250); await pg.click('#np-pop [role="menuitem"]:has-text("Editar")'); await pg.waitForTimeout(400);
+    const ed = await pg.evaluate(() => ({ h2: document.querySelector('#modalHost h2')?.textContent, titulo: document.querySelector('#modalHost input[type="text"]')?.value, prazo: document.querySelector('#modalHost input[type="date"]')?.value }));
+    const conf = TAREFAS.find(t => t.id === ids.conf);
+    if (/Editar/.test(ed.h2 || '') && ed.titulo === conf.titulo && ed.prazo === conf.prazo) ok(`"Editar / reagendar…" após a troca abre o modal com os dados da etapa atual (título e prazo ${ed.prazo})`); else falha('editar após troca: ' + JSON.stringify(ed));
+    await pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
+    const antes = escritas.length; await pg.click('.np-p-pe .np-btn.pri'); await pg.waitForTimeout(600);
+    const w = escritas.slice(antes); if (w.some(e => new RegExp('PATCH /rest/v1/tarefas\\?id=eq\\.' + ids.conf + '.* .*concluida').test(e))) ok('Concluir após a troca atua na etapa trocada (PATCH no id de "Conferir protocolo")'); else falha('concluir após troca: ' + JSON.stringify(w));
+    await pg.waitForTimeout(600); await pg.click(`.np-it[data-id="${ids.prot}"] .np-it-abrir`); await pg.waitForTimeout(700);
+    const c2 = await pg.evaluate(() => [...document.querySelectorAll('.np-painel .np-passos li')].map(li => li.className + ':' + li.textContent.trim().slice(0, 18)));
+    if (c2.some(x => /^on:Protocolar/.test(x)) && c2.some(x => /^ok:Conferir/.test(x))) ok(`voltar à etapa anterior: cadeia atualizada (${c2.join(' | ')})`); else falha('cadeia 2: ' + JSON.stringify(c2));
     if (!erros.length) ok('sem erros de página'); else falha('erros: ' + erros.join(' | '));
     await ctx.close(); }
   // ---------- 4. filtros: chips = mesmo T.f; Mais filtros tem todos os seletores ----------
@@ -173,22 +208,40 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     await pg.selectOption('#np-pop select >> nth=0', 'em_andamento'); await pg.waitForTimeout(250);
     const f3 = await pg.evaluate(() => ({ st: window.PP_TAREFAS.filtroAtual().status, n: document.querySelectorAll('#view-tarefas .np-it').length, extras: document.querySelector('#view-tarefas .np-chipf:has(.n)[aria-pressed="true"]')?.textContent }));
     if (f3.st === 'em_andamento' && f3.n === 1) ok('status "Só fazendo" pelo popover → T.f.status=em_andamento, 1 linha'); else falha('status: ' + JSON.stringify(f3));
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(150); const pf = await pg.evaluate(() => ({ pop: !!document.querySelector('#np-pop'), foco: document.activeElement.textContent.trim().slice(0, 12) })); if (!pf.pop && /Mais filtros/.test(pf.foco)) ok('Esc fecha o popover e devolve o foco ao chip'); else falha('esc popover: ' + JSON.stringify(pf));
+    // mudanças consecutivas: o popover continua aberto, ancorado no chip novo, com foco dentro e resultados corretos
+    const esperado = (f) => pg.evaluate((f) => window.PP_TAREFAS.lista().filter(t => (f.status === 'abertas' ? (t.status === 'aberta' || t.status === 'em_andamento') : f.status === 'todas' ? true : t.status === f.status) && (!f.resp || t.responsavel_id === f.resp) && (!f.nucleo || t.nucleo === f.nucleo) && (!f.cliente || t.cliente_id === f.cliente)).length, f);
+    const passos = [['select >> nth=1', 'col-caio', { status: 'em_andamento', resp: 'col-caio' }], ['select >> nth=0', 'todas', { status: 'todas', resp: 'col-caio' }], ['select >> nth=2', 'juridico', { status: 'todas', resp: 'col-caio', nucleo: 'juridico' }], ['select >> nth=3', 'c1', { status: 'todas', resp: 'col-caio', nucleo: 'juridico', cliente: 'c1' }]];
+    const seqOk = [];
+    for (const [sel, val, f] of passos) { await pg.selectOption('#np-pop ' + sel, val); await pg.waitForTimeout(250); const st = await pg.evaluate(() => ({ pop: !!document.querySelector('#np-pop'), focoDentro: !!document.activeElement.closest('#np-pop'), ancora: document.querySelector('#view-tarefas .np-chipf[aria-haspopup="dialog"]')?.getAttribute('aria-expanded'), n: document.querySelectorAll('#view-tarefas .np-it:not(.np-it-feita)').length, f: window.PP_TAREFAS.filtroAtual(), popLeft: parseFloat(document.querySelector('#np-pop').style.left), chipRight: document.querySelector('#view-tarefas .np-chipf[aria-haspopup="dialog"]').getBoundingClientRect().right })); const esp = await esperado(f); seqOk.push({ sel, val, ok: st.pop && st.focoDentro && st.ancora === 'true' && st.n === esp && st.f.status === f.status && (st.f.resp || '') === (f.resp || '') && (st.f.nucleo || '') === (f.nucleo || '') && (st.f.cliente || '') === (f.cliente || ''), n: st.n, esp, st }); }
+    if (seqOk.every(x => x.ok)) ok(`Mais filtros: 4 mudanças consecutivas (responsável → status → núcleo → cliente) com popover aberto, foco dentro, chip reancorado (aria-expanded) e contagens corretas (${seqOk.map(x => x.n).join('/')})`); else falha('ciclo Mais filtros: ' + JSON.stringify(seqOk.filter(x => !x.ok).map(x => ({ sel: x.sel, n: x.n, esp: x.esp, st: { pop: x.st.pop, foco: x.st.focoDentro, ancora: x.st.ancora, f: x.st.f } }))));
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(150); const pf = await pg.evaluate(() => ({ pop: !!document.querySelector('#np-pop'), foco: document.activeElement.textContent.trim().slice(0, 12) })); if (!pf.pop && /Mais filtros/.test(pf.foco)) ok('Esc fecha o popover e devolve o foco ao chip (mesmo após re-render)'); else falha('esc popover: ' + JSON.stringify(pf));
     await ctx.close(); }
   // ---------- 5. quadro ----------
   rel.push('5. quadro (4 colunas da V2, régua, mover por teclado)');
   { const { ctx, pg, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' });
     await pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const q = await pg.evaluate(() => ({ cols: [...document.querySelectorAll('.np-colq h3 > span:first-child')].map(s => s.textContent), ns: [...document.querySelectorAll('.np-colq h3 .n')].map(s => +s.textContent), cards: document.querySelectorAll('.np-cardq').length, reguas: document.querySelectorAll('.np-cardq[class*="r-"]').length, por: document.querySelector('.np-colq h3 .por')?.textContent, vista: localStorage.getItem('np-tarefas-vista'), legado: localStorage.getItem('pp-tarefas-vista') }));
-    const L = TAREFAS; const esperado = [L.filter(t => t.status === 'aberta').length, L.filter(t => t.status === 'em_andamento').length, 0, L.filter(t => t.status === 'concluida').length];
-    if (JSON.stringify(q.cols) === JSON.stringify(['A fazer', 'Fazendo', 'Aguardando área', 'Feitas (7 dias)']) && JSON.stringify(q.ns) === JSON.stringify(esperado) && q.reguas >= 3 && q.vista === 'quadro' && q.legado === 'kanban') ok(`quadro: colunas ${q.cols.join(' · ')} com ${q.ns.join('/')} cartões (= regras da V2); ${q.reguas} cartões com régua; contagem por responsável "${q.por}"; preferência gravada (e a legada pp-tarefas-vista=kanban)`); else falha('quadro: ' + JSON.stringify({ q, esperado }));
+    const L = TAREFAS; const esperado = [L.filter(t => t.status === 'aberta').length, L.filter(t => t.status === 'em_andamento').length, L.filter(t => t.status === 'concluida').length];
+    if (JSON.stringify(q.cols) === JSON.stringify(['A fazer', 'Fazendo', 'Feitas (7 dias)']) && JSON.stringify(q.ns) === JSON.stringify(esperado) && q.reguas >= 3 && q.vista === 'quadro' && q.legado === 'kanban') ok(`quadro: colunas ${q.cols.join(' · ')} com ${q.ns.join('/')} cartões (= colunas e regras da V2 com tickets desativados); ${q.reguas} cartões com régua; contagem por responsável "${q.por}"; preferência gravada (e a legada pp-tarefas-vista=kanban)`); else falha('quadro: ' + JSON.stringify({ q, esperado }));
     await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(250);
     const mv = await pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(b => b.textContent.trim() + (b.disabled ? ' (desab.)' : '') + (b.classList.contains('atual') ? ' (atual)' : '')));
-    if (mv.length === 4 && /A fazer \(atual\)/.test(mv[0]) && /Aguardando área \(desab\.\)/.test(mv[2])) ok(`"Mover para…" por teclado/popover: ${mv.join(' · ')}`); else falha('mover: ' + JSON.stringify(mv));
+    if (mv.length === 3 && /A fazer \(atual\)/.test(mv[0]) && !mv.some(x => /Aguardando/.test(x))) ok(`"Mover para…" por teclado/popover (sem "Aguardando área", como a V2 com tickets desativados): ${mv.join(' · ')}`); else falha('mover: ' + JSON.stringify(mv));
     const antes = escritas.length; await pg.click('#np-pop [role="menuitem"]:nth-child(2)'); await pg.waitForTimeout(600);
-    if (escritas.slice(antes).some(e => /PATCH \/rest\/v1\/tarefas .*em_andamento/.test(e))) ok('mover para Fazendo → PATCH tarefas{status:em_andamento} (mesma regra do drop da V2)'); else falha('mover: ' + JSON.stringify(escritas.slice(antes)));
+    if (escritas.slice(antes).some(e => /PATCH \/rest\/v1\/tarefas\S* .*em_andamento/.test(e))) ok('mover para Fazendo → PATCH tarefas{status:em_andamento} (mesma regra do drop da V2)'); else falha('mover: ' + JSON.stringify(escritas.slice(antes)));
+    // mover para "Feitas" não grava: abre o painel para concluir com nota (V2: abre a tela da tarefa)
+    const antesF = escritas.length; await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("Feitas")'); await pg.waitForTimeout(500);
+    const mf = await pg.evaluate(() => ({ painel: !document.querySelector('.np-painel').hidden, foco: document.activeElement.tagName })); if (!escritas.slice(antesF).length && mf.painel && mf.foco === 'TEXTAREA') ok('mover para Feitas → sem escrita; abre o painel com foco no andamento (equivalente ao openTarefa+foco da V2)'); else falha('mover feitas: ' + JSON.stringify({ mf, w: escritas.slice(antesF) }));
     await pg.screenshot({ path: path.join(OUT, 'v3-light-1440-quadro.png') });
-    await ctx.close(); }
+    await ctx.close();
+    // V2: arrastar de "A fazer" para "Fazendo" produz exatamente a mesma escrita
+    const c2 = await contexto(b, { perfil: 'admin', casca: 'v2' }); await c2.pg.click('#view-tarefas .tabs .tab:has-text("Kanban")'); await c2.pg.waitForTimeout(500);
+    const antesV2 = c2.escritas.length; await c2.pg.dragAndDrop('.kb-col[data-st="aberta"] .kb-card', '.kb-col[data-st="em_andamento"] .kb-body'); await c2.pg.waitForTimeout(600);
+    const wV2 = c2.escritas.slice(antesV2).filter(e => /PATCH/.test(e)).map(e => e.replace(/id=eq\.[^ ]+/, 'id=eq.X'));
+    const wV3 = escritas.filter(e => /PATCH \/rest\/v1\/tarefas\S* .*em_andamento/.test(e)).map(e => e.replace(/id=eq\.[^ ]+/, 'id=eq.X'));
+    if (wV2.length === 1 && wV3.length >= 1 && wV2[0] === wV3[0]) ok(`V2 (arrastar) e V3.1 (Mover para…) geram a mesma escrita: ${wV2[0]}`); else falha('paridade kanban: ' + JSON.stringify({ wV2, wV3 }));
+    const colsV2 = await c2.pg.evaluate(() => [...document.querySelectorAll('.kb-col')].map(c => c.dataset.st)); const colsV3 = ['aberta', 'em_andamento', 'concluida'];
+    if (JSON.stringify(colsV2) === JSON.stringify(colsV3)) ok(`V2 e V3.1 com as mesmas colunas (${colsV2.join(', ')}): "Aguardando área" só existe com tickets ativos`); else falha('colunas V2 × V3.1: ' + JSON.stringify({ colsV2, colsV3 }));
+    await c2.ctx.close(); }
   // ---------- 6. permissões e readOnly ----------
   rel.push('6. permissões (escopo restrito) e modo só leitura');
   { const { ctx, pg } = await contexto(b, { perfil: 'juridico', casca: 'v3' });
@@ -239,6 +292,16 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     const pm = await pg.evaluate(() => ({ modo: document.querySelector('.np-painel').dataset.modo, role: document.querySelector('.np-painel').getAttribute('role'), modal: document.querySelector('.np-painel').getAttribute('aria-modal'), w: Math.round(document.querySelector('.np-painel').getBoundingClientRect().width) }));
     if ((w === 375 && pm.modo === 'cheia' && pm.role === 'dialog' && pm.modal === 'true' && pm.w === 375) || (w === 1024 && pm.modo === 'overlay' && pm.w <= 480)) ok(`${rotulo}: painel em modo ${pm.modo} (${pm.w}px${pm.role ? ', role=dialog aria-modal' : ''})`); else falha(`${rotulo} painel: ` + JSON.stringify(pm));
     await pg.screenshot({ path: path.join(OUT, `v3-light-${w}-painel.png`) }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(OUT, `v3-light-${w}-lista.png`) }); await ctx.close(); }
+  // ---------- 8b. capturas nas quatro larguras e nos dois temas ----------
+  rel.push('8b. capturas 375/768/1024/1440 × claro/escuro');
+  for (const tema of ['light', 'dark']) for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]]) { const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h, tema, touch: w < 1024 });
+    const sx = await pg.evaluate(() => document.documentElement.scrollWidth); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-lista.png`) });
+    if (w === 768) { const tb = await pg.evaluate(() => ({ h: document.querySelector('.np-toolbar').getBoundingClientRect().height, linha1: [...document.querySelectorAll('.np-toolbar > *')].map(e => e.className.split(' ')[0] + '@' + Math.round(e.getBoundingClientRect().top)) })); await pg.click('.np-it[data-id] .np-it-abrir'); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-768-painel.png`) }); if (tema === 'light') ok(`768: toolbar ${Math.round(tb.h)} px (${tb.linha1.join(', ')})`); }
+    if (sx <= w && !erros.length) ok(`${tema} ${w}px: sem rolagem horizontal, sem erros`); else falha(`${tema} ${w}px: sx=${sx} erros=${erros.join('|')}`); await ctx.close(); }
+  { const c = await contexto(b, { perfil: 'admin', casca: 'v3', w: 375, h: 812, touch: true });
+    const comp = await c.pg.evaluate(() => { const li = document.querySelector('.np-it'); const r = (s) => li.querySelector(s)?.getBoundingClientRect(); const pz = r('.np-it-prazo'), tx = r('.np-it-abrir .tx'), ctx = r('.np-it-abrir .ctx'), dir = r('.np-it-dir'); return { prazoTop: Math.round(pz.top), tituloTop: Math.round(tx.top), ctxTop: Math.round(ctx.top), tituloW: Math.round(tx.width), dirTop: Math.round(dir.top), relNoPrazo: getComputedStyle(li.querySelector('.np-it-prazo .r')).display, relNoCtx: li.querySelector('.ctx .rel') ? getComputedStyle(li.querySelector('.ctx .rel')).display : 'none', nome: getComputedStyle(li.querySelector('.np-quem span')).display, linhas: Math.round(tx.height / parseFloat(getComputedStyle(li.querySelector('.np-it-abrir .tx')).lineHeight)) }; });
+    if (comp.prazoTop < comp.tituloTop && comp.tituloTop < comp.ctxTop && Math.abs(comp.dirTop - comp.prazoTop) < 8 && comp.tituloW >= 280 && comp.relNoPrazo !== 'none' && comp.relNoCtx === 'none' && comp.nome === 'none') ok(`375: composição em três linhas — prazo + relativo (${comp.relNoPrazo}) e marcas/iniciais na 1ª, título com ${comp.tituloW}px (${comp.linhas} linha(s)), contexto na 3ª`); else falha('composição 375: ' + JSON.stringify(comp));
+    await c.ctx.close(); }
   // ---------- 9. persistência e V2 intacta ----------
   rel.push('9. persistência (grupos, vista) e V2 intacta sem a chave');
   { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3' });
@@ -250,7 +313,8 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     const v2 = await c2.pg.evaluate(() => ({ head: !!document.querySelector('#view-tarefas .head'), kpis: document.querySelectorAll('#view-tarefas .kpis .kpi').length, np: document.querySelectorAll('#view-tarefas [class^="np-"]').length, rows: document.querySelectorAll('#view-tarefas .card.list .row').length }));
     if (v2.head && v2.kpis === 6 && v2.np === 0 && v2.rows > 0) ok(`sem a chave: V2 intacta (.head, 6 KPIs, ${v2.rows} linhas, 0 elementos np-*)`); else falha('V2: ' + JSON.stringify(v2));
     await c2.pg.screenshot({ path: path.join(OUT, 'v2-light-1440-lista.png') }); await c2.ctx.close();
-    for (const w of [375, 1024]) { const c3 = await contexto(b, { perfil: 'admin', casca: 'v2', w, h: w === 375 ? 812 : 768 }); await c3.pg.screenshot({ path: path.join(OUT, `v2-light-${w}-lista.png`) }); await c3.ctx.close(); }
+    for (const [w, h] of [[375, 812], [768, 1024], [1024, 768]]) { const c3 = await contexto(b, { perfil: 'admin', casca: 'v2', w, h }); await c3.pg.screenshot({ path: path.join(OUT, `v2-light-${w}-lista.png`) }); await c3.ctx.close(); }
+    for (const w of [375, 768, 1024, 1440]) { const c5 = await contexto(b, { perfil: 'admin', casca: 'v2', w, h: w === 375 ? 812 : w === 768 ? 1024 : w === 1024 ? 768 : 900, tema: 'dark' }); await c5.pg.screenshot({ path: path.join(OUT, `v2-dark-${w}-lista.png`) }); await c5.ctx.close(); }
     const c4 = await contexto(b, { perfil: 'admin', casca: 'v3', reduz: true }); const rm = await c4.pg.evaluate(() => getComputedStyle(document.querySelector('.np-grp-c')).transitionDuration); if (parseFloat(rm) < 0.01) ok('prefers-reduced-motion: grupos sem transição (' + rm + ')'); else falha('reduced motion: ' + rm); await c4.ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.'); console.log(txt); fs.writeFileSync(path.join(OUT, 'relatorio.txt'), txt); process.exit(falhas ? 1 : 0);

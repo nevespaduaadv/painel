@@ -523,8 +523,9 @@ function contextoV3(t,{mostrarCliente=true}={}){
   if(t.numero_cnj)partes.push("Proc. "+t.numero_cnj);
   if(t.etapa_codigo)partes.push(ETAPA_N3[t.etapa_codigo]?"cadeia · "+ETAPA_N3[t.etapa_codigo].toLowerCase():"cadeia");
   if(t.horas_apontadas>0)partes.push(horasFmt(t.horas_apontadas)+" apontadas");
-  if(p.rel&&(t.status==="aberta"||t.status==="em_andamento"))partes.push(el("span",{class:"rel "+tomPrazo(t)},p.rel));
-  const out=[];partes.forEach((x,i)=>{if(i)out.push(" · ");out.push(x)});return out;
+  const out=[];partes.forEach((x,i)=>{if(i)out.push(" · ");out.push(x)});
+  if(p.rel&&(t.status==="aberta"||t.status==="em_andamento")){if(out.length)out.push(el("span",{class:"sep"}," · "));out.push(el("span",{class:"rel "+tomPrazo(t)},p.rel))}
+  return out;
 }
 function marcasV3(t){
   const m=[];const tk=ticketDe(t);
@@ -542,7 +543,7 @@ function linhaV3(t,{mostrarCliente=true}={}){
     check:readOnly()?null:{checked:t.status==="concluida",title:t.status==="concluida"?"Reabrir":"Concluir",onChange:async(c)=>{
       if(c.checked){c.checked=false;abrirPainelV3(t,{focoAndamento:true});return}
       try{await mudarStatus(t,"aberta");toast("Tarefa reaberta")}catch(e){toast(e.message);c.checked=true}}},
-    prazo:t.prazo?{curta:p.curta,hora:p.hora,exata:p.exata+(p.rel?" · "+p.rel:""),tom:tomPrazo(t)}:{curta:"",exata:"sem prazo"},
+    prazo:t.prazo?{curta:p.curta,hora:p.hora,rel:aberta?p.rel:"",exata:p.exata+(p.rel?" · "+p.rel:""),tom:tomPrazo(t)}:{curta:"",exata:"sem prazo"},
     titulo:t.titulo,contexto:contextoV3(t,{mostrarCliente}),direita:[...marcasV3(t),NPUI.quem(t.responsavel_nome)],titleAbrir:"Abrir a tarefa",
     onOpen:(li)=>abrirPainelV3(t,{origem:li.querySelector(".np-it-abrir")}),
     onTecla:(e,li)=>{if(e.key.toLowerCase()==="c"&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&aberta&&!readOnly()){e.preventDefault();abrirPainelV3(t,{focoAndamento:true})}}});
@@ -558,8 +559,9 @@ function listaV3(lista,opts){
     host.append(NPUI.grupo({id:k,titulo:l,n:ts.length,tom:FAIXA_TOM[k]||"",aberto:ab[k]!==false,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-tarefas-grupos",JSON.stringify(ab))},itens:ts.map(t=>linhaV3(t,opts))}))}
   return host;
 }
-/* quadro: as mesmas 4 colunas e regras de movimento da V2; arrastar + alternativa por teclado ("Mover para…") */
-const COLS_V3=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=addD(hojeISO(),-7)]];
+/* quadro: as mesmas colunas e regras de movimento da V2 (4 colunas; "Aguardando área" só com tickets ativos, como na V2); arrastar + alternativa por teclado ("Mover para…") */
+const COLS_V3_TODAS=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=addD(hojeISO(),-7)]];
+const COLS_V3=COLS_V3_TODAS.filter(c=>TICKETS_ATIVOS||c[0]!=="aguardando");
 async function moverV3(t,k){
   if(k==="aguardando"){if(!TICKETS_ATIVOS){toast("Tickets desativados");return}if(!ticketDe(t))encaminharArea(t,()=>{T.ok=false;carregar()});return}
   if(k==="concluida"){if(t.status!=="concluida")abrirPainelV3(t,{focoAndamento:true});return}
@@ -628,8 +630,8 @@ function renderTarefasV3(){
   const resumo=NPUI.resumo([{n:fat,label:"fatais em 7 dias",tom:fat?"crit":"zero"},{n:n("atrasada"),label:"atrasadas",tom:n("atrasada")?"crit":"zero"},{n:n("hoje"),label:"hoje",tom:n("hoje")?"att":"zero"},{n:n("d7"),label:"até 7 dias",tom:n("d7")?"":"zero"},{n:abertas.length,label:"abertas"}]);
   const vista=vistaV3();
   const seg=NPUI.seg([["lista","Lista"],["quadro","Quadro"]],vista,k=>{V3.vista=k;NPUI.pref.set("np-tarefas-vista",k);try{localStorage.setItem("pp-tarefas-vista",k==="quadro"?"kanban":"lista")}catch(_){}NPUI.vt(()=>render())});
-  const direita=[seg,NPUI.btn("CSV",{variante:"ghost",title:"Exportar a lista",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])}),readOnly()?null:NPUI.btn("Nova tarefa",{variante:"pri",icone:"mais",onclick:()=>openTarefaForm({})})];
-  const fl=filtrosV3();v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita}));
+  const direita=[seg,NPUI.btn(el("span",{},"CSV"),{variante:"ghost",cls:"np-csv",title:"Exportar a lista (CSV)",icone:"csv",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])}),readOnly()?null:NPUI.btn("Nova tarefa",{variante:"pri",icone:"mais",onclick:()=>openTarefaForm({})})];
+  const fl=filtrosV3();v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita}));NPUI.reancorarPop();
   const obra=el("div",{class:"np-obra"});V3.obra=obra;
   const corpo=vista==="quadro"?el("div",{class:"np-corpo"},quadroV3(filtrarV3(T.tarefas,{...f,status:"todas"}))):listaV3(filtrarV3(T.tarefas,f));
   const lista=filtrarV3(T.tarefas,f);const ab2=lista.filter(t=>t.status==="aberta"||t.status==="em_andamento").length;
@@ -638,6 +640,9 @@ function renderTarefasV3(){
   V3.painel=NPUI.painel({obra,label:"Detalhe da tarefa",onClose:()=>{V3.aberta=null;clearInterval(V3.tick)}});
   if(V3.aberta){const t=T.tarefas.find(x=>x.id===V3.aberta);if(t)abrirPainelV3(t,{silencioso:true});else V3.aberta=null}
 }
+/* abre pelo id garantindo o registro completo e atual: primeiro a lista carregada; se não estiver nela (fora do escopo/filtro), busca a linha inteira */
+async function abrirTarefaCompleta(id){const local=T.tarefas.find(x=>x.id===id);if(local){abrirPainelV3(local);return}
+  const {data,error}=await SB.from("v_tarefas").select("*").eq("id",id).maybeSingle();if(error||!data){toast("Não foi possível abrir a etapa");return}abrirPainelV3(data)}
 /* ---------- painel de detalhe: mesmas ações da tela da tarefa (openTarefa), em split ---------- */
 function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   if(!V3.painel){openTarefa(t);return}
@@ -654,7 +659,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   const cadeia=t.cadeia_id?NPUI.secao("Cadeia do prazo",el("div",{class:"np-rodape",style:"padding:0"},"Carregando etapas…")):null;
   if(cadeia)SB.from("v_tarefas").select("id,titulo,prazo,prazo_fatal,status,etapa_codigo,responsavel_nome,faixa,dias_para_prazo,cadeia_id").eq("cadeia_id",t.cadeia_id).order("prazo").then(({data})=>{const ts=data||[];
     cadeia.replaceChildren(el("h3",{},"Cadeia do prazo"),NPUI.passos(ts.map(x=>{const px=NPUI.prazoTxt(x.prazo);return {estado:x.id===t.id?"on":x.status==="concluida"?"ok":x.status==="cancelada"?"cancelada":"",
-      el:x.id===t.id?el("span",{},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null):el("button",{type:"button",class:"lnk",onclick:()=>abrirPainelV3({...x,cadeia_id:t.cadeia_id})},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?" · fatal":""),
+      el:x.id===t.id?el("span",{},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null):el("button",{type:"button",class:"lnk",onclick:()=>abrirTarefaCompleta(x.id)},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?" · fatal":""),
       sub:(x.prazo?px.exata+" · "+px.rel:"sem prazo")+(x.responsavel_nome?" · "+NPUI.curto(x.responsavel_nome):"")+(x.status==="concluida"?" · feita":x.status==="cancelada"?" · cancelada":"")}})))});
   const desc=NPUI.secao("Descrição",t.descricao?el("p",{style:"white-space:pre-wrap"},t.descricao):el("p",{style:"color:var(--np-text-3)"},"Sem descrição."));
   /* andamento: registro obrigatório para concluir (regra da controladoria) — mesma lógica da V2 */
@@ -678,11 +683,13 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
       await mudarStatus(t,"concluida",txt||null,[...arqCom.files]);V3.recem.set(t.id,{quando:Date.now()});
       const li=V3.obra?.querySelector(`.np-it[data-id="${t.id}"]`);if(li)NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(t.id);toast("Tarefa reaberta");recarregar()}catch(e){toast(e.message)}}});
-      V3.painel.fechar();if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);recarregar()}catch(e){toast(e.message)}};
-  const feito=async()=>{try{const txt=com.value.trim();if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
-      if(txt||arqCom.files.length){await comentar(t.id,txt||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";arqCom.onchange();liberar()}
-      noPe(txt?"Andamento registrado — tarefa continua aberta":"Tempo gravado — tarefa continua aberta");cron=null;setTimeout(reabrirTela,300)}catch(e){toast(e.message)}};
-  const desenharTrabalho=()=>{trabalho.replaceChildren();clearInterval(V3.tick);if(!aberta||!window.PP_TS)return;const c=cronDaTarefa();
+      V3.aberta=null;V3.painel.fechar();if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);recarregar()}catch(e){toast(e.message)}};
+  const temOQueGravar=()=>!!(com.value.trim()||arqCom.files.length||cronDaTarefa());
+  const feito=async()=>{if(!temOQueGravar()){nota.textContent="Nada a gravar: escreva um andamento, anexe um arquivo ou use o cronômetro.";com.focus();return}
+    try{const txt=com.value.trim(),anexos=arqCom.files.length,tempo=!!(window.PP_TS&&cronDaTarefa());if(tempo)await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
+      if(txt||anexos){await comentar(t.id,txt||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";arqCom.onchange();temRegistro=true;liberar()}
+      const feitoTxt=[tempo?"Tempo gravado":null,txt?"andamento registrado":anexos?"anexo registrado":null].filter(Boolean).join(" e ");noPe(feitoTxt.charAt(0).toUpperCase()+feitoTxt.slice(1)+" — tarefa continua aberta");cron=null;setTimeout(reabrirTela,300)}catch(e){toast(e.message)}};
+  const desenharTrabalho=()=>{trabalho.replaceChildren();clearInterval(V3.tick);liberarFeito();if(!aberta||!window.PP_TS)return;const c=cronDaTarefa();
     if(c){const rel=el("b",{style:"font:500 18px/1 var(--np-display);font-variant-numeric:tabular-nums"},"00:00:00");const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-new Date(c.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};tick();V3.tick=setInterval(tick,1000);
       ativSel=sel({outro:"Atividade…"},"outro");window.PP_TS.atividades().then(as=>{ativSel.replaceChildren(...as.map(a=>el("option",{value:a.codigo},a.nome)));ativSel.value=as.some(a=>a.codigo===(c.tipo_atividade||""))?c.tipo_atividade:(as.find(a=>a.codigo==="outro")?"outro":as[0]?.codigo)});
       trabalho.append(NPUI.marca("trabalhando","info"),rel,el("span",{class:"np-rodape",style:"padding:0"},"desde "+fmtDT(c.inicio)),ativSel,NPUI.btn("Pausar",{onclick:async()=>{try{await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel.value});noPe("Tempo gravado");cron=null;setTimeout(reabrirTela,300)}catch(e){toast(e.message)}}}))}
@@ -692,7 +699,9 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   const trab=aberta&&window.PP_TS?NPUI.secao("Trabalho",trabalho):null;
   /* rodapé: Concluir · Feito · Mais ações (passar, ticket, horas, dossiê, editar/reagendar, reabrir, abrir em janela) */
   const btnConcluir=aberta&&!readOnly()?NPUI.btn("Concluir",{variante:"pri",icone:"check",disabled:true,onclick:concluir}):null;if(btnConcluir)btnsConcluir.push(btnConcluir);
-  const btnFeito=aberta&&!readOnly()?NPUI.btn("Feito",{title:"Grava o tempo e o andamento sem concluir a tarefa",onclick:feito}):null;
+  const btnFeito=aberta&&!readOnly()?NPUI.btn("Feito",{title:"Grava o tempo do cronômetro e/ou o andamento sem concluir a tarefa",disabled:true,onclick:feito}):null;
+  const liberarFeito=()=>{if(!btnFeito)return;const ok=temOQueGravar();btnFeito.disabled=!ok;btnFeito.title=ok?"Grava "+[cronDaTarefa()?"o tempo do cronômetro":null,com.value.trim()?"o andamento":arqCom.files.length?"o anexo":null].filter(Boolean).join(" e ")+" sem concluir a tarefa":"Escreva um andamento, anexe um arquivo ou ligue o cronômetro para gravar"};
+  com.addEventListener("input",liberarFeito);arqCom.addEventListener("change",liberarFeito);
   const mais=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[
     aberta&&!readOnly()?{label:"Passar para…",onclick:()=>passarPara(t,reabrirTela)}:null,
     aberta&&!readOnly()?{label:"Editar / reagendar…",onclick:()=>openTarefaForm(t)}:null,

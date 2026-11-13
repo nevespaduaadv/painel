@@ -387,6 +387,7 @@ html.np-casca-v3 .np-it-prazo{display:flex;flex-direction:column;line-height:1.1
 html.np-casca-v3 .np-it-prazo .d{font:500 var(--np-fs-5)/1.1 var(--np-display);color:var(--np-text);white-space:nowrap}
 html.np-casca-v3 .np-it-prazo .d.np-sem{color:var(--np-text-3);font-family:var(--np-ui);font-size:var(--np-fs-2)}
 html.np-casca-v3 .np-it-prazo .h{font:400 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-it-prazo .r{display:none}
 html.np-casca-v3 .np-it-prazo.crit .d{color:var(--np-crit)}html.np-casca-v3 .np-it-prazo.late .d{color:var(--np-late)}html.np-casca-v3 .np-it-prazo.att .d{color:var(--np-att)}
 html.np-casca-v3 .np-it-abrir{appearance:none;border:0;background:transparent;text-align:left;padding:4px 0;min-width:0;display:flex;flex-direction:column;gap:2px;color:var(--np-text);cursor:pointer;font:inherit;border-radius:4px}
 html.np-casca-v3 .np-it-abrir .tx{font:500 var(--np-fs-3)/1.3 var(--np-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
@@ -460,7 +461,7 @@ html.np-casca-v3 .np-pop-form{display:flex;flex-direction:column;gap:10px;paddin
 html.np-casca-v3 .np-pop-form label{font-size:var(--np-fs-1);color:var(--np-text-3);display:block;margin-bottom:3px}
 html.np-casca-v3 .np-pop-form select,html.np-casca-v3 .np-pop-form input{width:100%;height:34px;border:1px solid var(--np-ctrl);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2) var(--np-ui);padding:0 8px}
 /* ---------- quadro ---------- */
-html.np-casca-v3 .np-quadro{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
+html.np-casca-v3 .np-quadro{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
 html.np-casca-v3 .np-colq{border-top:1px solid var(--np-line);min-height:120px}
 html.np-casca-v3 .np-colq.sobre{outline:2px dashed var(--np-ink);outline-offset:2px;border-radius:var(--np-r)}
 html.np-casca-v3 .np-colq h3{font:italic 500 var(--np-fs-4)/1.2 var(--np-display);margin:0;padding:10px 6px 8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;color:var(--np-text)}
@@ -485,17 +486,25 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-toolbar{position:static}
   html.np-casca-v3 .np-resumo{width:100%;gap:12px;overflow-x:auto;scrollbar-width:none}
   html.np-casca-v3 .np-tb-dir{margin-left:0;width:100%;justify-content:space-between}
-  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"chk texto dir" "chk prazo dir";row-gap:0;padding-top:6px;padding-bottom:6px}
-  html.np-casca-v3 .np-it-chk{grid-area:chk}html.np-casca-v3 .np-it-abrir{grid-area:texto}html.np-casca-v3 .np-it-dir{grid-area:dir}
-  html.np-casca-v3 .np-it-prazo{grid-area:prazo;flex-direction:row;gap:6px;align-items:baseline}
-  html.np-casca-v3 .np-it-prazo .d{font-size:var(--np-fs-3)}
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
+  html.np-casca-v3 .np-it-chk{grid-area:chk;align-self:start;margin-top:1px}html.np-casca-v3 .np-it-abrir{grid-area:texto;padding-top:0}html.np-casca-v3 .np-it-dir{grid-area:dir;align-self:start;gap:8px}
+  html.np-casca-v3 .np-it-prazo{grid-area:prazo;flex-direction:row;gap:7px;align-items:baseline;flex-wrap:wrap;min-height:20px}
+  html.np-casca-v3 .np-it-prazo .d{font-size:var(--np-fs-4)}
+  html.np-casca-v3 .np-it-prazo .r{display:inline;font:400 var(--np-fs-2)/1.2 var(--np-ui);color:var(--np-text-3)}
+  html.np-casca-v3 .np-it-prazo.crit .r,html.np-casca-v3 .np-it-prazo.late .r{color:var(--np-crit)}html.np-casca-v3 .np-it-prazo.att .r{color:var(--np-att)}
+  html.np-casca-v3 .np-it-abrir .ctx .rel,html.np-casca-v3 .np-it-abrir .ctx .sep:has(+.rel){display:none}
+  html.np-casca-v3 .np-it-abrir .tx{white-space:normal;line-height:1.35}
+  html.np-casca-v3 .np-it-abrir .ctx{white-space:normal;line-height:1.4}
   html.np-casca-v3 .np-it-dir .np-quem span{display:none}
+  html.np-casca-v3 .np-it-dir .np-marca{font-size:var(--np-fs-1)}
+  html.np-casca-v3 .np-tb-dir .np-csv span{display:none}html.np-casca-v3 .np-tb-dir .np-csv{padding:0 8px}
   html.np-casca-v3 .np-legenda{display:none}
   html.np-casca-v3 .np-quadro{grid-template-columns:repeat(4,minmax(240px,80vw))}
 }
 @media (max-width:600px){
   html.np-casca-v3 .np-resumo{flex-wrap:wrap;row-gap:2px;overflow:visible;white-space:normal}
-  html.np-casca-v3 .np-it-abrir .tx,html.np-casca-v3 .np-it-abrir .ctx{white-space:normal}
+  html.np-casca-v3 .np-tb-dir{flex-wrap:wrap;gap:8px}
+  html.np-casca-v3 .np-tb-dir .np-seg{margin-right:auto}
   html.np-casca-v3 .np-props{grid-template-columns:1fr}html.np-casca-v3 .np-props dt{margin-top:4px}
 }
 @media (pointer:coarse),(hover:none){
@@ -1926,7 +1935,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwe6vohs";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwe9gv4a";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
