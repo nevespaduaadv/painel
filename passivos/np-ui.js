@@ -80,16 +80,19 @@ function painel({ obra, label = "Detalhe", onClose }) {
   const modo = () => innerWidth <= 980 ? "cheia" : innerWidth <= 1179 ? "overlay" : "split";
   const aplicarModo = () => { const m = modo(); aside.dataset.modo = m; if (m === "cheia") { aside.setAttribute("role", "dialog"); aside.setAttribute("aria-modal", "true"); } else { aside.removeAttribute("role"); aside.removeAttribute("aria-modal"); } };
   const fechar = (devolver = true) => { if (!aberto) return; aberto = false; const fn = () => { obra.classList.remove("np-aberta"); aside.hidden = true; aside.setAttribute("inert", ""); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); doc.body.classList.remove("np-painel-cheia"); }; vt(fn).then(() => { onClose?.(); if (devolver && origem && origem.isConnected) origem.focus(); origem = null; }); };
+  /* `pend` guarda sempre o último conteúdo pedido: abrir() aplica o DOM dentro de uma view transition (assíncrona) e atualizar()
+     pode chegar antes disso — sem isto, o esqueleto do abrir() sobrescreveria os dados já carregados (corrida vista no CI) */
+  let pend = { c: null, p: null };
   const abrir = ({ trilha: tr, titulo, corpo: c, pe: p, origem: o, id, foco }) => {
-    aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o;
+    aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o; pend = { c, p: p || [] };
     const linhaTx = id != null ? obra.querySelector(`.np-it[data-id="${id}"] .tx`) : null; if (linhaTx && !ja) linhaTx.style.viewTransitionName = "np-titulo";
-    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(c).filter(Boolean)); pe.replaceChildren(...[].concat(p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
+    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...[].concat(pend.p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
     (ja ? Promise.resolve(fn()) : vt(fn)).then(() => { if (linhaTx) linhaTx.style.viewTransitionName = ""; if (foco) setTimeout(foco, ms(60)); else if (!ja) setTimeout(() => btnX.focus(), ms(60)); });
   };
   btnX.onclick = () => fechar();
   aside.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.defaultPrevented) { if (doc.querySelector("#np-pop.on")) return; e.stopPropagation(); fechar(); } });
   matchMedia("(max-width:980px)").addEventListener("change", () => { if (aberto) aplicarModo(); }); matchMedia("(max-width:1179px)").addEventListener("change", () => { if (aberto) aplicarModo(); });
-  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) corpo.replaceChildren(...[].concat(c).filter(Boolean)); if (p) pe.replaceChildren(...[].concat(p).filter(Boolean)); } };
+  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...[].concat(p).filter(Boolean)); } } };
 }
 
 /* ---------- props, passos, seções ---------- */
