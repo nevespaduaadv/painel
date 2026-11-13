@@ -185,7 +185,8 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
 }
 @media (pointer:coarse),(hover:none){
   html.np-casca-v3 .np-chipf,html.np-casca-v3 .np-seg button,html.np-casca-v3 .np-btn,html.np-casca-v3 .np-ib,html.np-casca-v3 .np-grp-h,html.np-casca-v3 .np-pop-i{min-height:44px}
-  html.np-casca-v3 .np-ib{width:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-props dd a,html.np-casca-v3 .np-passos a{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-it-chk{min-width:44px;min-height:44px;margin-left:-11px}
   html.np-casca-v3 .np-passos .lnk,html.np-casca-v3 .np-feito .lnk,html.np-casca-v3 .np-vazio .lnk,html.np-casca-v3 .np-erro .lnk{display:inline-flex;align-items:center;min-height:44px}
 }
@@ -222,14 +223,17 @@ html.np-casca-v3 .np-tab th.num{font-family:var(--np-ui)}
 html.np-casca-v3 .np-tab td.np-sem,html.np-casca-v3 .np-tab .np-sem{color:var(--np-text-3)}
 /* módulos renderizados em V3.1 (`.np-v3` na vista): a faixa de abas do hub (V2) sai — a árvore da casca já tem os destinos */
 html.np-casca-v3 .np-v3 > .hub-tabs{display:none}
-/* celular: a coluna direita quebra em duas alturas — marcas + pessoa em cima, valor embaixo (só o acordo; o cobrado riscado fica no painel) */
+/* celular (≤ 600): a linha vira três faixas — (1) data da reunião/prazo + urgência, (2) título e contexto, (3) marcas · responsável · progresso · valor —
+   nenhum elemento divide a largura com outro de função diferente; todas as informações continuam presentes */
 @media (max-width:600px){
-  html.np-casca-v3 .np-it-dir{flex-wrap:wrap;justify-content:flex-end;row-gap:3px}
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr);grid-template-areas:"chk prazo" "chk texto" "chk dir";row-gap:3px}
+  html.np-casca-v3 .np-it-prazo{min-height:0}
+  html.np-casca-v3 .np-it-dir{grid-area:dir;justify-content:flex-start;flex-wrap:wrap;gap:4px 10px;white-space:nowrap;margin-top:1px}
   html.np-casca-v3 .np-it-dir .np-quem{order:-1}
   html.np-casca-v3 .np-it-dir .np-quem-vazio{font-size:0}html.np-casca-v3 .np-it-dir .np-quem-vazio::before{content:"—";font-size:var(--np-fs-2);color:var(--np-text-3)}
-  html.np-casca-v3 .np-it-dir .np-val{flex-basis:100%;justify-content:flex-end;font-size:var(--np-fs-2)}
-  html.np-casca-v3 .np-it-prazo .r{white-space:nowrap}
+  html.np-casca-v3 .np-it-dir .np-val{margin-left:auto;font-size:var(--np-fs-2)}
   html.np-casca-v3 .np-it-dir .np-val b.de,html.np-casca-v3 .np-it-dir .np-val .seta{display:none}
+  html.np-casca-v3 .np-it-prazo .r{white-space:nowrap}
 }
 /* quadro de etapas (Negociações): sempre uma linha de colunas, com rolagem horizontal — como o kanban V2 */
 html.np-casca-v3 .np-quadro-neg{grid-template-columns:repeat(var(--n,7),minmax(200px,1fr));overflow-x:auto;scroll-snap-type:x proximity}html.np-casca-v3 .np-quadro-neg .np-colq{scroll-snap-align:start;min-width:0}

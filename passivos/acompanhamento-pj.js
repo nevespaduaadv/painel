@@ -150,7 +150,8 @@ const css=document.createElement("style");css.textContent=`
    selecionado passado explicitamente. Permissão da rota = a mesma da aba (equipe, acesso a Clientes, não readOnly).
    ==================================================================================================================== */
 const acompV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
-const podeVerTransversal=()=>{try{return typeof equipe==="function"&&equipe()&&!readOnly()&&(typeof PP.temAcesso!=="function"||PP.temAcesso("acompanhamento")===true)}catch(_){return false}};
+/* falha fechada: só com equipe(), fora do modo só leitura e com PP.temAcesso("acompanhamento") respondendo exatamente true (função ausente, false ou exceção = sem acesso) */
+const podeVerTransversal=()=>{try{if(typeof equipe!=="function"||!equipe())return false;if(readOnly())return false;if(typeof PP?.temAcesso!=="function")return false;return PP.temAcesso("acompanhamento")===true}catch(_){return false}};
 const A3={lista:null,carregando:false,erro:null,esperando:null,pend:[],f:{escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:""},painel:null,obra:null,aberta:null,grupos:null};
 const FASE_L={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};
 const DIREC_L={acordos:"Acordos",juridico:"Jurídico",ambos:"Acordos + Jurídico"};
@@ -158,7 +159,7 @@ const RESERVA_L={nao_iniciado:"não iniciada",apresentado:"apresentada ao client
 const REGUA_L={bronze:"Bronze (2x/mês)",prata:"Prata (1x/mês)",ouro:"Ouro (por marco)"};
 const gruposA3=()=>{if(!A3.grupos){try{A3.grupos=JSON.parse(NPUI.pref.get("np-acomp-grupos","{}"))||{}}catch(_){A3.grupos={}}}return A3.grupos};
 async function carregarLista(force){
-  if(A3.carregando)return;if(A3.lista&&!force)return;A3.carregando=true;
+  if(!podeVerTransversal())return;if(A3.carregando)return;if(A3.lista&&!force)return;A3.carregando=true;
   try{const [v,co,tp]=await Promise.all([SB.from("v_acompanhamento_pj").select("*"),A.colab?{data:A.colab}:SB.from("colaboradores").select("id,nome,perfil_id,frente,nucleo,ativo").order("nome"),
       SB.from("v_tarefas").select("id,cliente_id,titulo,prazo,status,prazo_fatal,responsavel_nome").eq("nucleo","acompanhamento_pj").in("status",["aberta","em_andamento"])]);
     A.colab=co.data||[];A3.pend=tp.data||[];A3.erro=v.error?.message||null;A3.lista=v.data||[]}
@@ -301,5 +302,5 @@ function montarPainelA3(c){
   renderAcompanhamentoV3()}}
 const invalidarLista=()=>{A3.lista=null};
 window.__PP_LOGIN?.then?.(()=>{try{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("acomp-pj");for(const t of ["acompanhamento_pj","atas_reuniao","dividas_raio_x"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{invalidarLista();if(S.tab==="acompanhamento")render()});ch.subscribe()}}catch(_){}});
-window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid)};
+window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid),podeVer:podeVerTransversal};
 })();

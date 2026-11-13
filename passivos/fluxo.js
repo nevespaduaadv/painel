@@ -263,7 +263,7 @@ function linhaN3(n){
   return NPUI.linha({id:n.id,regua:reguaN3(n),riscado:false,atual:N3.aberta===n.id,
     prazo:n.prazo?{curta:p.curta,hora:"",rel:ab?p.rel:"",exata:p.exata+(p.rel?" · "+p.rel:""),tom:tomPrazoN3(n)}:{curta:"",exata:"sem prazo"},
     titulo:n.titulo||[n.cliente_nome,n.banco].filter(Boolean).join(" | "),contexto:contextoN3(n),titleAbrir:"Abrir a negociação",
-    direita:[...marcasN3(n),NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo}),NPUI.quem(n.responsavel_nome)],
+    direita:[...marcasN3(n),NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo,sub:n.valor_acordo!=null&&!NEG_FASE_ACORDO.includes(n.etapa)?"proposta":null}),NPUI.quem(n.responsavel_nome)],
     onOpen:li=>abrirPainelN3(n,{origem:li.querySelector(".np-it-abrir")})});
 }
 function listaN3(lista){
@@ -285,7 +285,7 @@ function cardN3(n){
   const c=el("div",{class:"np-cardq neg-card"+(r?" r-"+r:""),"data-id":n.id,tabindex:"0",role:"button","aria-label":n.titulo||"",onclick:()=>abrirPainelN3(n,{origem:c}),onkeydown:e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();abrirPainelN3(n,{origem:c})}}},
     el("div",{class:"tx"},n.titulo||[n.cliente_nome,n.banco].filter(Boolean).join(" | ")),el("div",{class:"ctx"},[n.cliente_nome,n.banco].filter(Boolean).join(" · ")),
     el("div",{class:"pe"},el("span",{class:"pz "+tomPrazoN3(n),title:n.prazo?p.exata+" · "+p.rel:"sem prazo"},n.prazo?p.curta:"sem prazo"),el("span",{style:"display:flex;gap:4px;align-items:center"},...marcasN3(n),mover)),
-    (n.valor_cobrado!=null||n.valor_acordo!=null)?el("div",{class:"ctx"},NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo})):null);
+    (n.valor_cobrado!=null||n.valor_acordo!=null)?el("div",{class:"ctx"},NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo,sub:n.valor_acordo!=null&&!NEG_FASE_ACORDO.includes(n.etapa)?"proposta":null})):null);
   if(readOnly())c.setAttribute("draggable","false");
   return c;
 }
@@ -358,23 +358,31 @@ function abrirPainelN3(n,{origem,silencioso}={}){
     ["Situação",n.situacao_processual||null],["Processo",n.numero_processo||null],["Contrato",kon?shortName(kon):null],["Adverso",n.adverso_contato||null],
     paradaN(n)?["Parada",NPUI.marca(`há ${n.dias_parada} dias sem movimentação`,"att")]:null,
   ].filter(x=>x&&(x[1]!=null)));
-  /* valores: cobrado × acordo (proposta até a formalização) × alçada; êxito = o percentual gravado nesta negociação (nenhum padrão fixo) */
+  /* valores — só o que está gravado nesta negociação; nada é validado nem autorizado aqui:
+     · acordo é "proposta" (valor e desconto PROPOSTOS) até a etapa formalizado; depois, "acordo" com a etapa ao lado;
+     · êxito = exclusivamente o percentual gravado nesta negociação (sem o campo, a linha não aparece);
+     · alçada = valor informado no cadastro desta negociação; o cliente pode ter alçada global (outras dívidas/honorários), então a
+       comparação é uma ESTIMATIVA desta negociação (acordo + êxito estimado, a mesma conta do formulário), nunca "autorizado/dentro". */
   const vc=n.valor_cobrado!=null?+n.valor_cobrado:null,va=n.valor_acordo!=null?+n.valor_acordo:null,alc=n.alcada_autorizada!=null?+n.alcada_autorizada:null,pex=n.percentual_exito!=null?+n.percentual_exito:null;
   const emNeg=!NEG_FASE_ACORDO.includes(n.etapa);
-  const exito=pex!=null&&vc!=null&&va!=null&&vc>va?(vc-va)*pex/100:null;const desembolso=va!=null?va+(exito||0):null;
+  const exito=pex!=null&&vc!=null&&va!=null&&vc>va?(vc-va)*pex/100:null;const desembolso=va!=null&&exito!=null?va+exito:null;
+  const outras=X.neg.filter(x=>x.cliente_id===n.cliente_id&&x.id!==n.id&&x.etapa!=="concluido").length;
+  const sm=(t,cor)=>el("small",{style:"margin-left:6px;color:"+(cor||"var(--np-text-3)")},t);
+  const pct=vc&&va!=null&&va<vc?Math.round((1-va/vc)*100):null;
   const valores=NPUI.props([
     ["Cobrado",vc!=null?BRL(vc):null,"serif"],
-    [emNeg?"Acordo (proposta)":"Acordo",va!=null?[BRL(va),vc&&va<vc?el("small",{style:"margin-left:6px;color:var(--np-ok)"},`−${Math.round((1-va/vc)*100)}% sobre o cobrado`):null,emNeg?el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"ainda em negociação"):null]:null,"serif"],
-    ["Alçada",alc!=null?[BRL(alc),desembolso!=null?el("small",{style:"margin-left:6px;color:desembolso>alc?'var(--np-crit)':'var(--np-text-3)'"},desembolso>alc?`acima em ${BRL(desembolso-alc)}`:`dentro (sobra ${BRL(alc-desembolso)})`):null]:null,"serif"],
-    ["Êxito",pex!=null?[pex+"%",el("small",{style:"margin-left:6px;color:var(--np-text-3)"},exito!=null?`≈ ${BRL(exito)} sobre a economia`:"sobre a economia (cobrado − acordo)")]:null],
-    ["Desembolso",desembolso!=null&&exito!=null?[BRL(desembolso),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"acordo + êxito")]:null,"serif"],
+    [emNeg?"Proposta de acordo":"Acordo",va!=null?[BRL(va),pct!=null?sm(emNeg?`desconto proposto −${pct}%`:`−${pct}% sobre o cobrado`,"var(--np-ok)"):null,sm(emNeg?"valor proposto · ainda em negociação":(NEG_LABEL[n.etapa]||"").toLowerCase())]:null,"serif"],
+    ["Êxito gravado",pex!=null?[pex+"%",sm(exito!=null?`≈ ${BRL(exito)} sobre a economia estimada (cobrado − ${emNeg?"proposta":"acordo"})`:"sobre a economia (cobrado − acordo); sem base para estimar")]:null],
+    ["Desembolso estimado",desembolso!=null?[BRL(desembolso),sm((emNeg?"proposta":"acordo")+" + êxito estimado")]:null,"serif"],
+    ["Alçada informada",alc!=null?[BRL(alc),desembolso!=null?sm(desembolso>alc?`estimativa ${BRL(desembolso-alc)} acima da alçada informada`:`estimativa ${BRL(alc-desembolso)} abaixo da alçada informada`,desembolso>alc?"var(--np-att)":undefined):sm("sem estimativa de desembolso para comparar")]:null,"serif"],
     ["Data do acordo",n.data_acordo?fmtD(parseD(n.data_acordo)):null],
   ].filter(x=>x[1]!=null));
+  const notaAlcada=alc!=null?el("div",{class:"np-rodape",style:"padding:6px 0 0;display:block"},"A alçada é o valor informado no cadastro desta negociação"+(outras?` — este cliente tem ${outras} outra${outras===1?"":"s"} negociaç${outras===1?"ão":"ões"} aberta${outras===1?"":"s"}; a alçada pode ser global`:"")+". A comparação acima é estimativa, não autorização."):null;
   const reserva=c?NPUI.props([
     ["Planejada",c.projeto_reserva?RESERVA[c.projeto_reserva]:el("span",{class:"np-sem"},"não iniciada")],
     ["Acumulada",c.reservaAcumulada?[BRL(+c.reservaAcumulada),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada"),"serif"],
   ]):null;
-  const corpo=[props,NPUI.secao("Valores",valores.children.length?valores:el("div",{class:"np-sem"},"Sem valores informados")),
+  const corpo=[props,NPUI.secao("Valores",valores.children.length?valores:el("div",{class:"np-sem"},"Sem valores informados"),notaAlcada),
     c?NPUI.secao("Reserva financeira do cliente",reserva):null,
     n.proximo_passo?NPUI.secao("Próximo passo",el("div",{style:"white-space:pre-wrap"},n.proximo_passo)):null,
     n.aguardando?NPUI.secao("Aguardando",el("div",{},n.aguardando)):null,

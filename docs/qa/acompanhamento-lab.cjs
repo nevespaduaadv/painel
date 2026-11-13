@@ -5,7 +5,7 @@
    (vencida / esta semana / próximas / sem agendamento / não iniciado / encerrados) e resumo, marcas e etapa, painel com os
    dados reais (ciclo, Raio-X, pendências, atas, reserva planejada × acumulada), formulários com o cliente explícito e troca
    de cliente sem vazar gravações, filtros, ARIA/teclado, capturas, aba da ficha intacta, ambiente sem a migração 0104. */
-const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http');
+const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs')); // cwd = raiz do repositório (como RAIZ)
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/acompanhamento-lab'; fs.mkdirSync(OUT, { recursive: true });
 const REF = 'ksdwzljfjfucjevdqxvx';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json' };
@@ -106,6 +106,31 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   { // só leitura: recusa
     const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3' }); await pg.evaluate(() => { S.canWrite = false; render(); }); await pg.waitForTimeout(400);
     const r = await pg.evaluate(() => ({ tab: S.tab, vis: !document.querySelector('#view-acompanhamento').hidden })); if (r.tab !== 'acompanhamento' && !r.vis) ok('só leitura (readOnly): a visão transversal é recusada como a aba'); else falha('readOnly: ' + JSON.stringify(r)); await ctx.close(); }
+  // falha fechada: PP.temAcesso ausente / false / exceção — nada é lido, rota recusada, item some
+  { // unidade: a função de permissão com PP.temAcesso ausente / false / exceção / true-não-estrito
+    const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', hash: '#clientes', esperar: false }); await pg.waitForTimeout(300);
+    const u = await pg.evaluate(() => { const orig = PP.temAcesso; const res = {}; const teste = (nome, f) => { PP.temAcesso = f; try { res[nome] = window.PP_ACOMP.podeVer(); } catch (e) { res[nome] = 'lançou'; } }; teste('ausente', undefined); teste('nulo', null); teste('false', () => false); teste('excecao', () => { throw new Error('boom'); }); teste('truthy', () => 1); teste('string', () => 'true'); teste('true', () => true); PP.temAcesso = orig; res.original = window.PP_ACOMP.podeVer(); return res; });
+    if (u.ausente === false && u.nulo === false && u.false === false && u.excecao === false && u.truthy === false && u.string === false && u.true === true && u.original === true) ok(`podeVerTransversal falha fechada: ausente/nulo/false/exceção/1/"true" → false; só true estrito → true (${JSON.stringify(u)})`); else falha('unidade permissão: ' + JSON.stringify(u));
+    await ctx.close(); }
+  // integração: o guarda global do app (render) continua respondendo true; só a chamada feita pelo módulo (pilha com acompanhamento-pj.js) recebe ausência/false/exceção —
+  // assim o teste prova que o PRÓPRIO módulo recusa, mesmo quando o resto do app deixaria passar
+  const SO_MODULO = (corpo) => `const _o = PP.temAcesso; PP.temAcesso = (t) => { if (t === "acompanhamento" && /podeVerTransversal/.test(String(new Error().stack).split("\\n")[2] || "")) { ${corpo} } return t === "acompanhamento" ? true : _o(t); }`;
+  for (const [nome, patch] of [['resposta indefinida', SO_MODULO('return undefined;')], ['retorno false', SO_MODULO('return false;')], ['exceção', SO_MODULO('throw new Error("boom");')]]) {
+    const { ctx, pg, leituras, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', hash: '#clientes', esperar: false }); await pg.waitForTimeout(400);
+    const n0 = leituras.length; await pg.evaluate((code) => { eval(code); window.PP_ACOMP.filtro({}); S.tab = 'acompanhamento'; try { localStorage.setItem('pp-tab', 'acompanhamento'); } catch (_) {} render(); }, patch); await pg.waitForTimeout(900);
+    const novas = leituras.slice(n0).filter(l => /v_acompanhamento_pj|v_tarefas|acompanhamento_pj|dividas_raio_x|atas_reuniao/.test(l));
+    const r = await pg.evaluate(() => ({ tab: S.tab, vis: !document.querySelector('#view-acompanhamento').hidden, conteudo: document.querySelector('#view-acompanhamento').children.length, item: (() => { const e = document.querySelector('#np-tree .tab[data-tab="acompanhamento"]'); return !!e && e.offsetParent !== null; })(), pp: localStorage.getItem('pp-tab') }));
+    if (r.tab !== 'acompanhamento' && !r.vis && r.conteudo === 0 && novas.length === 0 && r.pp !== 'acompanhamento' && erros.length === 0) ok(`falha fechada (${nome}, só para o módulo; o app diria sim): rota recusada (→ "${r.tab}"), vista vazia e oculta, nenhuma leitura de v_acompanhamento_pj / v_tarefas / dados do cliente`); else falha(`falha fechada (${nome}): ` + JSON.stringify({ r, novas, erros }));
+    // mesmo chamando o carregamento por fora, nada é lido
+    const n1 = leituras.length; await pg.evaluate(() => { try { window.PP_ACOMP.abrir('c1'); } catch (_) {} }); await pg.waitForTimeout(500);
+    const novas2 = leituras.slice(n1).filter(l => /v_acompanhamento_pj|v_tarefas\?.*nucleo/.test(l)); if (!novas2.length) ok(`falha fechada (${nome}): PP_ACOMP não carrega a lista`); else falha(`falha fechada (${nome}) abrir: ` + JSON.stringify(novas2));
+    await ctx.close(); }
+  // escopo efetivo das consultas (sem tocar no banco): a lista lê v_acompanhamento_pj (security_invoker → RLS sou_equipe), colaboradores, v_tarefas filtrada por núcleo; o painel lê as três tabelas filtradas por cliente_id; clientes só de S.clientes
+  { const { ctx, pg, leituras } = await contexto(b, { perfil: 'lucas', casca: 'v3' }); await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(800);
+    const L = leituras.filter(l => /v_acompanhamento_pj|v_tarefas|acompanhamento_pj\?|dividas_raio_x|atas_reuniao|colaboradores/.test(l)).map(l => l.replace(/select=[^&]*&?/, '').replace(/&$/, ''));
+    const okEsc = L.some(l => /^\/rest\/v1\/v_acompanhamento_pj\??$/.test(l)) && L.some(l => /v_tarefas.*nucleo=eq\.acompanhamento_pj.*status=in/.test(l)) && ['acompanhamento_pj', 'dividas_raio_x', 'atas_reuniao'].every(t => L.some(l => new RegExp('^/rest/v1/' + t + '\\?.*cliente_id=eq\\.c1').test(l))) && !L.some(l => /v_tarefas\??$/.test(l));
+    if (okEsc) ok('escopo das consultas: v_acompanhamento_pj inteira (RLS sou_equipe via security_invoker, como a aba), v_tarefas só do núcleo e abertas, tabelas do cliente só por cliente_id; clientes vêm de S.clientes (já filtrados ao perfil)'); else falha('escopo: ' + JSON.stringify(L));
+    await ctx.close(); }
   // ---------- 2. grupos, resumo, marcas, etapa ----------
   rel.push('2. grupos por reunião, resumo, marcas e indicador de etapa');
   { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3' });
@@ -188,6 +213,39 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     await pg.focus('li.np-it[data-id="c1"] .np-it-abrir'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(600); const k1 = await pg.evaluate(() => ({ aberto: !document.querySelector('.np-painel').hidden, foco: document.activeElement.getAttribute('aria-label'), ciclo: document.querySelector('.np-painel .np-ciclo [aria-current="step"] .l')?.textContent }));
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); const k2 = await pg.evaluate(() => ({ fechado: document.querySelector('.np-painel').hidden, foco: document.activeElement.className }));
     if (a.listas > 0 && a.tab === 0 && a.pressed && a.status === 'status' && a.etapa === 'R2' && k1.aberto && k1.foco === 'Fechar (Esc)' && k1.ciclo === 'R2' && k2.fechado && /np-it-abrir/.test(k2.foco)) ok(`ARIA: listas, aria-pressed, resumo role=status, etapa aria-current=step "${a.etapa}"; Enter abre (foco no Fechar; ciclo com passo atual "${k1.ciclo}"), Esc devolve o foco`); else falha('aria: ' + JSON.stringify({ a, k1, k2 }));
+    await ctx.close(); }
+
+  // composição em 375 px: três faixas sem sobreposição (prazo+urgência / título+contexto / marcas+responsável+progresso+valor) e nada ultrapassa a linha
+  { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w: 375, h: 812 });
+    const comp = await pg.evaluate(() => [...document.querySelectorAll('#view-acompanhamento li.np-it[data-id]')].map(li => { const r = (e) => e ? e.getBoundingClientRect() : null; const L = r(li), P = r(li.querySelector('.np-it-prazo')), T = r(li.querySelector('.np-it-abrir')), D = r(li.querySelector('.np-it-dir')); const filhos = [...li.querySelectorAll('.np-it-dir > *')].map(r);
+      return { id: li.dataset.id, ok: P.bottom <= T.top + 1 && T.bottom <= D.top + 1 && D.right <= L.right + 1 && P.right <= L.right + 1 && filhos.every(f => f.right <= L.right + 1 && f.left >= L.left - 1), titulo: getComputedStyle(li.querySelector('.np-it-abrir .tx')).whiteSpace !== 'nowrap', sx: document.documentElement.scrollWidth }; }));
+    const ruins = comp.filter(c => !c.ok || !c.titulo);
+    if (comp.length && !ruins.length && comp[0].sx <= 375) ok(`375 px: ${comp.length} linhas em três faixas (prazo+urgência / título+contexto / marcas+responsável+progresso+valor) sem sobreposição nem estouro; título com quebra`); else falha('composição 375: ' + JSON.stringify(ruins.slice(0, 3)));
+    await pg.screenshot({ path: path.join(OUT, 'v3-light-375-composicao.png') }); await ctx.close(); }
+  // ---------- 6b. acessibilidade específica: contraste e alvos (marcas, etapa, ciclo, tabela, popover, painel) ----------
+  rel.push('6b. contraste (texto 4,5:1; componentes 3:1) e alvos de toque (44 px) em 375/768/1024/1440');
+  for (const tema of ['light', 'dark']) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', tema });
+    await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250);
+    const pares = [
+      { sel: '.np-resumo b', nome: 'número do resumo' }, { sel: '.np-resumo b.crit', nome: 'número crítico' }, { sel: '.np-resumo b.att', nome: 'número atenção' }, { sel: '.np-resumo span', nome: 'rótulo do resumo' },
+      { sel: '.np-chipf[aria-pressed="true"]', nome: 'chip ativo' }, { sel: '.np-chipf[aria-pressed="false"]', nome: 'chip inativo' }, { sel: '.np-grp.crit .np-grp-h .t', nome: 'cabeça Reunião vencida' }, { sel: '.np-grp.att .np-grp-h .t', nome: 'cabeça Esta semana' }, { sel: '.np-grp-h .n', nome: 'contagem do grupo' },
+      { sel: '.np-it-prazo.late .d', nome: 'reunião vencida' }, { sel: '.np-it-prazo.att .d', nome: 'reunião esta semana' }, { sel: '.np-it-prazo .r', nome: 'relativo (celular)' }, { sel: '.np-it-abrir .tx', nome: 'nome do cliente' }, { sel: '.np-it-abrir .ctx', nome: 'contexto' }, { sel: '.ctx .rel.late', nome: 'relativo vencido' }, { sel: '.ctx .rel.att', nome: 'relativo esta semana' },
+      { sel: '.np-marca.info', nome: 'marca mensal' }, { sel: '.np-marca.ok', nome: 'marca acordos liberado' }, { sel: '.np-marca.att', nome: 'marca pendências' }, { sel: '.np-marca.crit', nome: 'marca pendência vencida' },
+      { sel: '.np-quem span', nome: 'responsável' }, { sel: '.np-quem b', nome: 'iniciais' },
+      { sel: '.np-etapa li:not(.ok):not(.atual)', nome: 'ponto de etapa (borda)', prop: 'borderColor', minimo: 3 }, { sel: '.np-etapa li.ok', nome: 'ponto feito', prop: 'backgroundColor', minimo: 3 }, { sel: '.np-etapa li.atual', nome: 'ponto atual', prop: 'backgroundColor', minimo: 3 },
+      { sel: '.np-painel h2', nome: 'título do painel' }, { sel: '.np-props dt', nome: 'rótulo de prop' }, { sel: '.np-props dd', nome: 'valor de prop' }, { sel: '.np-props dd small', nome: 'complemento de prop' }, { sel: '.np-props dd .np-marca.ok', nome: 'acordos liberado (painel)' }, { sel: '.np-sec h3', nome: 'título de seção' },
+      { sel: '.np-ciclo .l', nome: 'rótulo do ciclo' }, { sel: '.np-ciclo li.atual .l', nome: 'rótulo do passo atual' }, { sel: '.np-ciclo .d', nome: 'data do ciclo' }, { sel: '.np-ciclo li:not(.ok):not(.atual) .dot', nome: 'número do passo' }, { sel: '.np-ciclo li.ok .dot', nome: 'passo feito (fundo)', prop: 'backgroundColor', minimo: 3 }, { sel: '.np-ciclo li:not(.ok) .dot', nome: 'borda do passo', prop: 'borderColor', minimo: 3 }, { sel: '.np-ciclo li.atual .dot', nome: 'borda do passo atual', prop: 'borderColor', minimo: 3 },
+      { sel: '.np-tab th', nome: 'cabeçalho da tabela' }, { sel: '.np-tab td', nome: 'célula da tabela' }, { sel: '.np-tab td.num', nome: 'número da tabela' },
+      { sel: '.np-passos li.crit', nome: 'pendência vencida (passos)' }, { sel: '.np-passos li small', nome: 'sub dos passos' }, { sel: '.np-passos .lnk', nome: 'link de pendência' },
+      { sel: '#np-pop .np-pop-i', nome: 'item do popover' }, { sel: '.np-btn.pri', nome: 'botão primário' }, { sel: '.np-btn.ghost', nome: 'botão fantasma' }, { sel: '.np-btn:not(.pri):not(.ghost)', nome: 'botão secundário' },
+    ];
+    const m = await medirContraste(pg, pares); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+    if (!m.ruins.length && m.ausentes.length <= 2) ok(`${tema}: ${m.medidos.length} pares medidos ≥ mínimo; menor razão ${m.minimo.toFixed(2)}:1${m.ausentes.length ? ' · não encontrados: ' + m.ausentes.join(', ') : ''}`); else falha(`${tema}: contraste insuficiente: ` + m.ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1 (${p.fg} sobre ${p.bg})`).join('; ') + ' · ausentes: ' + m.ausentes.join(', '));
+    await ctx.close(); }
+  for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]]) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h }); await pg.evaluate(() => {});
+    const a1 = await medirAlvos(pg, '#view-acompanhamento'); await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250); const a2 = await medirAlvos(pg, '.np-painel'); await pg.keyboard.press('Escape');
+    const todos = [...a1, ...a2]; const pequenos = todos.filter(a => w < 900 ? (a.h < 44 || (a.icone && a.w < 44)) : (!a.inline && (a.h < 24 || (a.icone && a.w < 24)))); // toque (≤ 900): 44 px; ponteiro fino: WCAG 2.5.8 (24 px, links inline no texto isentos)
+    if (!pequenos.length) ok(`${w}px: ${todos.length} alvos conferidos (${w < 900 ? '≥ 44 px no toque' : '≥ 24 px no ponteiro fino, links inline isentos'}) — lista, chips, painel, links de pendência/atas, popover`); else falha(`${w}px: alvos pequenos: ` + [...new Set(pequenos.map(a => `${a.nome} ${a.w}×${a.h}`))].join(', '));
     await ctx.close(); }
   for (const tema of ['light', 'dark']) for (const w of [375, 768, 1024, 1440]) {
     const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h: 900, tema });
