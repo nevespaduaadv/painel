@@ -86,7 +86,8 @@
   sincRail();
 
   /* ---------- modelo da árvore a partir do NAV real ---------- */
-  const FIXOS = ["painel", "tarefas", "agenda", "avisos", "clientes"];
+  const FIXOS = ["painel", "tarefas", "agenda", "avisos", "clientes", "acompanhamento"]; // "acompanhamento" (Fase 3) é filho visual de Clientes
+  const FILHOS = { acompanhamento: "clientes" };
   const HUBS = (window.PP_HUBS && window.PP_HUBS.HUBS) || {};
   // Falha fechada: a casca nunca libera visualmente um destino por conta própria. Só mostra o que PP.temAcesso
   // (regra da aplicação, definida pelo gerador) responde `true`; ausência ou erro da função esconde o item.
@@ -118,7 +119,7 @@
     const m = modelo(); const ativo = (i) => ativoDe(i);
     const item = (i, extra) => { const b = itemNav(i, ativo(i)); semantica(b, ativo(i)); if (!temIcone(i) && I_TAB[i.tab]) b.querySelector("svg")?.replaceWith(ico(I_TAB[i.tab])); if (extra) b.classList.add(extra); return b; };
     const lista = (botoes) => el("ul", { class: "np-lista" }, botoes.map(b => el("li", {}, b)));
-    tree.replaceChildren(lista(m.fixos.map(i => item(i, "np-top"))), el("div", { class: "np-sec" }));
+    tree.replaceChildren(lista(m.fixos.map(i => { const b = item(i, "np-top"); if (FILHOS[i.tab]) b.classList.add("np-filho"); return b; })), el("div", { class: "np-sec" }));
     for (const g of m.grupos) {
       const temAtivo = g.itens.some(ativo) || (g.hubTab && ativo({ tab: g.hubTab, tabs: g.itens.map(i => i.tab) }));
       const aberto = abertos[g.id] !== undefined ? !!abertos[g.id] : (g.id === "juridico" || temAtivo);
