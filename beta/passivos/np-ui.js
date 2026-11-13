@@ -1,5 +1,5 @@
 /* np-ui.js — componentes V3.1 do Design System (DESIGN.md §4): toolbar, filtros tipográficos, grupo recolhível, linha com régua,
-   marca itálica, painel de detalhe (split/overlay/tela cheia), props, passos, popover, feedback no lugar, estados, movimento.
+   marca itálica, painel de detalhe (split/overlay/tela cheia), props, passos, etapa/ciclo/valor/tabela (Fase 3), popover, feedback no lugar, estados, movimento.
    Só apresentação: devolve elementos (mesmo el() do painel), não guarda estado global nem fala com o Supabase.
    Os estilos ficam em fontes/np-ui.css, escopados em html.np-casca-v3; os módulos usam NPUI só quando a casca V3.1 está ativa. */
 (() => {
@@ -51,10 +51,10 @@ const grupo = ({ id, titulo, n, tom, aberto = true, onToggle, itens }) => {
 };
 
 /* ---------- linha ---------- */
-/* regua: "fatal" | "late" | "att" | null · check: {checked, onChange, title} · prazo: {curta, hora, rel, exata, tom} · direita: elementos */
+/* regua: "fatal" | "late" | "att" | null · check: {checked, onChange, title} (sem check, a coluna de 22 px fica vazia para a grade não deslocar) · prazo: {curta, hora, rel, exata, tom} · direita: elementos */
 const linha = ({ id, regua, check, prazo, titulo, contexto, direita = [], atual = false, riscado = false, onOpen, onTecla, titleAbrir }) => {
   const li = el("li", { class: "np-it" + (regua ? " r-" + regua : "") + (riscado ? " np-riscado" : ""), "data-id": id, "aria-current": atual ? "true" : null });
-  if (check) { const c = el("input", { type: "checkbox", class: "np-check", title: check.title || "Concluir", "aria-label": (check.title || "Concluir") + ": " + titulo }); c.checked = !!check.checked; c.onchange = () => check.onChange(c); li.append(el("span", { class: "np-it-chk" }, c)); }
+  if (check) { const c = el("input", { type: "checkbox", class: "np-check", title: check.title || "Concluir", "aria-label": (check.title || "Concluir") + ": " + titulo }); c.checked = !!check.checked; c.onchange = () => check.onChange(c); li.append(el("span", { class: "np-it-chk" }, c)); } else li.append(el("span", { class: "np-it-chk np-it-chk-vazio", "aria-hidden": "true" }));
   li.append(el("span", { class: "np-it-prazo" + (prazo?.tom ? " " + prazo.tom : ""), title: prazo?.exata || null }, prazo?.curta ? el("span", { class: "d" }, prazo.curta) : el("span", { class: "d np-sem" }, "—"), prazo?.hora ? el("span", { class: "h" }, prazo.hora) : null, prazo?.rel ? el("span", { class: "r", "aria-hidden": "true" }, prazo.rel) : null));
   const abrir = el("button", { type: "button", class: "np-it-abrir", title: titleAbrir || "Abrir", onclick: () => onOpen?.(li) }, el("span", { class: "tx" }, titulo), contexto ? el("span", { class: "ctx" }, ...(Array.isArray(contexto) ? contexto : [contexto])) : null);
   if (onTecla) abrir.addEventListener("keydown", (e) => { if (campoAtivo()) return; onTecla(e, li); });
@@ -80,22 +80,56 @@ function painel({ obra, label = "Detalhe", onClose }) {
   const modo = () => innerWidth <= 980 ? "cheia" : innerWidth <= 1179 ? "overlay" : "split";
   const aplicarModo = () => { const m = modo(); aside.dataset.modo = m; if (m === "cheia") { aside.setAttribute("role", "dialog"); aside.setAttribute("aria-modal", "true"); } else { aside.removeAttribute("role"); aside.removeAttribute("aria-modal"); } };
   const fechar = (devolver = true) => { if (!aberto) return; aberto = false; const fn = () => { obra.classList.remove("np-aberta"); aside.hidden = true; aside.setAttribute("inert", ""); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); doc.body.classList.remove("np-painel-cheia"); }; vt(fn).then(() => { onClose?.(); if (devolver && origem && origem.isConnected) origem.focus(); origem = null; }); };
+  /* `pend` guarda sempre o último conteúdo pedido: abrir() aplica o DOM dentro de uma view transition (assíncrona) e atualizar()
+     pode chegar antes disso — sem isto, o esqueleto do abrir() sobrescreveria os dados já carregados (corrida vista no CI) */
+  let pend = { c: null, p: null };
   const abrir = ({ trilha: tr, titulo, corpo: c, pe: p, origem: o, id, foco }) => {
-    aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o;
+    aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o; pend = { c, p: p || [] };
     const linhaTx = id != null ? obra.querySelector(`.np-it[data-id="${id}"] .tx`) : null; if (linhaTx && !ja) linhaTx.style.viewTransitionName = "np-titulo";
-    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(c).filter(Boolean)); pe.replaceChildren(...[].concat(p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
+    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...[].concat(pend.p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
     (ja ? Promise.resolve(fn()) : vt(fn)).then(() => { if (linhaTx) linhaTx.style.viewTransitionName = ""; if (foco) setTimeout(foco, ms(60)); else if (!ja) setTimeout(() => btnX.focus(), ms(60)); });
   };
   btnX.onclick = () => fechar();
   aside.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.defaultPrevented) { if (doc.querySelector("#np-pop.on")) return; e.stopPropagation(); fechar(); } });
   matchMedia("(max-width:980px)").addEventListener("change", () => { if (aberto) aplicarModo(); }); matchMedia("(max-width:1179px)").addEventListener("change", () => { if (aberto) aplicarModo(); });
-  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) corpo.replaceChildren(...[].concat(c).filter(Boolean)); if (p) pe.replaceChildren(...[].concat(p).filter(Boolean)); } };
+  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...[].concat(p).filter(Boolean)); } } };
 }
 
 /* ---------- props, passos, seções ---------- */
 const props = (pares) => { const dl = el("dl", { class: "np-props" }); for (const [k, v, cls] of pares.filter(Boolean)) { dl.append(el("dt", {}, k), el("dd", { class: cls || "" }, ...[].concat(v))); } return dl; };
 const passos = (itens) => el("ol", { class: "np-passos" }, itens.map(p => el("li", { class: p.estado || "" }, p.el || el("span", {}, p.texto), p.sub ? el("small", {}, p.sub) : null)));
 const secao = (titulo, ...kids) => el("section", { class: "np-sec" }, el("h3", {}, titulo), ...kids);
+
+/* ---------- indicador de etapa, valor, ciclo, tabela compacta (DESIGN.md §5; Fase 3) ---------- */
+/* etapa: pontos horizontais — passos: [{k,label}] · atual: k · feitos: Set/array de k concluídos (default: os anteriores ao atual) */
+const etapa = (passos, atual, { feitos } = {}) => {
+  const i = passos.findIndex(p => p.k === atual); const done = new Set(feitos || passos.slice(0, Math.max(i, 0)).map(p => p.k));
+  const ol = el("ol", { class: "np-etapa", "aria-label": i >= 0 ? `etapa ${i + 1} de ${passos.length}: ${passos[i].label}` : `${passos.length} etapas`, title: i >= 0 ? passos[i].label : null });
+  passos.forEach((p, j) => ol.append(el("li", { class: p.k === atual ? "atual" : done.has(p.k) ? "ok" : "", "aria-current": p.k === atual ? "step" : null }, el("span", { class: "np-sr" }, p.label))));
+  return ol;
+};
+/* val: dinheiro em serifa tabular — "cobrado → acordo" com % só quando os dois existem; nunca inventa valor */
+const brl = (v) => (typeof BRL === "function" ? BRL(+v) : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+const val = ({ cobrado, acordo, rotuloAcordo = "acordo", sub } = {}) => {
+  const temC = cobrado != null && cobrado !== "", temA = acordo != null && acordo !== "";
+  const w = el("span", { class: "np-val" });
+  if (temC) w.append(el("b", { class: temA ? "de" : "", title: "valor cobrado" }, brl(cobrado)));
+  if (temC && temA) w.append(el("span", { class: "seta", "aria-hidden": "true" }, "→"));
+  if (temA) w.append(el("b", { title: rotuloAcordo }, brl(acordo)));
+  if (temC && temA && +cobrado > 0) { const pct = Math.round((1 - (+acordo) / (+cobrado)) * 100); if (pct > 0 && pct < 100) w.append(el("small", { title: "desconto sobre o cobrado" }, `−${pct}%`)); }
+  if (!temC && !temA) w.append(el("span", { class: "np-sem" }, "—"));
+  if (sub) w.append(el("small", { class: "sub" }, sub));
+  return w;
+};
+/* ciclo: 5 passos horizontais com data — passos: [{label, data, feita, atual, sub}] */
+const ciclo = (passos) => el("ol", { class: "np-ciclo", "aria-label": "Ciclo de acompanhamento" }, passos.map((p, i) => el("li", { class: (p.feita ? "ok" : "") + (p.atual ? " atual" : ""), "aria-current": p.atual ? "step" : null },
+  el("span", { class: "dot", "aria-hidden": "true" }, p.feita ? svgIco(I.check, "np-ico") : String(i + 1)), el("span", { class: "l" }, p.label), el("span", { class: "d" }, p.data || p.sub || "—"))));
+/* tabela compacta — colunas: [{k,label,num,render}] · linhas: objetos */
+const tabela = (colunas, linhas, { vazio: tv = "—", label } = {}) => {
+  const t = el("table", { class: "np-tab", "aria-label": label || null }, el("thead", {}, el("tr", {}, colunas.map(c => el("th", { class: c.num ? "num" : "", scope: "col" }, c.label)))),
+    el("tbody", {}, linhas.length ? linhas.map(l => el("tr", {}, colunas.map(c => { const v = c.render ? c.render(l) : l[c.k]; return el("td", { class: c.num ? "num" : "" }, v == null || v === "" ? el("span", { class: "np-sem" }, "—") : v); }))) : el("tr", {}, el("td", { colspan: String(colunas.length), class: "np-sem" }, tv))));
+  return el("div", { class: "np-tab-w" }, t);
+};
 
 /* ---------- popover (um por vez) ---------- */
 let popAtual = null;
@@ -131,5 +165,5 @@ const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").f
 const btn = (label, { variante = "", onclick, title, disabled, icone, type = "button", cls = "" } = {}) => el("button", { type, class: ("np-btn " + variante + " " + cls).trim(), onclick, title: title || null, disabled: disabled ? "" : null }, icone ? svgIco(I[icone] || icone) : null, label);
 const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-ib", "aria-label": label, title: label, onclick }, svgIco(I[icone] || icone));
 
-window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+window.NPUI = { pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

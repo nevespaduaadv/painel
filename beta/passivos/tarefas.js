@@ -104,7 +104,7 @@ function listaAgrupada(lista,opts){
 }
 function renderTarefas(){
   if(tarefasV3())return renderTarefasV3();
-  const v=$("#view-tarefas");v.replaceChildren();
+  const v=$("#view-tarefas");v.replaceChildren();v.classList.remove("np-v3");
   if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>openTarefa(t),0)}
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Escritório"),el("h1",{},"Tarefas e prazos"),el("div",{class:"sub"},"Prazos fatais em vermelho. Quem executa, lança na hora.")),
     el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])},"CSV"),el("button",{class:"btn primary",onclick:()=>openTarefaForm({})},"+ Tarefa"))));
@@ -621,7 +621,7 @@ function filtrosV3(){
 function filtrarV3(lista,f){return filtrar(lista,f).filter(t=>!f.cadeias||!!t.cadeia_id)}
 /* ---------- render ---------- */
 function renderTarefasV3(){
-  const v=$("#view-tarefas");v.replaceChildren();V3.obra=null;V3.painel=null;clearInterval(V3.tick);
+  const v=$("#view-tarefas");v.replaceChildren();v.classList.add("np-v3");V3.obra=null;V3.painel=null;clearInterval(V3.tick);
   if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>abrirPainelV3(t),0)}
   if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   const f=T.f;if(f.cadeias==null)f.cadeias=false;
