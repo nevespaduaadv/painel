@@ -162,7 +162,7 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-toolbar{position:static}
   html.np-casca-v3 .np-resumo{width:100%;gap:12px;overflow-x:auto;scrollbar-width:none}
   html.np-casca-v3 .np-tb-dir{margin-left:0;width:100%;justify-content:space-between}
-  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
+  html.np-casca-v3 .np-it{grid-template-columns:22px minmax(0,1fr) fit-content(60%);grid-template-areas:"chk prazo dir" "chk texto texto";row-gap:2px;padding-top:8px;padding-bottom:8px;align-items:start}
   html.np-casca-v3 .np-it-chk{grid-area:chk;align-self:start;margin-top:1px}html.np-casca-v3 .np-it-abrir{grid-area:texto;padding-top:0}html.np-casca-v3 .np-it-dir{grid-area:dir;align-self:start;gap:8px}
   html.np-casca-v3 .np-it-prazo{grid-area:prazo;flex-direction:row;gap:7px;align-items:baseline;flex-wrap:wrap;min-height:20px}
   html.np-casca-v3 .np-it-prazo .d{font-size:var(--np-fs-4)}
@@ -224,7 +224,7 @@ html.np-casca-v3 .np-tab td.np-sem,html.np-casca-v3 .np-tab .np-sem{color:var(--
 html.np-casca-v3 .np-v3 > .hub-tabs{display:none}
 /* celular: a coluna direita quebra em duas alturas — marcas + pessoa em cima, valor embaixo (só o acordo; o cobrado riscado fica no painel) */
 @media (max-width:600px){
-  html.np-casca-v3 .np-it-dir{flex-wrap:wrap;justify-content:flex-end;max-width:min(58%,250px);row-gap:3px}
+  html.np-casca-v3 .np-it-dir{flex-wrap:wrap;justify-content:flex-end;row-gap:3px}
   html.np-casca-v3 .np-it-dir .np-quem{order:-1}
   html.np-casca-v3 .np-it-dir .np-quem-vazio{font-size:0}html.np-casca-v3 .np-it-dir .np-quem-vazio::before{content:"—";font-size:var(--np-fs-2);color:var(--np-text-3)}
   html.np-casca-v3 .np-it-dir .np-val{flex-basis:100%;justify-content:flex-end;font-size:var(--np-fs-2)}

@@ -180,7 +180,7 @@ const diaCiclo=a=>a?.onb_data?Math.round((new Date(hojeISO())-new Date(diaISO(a.
 function registrosA3(){
   const porCli=new Map((A3.lista||[]).map(a=>[a.cliente_id,a]));const pendPor=new Map();for(const t of A3.pend){const l=pendPor.get(t.cliente_id)||[];l.push(t);pendPor.set(t.cliente_id,l)}
   return (S.clientes||[]).map(c=>{const a0=porCli.get(c.id)||null;const iniciado=!!(a0&&a0.fase);const a=iniciado?a0:null;const prox=proximaDe(a);const d=prox?diasAte(prox.data):null;const pend=pendPor.get(c.id)||[];
-    const grupo=!iniciado?"sem_acomp":(a.fase==="encerrado")?"encerrado":d==null?"sem_data":d<0?"vencida":d<=6?"semana":"proxima";
+    const grupo=!iniciado?"sem_acomp":(a.fase==="encerrado")?"encerrado":d==null?"sem_data":d<0?"vencida":d<=6?"semana":a.fase==="mensal"?"mensal":"proxima";
     return {c,a,iniciado,prox,dias:d,pend,grupo,resp:(A.colab||[]).find(x=>x.id===c.resp_estrategico_id)||null}})
     .filter(r=>r.iniciado||r.c.status!=="encerrado");
 }
@@ -192,7 +192,7 @@ function filtrarA3(regs){
     if(f.resp&&(f.resp==="eu"?!(meu&&r.c.resp_estrategico_id===meu.id):r.c.resp_estrategico_id!==f.resp))return false;if(f.fase&&(r.a?.fase||"")!==f.fase)return false;if(f.regua&&(r.c.regua||"")!==f.regua)return false;
     return true});
 }
-const GRUPOS_A3=[["vencida","Reunião vencida","crit"],["semana","Esta semana","att"],["proxima","Próximas reuniões",""],["sem_data","Sem agendamento",""],["sem_acomp","Sem acompanhamento iniciado",""],["encerrado","Encerrados",""]];
+const GRUPOS_A3=[["vencida","Reunião vencida","crit"],["semana","Esta semana","att"],["proxima","Próximas reuniões do ciclo",""],["mensal","Acompanhamento mensal",""],["sem_data","Sem agendamento",""],["sem_acomp","Sem acompanhamento iniciado",""],["encerrado","Encerrados",""]];
 const reguaA3=r=>r.grupo==="vencida"?"late":r.grupo==="semana"?"att":null;
 function marcasA3(r){const m=[];if(r.iniciado&&r.a.fase==="mensal")m.push(NPUI.marca("mensal","info"));if(r.a?.acordos_liberado)m.push(NPUI.marca("acordos liberado","ok"));if(r.c.projeto_reserva==="formada")m.push(NPUI.marca("reserva formada","ok"));
   const venc=r.pend.filter(t=>t.prazo&&t.prazo<hojeISO()).length;if(r.pend.length)m.push(NPUI.marca(`${r.pend.length} pendência${r.pend.length===1?"":"s"}`,venc?"crit":"att"));return m}
