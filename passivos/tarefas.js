@@ -550,10 +550,10 @@ function linhaV3(t,{mostrarCliente=true}={}){
 }
 function listaV3(lista,opts){
   const host=el("div",{class:"np-corpo"});const grupos=FAIXAS.filter(([k])=>lista.some(t=>t.faixa===k));
-  if(!grupos.length){host.append(NPUI.vazio({titulo:"Nada com esses filtros",texto:"Tire um filtro ou crie uma tarefa nova.",acao:"Limpar filtros",onAcao:()=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false};render()}}));return host}
-  /* feitas há pouco (nesta sessão) continuam visíveis como faixa "feita · Reabrir" mesmo quando o filtro é "abertas" */
-  const agora=Date.now();for(const [id,r] of V3.recem){if(agora-r.quando>10*60000){V3.recem.delete(id);continue}const t=T.tarefas.find(x=>x.id===id);if(!t||t.status!=="concluida"){V3.recem.delete(id);continue}
-    if(!lista.some(x=>x.id===id)){const li=el("li",{class:"np-it np-it-feita","data-id":id,role:"status"});NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(id);toast("Tarefa reaberta");T.ok=false;carregar()}catch(e){toast(e.message)}}});host.append(el("ul",{class:"np-lst",role:"list",style:"border-top:0"},li))}}
+  /* feitas há pouco (nesta sessão) continuam visíveis como faixa "feita · Reabrir" mesmo quando o filtro é "abertas" — inclusive quando era a última da lista */
+  const agora=Date.now();let recentes=0;for(const [id,r] of V3.recem){if(agora-r.quando>10*60000){V3.recem.delete(id);continue}const t=T.tarefas.find(x=>x.id===id);if(!t||t.status!=="concluida"){V3.recem.delete(id);continue}
+    if(!lista.some(x=>x.id===id)){recentes++;const li=el("li",{class:"np-it np-it-feita","data-id":id,role:"status"});NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(id);toast("Tarefa reaberta");T.ok=false;carregar()}catch(e){toast(e.message)}}});host.append(el("ul",{class:"np-lst",role:"list",style:"border-top:0"},li))}}
+  if(!grupos.length){host.append(NPUI.vazio({titulo:recentes?"Tudo feito por aqui":"Nada com esses filtros",texto:recentes?"Não sobrou nada aberto com esses filtros.":"Tire um filtro ou crie uma tarefa nova.",acao:"Limpar filtros",onAcao:()=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false};render()}}));return host}
   const ab=gruposV3();
   for(const [k,l] of grupos){const ts=lista.filter(t=>t.faixa===k).sort((a,b)=>(a.prazo||"9999").localeCompare(b.prazo||"9999")||a.prioridade-b.prioridade);
     host.append(NPUI.grupo({id:k,titulo:l,n:ts.length,tom:FAIXA_TOM[k]||"",aberto:ab[k]!==false,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-tarefas-grupos",JSON.stringify(ab))},itens:ts.map(t=>linhaV3(t,opts))}))}

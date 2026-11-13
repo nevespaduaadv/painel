@@ -36,16 +36,21 @@ const TAREFAS = [
   tarefa({ t: 'Enviar boleto de novembro', c: 'c1', r: 'col-ana', n: 'administrativo', dias: -2, s: 'concluida' }),
   tarefa({ t: 'Agendar reunião com o Banco Delta', c: 'c2', r: 'col-maria', n: 'acordos', dias: 5, s: 'cancelada' }),
 ];
+/* ticket (só com tickets=true): a tarefa 'Montar planilha de passivos' aguarda o Financeiro */
+const TICKET = { id: '00000000-0000-4000-8000-000000000007', aguardando_area: 'financeiro', aguardando_por_nome: 'Ana Teste', aguardando_motivo: 'Preciso do extrato consolidado', aguardando_desde: new Date(Date.now() - 86400000).toISOString(), sla_dias: 3, sla_situacao: 'no_prazo' };
 const PERFIS = { admin: { id: 'u-admin', nome: 'Ana Teste', papel: 'admin', acessos: [] }, juridico: { id: 'u-jur', nome: 'Caio Teste', papel: 'colaborador', acessos: ['juridico'] } };
 const EVENTOS = (tid) => { const t = TAREFAS.find(x => x.id === tid); const ev = [{ id: 'ev1-' + tid, tarefa_id: tid, tipo: 'criada', autor_nome: 'Maria Eulália Teste', para: 'Caio Teste', criado_em: '2026-11-01T14:10:00Z' }]; if (!t?.cadeia_id) ev.push({ id: 'ev2-' + tid, tarefa_id: tid, tipo: 'comentario', autor_nome: 'Caio Teste', nota: 'Minuta pronta; falta a guia.', criado_em: '2026-11-05T09:30:00Z' }); return ev; };
 const sessao = (perfil) => ({ access_token: 'lab', refresh_token: 'lab', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user: { id: perfil.id, email: perfil.id + '@lab.exemplo', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } });
 
-async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', reduz = false, touch = false, extraLS = {} } = {}) {
-  const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = [];
+async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', reduz = false, touch = false, extraLS = {}, tickets = false } = {}) {
+  const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = []; const sim = { falharPatch: false };
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: touch || w < 900, isMobile: touch, reducedMotion: reduz ? 'reduce' : 'no-preference' });
   await ctx.addInitScript(({ s, ref, casca, tema, extraLS }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); if (casca === 'v3') localStorage.setItem('np-casca', 'v3'); localStorage.setItem('pp-tema', tema); localStorage.setItem('pp-tab', 'tarefas'); for (const [k, v] of Object.entries(extraLS)) localStorage.setItem(k, v); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema, extraLS });
+  // tickets ativos: serve o mesmo tarefas.js com a constante ligada (só em memória do laboratório) + um ticket na fixture
+  if (tickets) await ctx.route(/\/passivos\/tarefas\.js/, (rota) => rota.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(path.join(RAIZ, 'passivos/tarefas.js'), 'utf8').replace('const TICKETS_ATIVOS=false;', 'const TICKETS_ATIVOS=true;') }));
   await ctx.route(/supabase\.co/, async (rota) => {
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
+    if (sim.falharPatch && m === 'PATCH' && p.startsWith('/rest/v1/tarefas')) { escritas.push(m + ' ' + p + u.search + ' (falha simulada)'); return rota.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ message: 'falha simulada do banco', code: 'LAB500' }) }); }
     const json = (b, status = 200, extra = {}) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0', ...extra }, body: JSON.stringify(b) });
     if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && !p.startsWith('/auth/')) { escritas.push(m + ' ' + p + u.search + ' ' + (req.postData() || '').slice(0, 120));
       // simula o efeito da escrita na fixture (só em memória do laboratório) para que a tela recarregada reflita a mudança
@@ -58,7 +63,7 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
     if (p.startsWith('/rest/v1/v_tarefas')) { const cad = u.searchParams.get('cadeia_id'); const lista = cad ? TAREFAS.filter(t => t.cadeia_id === cad.replace('eq.', '')) : TAREFAS; return json(lista); }
     if (p.startsWith('/rest/v1/colaboradores')) { const pid = (u.searchParams.get('perfil_id') || '').replace('eq.', ''); const lista = pid ? COLAB.filter(x => x.perfil_id === pid) : COLAB; if (unico) return lista[0] ? json(lista[0]) : json({ message: 'nenhum', code: 'PGRST116' }, 406); return json(lista); }
     if (p.startsWith('/rest/v1/processos')) return json([{ id: 'p1', cliente_id: 'c1', numero_cnj: '0000001-11.2026.8.26.0196', parte_contraria: 'Banco Sigma' }]);
-    if (p.startsWith('/rest/v1/v_tickets')) return json([]);
+    if (p.startsWith('/rest/v1/v_tickets')) return json(tickets ? [TICKET] : []);
     if (p.startsWith('/rest/v1/motivos_reagendamento')) return json([{ id: 'm1', motivo: 'Pedido do cliente', exige_complemento: false, ativo: true, ordem: 1 }, { id: 'm2', motivo: 'Outro', exige_complemento: true, ativo: true, ordem: 9 }]);
     if (p.startsWith('/rest/v1/tarefa_eventos')) { const tid = (u.searchParams.get('tarefa_id') || '').replace('eq.', ''); const tipo = u.searchParams.get('tipo'); let ev = EVENTOS(tid); if (tipo) ev = ev.filter(e => e.tipo === tipo.replace('eq.', '')); return json(ev); }
     if (p.startsWith('/rest/v1/anexos')) return json([]);
@@ -68,7 +73,7 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
   await pg.goto(BASE + '/index.html#tarefas', { waitUntil: 'load' });
   await pg.waitForFunction(() => typeof PP !== 'undefined' && PP.perfil && document.querySelector('#login')?.hidden && window.PP_TAREFAS && window.PP_TAREFAS.lista().length > 0 && !document.querySelector('#view-tarefas')?.hidden, null, { timeout: 20000 });
   await pg.waitForTimeout(600);
-  return { ctx, pg, erros, escritas, perfil: P };
+  return { ctx, pg, erros, escritas, perfil: P, sim };
 }
 
 /* conjunto de tarefas visíveis (ids) na tela atual, V2 ou V3 */
@@ -242,6 +247,69 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     const colsV2 = await c2.pg.evaluate(() => [...document.querySelectorAll('.kb-col')].map(c => c.dataset.st)); const colsV3 = ['aberta', 'em_andamento', 'concluida'];
     if (JSON.stringify(colsV2) === JSON.stringify(colsV3)) ok(`V2 e V3.1 com as mesmas colunas (${colsV2.join(', ')}): "Aguardando área" só existe com tickets ativos`); else falha('colunas V2 × V3.1: ' + JSON.stringify({ colsV2, colsV3 }));
     await c2.ctx.close(); }
+  // ---------- 5b. quadro: equivalência completa com a V2 (tickets on/off, ida e volta, erro, só leitura) ----------
+  rel.push('5b. quadro — equivalência com a V2 em todos os caminhos');
+  { // tickets desativados: Fazendo → A fazer, mesma coluna, falha do banco
+    const { ctx, pg, escritas, sim } = await contexto(b, { perfil: 'admin', casca: 'v3' });
+    await pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
+    const toastTxt = () => pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
+    let antes = escritas.length; await pg.click('.np-colq[data-st="em_andamento"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("A fazer")'); await pg.waitForTimeout(600);
+    if (escritas.slice(antes).some(e => /PATCH \/rest\/v1\/tarefas\S* .*"aberta"/.test(e))) ok('Fazendo → A fazer: PATCH tarefas{status:aberta} (volta, como o drop da V2)'); else falha('volta: ' + JSON.stringify(escritas.slice(antes)));
+    antes = escritas.length; await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("A fazer")'); await pg.waitForTimeout(400);
+    if (!escritas.slice(antes).length) ok('mover para a própria coluna: nenhuma escrita (t.status===k, como a V2)'); else falha('mesma coluna: ' + JSON.stringify(escritas.slice(antes)));
+    sim.falharPatch = true; const antesCols = await pg.evaluate(() => [...document.querySelectorAll('.np-colq h3 .n')].map(n => n.textContent));
+    antes = escritas.length; await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("Fazendo")'); await pg.waitForTimeout(600);
+    const err = { toast: await toastTxt(), cols: await pg.evaluate(() => [...document.querySelectorAll('.np-colq h3 .n')].map(n => n.textContent)), w: escritas.slice(antes) };
+    if (/falha simulada/.test(err.toast) && JSON.stringify(err.cols) === JSON.stringify(antesCols) && err.w.length === 1) ok(`erro do banco ao mover: toast com a mensagem ("${err.toast}"), nada recarregado, colunas intactas (mesmo tratamento da V2: toast(error.message); return)`); else falha('erro mover: ' + JSON.stringify({ err, antesCols }));
+    sim.falharPatch = false; await ctx.close();
+    // V2 com a mesma falha: mesmo toast
+    const e2 = await contexto(b, { perfil: 'admin', casca: 'v2' }); await e2.pg.click('#view-tarefas .tabs .tab:has-text("Kanban")'); await e2.pg.waitForTimeout(500); e2.sim.falharPatch = true;
+    await e2.pg.dragAndDrop('.kb-col[data-st="aberta"] .kb-card', '.kb-col[data-st="em_andamento"] .kb-body'); await e2.pg.waitForTimeout(600);
+    const t2 = await e2.pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
+    if (t2 === err.toast) ok(`V2 e V3.1 reagem igual ao erro: "${t2}"`); else falha('erro V2 × V3: ' + JSON.stringify({ t2, v3: err.toast })); await e2.ctx.close();
+    // só leitura: V3.1 não arrasta nem oferece "Mover para…"; nenhuma escrita
+    const r3 = await contexto(b, { perfil: 'admin', casca: 'v3' }); await r3.pg.evaluate(() => { S.canWrite = false; render(); }); await r3.pg.waitForTimeout(300);
+    await r3.pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await r3.pg.waitForTimeout(400);
+    const ro = await r3.pg.evaluate(() => ({ drag: [...document.querySelectorAll('.np-cardq')].every(c => c.getAttribute('draggable') === 'false'), n: document.querySelectorAll('.np-cardq').length }));
+    const antesRO = r3.escritas.length; await r3.pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await r3.pg.waitForTimeout(200);
+    const itensRO = await r3.pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(b => b.disabled)); await r3.pg.keyboard.press('Escape');
+    if (ro.drag && ro.n > 0 && itensRO.length === 3 && itensRO.every(Boolean) && r3.escritas.length === antesRO) ok(`só leitura no quadro: ${ro.n} cartões sem arrastar, "Mover para…" todo desabilitado, nenhuma escrita (V2 depende do RLS para recusar; V3.1 recusa antes)`); else falha('readOnly quadro: ' + JSON.stringify({ ro, itensRO })); await r3.ctx.close();
+    // tickets ATIVOS (constante ligada só em memória): 4 colunas, cartão com ticket em "Aguardando área", regras de ticket iguais nas duas versões
+    const estadoQuadro = (pg, v3) => pg.evaluate((v3) => { const cols = [...document.querySelectorAll(v3 ? '.np-colq' : '.kb-col')]; return cols.map(c => c.dataset.st + ':' + c.querySelectorAll(v3 ? '.np-cardq' : '.kb-card').length); }, v3);
+    const k3 = await contexto(b, { perfil: 'admin', casca: 'v3', tickets: true }); await k3.pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await k3.pg.waitForTimeout(500);
+    const k2 = await contexto(b, { perfil: 'admin', casca: 'v2', tickets: true }); await k2.pg.click('#view-tarefas .tabs .tab:has-text("Kanban")'); await k2.pg.waitForTimeout(500);
+    const q3 = await estadoQuadro(k3.pg, true), q2 = await estadoQuadro(k2.pg, false);
+    if (q3.length === 4 && JSON.stringify(q3) === JSON.stringify(q2) && q3.some(x => x === 'aguardando:1')) ok(`tickets ativos: V2 e V3.1 com as mesmas 4 colunas e contagens (${q3.join(' · ')})`); else falha('tickets colunas: ' + JSON.stringify({ q3, q2 }));
+    // cartão com ticket não move para Fazendo (toast "Responda o ticket")
+    let a3 = k3.escritas.length; await k3.pg.click('.np-colq[data-st="aguardando"] .np-cardq .np-ib'); await k3.pg.waitForTimeout(200); await k3.pg.click('#np-pop [role="menuitem"]:has-text("Fazendo")'); await k3.pg.waitForTimeout(400);
+    const tk3 = await k3.pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
+    let a2 = k2.escritas.length; await k2.pg.dragAndDrop('.kb-col[data-st="aguardando"] .kb-card', '.kb-col[data-st="em_andamento"] .kb-body'); await k2.pg.waitForTimeout(400);
+    const tk2 = await k2.pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
+    if (/Responda o ticket/.test(tk3) && tk3 === tk2 && k3.escritas.length === a3 && k2.escritas.length === a2) ok(`cartão com ticket → "${tk3}" nas duas versões, sem escrita`); else falha('ticket mover: ' + JSON.stringify({ tk3, tk2, w3: k3.escritas.slice(a3), w2: k2.escritas.slice(a2) }));
+    // mover para "Aguardando área" sem ticket abre o modal "Abrir ticket" (encaminharArea) nas duas versões, sem escrita direta
+    a3 = k3.escritas.length; await k3.pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await k3.pg.waitForTimeout(200); await k3.pg.click('#np-pop [role="menuitem"]:has-text("Aguardando")'); await k3.pg.waitForTimeout(400);
+    const m3 = await k3.pg.evaluate(() => document.querySelector('#modalHost h2')?.textContent || ''); await k3.pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
+    a2 = k2.escritas.length; await k2.pg.dragAndDrop('.kb-col[data-st="aberta"] .kb-card', '.kb-col[data-st="aguardando"] .kb-body'); await k2.pg.waitForTimeout(400);
+    const m2 = await k2.pg.evaluate(() => document.querySelector('#modalHost h2')?.textContent || ''); await k2.pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
+    if (/^Abrir ticket/.test(m3) && /^Abrir ticket/.test(m2) && k3.escritas.length === a3 && k2.escritas.length === a2) ok(`mover para Aguardando área → modal "${m3.slice(0, 12)}…" (encaminharArea) nas duas versões, sem escrita direta`); else falha('aguardando: ' + JSON.stringify({ m3, m2 }));
+    // "Mover para…" lista "Aguardando área" habilitado com tickets ativos
+    await k3.pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await k3.pg.waitForTimeout(200);
+    const mv4 = await k3.pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(b => b.textContent.trim() + (b.disabled ? ' (desab.)' : ''))); await k3.pg.keyboard.press('Escape');
+    if (mv4.length === 4 && mv4.some(x => x === 'Aguardando área')) ok(`"Mover para…" com tickets ativos: ${mv4.join(' · ')}`); else falha('mover 4: ' + JSON.stringify(mv4));
+    await k3.ctx.close(); await k2.ctx.close(); }
+  // ---------- 5c. concluir a única tarefa visível ----------
+  rel.push('5c. concluir a última tarefa visível de um filtro/grupo');
+  { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3' });
+    await pg.evaluate(() => { window.PP_TAREFAS.filtro({ status: 'abertas', cliente: 'c3', nucleo: 'acompanhamento_pj' }); }); await pg.waitForTimeout(300);
+    const n0 = await pg.evaluate(() => document.querySelectorAll('.np-it[data-id]').length);
+    await pg.click('.np-it[data-id] .np-it-abrir'); await pg.waitForTimeout(500); await pg.fill('.np-painel textarea', 'Reunião realizada.'); await pg.click('.np-p-pe .np-btn.pri'); await pg.waitForTimeout(900);
+    const u = await pg.evaluate(() => ({ feita: !!document.querySelector('#view-tarefas .np-it-feita'), txt: document.querySelector('#view-tarefas .np-it-feita')?.textContent.trim() || '', reabrir: !!document.querySelector('#view-tarefas .np-it-feita button'), vazio: document.querySelector('#view-tarefas .np-vazio h3')?.textContent || '', linhas: document.querySelectorAll('#view-tarefas .np-it[data-id]:not(.np-it-feita)').length }));
+    if (n0 === 1 && u.feita && u.reabrir && /feita · Reunião/.test(u.txt) && u.linhas === 0 && /Tudo feito/.test(u.vazio)) ok(`última tarefa do filtro concluída: faixa "feita · Reabrir" continua visível junto do estado vazio ("${u.vazio}")`); else falha('última tarefa: ' + JSON.stringify({ n0, u }));
+    // Reabrir funciona a partir da faixa
+    const antesR = (await pg.evaluate(() => 0)); await pg.click('#view-tarefas .np-it-feita button'); await pg.waitForTimeout(800);
+    const v = await pg.evaluate(() => ({ linhas: document.querySelectorAll('#view-tarefas .np-it[data-id]:not(.np-it-feita)').length, feita: !!document.querySelector('#view-tarefas .np-it-feita') }));
+    if (v.linhas === 1 && !v.feita) ok('Reabrir pela faixa devolve a tarefa à lista (mudarStatus(t,"aberta"))'); else falha('reabrir última: ' + JSON.stringify(v));
+    await ctx.close(); }
   // ---------- 6. permissões e readOnly ----------
   rel.push('6. permissões (escopo restrito) e modo só leitura');
   { const { ctx, pg } = await contexto(b, { perfil: 'juridico', casca: 'v3' });
