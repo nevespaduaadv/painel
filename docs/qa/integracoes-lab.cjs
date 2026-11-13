@@ -222,6 +222,91 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
       if (!p.secs.includes('Acompanhamento PJ') && !mk.includes('acomp') && leituras.filter(l => /v_acompanhamento_pj/.test(l)).length === 0) ok('perfil só-Jurídico: t1 sem bloco "Acompanhamento PJ" e sem marca; v_acompanhamento_pj nunca lida'); else falha('perm B3: ' + JSON.stringify([p.secs, mk])); }
     else ok('perfil só-Jurídico: tarefas do núcleo Acompanhamento PJ não entram na lista deste perfil (nada a bloquear)');
     await ctx.close(); }
+  // ========== 3. B4 — marcos previstos do Acompanhamento PJ na Agenda ==========
+  rel.push('3. B4 — Agenda: marcos previstos × reuniões agendadas × realizadas');
+  const dataLocal = (n) => { const [y, m, d] = dia(n).split('-').map(Number); return { y, m: m - 1, d }; };
+  const irDia = async (pg, n) => { const o = dataLocal(n); await pg.evaluate(({ y, m, d }) => window.PP_AGENDA.ir(new Date(y, m, d), 'dia'), o); await pg.waitForFunction(() => S.tab === 'agenda' && document.querySelector('#view-agenda .np-grp'), null, { timeout: 8000 }); await pg.waitForTimeout(500); };
+  const itensDia = (pg) => pg.evaluate(() => [...document.querySelectorAll('#view-agenda .np-grp .np-it[data-id]')].map(li => ({ id: li.dataset.id, titulo: li.querySelector('.tx')?.textContent.trim() || li.querySelector('.np-it-abrir')?.textContent.trim(), col: li.querySelector('.np-it-prazo')?.textContent.trim(), marcas: [...li.querySelectorAll('.np-marca')].map(m => m.textContent) })));
+  const resumoAg = (pg) => pg.evaluate(() => [...document.querySelectorAll('#view-agenda .np-resumo > *')].map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+  { const { ctx, pg, erros, escritas, leituras } = await contexto(b, { hash: '#agenda', extraLS: { 'pp-agenda-modo': 'dia', 'pp-agenda-quem': 'equipe' } });
+    await pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await pg.waitForTimeout(1500); // dá tempo ao carregamento sob demanda da lista do acompanhamento
+    const lidas = leituras.filter(l => /v_acompanhamento_pj/.test(l)).length; if (lidas === 1) ok('lista do acompanhamento carregada 1 vez, sob demanda, pelo próprio módulo (Agenda só consome PP_ACOMP.marcos)'); else falha('leituras acomp agenda: ' + lidas);
+    // dia(12): R3 PREVISTA de c1 (Alfa) + compromisso avulso "Visita à fábrica" do mesmo cliente no mesmo dia → os dois aparecem
+    await irDia(pg, 12); let it = await itensDia(pg); let r = await resumoAg(pg);
+    const r3 = it.find(x => /^marco:r3:c1:/.test(x.id)), vis = it.find(x => x.id === 'e-avulso-c1');
+    if (r3 && r3.titulo === 'R3 — Empresa Alfa Ltda' && r3.col === 'previsto' && r3.marcas.includes('marco previsto') && vis && vis.titulo === 'Visita à fábrica' && r.some(x => /1 marco previsto/.test(x)) && r.some(x => /1 compromisso\b/.test(x))) ok('dia +12: marco "R3 — Empresa Alfa Ltda" (coluna "previsto", marca "marco previsto") E o compromisso "Visita à fábrica" do mesmo cliente — nenhum descartado; resumo: 1 compromisso + 1 marco previsto (previsão não conta como compromisso)'); else falha('dia+12: ' + JSON.stringify([it, r]));
+    // painel do marco R3: situação prevista, lista o compromisso do dia, botões; "Marcar compromisso…" abre o formulário já com o cliente c1
+    await pg.click(`#view-agenda .np-it[data-id="${r3.id}"] .np-it-abrir`); await esperaPainel(pg, '#view-agenda'); await pg.waitForTimeout(300); const pm = await painel(pg, '#view-agenda');
+    const comp = await pg.evaluate(() => [...document.querySelectorAll('#view-agenda .np-painel .np-vinc button')].map(b => b.textContent));
+    if (/Marco previsto/.test(pm.trilha) && pm.titulo === 'R3 — Empresa Alfa Ltda' && /sem horário/.test(pm.props.Quando) && pm.props.Marco === 'R3' && /não é compromisso confirmado/.test(pm.props['Situação']) && /Ana/.test(pm.props['Resp. estratégico']) && /não cria compromisso nem evento no Google/.test(pm.props.Origem) && comp.includes('Visita à fábrica') && pm.pe.includes('Abrir acompanhamento') && pm.pe.some(x => /Marcar compromisso/.test(x))) ok('painel do marco: "data prevista, sem horário", situação "prevista — não é compromisso confirmado", origem explícita, lista "Visita à fábrica" como compromisso do cliente no dia, ações Abrir acompanhamento / Marcar compromisso…'); else falha('painel marco: ' + JSON.stringify([pm, comp]));
+    await pg.click('#view-agenda .np-painel button:has-text("Marcar compromisso")'); await pg.waitForTimeout(400);
+    const form = await pg.evaluate(() => { const h = document.querySelector('#modalHost'); const sels = [...h.querySelectorAll('select')]; const inputs = [...h.querySelectorAll('input')]; return { aberto: !!h.children.length, cliente: sels.map(s => s.value).includes('c1'), tipo: sels.map(s => s.value).includes('reuniao'), titulo: inputs.find(i => i.type === 'text')?.value, data: inputs.find(i => i.type === 'date')?.value }; });
+    if (form.aberto && form.cliente && form.tipo && form.titulo === 'R3 — Empresa Alfa Ltda' && form.data === dia(12)) ok('"Marcar compromisso…" abre o formulário EXISTENTE de compromisso com cliente c1, tipo reunião, título e data do marco pré-preenchidos (horário é escolha do usuário; nada gravado)'); else falha('form marco: ' + JSON.stringify(form));
+    await pg.evaluate(() => document.querySelector('#modalHost .btn:not(.primary)')?.click()); await pg.waitForTimeout(200);
+    // "Abrir acompanhamento" → painel de c1
+    await pg.evaluate(() => document.querySelector('#view-agenda .np-painel button, #view-agenda .np-painel .np-btn') && [...document.querySelectorAll('#view-agenda .np-painel .np-btn')].find(b => b.textContent === 'Abrir acompanhamento').click()); await pg.waitForFunction(() => S.tab === 'acompanhamento', null, { timeout: 8000 }); await esperaPainel(pg, '#view-acompanhamento'); await pg.waitForTimeout(300);
+    const pa = await painel(pg, '#view-acompanhamento'); if (pa.titulo === 'Empresa Alfa Ltda') ok('"Abrir acompanhamento" do marco → #acompanhamento com o painel de c1'); else falha('marco → acomp: ' + pa.titulo);
+    // dia(-3): R2 de c1 tem a TAREFA DO CICLO "R2 — Empresa Alfa Ltda" (título gerado, mesmo cliente, núcleo, mesma data) → 1 linha (a tarefa), anotada "marco R2"; sem linha de marco duplicada
+    await irDia(pg, -3); it = await itensDia(pg);
+    const t1 = it.find(x => x.id === 'prazo:tarefa:t1'), dupR2 = it.find(x => /^marco:r2:c1:/.test(x.id));
+    if (t1 && t1.marcas.includes('marco R2') && !dupR2 && it.filter(x => /Alfa/.test(x.titulo)).length === 1) ok('dia −3: tarefa do ciclo "R2 — Empresa Alfa Ltda" representa o marco (identificador: título gerado + cliente + núcleo + data) → uma linha só, com a marca "marco R2"'); else falha('dia-3: ' + JSON.stringify(it));
+    await pg.click(`#view-agenda .np-it[data-id="prazo:tarefa:t1"] .np-it-abrir`); await esperaPainel(pg, '#view-agenda'); await esperaSecao(pg, '#view-agenda', 'Acompanhamento PJ'); const pt = await painel(pg, '#view-agenda');
+    if (pt.secs.some(x => /Acompanhamento PJ · marco R2/.test(x)) && /Ciclo inicial/.test(pt.props.Fase) && pt.pe.includes('Abrir a tarefa')) ok('painel do prazo da tarefa do ciclo: bloco "Acompanhamento PJ · marco R2" (dados de c1) e a ação original "Abrir a tarefa" preservada'); else falha('painel t1 agenda: ' + JSON.stringify(pt));
+    // dia(2): ONB de c2 PREVISTO + compromisso AGENDADO "Onboarding — Beta Comércio" (título diferente, sem tarefa_id) → os dois aparecem; o marco aponta o compromisso
+    await irDia(pg, 2); it = await itensDia(pg);
+    const onb = it.find(x => /^marco:onb:c2:/.test(x.id)), ev2 = it.find(x => x.id === 'e-onb-c2');
+    if (onb && onb.titulo === 'Onboarding (ONB) — Beta Comércio ME' && ev2 && /reunião/.test(ev2.marcas.join())) ok('dia +2: marco "Onboarding (ONB) — Beta Comércio ME" (previsto) E a reunião agendada "Onboarding — Beta Comércio" (10h) — sem identificador comum, nada é fundido nem descartado'); else falha('dia+2: ' + JSON.stringify(it));
+    await pg.click(`#view-agenda .np-it[data-id="${onb.id}"] .np-it-abrir`); await esperaPainel(pg, '#view-agenda'); await pg.waitForTimeout(300);
+    const c2c = await pg.evaluate(() => [...document.querySelectorAll('#view-agenda .np-painel .np-vinc button')].map(b => b.textContent));
+    if (c2c.includes('Onboarding — Beta Comércio')) ok('painel do marco ONB (c2) lista a reunião agendada do dia como contexto (clicável)'); else falha('c2 contexto: ' + JSON.stringify(c2c));
+    // dia(5): R1 de c8 com tarefa do ciclo "R1 — Theta Agro" → só a tarefa, anotada
+    await irDia(pg, 5); it = await itensDia(pg);
+    const t8 = it.find(x => x.id === 'prazo:tarefa:t-r1-c8'), dupR1 = it.find(x => /^marco:r1:c8:/.test(x.id)); const dent = it.find(x => x.id === 'e-google');
+    if (t8 && t8.marcas.includes('marco R1') && !dupR1 && dent) ok('dia +5: "R1 — Theta Agro" (tarefa do ciclo) anotada "marco R1", sem duplicata; evento do Google "Dentista" intacto'); else falha('dia+5: ' + JSON.stringify(it));
+    // dia(10): mensal de c3 (prevista) + tarefa "Reunião mensal — Gama" (título NÃO gerado) → dois registros distintos
+    await irDia(pg, 10); it = await itensDia(pg);
+    const men = it.find(x => /^marco:mensal:c3:/.test(x.id)), t3 = it.find(x => x.id === 'prazo:tarefa:t3');
+    if (men && men.titulo === 'Reunião mensal — Gama Indústria SA' && t3 && !t3.marcas.includes('marco Mensal')) ok('dia +10: marco "Reunião mensal — Gama Indústria SA" E a tarefa "Reunião mensal — Gama" (título parecido, não idêntico) — registros distintos preservados, sem anotação inferida'); else falha('dia+10: ' + JSON.stringify(it));
+    // dia(-8): mensal de c5 prevista e não realizada → "previsto · não realizado" (atenção, não é prazo atrasado)
+    await irDia(pg, -8); it = await itensDia(pg); r = await resumoAg(pg);
+    const e5 = it.find(x => /^marco:mensal:c5:/.test(x.id));
+    if (e5 && e5.marcas.includes('previsto · não realizado') && r.some(x => /0 atrasados/.test(x))) ok('dia −8: mensal de c5 vencida aparece como "previsto · não realizado" e NÃO entra em "atrasados" (não é prazo)'); else falha('dia-8: ' + JSON.stringify([it, r]));
+    // dia(-33): ONB de c1 realizado → marca "realizada"
+    await irDia(pg, -33); it = await itensDia(pg); const o1 = it.find(x => /^marco:onb:c1:/.test(x.id));
+    if (o1 && o1.marcas.includes('realizada')) ok('dia −33: ONB de c1 realizado aparece como "realizada" (histórico), não como previsão'); else falha('dia-33: ' + JSON.stringify(it));
+    // encerrado (c7) e sem próxima (c4): nenhum marco; semana/mês: os marcos entram na Lista e na Grade
+    const nMar = await pg.evaluate(() => { const ids = []; for (const m of (window.PP_ACOMP.marcos() || [])) ids.push(m.cliente_id); return { c7: ids.includes('c7'), c4m: (window.PP_ACOMP.marcos() || []).some(m => m.cliente_id === 'c4' && m.chave === 'mensal') }; });
+    if (!nMar.c7 && !nMar.c4m) ok('cliente encerrado (c7) não gera marcos; mensal sem data (c4) não gera marco'); else falha('c7/c4: ' + JSON.stringify(nMar));
+    await pg.evaluate(() => { NPUI.pref.set('np-agenda-vista', 'grade'); window.PP_AGENDA.ir(null, 'semana'); }); await pg.waitForTimeout(600); await irDia(pg, 12).catch(() => {}); await pg.evaluate(() => window.PP_AGENDA.ir(null, 'semana')); await pg.waitForTimeout(600);
+    const grade = await pg.evaluate(() => ({ chips: [...document.querySelectorAll('#view-agenda .ag-ev.marco')].map(c => c.textContent.trim()), legenda: document.querySelector('#view-agenda .ag-legenda')?.textContent })); 
+    if (grade.chips.some(c => /R3 — Empresa Alfa/.test(c)) && /marco previsto/.test(grade.legenda)) ok('Grade (semana): marco "R3 — Empresa Alfa Ltda" como chip pontilhado de dia inteiro, legenda "marco previsto"'); else falha('grade: ' + JSON.stringify(grade));
+    await pg.screenshot({ path: path.join(OUT, 'b4-agenda-grade-marco-1440.png') });
+    await pg.evaluate(() => { NPUI.pref.set('np-agenda-vista', 'lista'); render(); }); await pg.waitForTimeout(400); await pg.screenshot({ path: path.join(OUT, 'b4-agenda-lista-semana-1440.png') });
+    const posts = escritas.filter(e => /agenda_eventos|functions\/v1|google/i.test(e));
+    if (!escritas.length && !erros.length) ok('B4: nenhuma escrita (agenda_eventos, Google, notificações), sem erros de página'); else falha('B4 escritas/erros: ' + JSON.stringify([escritas, posts, erros]));
+    await ctx.close(); }
+  { // filtros de pessoa: "Minha agenda" (Ana) mostra marcos de c1 (resp. Ana) e não de c8/c2 (resp. Lucas); pessoa selecionada (Lucas) inverte
+    const { ctx, pg } = await contexto(b, { hash: '#agenda', extraLS: { 'pp-agenda-modo': 'dia', 'pp-agenda-quem': 'minha' } });
+    await pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await pg.waitForTimeout(1200);
+    await irDia(pg, 12); let it = await itensDia(pg); const minhaR3 = it.some(x => /^marco:r3:c1:/.test(x.id));
+    await irDia(pg, 2); it = await itensDia(pg); const minhaOnb2 = it.some(x => /^marco:onb:c2:/.test(x.id));
+    await pg.evaluate(() => { localStorage.setItem('pp-agenda-quem', 'col-luc'); location.reload(); }); await pg.waitForFunction(() => typeof PP !== 'undefined' && document.querySelector('#view-agenda .np-grp'), null, { timeout: 15000 }); await pg.waitForTimeout(1200);
+    await irDia(pg, 2); it = await itensDia(pg); const lucOnb2 = it.some(x => /^marco:onb:c2:/.test(x.id)) && it.some(x => x.id === 'e-onb-c2');
+    await irDia(pg, 12); it = await itensDia(pg); const lucR3 = it.some(x => /^marco:r3:c1:/.test(x.id));
+    if (minhaR3 && !minhaOnb2 && lucOnb2 && !lucR3) ok('filtros preservados: "Minha agenda" (Ana) mostra o marco R3 de c1 e não o ONB de c2; pessoa "Lucas" mostra ONB de c2 (+ reunião agendada) e não R3 de c1'); else falha('quem: ' + JSON.stringify({ minhaR3, minhaOnb2, lucOnb2, lucR3 }));
+    await ctx.close(); }
+  { // perfil só-Jurídico: agenda sem marcos e sem leitura de v_acompanhamento_pj; V2 (casca off) sem marcos para o admin
+    const { ctx, pg, leituras } = await contexto(b, { perfil: 'juridico', hash: '#agenda', extraLS: { 'pp-agenda-modo': 'semana', 'pp-agenda-quem': 'equipe' } });
+    await pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await pg.waitForTimeout(1000);
+    const nm = await pg.evaluate(() => document.querySelectorAll('#view-agenda .np-it[data-id^="marco:"]').length + document.querySelectorAll('#view-agenda .ag-ev.marco').length);
+    if (nm === 0 && leituras.filter(l => /v_acompanhamento_pj/.test(l)).length === 0) ok('perfil só-Jurídico: nenhum marco na Agenda e v_acompanhamento_pj nunca lida'); else falha('perm agenda: ' + JSON.stringify([nm, leituras.filter(l => /v_acompanhamento_pj/.test(l)).length]));
+    await ctx.close();
+    const v2 = await contexto(b, { casca: 'v2', hash: '#agenda', extraLS: { 'pp-agenda-modo': 'semana', 'pp-agenda-quem': 'equipe' } });
+    await v2.pg.waitForFunction(() => document.querySelector('#view-agenda .ag-ev, #view-agenda .ag-grid, #view-agenda table'), null, { timeout: 10000 }).catch(() => {}); await v2.pg.waitForTimeout(800);
+    const v2m = await v2.pg.evaluate(() => ({ marco: document.querySelectorAll('#view-agenda .ag-ev.marco, #view-agenda [data-id^="marco:"]').length, txt: /marco previsto/i.test(document.querySelector('#view-agenda')?.textContent || ''), v3: document.querySelector('#view-agenda')?.classList.contains('np-v3') }));
+    const v2lidas = v2.leituras.filter(l => /v_acompanhamento_pj/.test(l)).length;
+    if (v2m.marco === 0 && !v2m.txt && !v2m.v3 && v2lidas === 0) ok('V2 (casca desligada): Agenda sem marcos, sem texto "marco previsto" e sem leitura extra de v_acompanhamento_pj'); else falha('V2 agenda: ' + JSON.stringify([v2m, v2lidas]));
+    await v2.ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.') + '\n'; fs.writeFileSync(path.join(OUT, 'relatorio-integracoes-lab.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch(e => { console.log(rel.join('\n')); console.error(e); process.exit(2); });

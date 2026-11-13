@@ -11,11 +11,11 @@ const hm=d=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padS
 const segunda=d=>{const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);return x};
 const meuColab=()=>A.colab.find(c=>c.perfil_id===PP.perfil?.id);
 const TIPO={compromisso:"Compromisso",audiencia:"Audiência",reuniao:"Reunião",pericia:"Perícia",prazo:"Prazo",outro:"Outro"};
-const COR={audiencia:"var(--crit)",prazo:"var(--warn)",reuniao:"var(--info)",pericia:"#7A5AA6",compromisso:"var(--ch-a)",outro:"var(--muted)"};
+const COR={audiencia:"var(--crit)",prazo:"var(--warn)",reuniao:"var(--info)",pericia:"#7A5AA6",compromisso:"var(--ch-a)",outro:"var(--muted)",marco:"var(--muted)"};
 const DIAS=["seg","ter","qua","qui","sex","sáb","dom"];
 function intervalo(){if(A.modo==="mes"){const ini=segunda(new Date(A.ref.getFullYear(),A.ref.getMonth(),1));return {ini,fim:addD(ini,42)}}const ini=A.modo==="semana"?segunda(A.ref):new Date(A.ref);const fim=addD(ini,A.modo==="semana"?7:1);return {ini,fim}}
 /* prazos (tarefas sem horário, processos, negociações) viram itens de dia inteiro na agenda */
-function prazoParaEvento(z){const d=parseD(z.prazo);return {id:"prazo:"+z.origem+":"+z.id,titulo:(z.prazo_fatal?"PRAZO FATAL: ":"")+z.descricao,inicio:d.toISOString(),fim:addD(d,1).toISOString(),dia_inteiro:true,colaborador_id:z.responsavel_id,colaborador_nome:z.responsavel_nome,cliente_id:z.cliente_id,cliente_nome:z.cliente_nome,processo_id:z.processo_id,numero_cnj:z.numero_cnj||null,tipo:"prazo",origem:"prazo",prazo_origem:z.origem,prazo_id:z.id,prazo_fatal:z.prazo_fatal,atrasada:z.faixa==="atrasada",faixa:z.faixa}}
+function prazoParaEvento(z){const d=parseD(z.prazo);return {id:"prazo:"+z.origem+":"+z.id,titulo:(z.prazo_fatal?"PRAZO FATAL: ":"")+z.descricao,inicio:d.toISOString(),fim:addD(d,1).toISOString(),dia_inteiro:true,colaborador_id:z.responsavel_id,colaborador_nome:z.responsavel_nome,cliente_id:z.cliente_id,cliente_nome:z.cliente_nome,processo_id:z.processo_id,numero_cnj:z.numero_cnj||null,nucleo:z.nucleo||null,tipo:"prazo",origem:"prazo",prazo_origem:z.origem,prazo_id:z.id,prazo_fatal:z.prazo_fatal,atrasada:z.faixa==="atrasada",faixa:z.faixa}}
 async function carregar(){
   if(A.carregando)return;A.carregando=true;
   try{const {ini,fim}=intervalo();const de=addD(ini,-7),ate=addD(fim,7);
@@ -33,9 +33,29 @@ async function carregar(){
 function garantir(){const {ini,fim}=intervalo();if(A.ok&&A.ini&&ini>=A.ini&&fim<=A.fim)return true;if(!A.carregando)carregar();return false}
 const recarregar=()=>{A.ok=false;carregar()};
 
+/* Fase 4B · B4 — marcos previstos do Acompanhamento PJ (ONB/R1/R2/R3 gravados e próxima reunião mensal) como itens de dia inteiro, SÓ na V3.1 e só leitura.
+   Previsto ≠ agendado ≠ realizado: o marco é uma data do planejamento — sem horário, sem evento no banco ou no Google, não conta como compromisso.
+   Deduplicação só por identificador efetivo: a tarefa do ciclo criada por criarTarefasCiclo (mesmo cliente, núcleo acompanhamento_pj, título gerado
+   idêntico e mesma data) — ou o compromisso derivado dessa tarefa (tarefa_id) — já representa o marco e recebe a anotação; compromissos do mesmo
+   cliente no mesmo dia NUNCA são descartados: aparecem como contexto no painel do marco. */
+const MARCO_T={onb:"Onboarding (ONB)",r1:"R1",r2:"R2",r3:"R3",mensal:"Reunião mensal"};
+function marcosAgenda(){
+  if(typeof agendaV3!=="function"||!agendaV3())return [];const AC=window.PP_ACOMP;let pode=false;try{pode=AC?.podeVer?.()===true}catch(_){pode=false}if(!pode)return [];
+  let ms=null;try{ms=AC.marcos()}catch(_){ms=null}
+  if(ms===null){const e=AC.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)AC.carregarLista?.();return []}
+  const hoje=iso(hojeLocal());const out=[];
+  for(const m of ms){if(!m.data||!MARCO_T[m.chave])continue;const d=parseD(m.data);const titulo=MARCO_T[m.chave]+" — "+m.cliente_nome;
+    const mesmoDia=x=>iso(new Date(x.inicio))===m.data&&x.cliente_id===m.cliente_id&&String(x.titulo||"")===titulo;
+    const z=A.prazos.find(x=>x.prazo_origem==="tarefa"&&x.nucleo==="acompanhamento_pj"&&mesmoDia(x))||A.eventos.find(x=>x.tarefa_id&&mesmoDia(x));
+    if(z){z.marco=m;continue}
+    const col=A.colab.find(c=>c.id===m.responsavel_id);
+    out.push({id:"marco:"+m.chave+":"+m.cliente_id+":"+m.data,titulo,inicio:d.toISOString(),fim:addD(d,1).toISOString(),dia_inteiro:true,colaborador_id:m.responsavel_id||null,colaborador_nome:col?.nome||null,cliente_id:m.cliente_id,cliente_nome:m.cliente_nome,tipo:"marco",origem:"acompanhamento",marco:m,vencido:!m.realizada&&m.data<hoje})}
+  return out;
+}
+const todosItens=()=>[...A.eventos,...A.prazos,...marcosAgenda()];
 function visiveis(){
   const meu=meuColab();
-  const todos=[...A.eventos,...A.prazos];
+  const todos=todosItens();
   return todos.filter(ev=>A.quem==="equipe"||(A.quem==="minha"?(!meu||ev.colaborador_id===meu.id||!ev.colaborador_id):ev.colaborador_id===A.quem));
 }
 function abrir(ev){
@@ -143,7 +163,7 @@ function renderMes(v,dias,porDia){
 }
 const abrirEv=e=>(typeof agendaV3==="function"&&agendaV3()&&G3.painel)?abrirPainelAgV3(e,null):abrir(e);
 function chip(e,comHora){
-  const c=el("button",{class:"ag-ev"+(e.origem==="google"?" google":"")+(e.atrasada?" atrasada":"")+(e.prazo_fatal?" fatal":""),style:`--c:${COR[e.tipo]||COR.outro}`,title:`${e.titulo}\n${fmtQuando(e)}${e.colaborador_nome?"\n"+e.colaborador_nome:""}`,onclick:ev=>{ev.stopPropagation();abrirEv(e)}},
+  const c=el("button",{class:"ag-ev"+(e.origem==="google"?" google":"")+(e.tipo==="marco"?" marco":"")+(e.atrasada?" atrasada":"")+(e.prazo_fatal?" fatal":""),style:`--c:${COR[e.tipo]||COR.outro}`,title:`${e.titulo}\n${fmtQuando(e)}${e.colaborador_nome?"\n"+e.colaborador_nome:""}`,onclick:ev=>{ev.stopPropagation();abrirEv(e)}},
     comHora?el("b",{},hm(new Date(e.inicio))+" "):null,e.titulo,A.quem==="equipe"&&e.colaborador_nome?el("small",{}," · "+e.colaborador_nome.split(" ")[0]):null);
   return c;
 }
@@ -176,22 +196,25 @@ const TIPO_M={compromisso:"compromisso",audiencia:"audiência",reuniao:"reunião
 const hmV3=d=>String(d.getHours()).padStart(2,"0")+"h"+String(d.getMinutes()).padStart(2,"0");
 function linhaAgV3(e,{comDia=false}={}){
   const i=new Date(e.inicio);const p=NPUI.prazoTxt(iso(i),e.dia_inteiro?null:hm(i));
-  if(!comDia){p.curta=e.origem==="prazo"?"prazo":e.dia_inteiro?"dia inteiro":p.hora||"—";p.hora="";p.rel=""}else p.rel="";
+  if(!comDia){p.curta=e.tipo==="marco"?"previsto":e.origem==="prazo"?"prazo":e.dia_inteiro?"dia inteiro":p.hora||"—";p.hora="";p.rel=""}else p.rel="";
   if(!e.dia_inteiro&&comDia)p.hora=hmV3(i);
   const regua=e.atrasada?"late":e.prazo_fatal?"fatal":e.tipo==="prazo"?"att":null;
-  const dir=[e.prazo_fatal?NPUI.marca("fatal","crit"):e.origem==="prazo"?(e.prazo_origem==="processo"?NPUI.marca("processo"):e.prazo_origem==="negociacao"?NPUI.marca("negociação"):null):TIPO_M[e.tipo]?NPUI.marca(TIPO_M[e.tipo],e.tipo==="audiencia"?"crit":""):null,e.origem==="google"?NPUI.marca("Google"):e.origem==="tarefa"?NPUI.marca("tarefa"):e.origem==="lead"?NPUI.marca("CRM"):null,NPUI.quem(e.colaborador_nome)];
+  const dir=[e.prazo_fatal?NPUI.marca("fatal","crit"):e.origem==="prazo"?(e.prazo_origem==="processo"?NPUI.marca("processo"):e.prazo_origem==="negociacao"?NPUI.marca("negociação"):null):TIPO_M[e.tipo]?NPUI.marca(TIPO_M[e.tipo],e.tipo==="audiencia"?"crit":""):null,e.origem==="google"?NPUI.marca("Google"):e.origem==="tarefa"?NPUI.marca("tarefa"):e.origem==="lead"?NPUI.marca("CRM"):null,
+    e.tipo==="marco"?NPUI.marca(e.marco.realizada?"realizada":e.vencido?"previsto · não realizado":"marco previsto",e.marco.realizada?"ok":e.vencido?"att":""):e.marco?NPUI.marca("marco "+e.marco.rotulo):null,NPUI.quem(e.colaborador_nome)];
   const fimOk=e.fim&&!isNaN(new Date(e.fim));const fimTxt=!e.dia_inteiro&&fimOk?"até "+hmV3(new Date(e.fim)):null;
   const nDias=e.dia_inteiro&&fimOk?Math.round((new Date(e.fim)-new Date(e.inicio))/864e5):1;const diasTxt=nDias>1?`${nDias} dias (até ${addD(new Date(e.fim),-1).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})`:null;
   return NPUI.linha({id:e.id,regua,prazo:{...p,tom:regua==="late"||regua==="fatal"?"crit":regua==="att"?"att":""},titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),contexto:ctxV3([e.cliente_nome,e.local,fimTxt,diasTxt]),direita:dir,atual:G3.aberta===e.id,onOpen:li=>abrirPainelAgV3(e,li),titleAbrir:"Ver o compromisso"});
 }
 function abrirPainelAgV3(e,li,{silencioso}={}){
   if(!G3.painel){abrir(e);return}G3.aberta=e.id;
+  if(e.tipo==="marco"){abrirPainelMarco(e,li,{silencioso});return}
   const i=new Date(e.inicio),f=e.fim?new Date(e.fim):null;const fimOk=f&&!isNaN(f);const TIPO_L={compromisso:"Compromisso",audiencia:"Audiência",reuniao:"Reunião",pericia:"Perícia",prazo:"Prazo",outro:"Outro"};
   const dl=d=>d.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
   const quando=e.dia_inteiro?(fimOk&&Math.round((f-i)/864e5)>1?`${dl(i)} a ${dl(addD(f,-1))}`:dl(i)):`${dl(i)} · ${hmV3(i)}${fimOk?"–"+hmV3(f):" (sem horário de término)"}`;
   const origem=e.origem==="google"?"Google Calendar (edite por lá; chega aqui na próxima sincronização)":e.origem==="tarefa"?"tarefa com horário":e.origem==="lead"?"reunião marcada no CRM (altere na ficha do lead)":e.origem==="prazo"?(e.prazo_origem==="tarefa"?"prazo de tarefa":e.prazo_origem==="processo"?"prazo processual":"prazo de negociação"):"compromisso do painel";
   const props=NPUI.props([["Quando",quando],["Tipo",e.prazo_fatal?"Prazo fatal":TIPO_L[e.tipo]||e.tipo||"—"],["Responsável",e.colaborador_nome||"—"],e.cliente_nome?["Cliente",e.cliente_nome]:null,e.numero_cnj?["Processo",e.numero_cnj]:null,e.local?["Local",e.local]:null,["Origem",origem]]);
   const desc=e.descricao?NPUI.secao("Observações",el("p",{class:"np-txt"},String(e.descricao).slice(0,1500))):null;
+  const acomp=e.marco&&e.cliente_id&&window.PP_ACOMP?.bloco?window.PP_ACOMP.bloco(e.cliente_id,{titulo:"Acompanhamento PJ · marco "+e.marco.rotulo}):null; // tarefa/compromisso que representa um marco do ciclo (Fase 4B)
   const pe=[];
   // prazo processual: tarefas com prazo vinculadas ao mesmo processo (linhas próprias em v_prazos) aparecem aqui como atalho
   const vinc=e.origem==="prazo"&&e.prazo_origem==="processo"&&e.processo_id?A.prazos.filter(x=>x.prazo_origem==="tarefa"&&x.processo_id===e.processo_id):[];
@@ -202,7 +225,22 @@ function abrirPainelAgV3(e,li,{silencioso}={}){
   else if(e.origem==="google"){if(e.link)pe.push(el("a",{class:"np-btn pri",href:e.link,target:"_blank",rel:"noopener"},"Abrir no Google"))}
   else if(!readOnly())pe.push(NPUI.btn("Editar",{variante:"pri",onclick:()=>formEvento(e)}));
   if(e.cliente_id&&e.origem!=="prazo")pe.push(NPUI.btn("Abrir o cliente",{onclick:()=>{try{history.pushState(null,"","#clientes/"+encodeURIComponent(e.cliente_id))}catch(_){}if(aplicarHash())render()}}));
-  G3.painel.abrir({id:e.id,trilha:[el("span",{},"Agenda"),el("span",{},e.origem==="prazo"?(e.prazo_fatal?"Prazo fatal":"Prazo"):"Compromisso")],titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),corpo:[props,secVinc,desc],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
+  G3.painel.abrir({id:e.id,trilha:[el("span",{},"Agenda"),el("span",{},e.origem==="prazo"?(e.prazo_fatal?"Prazo fatal":"Prazo"):"Compromisso")],titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),corpo:[props,secVinc,acomp,desc],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
+}
+/* painel do marco previsto: só dados do Acompanhamento PJ; mostra (sem descartar) os compromissos e tarefas do mesmo cliente no dia; nada é gravado daqui */
+function abrirPainelMarco(e,li,{silencioso}={}){
+  const m=e.marco;const d=new Date(e.inicio);const k=iso(d);const hoje=iso(hojeLocal());
+  const dl=d.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  const situ=m.realizada?NPUI.marca("realizada — registrada no acompanhamento","ok"):e.vencido?NPUI.marca("prevista, ainda não registrada como realizada","att"):NPUI.marca("prevista no planejamento — não é compromisso confirmado");
+  const props=NPUI.props([["Quando",dl+" (data prevista, sem horário)"],["Marco",m.rotulo],["Situação",situ],["Cliente",e.cliente_nome||"—"],["Resp. estratégico",e.colaborador_nome||"— ninguém —"],["Origem","data gravada no Acompanhamento PJ (planejamento); não cria compromisso nem evento no Google"]]);
+  const abrirItem=x=>()=>{const li2=G3.obra?.querySelector(`.np-it[data-id="${x.id}"]`);abrirPainelAgV3(x,li2||null)};
+  const comp=A.eventos.filter(x=>x.cliente_id===e.cliente_id&&!x.cancelado&&iso(new Date(x.inicio))===k);
+  const secComp=NPUI.secao(`Compromissos do cliente neste dia (${comp.length})`,comp.length?el("ul",{class:"np-vinc"},comp.map(x=>el("li",{},NPUI.btn(String(x.titulo||""),{variante:"ghost",onclick:abrirItem(x)}),el("span",{class:"np-sem"}," · "+(x.dia_inteiro?"dia inteiro":hmV3(new Date(x.inicio)))+(x.origem==="google"?" · Google":""))))):el("div",{class:"np-sem"},"Nenhum compromisso marcado para este cliente neste dia."));
+  const tz=A.prazos.filter(x=>x.prazo_origem==="tarefa"&&x.cliente_id===e.cliente_id&&x.nucleo==="acompanhamento_pj");
+  const secTz=tz.length?NPUI.secao(`Tarefas do ciclo deste cliente no período (${tz.length})`,el("ul",{class:"np-vinc"},tz.map(x=>el("li",{},NPUI.btn(String(x.titulo||"").replace(/^PRAZO FATAL:\s*/,""),{variante:"ghost",onclick:()=>window.PP_TAREFAS?.abrir(x.prazo_id)}),el("span",{class:"np-sem"}," · "+parseD(x.inicio.slice(0,10)).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})))))):null;
+  const pe=[NPUI.btn("Abrir acompanhamento",{variante:"pri",onclick:()=>window.PP_ACOMP?.abrir?.(e.cliente_id)})];
+  if(!readOnly()&&!m.realizada)pe.push(NPUI.btn("Marcar compromisso…",{title:"Abre o formulário de compromisso já com cliente e título; você define o horário",onclick:()=>formEvento({titulo:e.titulo,tipo:"reuniao",cliente_id:e.cliente_id,colaborador_id:e.colaborador_id||meuColab()?.id||null},{inicio:new Date(d.getFullYear(),d.getMonth(),d.getDate(),9,0)})}));
+  G3.painel.abrir({id:e.id,trilha:[el("span",{},"Agenda"),el("span",{},"Marco previsto")],titulo:e.titulo,corpo:[props,secComp,secTz],pe,origem:silencioso?null:(li?.querySelector(".np-it-abrir")||li)});
 }
 function renderAgendaV3(){
   const v=$("#view-agenda");v.replaceChildren();v.classList.add("np-v3");G3.obra=null;G3.painel=null;
@@ -211,8 +249,8 @@ function renderAgendaV3(){
   if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   const evs=visiveis();const dias=[];for(let d=new Date(ini);d<fim;d=addD(d,1))dias.push(d);
   const porDia=d=>{const k=iso(d);return evs.filter(e=>{const s0=new Date(e.inicio);return e.dia_inteiro?iso(s0)<=k&&iso(addD(new Date(e.fim),-1))>=k:iso(s0)===k}).sort((a,b)=>(a.dia_inteiro?0:1)-(b.dia_inteiro?0:1)||a.inicio.localeCompare(b.inicio))};
-  const no=dias.flatMap(d=>porDia(d));const nPr=no.filter(e=>e.tipo==="prazo").length,nFat=no.filter(e=>e.prazo_fatal).length,nAtr=no.filter(e=>e.atrasada).length,nComp=no.length-nPr;
-  const resumo=NPUI.resumo([{n:nFat,label:"fatais",tom:nFat?"crit":"zero"},{n:nAtr,label:"atrasados",tom:nAtr?"crit":"zero"},{n:nPr,label:"prazos",tom:nPr?"att":"zero"},{n:nComp,label:nComp===1?"compromisso":"compromissos"}]);
+  const no=dias.flatMap(d=>porDia(d));const nPr=no.filter(e=>e.tipo==="prazo").length,nFat=no.filter(e=>e.prazo_fatal).length,nAtr=no.filter(e=>e.atrasada).length,nMar=no.filter(e=>e.tipo==="marco").length,nComp=no.length-nPr-nMar;
+  const resumo=NPUI.resumo([{n:nFat,label:"fatais",tom:nFat?"crit":"zero"},{n:nAtr,label:"atrasados",tom:nAtr?"crit":"zero"},{n:nPr,label:"prazos",tom:nPr?"att":"zero"},{n:nComp,label:nComp===1?"compromisso":"compromissos"},nMar?{n:nMar,label:nMar===1?"marco previsto":"marcos previstos"}:null].filter(Boolean));
   const meu=meuColab();const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
   const quem=(k,l,n)=>C({label:l,n,on:A.quem===k,grupo:"quem",onclick:()=>{A.quem=k;try{localStorage.setItem("pp-agenda-quem",k)}catch(_){}render()}});
   quem("minha","Minha agenda");quem("equipe","Toda a equipe");
@@ -232,9 +270,9 @@ function renderAgendaV3(){
   if(vista==="grade"){ // mesma grade da V2 (horários livres, conflitos, sobreposições); chips abrem o painel; célula vazia abre o formulário no horário
     if(A.modo==="mes"){const {g,nota}=montarMes(dias,porDia);corpo.append(el("div",{class:"np-grade-w"},g),NPUI.rodape(nota,[["crit","fatal / atrasado"],["att","prazo"]]))}
     else{const {grade,fora}=montarGrade(dias,porDia,evs);corpo.append(el("div",{class:"np-grade-w"},grade));if(fora.length)corpo.append(el("p",{class:"np-sem np-fora"},"Fora do horário exibido (7h–20h): "+fora.map(e=>`${hm(new Date(e.inicio))} ${e.titulo}`).join(" · ")));corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]))}
-    corpo.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google")));
+    corpo.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google"),window.PP_ACOMP?.podeVer?.()===true?el("span",{},el("i",{style:"background:transparent;border:1.5px dotted var(--muted)"}),"marco previsto (Acompanhamento PJ)"):null));
     obra.append(corpo);v.append(obra);G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
-    if(G3.aberta){const e=[...A.eventos,...A.prazos].find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
+    if(G3.aberta){const e=todosItens().find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
     return}
   const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
   const grupos=[];
@@ -251,11 +289,12 @@ function renderAgendaV3(){
   corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]));
   obra.append(corpo);v.append(obra);
   G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
-  if(G3.aberta){const e=[...A.eventos,...A.prazos].find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
+  if(G3.aberta){const e=todosItens().find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
 }
 document.head.append(el("style",{},`html.np-casca-v3 .np-ag-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-ag-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-ag-s{font:400 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .ag-ev.marco{background:transparent;border:1px dotted var(--muted);border-left:3px dotted var(--c);color:var(--np-text-2)}
 html.np-casca-v3 .np-grade-w{overflow:auto;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);margin:0 0 10px}html.np-casca-v3 .np-fora{margin:0 0 8px;font-size:var(--np-fs-1)}html.np-casca-v3 .np-vinc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}html.np-casca-v3 .np-vinc li{display:flex;align-items:center;gap:4px;flex-wrap:wrap}`));
 
 {const _r=render;render=function(){_r();const v=$("#view-agenda");if(!v)return;v.hidden=S.tab!=="agenda";if(S.tab==="agenda"){if(agendaV3())renderAgendaV3();else{v.classList.remove("np-v3");renderAgenda()}}}}
-window.PP_AGENDA={recarregar,novo:formEvento,sincronizar:sincronizarAgora,v3:agendaV3,abrir:id=>{const e=[...A.eventos,...A.prazos].find(x=>x.id===id);if(e&&agendaV3()&&G3.painel)abrirPainelAgV3(e,null);else if(e)abrir(e)},ir:(d,modo)=>{if(d)A.ref=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(modo){A.modo=modo;try{localStorage.setItem("pp-agenda-modo",modo)}catch(_){}}irPara("agenda")}};
+window.PP_AGENDA={recarregar,novo:formEvento,sincronizar:sincronizarAgora,v3:agendaV3,abrir:id=>{const e=todosItens().find(x=>x.id===id);if(e&&agendaV3()&&G3.painel)abrirPainelAgV3(e,null);else if(e)abrir(e)},ir:(d,modo)=>{if(d)A.ref=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(modo){A.modo=modo;try{localStorage.setItem("pp-agenda-modo",modo)}catch(_){}}irPara("agenda")}};
 })();
