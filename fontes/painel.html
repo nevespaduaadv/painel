@@ -546,6 +546,8 @@ const sv=(tag,attrs={},...kids)=>{const e=document.createElementNS(SVGNS,tag);fo
 /* ---------- Render ---------- */
 /* ---------- Navegação por áreas (pastas), rotas no # e breadcrumb ---------- */
 const NAV=[{tab:"clientes",label:"Clientes"},
+  /* Acompanhamento PJ (visão transversal da carteira): só aparece na casca V3.1 (np-v3-only); na V2 o acesso continua pela ficha do cliente */
+  {tab:"acompanhamento",label:"Acompanhamento PJ",cls:"area-clientes edit-only np-v3-only",icone:"acompanhamento"},
   {grupo:"juridico",label:"Jurídico",cls:"edit-only",itens:[/*NAV_JURIDICO*/{tab:"historico",label:"Base de acordos"},{tab:"regras",label:"Regras de projeção"},{tab:"calibracao",label:"Calibração"}]},
   /*NAV_GRUPOS*/];
 const ROTAS=["clientes","historico","regras","calibracao"];window.PP_ROTAS=ROTAS;
@@ -580,6 +582,7 @@ const ICONES={
   feriados:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>',
   agenda:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   visao:'<path d="M4 19V9M10 19V5M16 19v-8M22 19H2"/><circle cx="4" cy="6" r="1.5"/>',
+  acompanhamento:'<path d="M3 12h4l2-5 4 10 2-5h6"/>',
   portal:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'
 };
 const icone=k=>{const d=ICONES[k]||'<circle cx="12" cy="12" r="3"/>';const s=document.createElementNS(SVGNS,"svg");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("aria-hidden","true");s.innerHTML=d;return s};

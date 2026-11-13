@@ -74,8 +74,12 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
   for (const perfil of Object.keys(PERFIS)) {
     const r = {};
     for (const casca of ['v2', 'v3']) { const { ctx, pg, erros } = await contexto(b, { perfil, casca, w: 1440, h: 900, tema: 'light' }); r[casca] = await destinos(pg); r[casca].erros = erros; await ctx.close(); }
+    // destinos que só existem na casca V3.1 (visão transversal; na V2 o mesmo conteúdo vive na ficha do cliente). Cada um exige o acesso da sua área.
+    const SO_V3 = { acompanhamento: 'clientes' };
+    const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t));
+    const extrasOk = extras.every(t => SO_V3[t] && r.v2.tabs.includes(SO_V3[t])) && Object.keys(SO_V3).every(t => !r.v2.tabs.includes(SO_V3[t]) || extras.includes(t));
     const a = JSON.stringify(r.v2.tabs), c = JSON.stringify(r.v3.tabs);
-    if (a === c) ok(`${perfil}: ${r.v3.tabs.length} destinos iguais nas duas cascas`); else falha(`${perfil}: destinos diferem\n        V2: ${a}\n        V3: ${c}`);
+    if (!faltam.length && extrasOk) ok(`${perfil}: ${r.v2.tabs.length} destinos da V2 presentes na V3.1` + (extras.length ? ` + só-V3.1 [${extras}] (exige acesso a ${extras.map(t => SO_V3[t]).join(', ')})` : ' (nenhum extra)')); else falha(`${perfil}: destinos diferem\n        V2: ${a}\n        V3: ${c}`);
     if (JSON.stringify(r.v2.links) === JSON.stringify(r.v3.links)) ok(`${perfil}: links externos iguais (${r.v3.links.length})`); else falha(`${perfil}: links diferem V2 ${r.v2.links} V3 ${r.v3.links}`);
     for (const casca of ['v2', 'v3']) if (r[casca].erros.length) falha(`${perfil} ${casca}: erros de página: ${r[casca].erros.join(' | ')}`); else ok(`${perfil} ${casca}: sem erros de página`);
     fs.writeFileSync(path.join(OUT, `destinos-${perfil}.json`), JSON.stringify(r, null, 1));

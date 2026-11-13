@@ -25,7 +25,7 @@ async function carregar(cid,force){
   catch(e){console.warn("acomp",e);A.cache[cid]={ok:true,ac:null,dividas:[],atas:[],erro:String(e.message||e)}}
   render();
 }
-const invalidar=cid=>{if(cid)delete A.cache[cid];else A.cache={};render()};
+const invalidar=cid=>{if(cid)delete A.cache[cid];else A.cache={};if(typeof A3!=="undefined")A3.lista=null;render()};
 const selColab=v=>sel({"":"—",...Object.fromEntries((A.colab||[]).filter(c=>c.ativo!==false||c.id===v).map(c=>[c.id,c.nome]))},v||"");
 
 /* ---------- 1) status do ciclo ---------- */
@@ -142,5 +142,164 @@ const css=document.createElement("style");css.textContent=`
 .ciclo-l{font-size:12.5px;font-weight:600;margin-top:6px}.ciclo-passo.atual .ciclo-l{color:var(--fg)}.ciclo-d{font-size:12px;color:var(--muted)}
 .tl .tl-item{padding:10px 0;border-top:1px solid var(--line)}.tl .tl-item:first-child{border-top:0}.tl-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tl-b{white-space:pre-wrap;margin-top:6px;font-size:14px}
 @media (max-width:600px){.ciclo-barra{grid-template-columns:repeat(5,1fr)}.ciclo-l{font-size:11px}.ciclo-d{font-size:11px}}`;document.head.append(css);
-window.PP_ACOMP={invalidar,carregar};
+/* ====================================================================================================================
+   V3.1 (Design System, Fase 3) — Acompanhamento PJ: visão transversal da carteira (#acompanhamento), só com a casca V3.1
+   (html.np-casca-v3) e np-ui. A aba da ficha acima continua intacta. Leitura: v_acompanhamento_pj (0104) + S.clientes
+   (nomes/direcionamento/reserva — só clientes que o perfil já enxerga) + tarefas abertas do núcleo (contagem de pendências).
+   Ações do painel chamam as MESMAS funções da aba (formAta, formCiclo, formDivida, criarTarefasCiclo), sempre com o cliente
+   selecionado passado explicitamente. Permissão da rota = a mesma da aba (equipe, acesso a Clientes, não readOnly).
+   ==================================================================================================================== */
+const acompV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const podeVerTransversal=()=>{try{return typeof equipe==="function"&&equipe()&&!readOnly()&&(typeof PP.temAcesso!=="function"||PP.temAcesso("acompanhamento")===true)}catch(_){return false}};
+const A3={lista:null,carregando:false,erro:null,esperando:null,pend:[],f:{escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:""},painel:null,obra:null,aberta:null,grupos:null};
+const FASE_L={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};
+const DIREC_L={acordos:"Acordos",juridico:"Jurídico",ambos:"Acordos + Jurídico"};
+const RESERVA_L={nao_iniciado:"não iniciada",apresentado:"apresentada ao cliente",em_construcao:"em construção",formada:"formada"};
+const REGUA_L={bronze:"Bronze (2x/mês)",prata:"Prata (1x/mês)",ouro:"Ouro (por marco)"};
+const gruposA3=()=>{if(!A3.grupos){try{A3.grupos=JSON.parse(NPUI.pref.get("np-acomp-grupos","{}"))||{}}catch(_){A3.grupos={}}}return A3.grupos};
+async function carregarLista(force){
+  if(A3.carregando)return;if(A3.lista&&!force)return;A3.carregando=true;
+  try{const [v,co,tp]=await Promise.all([SB.from("v_acompanhamento_pj").select("*"),A.colab?{data:A.colab}:SB.from("colaboradores").select("id,nome,perfil_id,frente,nucleo,ativo").order("nome"),
+      SB.from("v_tarefas").select("id,cliente_id,titulo,prazo,status,prazo_fatal,responsavel_nome").eq("nucleo","acompanhamento_pj").in("status",["aberta","em_andamento"])]);
+    A.colab=co.data||[];A3.pend=tp.data||[];A3.erro=v.error?.message||null;A3.lista=v.data||[]}
+  catch(e){console.warn("acomp lista",e);A3.erro=String(e.message||e);A3.lista=[]}
+  finally{A3.carregando=false}
+  render();
+}
+const diaISO=iso=>iso?iso.slice(0,10):null;
+/* próxima reunião registrada: proxima_reuniao (mensal) ou, no ciclo inicial, a primeira reunião ainda não marcada como feita — só datas gravadas */
+function proximaDe(a){
+  if(!a)return null;const passos=[["onb","Onboarding",a.onb_data,a.onb_feita],["r1","R1",a.r1_data,a.r1_feita],["r2","R2",a.r2_data,a.r2_feita],["r3","R3",a.r3_data,a.r3_feita]];
+  if(a.fase==="mensal"||a.fase==="encerrado")return a.proxima_reuniao?{data:diaISO(a.proxima_reuniao),rotulo:"mensal"}:null;
+  for(const [k,l,d,f] of passos)if(d&&!f)return {data:diaISO(d),rotulo:l};
+  return a.proxima_reuniao?{data:diaISO(a.proxima_reuniao),rotulo:"mensal"}:null;
+}
+const diasAte=iso=>iso?Math.round((parseD(iso)-new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()))/86400000):null;
+const diaCiclo=a=>a?.onb_data?Math.round((new Date(hojeISO())-new Date(diaISO(a.onb_data)))/86400000):null;
+/* registros da carteira: uma linha por cliente visível (S.clientes) que tenha acompanhamento ou seja cliente PJ ativo */
+function registrosA3(){
+  const porCli=new Map((A3.lista||[]).map(a=>[a.cliente_id,a]));const pendPor=new Map();for(const t of A3.pend){const l=pendPor.get(t.cliente_id)||[];l.push(t);pendPor.set(t.cliente_id,l)}
+  return (S.clientes||[]).map(c=>{const a0=porCli.get(c.id)||null;const iniciado=!!(a0&&a0.fase);const a=iniciado?a0:null;const prox=proximaDe(a);const d=prox?diasAte(prox.data):null;const pend=pendPor.get(c.id)||[];
+    const grupo=!iniciado?"sem_acomp":(a.fase==="encerrado")?"encerrado":d==null?"sem_data":d<0?"vencida":d<=6?"semana":"proxima";
+    return {c,a,iniciado,prox,dias:d,pend,grupo,resp:(A.colab||[]).find(x=>x.id===c.resp_estrategico_id)||null}})
+    .filter(r=>r.iniciado||r.c.status!=="encerrado");
+}
+function filtrarA3(regs){
+  const f=A3.f;const meu=meuColab();
+  return regs.filter(r=>{
+    if(f.escopo==="ativos"&&(!r.iniciado||r.a.fase==="encerrado"))return false;if(f.escopo==="encerrados"&&!(r.iniciado&&r.a.fase==="encerrado"))return false;
+    if(f.ciclo&&!(r.iniciado&&(r.a.fase==="onboarding"||r.a.fase==="ciclo")))return false;if(f.mensal&&!(r.iniciado&&r.a.fase==="mensal"))return false;if(f.pend&&!r.pend.length)return false;
+    if(f.resp&&(f.resp==="eu"?!(meu&&r.c.resp_estrategico_id===meu.id):r.c.resp_estrategico_id!==f.resp))return false;if(f.fase&&(r.a?.fase||"")!==f.fase)return false;if(f.regua&&(r.c.regua||"")!==f.regua)return false;
+    return true});
+}
+const GRUPOS_A3=[["vencida","Reunião vencida","crit"],["semana","Esta semana","att"],["proxima","Próximas reuniões",""],["sem_data","Sem agendamento",""],["sem_acomp","Sem acompanhamento iniciado",""],["encerrado","Encerrados",""]];
+const reguaA3=r=>r.grupo==="vencida"?"late":r.grupo==="semana"?"att":null;
+function marcasA3(r){const m=[];if(r.iniciado&&r.a.fase==="mensal")m.push(NPUI.marca("mensal","info"));if(r.a?.acordos_liberado)m.push(NPUI.marca("acordos liberado","ok"));if(r.c.projeto_reserva==="formada")m.push(NPUI.marca("reserva formada","ok"));
+  const venc=r.pend.filter(t=>t.prazo&&t.prazo<hojeISO()).length;if(r.pend.length)m.push(NPUI.marca(`${r.pend.length} pendência${r.pend.length===1?"":"s"}`,venc?"crit":"att"));return m}
+function contextoA3(r){
+  const partes=[];if(r.c.segmento)partes.push(r.c.segmento);if(r.c.cidade)partes.push(r.c.cidade);
+  if(r.iniciado){partes.push(FASE_L[r.a.fase]||r.a.fase);const dc=diaCiclo(r.a);if(dc!=null&&dc>=0&&(r.a.fase==="onboarding"||r.a.fase==="ciclo"))partes.push(`dia ${dc} de 45`)}
+  if(r.c.direcionamento&&DIREC_L[r.c.direcionamento])partes.push("→ "+DIREC_L[r.c.direcionamento]);
+  const out=[];partes.forEach((x,i)=>{if(i)out.push(" · ");out.push(x)});
+  if(r.prox){const p=NPUI.prazoTxt(r.prox.data);out.push(el("span",{class:"sep"}," · "));out.push(el("span",{class:"rel "+(r.grupo==="vencida"?"late":r.grupo==="semana"?"att":"")},r.prox.rotulo+" "+p.rel))}
+  return out;
+}
+const ETAPAS_PT=[["onb","ONB"],["r1","R1"],["r2","R2"],["r3","R3"],["mensal","Mensal"]];
+function linhaA3(r){
+  const p=r.prox?NPUI.prazoTxt(r.prox.data):null;
+  return NPUI.linha({id:r.c.id,regua:reguaA3(r),atual:A3.aberta===r.c.id,
+    prazo:p?{curta:p.curta,hora:"",rel:p.rel,exata:p.exata+" · "+r.prox.rotulo+" · "+p.rel,tom:r.grupo==="vencida"?"late":r.grupo==="semana"?"att":""}:{curta:"",exata:r.iniciado?"sem reunião agendada":"acompanhamento não iniciado"},
+    titulo:r.c.nome,contexto:contextoA3(r),titleAbrir:"Abrir o acompanhamento",
+    direita:[...marcasA3(r),r.iniciado?NPUI.etapa(ETAPAS_PT.map(([k,label])=>({k,label})),r.a.etapa_atual,{feitos:ETAPAS_PT.filter(([k])=>k==="mensal"?(r.a.fase==="mensal"||r.a.fase==="encerrado"):!!r.a[k+"_feita"]).map(([k])=>k)}):null,NPUI.quem(r.resp?.nome)],
+    onOpen:li=>abrirPainelA3(r.c.id,{origem:li.querySelector(".np-it-abrir")})});
+}
+function listaA3(regs){
+  const host=el("div",{class:"np-corpo"});const grupos=GRUPOS_A3.filter(([k])=>regs.some(r=>r.grupo===k));
+  if(!grupos.length){host.append(NPUI.vazio({titulo:"Nada com esses filtros",texto:"Tire um filtro ou inicie o acompanhamento pela ficha do cliente.",acao:"Limpar filtros",onAcao:()=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:""};render()}}));return host}
+  const ab=gruposA3();
+  for(const [k,l,tom] of grupos){const its=regs.filter(r=>r.grupo===k).sort((x,y)=>(x.prox?.data||"9999").localeCompare(y.prox?.data||"9999")||x.c.nome.localeCompare(y.c.nome));
+    host.append(NPUI.grupo({id:k,titulo:l,n:its.length,tom,aberto:ab[k]!==false,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-acomp-grupos",JSON.stringify(ab))},itens:its.map(linhaA3)}))}
+  return host;
+}
+function filtrosA3(regs){
+  const f=A3.f;const chips=[];const C=(o)=>{const c=NPUI.chip(o);chips.push(c);return c};const meu=meuColab();
+  const ativos=regs.filter(r=>r.iniciado&&r.a.fase!=="encerrado");
+  const esc=(k,l)=>C({label:l,on:f.escopo===k,grupo:"escopo",onclick:()=>{f.escopo=k;render()}});esc("ativos","Em acompanhamento");esc("encerrados","Encerrados");esc("todos","Todos os clientes");
+  chips.push(NPUI.sepv());
+  C({label:"Ciclo inicial",n:ativos.filter(r=>r.a.fase==="onboarding"||r.a.fase==="ciclo").length,on:f.ciclo,grupo:"attr",onclick:()=>{f.ciclo=!f.ciclo;if(f.ciclo)f.mensal=false;render()}});
+  C({label:"Mensal",n:ativos.filter(r=>r.a.fase==="mensal").length,on:f.mensal,grupo:"attr",onclick:()=>{f.mensal=!f.mensal;if(f.mensal)f.ciclo=false;render()}});
+  C({label:"Com pendência",n:ativos.filter(r=>r.pend.length).length,on:f.pend,grupo:"attr",onclick:()=>{f.pend=!f.pend;render()}}).classList.add("crit");
+  if(meu)C({label:"Minhas",n:ativos.filter(r=>r.c.resp_estrategico_id===meu.id).length,on:f.resp==="eu",grupo:"attr",title:"Só os clientes em que sou o responsável estratégico",onclick:()=>{f.resp=f.resp==="eu"?"":"eu";render()}});
+  const cont=new Map();for(const r of ativos){if(r.resp)cont.set(r.resp.id,(cont.get(r.resp.id)||0)+1)}
+  const top=[...cont.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]).filter(id=>!(meu&&id===meu.id));
+  if(top.length){chips.push(NPUI.sepv());for(const id of top){const co=(A.colab||[]).find(x=>x.id===id);if(co)C({label:NPUI.curto(co.nome),on:f.resp===id,grupo:"resp",onclick:()=>{f.resp=f.resp===id?"":id;render()}})}}
+  const extras=[f.fase,f.regua,f.resp&&f.resp!=="eu"&&!top.includes(f.resp)].filter(Boolean).length;
+  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Fase, responsável estratégico, régua",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+    const fFase=sel({"":"Todas as fases",...FASE_L},f.fase),fResp=sel({"":"Todos os responsáveis",...Object.fromEntries((A.colab||[]).filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp==="eu"?(meu?.id||""):f.resp),fReg=sel({"":"Todas as réguas",...REGUA_L},f.regua);
+    fFase.onchange=()=>{f.fase=fFase.value;render()};fResp.onchange=()=>{f.resp=fResp.value;render()};fReg.onchange=()=>{f.regua=fReg.value;render()};
+    const L=(l,c)=>el("div",{},el("label",{},l),c);
+    return [el("div",{class:"np-pop-form"},L("Fase",fFase),L("Responsável estratégico",fResp),L("Régua",fReg),
+      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:""};NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-acompanhamento .np-chipf[aria-haspopup="dialog"]')})});
+  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
+  return {chips,fixos:[mais]};
+}
+function renderAcompanhamentoV3(){
+  const v=$("#view-acompanhamento");if(!v)return;v.replaceChildren();v.classList.add("np-v3");A3.obra=null;A3.painel=null;
+  if(!A3.lista){carregarLista();v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
+  const regs=registrosA3();const ativos=regs.filter(r=>r.iniciado&&r.a.fase!=="encerrado");
+  const nV=ativos.filter(r=>r.grupo==="vencida").length,nS=ativos.filter(r=>r.grupo==="semana").length,nSD=ativos.filter(r=>r.grupo==="sem_data").length,nP=ativos.reduce((s,r)=>s+r.pend.length,0),nM=ativos.filter(r=>r.a.fase==="mensal").length;
+  const resumo=NPUI.resumo([{n:nV,label:"reuniões vencidas",tom:nV?"crit":"zero"},{n:nS,label:"esta semana",tom:nS?"att":"zero"},{n:nSD,label:"sem agendamento",tom:nSD?"att":"zero"},{n:nP,label:"pendências",tom:nP?"":"zero"},{n:nM,label:"no mensal"}]);
+  const fl=filtrosA3(regs);
+  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[NPUI.btn("Clientes",{variante:"ghost",title:"Lista de clientes",onclick:()=>irPara("clientes")})]}));NPUI.reancorarPop();
+  if(A3.erro&&/acompanhamento_pj|v_acompanhamento/.test(A3.erro))v.append(NPUI.faixaErro({texto:"Acompanhamento PJ indisponível neste ambiente: rode a migração 0104.",acao:"Tentar de novo",onAcao:()=>carregarLista(true)}));
+  const obra=el("div",{class:"np-obra"});A3.obra=obra;const lista=filtrarA3(regs);const corpo=listaA3(lista);
+  corpo.append(NPUI.rodape(`${lista.length} cliente${lista.length===1?"":"s"} com estes filtros`,[["late","reunião vencida"],["att","esta semana"]]));
+  obra.append(corpo);v.append(obra);
+  A3.painel=NPUI.painel({obra,label:"Acompanhamento do cliente",onClose:()=>{A3.aberta=null}});
+  if(A3.aberta){if(regs.some(r=>r.c.id===A3.aberta))abrirPainelA3(A3.aberta,{silencioso:true});else A3.aberta=null}
+}
+/* painel: SEMPRE a partir do id → cliente atual de S.clientes + registro atual; as ações recebem esse `c` explicitamente */
+function abrirPainelA3(cid,{origem,silencioso}={}){
+  const c=(S.clientes||[]).find(x=>x.id===cid);if(!c){toast("Cliente não encontrado");return}
+  A3.aberta=cid;const st=A.cache[cid];if(!st?.ok){A3.esperando=cid;carregar(cid);}
+  const m=montarPainelA3(c);if(!m)return;
+  A3.painel.abrir({id:cid,trilha:m.trilha,titulo:c.nome,corpo:m.corpo,pe:m.pe,origem:silencioso?null:origem});
+}
+/* conteúdo do painel a partir do cliente atual (S.clientes) e do registro atual — reutilizado na abertura e na atualização silenciosa */
+function montarPainelA3(c){
+  const cid=c.id;const st=A.cache[cid];
+  const r=registrosA3().find(x=>x.c.id===cid);const a=r?.a||null;const edita=podeEditar()&&!readOnly();
+  const prox=r?.prox;const pp=prox?NPUI.prazoTxt(prox.data):null;
+  const props=NPUI.props([
+    ["Fase",a?.fase?[FASE_L[a.fase]||a.fase,(a.fase==="onboarding"||a.fase==="ciclo")&&diaCiclo(a)!=null&&diaCiclo(a)>=0?el("small",{style:"margin-left:6px;color:var(--np-text-3)"},`dia ${diaCiclo(a)} de 45`):null]:el("span",{class:"np-sem"},"acompanhamento não iniciado")],
+    ["Próxima reunião",pp?[pp.exata," ",el("span",{class:"np-marca "+(r.grupo==="vencida"?"crit":r.grupo==="semana"?"att":"")},prox.rotulo+" · "+pp.rel)]:el("span",{class:"np-sem"},a?"sem reunião agendada":"—"),"serif"],
+    ["Responsável",r?.resp?NPUI.quem(r.resp.nome):el("span",{class:"np-sem"},"— ninguém —")],
+    ["Direcionamento",c.direcionamento?"→ "+(DIREC_L[c.direcionamento]||c.direcionamento)+(c.direcionamento_em?" (em "+fmtD(diaISO(c.direcionamento_em))+")":""):el("span",{class:"np-sem"},"ainda não direcionado")],
+    ["Régua",c.regua?REGUA_L[c.regua]:null],
+    ["Acordos",a?(a.acordos_liberado?NPUI.marca("liberado em "+fmtD(diaISO(a.acordos_liberado_em||"")),"ok"):el("span",{class:"np-sem"},"aguarda a R1 + Raio-X")):null],
+    ["Reserva",[el("span",{},"planejada: "+(c.projeto_reserva?RESERVA_L[c.projeto_reserva]:"não iniciada")),el("br"),el("span",{},"acumulada: "),c.reservaAcumulada?[el("b",{style:"font-family:var(--np-display)"},BRL(+c.reservaAcumulada)),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada")]],
+  ].filter(x=>x&&x[1]!=null));
+  const passos=ETAPAS_PT.map(([k,label])=>{const d=k==="mensal"?diaISO(a?.proxima_reuniao):diaISO(a?.[k+"_data"]);const feita=k==="mensal"?(a?.fase==="mensal"||a?.fase==="encerrado"):!!a?.[k+"_feita"];return {label:k==="onb"?"Onboarding":label,data:d?fmtD(d):"—",feita,atual:a?a.etapa_atual===k:k==="onb"}});
+  const secCiclo=NPUI.secao("Ciclo de acompanhamento",NPUI.ciclo(passos),a?.observacoes?el("div",{style:"margin-top:8px;white-space:pre-wrap;font-size:var(--np-fs-2)"},a.observacoes):null,!a?el("div",{class:"np-sem",style:"margin-top:8px"},"Defina a data do onboarding para começar."):null);
+  const ds=st?.ok?st.dividas:null;
+  const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"}],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
+    ds&&ds.length?el("div",{class:"np-rodape",style:"padding:6px 0 0"},`${ds.length} dívida${ds.length===1?"":"s"} · ${BRL(ds.reduce((s,d)=>s+(+d.valor||0),0))} · ${ds.filter(d=>(d.atraso_meses||0)>0).length} em atraso`):null);
+  const pend=(r?.pend||[]).slice().sort((x,y)=>(x.prazo||"9999").localeCompare(y.prazo||"9999"));
+  const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
+  const atas=st?.ok?st.atas:null;
+  const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[(A.colab.find(k=>k.id===x.autor_id)?.nome||""),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
+  const trilha=[el("span",{},"Clientes"),el("span",{class:"sep"}),el("span",{},"Acompanhamento PJ")];
+  const pe=[edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
+    (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
+  return {trilha,corpo:[props,secCiclo,secRaio,secPend,secAtas],pe};
+}
+/* rota #acompanhamento: só com a casca V3.1 e permissão; fora disso, volta para Clientes (ou Hoje) — inclusive quando aberta por hash/URL */
+{const _r=render;render=function(){_r();const v=$("#view-acompanhamento");if(!v)return;
+  if(S.tab==="acompanhamento"&&!(acompV3()&&podeVerTransversal())){S.tab=(typeof PP.temAcesso==="function"&&PP.temAcesso("clientes"))?"clientes":"painel";try{localStorage.setItem("pp-tab",S.tab)}catch(_){}v.hidden=true;setTimeout(()=>render(),0);return}
+  v.hidden=S.tab!=="acompanhamento";if(S.tab!=="acompanhamento")return;
+  if(A3.esperando&&A3.obra&&A3.painel&&A3.aberta===A3.esperando&&A.cache[A3.esperando]?.ok&&A3.lista){const c=(S.clientes||[]).find(x=>x.id===A3.esperando);A3.esperando=null;const m=c&&montarPainelA3(c);if(m){A3.painel.atualizar({corpo:m.corpo,pe:m.pe});return}}
+  renderAcompanhamentoV3()}}
+const invalidarLista=()=>{A3.lista=null};
+window.__PP_LOGIN?.then?.(()=>{try{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("acomp-pj");for(const t of ["acompanhamento_pj","atas_reuniao","dividas_raio_x"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{invalidarLista();if(S.tab==="acompanhamento")render()});ch.subscribe()}}catch(_){}});
+window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid)};
 })();

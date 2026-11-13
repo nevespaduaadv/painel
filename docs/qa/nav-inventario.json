@@ -42,6 +42,13 @@
   "em": null
  },
  {
+  "tab": "acompanhamento",
+  "label": "Acompanhamento PJ",
+  "cls": "area-clientes edit-only np-v3-only",
+  "hash": "",
+  "em": null
+ },
+ {
   "tab": "processos",
   "label": "Jurídico",
   "cls": "edit-only grp-juridico area-juridico",

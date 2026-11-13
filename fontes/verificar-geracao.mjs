@@ -98,7 +98,8 @@ function inventario(html) {
   return itens;
 }
 const chave = (i) => i.tab ? `tab:${i.tab}|${i.hash}|${(i.tabs || []).join('+')}` : `grupo:${i.grupo}`;
-const classes = (inv) => new Set(inv.flatMap(i => i.cls.split(/\s+/).filter(Boolean)));
+// classes de PERMISSÃO (area-*, *-only, grp-*…); `np-*` são sinalizadores de apresentação da casca V3.1 (ex.: np-v3-only = item só existe na V3.1) e não entram no conjunto
+const classes = (inv) => new Set(inv.flatMap(i => i.cls.split(/\s+/).filter(Boolean)).filter(c => !/^np-/.test(c)));
 function parseTokens(css) {
   const out = { light: {}, 'media-dark': {}, 'data-dark': {} };
   const re = /(@media \(prefers-color-scheme:\s*dark\)\s*\{\s*)?(:root(?:\[data-theme="dark"\]|:not\(\[data-theme="light"\]\))?)\s*\{([\s\S]*?)\}/g; let m;
