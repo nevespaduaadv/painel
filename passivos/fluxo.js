@@ -384,14 +384,7 @@ function abrirPainelN3(n,{origem,silencioso}={}){
     ["Acumulada",c.reservaAcumulada?[BRL(+c.reservaAcumulada),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada"),"serif"],
   ]):null;
   /* Acompanhamento PJ do cliente (B2) — só leitura dos dados existentes, pelo id do cliente; nada vira regra ou bloqueio aqui */
-  const secAcomp=(()=>{const AC=window.PP_ACOMP;if(!c||!AC?.podeVer||AC.podeVer()!==true)return null;const r=AC.porCliente(c.id);
-    if(r===null){const e=AC.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)AC.carregarLista?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Acompanhamento PJ",e?.erro?el("div",{class:"np-sem"},"Acompanhamento indisponível neste ambiente."):NPUI.carregando(2))}
-    const abrir=NPUI.btn("Abrir acompanhamento",{variante:"ghost",onclick:()=>AC.abrir(c.id)});
-    if(!r.iniciado)return NPUI.secao("Acompanhamento PJ",el("div",{class:"np-sem"},"Acompanhamento não iniciado para este cliente."),el("div",{style:"margin-top:6px"},abrir));
-    const a=r.a;const FASE={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};const pp=r.prox?NPUI.prazoTxt(r.prox.data):null;
-    const kv=NPUI.props([["Fase",FASE[a.fase]||a.fase],["Próxima reunião",pp?[pp.exata," ",el("span",{class:"np-marca "+(r.grupo==="vencida"?"crit":r.grupo==="semana"?"att":"")},r.prox.rotulo+" · prevista · "+pp.rel)]:el("span",{class:"np-sem"},"sem data prevista"),"serif"],
-      ["Acordos",a.acordos_liberado?NPUI.marca("liberado em "+fmtD(parseD((a.acordos_liberado_em||"").slice(0,10))),"ok"):el("span",{class:"np-sem"},"aguarda a R1 + Raio-X")],["Resp. estratégico",r.resp?NPUI.quem(r.resp.nome):el("span",{class:"np-sem"},"— ninguém —")],r.pend.length?["Pendências",`${r.pend.length} tarefa${r.pend.length===1?"":"s"} aberta${r.pend.length===1?"":"s"} do núcleo`]:null].filter(Boolean));
-    return NPUI.secao("Acompanhamento PJ",kv,el("div",{style:"margin-top:6px"},abrir))})();
+  const secAcomp=c&&window.PP_ACOMP?.bloco?window.PP_ACOMP.bloco(c.id):null; // bloco cruzado só leitura (contrato PP_ACOMP; null sem permissão) — Fase 4B
   const corpo=[props,NPUI.secao("Valores",valores.children.length?valores:el("div",{class:"np-sem"},"Sem valores informados"),notaAlcada),
     c?NPUI.secao("Reserva financeira do cliente",reserva):null,secAcomp,
     n.proximo_passo?NPUI.secao("Próximo passo",el("div",{style:"white-space:pre-wrap"},n.proximo_passo)):null,

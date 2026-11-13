@@ -320,6 +320,16 @@ window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:
       for(const [k,l] of [["onb","Onboarding"],["r1","R1"],["r2","R2"],["r3","R3"]]){const d=diaISO(a[k+"_data"]);if(d)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:k,rotulo:l,data:d,realizada:!!a[k+"_feita"],responsavel_id:c.resp_estrategico_id||null})}
       if(a.proxima_reuniao)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:"mensal",rotulo:"Mensal",data:diaISO(a.proxima_reuniao),realizada:false,responsavel_id:c.resp_estrategico_id||null})}
     return out},
+  /* bloco cruzado "Acompanhamento PJ" (Fase 4B) para os painéis de Negociações e Tarefas — só leitura, só dados gravados; null sem permissão/V3.1 */
+  bloco:(cid,{titulo="Acompanhamento PJ"}={})=>{if(!podeVerTransversal()||!window.NPUI||!cid)return null;const AC=window.PP_ACOMP;const r=AC.porCliente(cid);
+    if(r===null){const e=AC.estado();if(!e.carregado&&!e.carregando&&!e.erro)carregarLista();/* com erro não insiste: evita laço de recarga */
+      return NPUI.secao(titulo,e.erro?el("div",{class:"np-sem"},"Acompanhamento indisponível neste ambiente."):NPUI.carregando(2))}
+    const abrir=NPUI.btn("Abrir acompanhamento",{variante:"ghost",onclick:()=>AC.abrir(cid)});
+    if(!r.iniciado)return NPUI.secao(titulo,el("div",{class:"np-sem"},"Acompanhamento não iniciado para este cliente."),el("div",{style:"margin-top:6px"},abrir));
+    const a=r.a;const FASE={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};const pp=r.prox?NPUI.prazoTxt(r.prox.data):null;
+    const kv=NPUI.props([["Fase",FASE[a.fase]||a.fase],["Próxima reunião",pp?[pp.exata," ",el("span",{class:"np-marca "+(r.grupo==="vencida"?"crit":r.grupo==="semana"?"att":"")},r.prox.rotulo+" · prevista · "+pp.rel)]:el("span",{class:"np-sem"},"sem data prevista"),"serif"],
+      ["Acordos",a.acordos_liberado?NPUI.marca("liberado em "+fmtD((a.acordos_liberado_em||"").slice(0,10)),"ok"):el("span",{class:"np-sem"},"aguarda a R1 + Raio-X")],["Resp. estratégico",r.resp?NPUI.quem(r.resp.nome):el("span",{class:"np-sem"},"— ninguém —")],r.pend.length?["Pendências",`${r.pend.length} tarefa${r.pend.length===1?" aberta":"s abertas"} do núcleo`]:null].filter(Boolean));
+    return NPUI.secao(titulo,kv,el("div",{style:"margin-top:6px"},abrir))},
   abrir:cid=>{if(!podeVerTransversal())return false;const c=(S.clientes||[]).find(x=>x.id===cid);if(!c)return false;
     if(!acompV3()){S.tab="clientes";S.sel=cid;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render();return true}
     const jaNaAba=S.tab==="acompanhamento";A3.aberta=cid;S.tab="acompanhamento";try{localStorage.setItem("pp-tab","acompanhamento")}catch(_){}
