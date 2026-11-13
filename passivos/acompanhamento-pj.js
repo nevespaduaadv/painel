@@ -289,10 +289,17 @@ function montarPainelA3(c){
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
   const atas=st?.ok?st.atas:null;
   const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[(A.colab.find(k=>k.id===x.autor_id)?.nome||""),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
+  /* Negociações do cliente (B2) — lidas pelo id do cliente no módulo de Negociações; cada uma só com os próprios valores (nenhuma soma global) */
+  const secNeg=(()=>{const NG=window.PP_NEG;if(!NG?.podeVer||NG.podeVer()!==true)return null;const lista=NG.porCliente(cid);
+    if(lista===null){const e=NG.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)NG.carregar?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Negociações",e?.erro?el("div",{class:"np-sem"},"Negociações indisponíveis no momento."):NPUI.carregando(2))}
+    const abertas=lista.filter(n=>n.etapa!=="concluido"),concl=lista.length-abertas.length;const nova=edita&&!readOnly()&&NG.nova?NPUI.btn("Nova negociação",{variante:"ghost",icone:"mais",onclick:()=>NG.nova(c)}):null;
+    return NPUI.secao(`Negociações${abertas.length?" · "+abertas.length+" aberta"+(abertas.length===1?"":"s"):""}`,
+      abertas.length?el("div",{class:"np-vinc-l"},abertas.map(n=>NG.linhaCompacta(n))):el("div",{class:"np-sem"},"Nenhuma negociação aberta para este cliente."),
+      el("div",{class:"np-rodape",style:"padding:6px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"},concl?el("span",{},`${concl} concluída${concl===1?"":"s"}`):null,nova))})();
   const trilha=[el("span",{},"Clientes"),el("span",{class:"sep"}),el("span",{},"Acompanhamento PJ")];
   const pe=[edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
     (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
-  return {trilha,corpo:[props,secCiclo,secRaio,secPend,secAtas],pe};
+  return {trilha,corpo:[props,secCiclo,secNeg,secRaio,secPend,secAtas],pe};
 }
 /* rota #acompanhamento: só com a casca V3.1 e permissão; fora disso, volta para Clientes (ou Hoje) — inclusive quando aberta por hash/URL */
 {const _r=render;render=function(){_r();const v=$("#view-acompanhamento");if(!v)return;
@@ -315,5 +322,6 @@ window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:
     return out},
   abrir:cid=>{if(!podeVerTransversal())return false;const c=(S.clientes||[]).find(x=>x.id===cid);if(!c)return false;
     if(!acompV3()){S.tab="clientes";S.sel=cid;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render();return true}
-    A3.aberta=cid;S.tab="acompanhamento";try{localStorage.setItem("pp-tab","acompanhamento")}catch(_){}if(S.tab==="acompanhamento"&&A3.painel&&A3.lista){abrirPainelA3(cid);return true}render();return true}};
+    const jaNaAba=S.tab==="acompanhamento";A3.aberta=cid;S.tab="acompanhamento";try{localStorage.setItem("pp-tab","acompanhamento")}catch(_){}
+    if(jaNaAba&&A3.painel&&A3.lista){abrirPainelA3(cid);return true}render();return true}};
 })();

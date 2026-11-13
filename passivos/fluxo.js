@@ -383,8 +383,17 @@ function abrirPainelN3(n,{origem,silencioso}={}){
     ["Planejada",c.projeto_reserva?RESERVA[c.projeto_reserva]:el("span",{class:"np-sem"},"não iniciada")],
     ["Acumulada",c.reservaAcumulada?[BRL(+c.reservaAcumulada),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada"),"serif"],
   ]):null;
+  /* Acompanhamento PJ do cliente (B2) — só leitura dos dados existentes, pelo id do cliente; nada vira regra ou bloqueio aqui */
+  const secAcomp=(()=>{const AC=window.PP_ACOMP;if(!c||!AC?.podeVer||AC.podeVer()!==true)return null;const r=AC.porCliente(c.id);
+    if(r===null){const e=AC.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)AC.carregarLista?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Acompanhamento PJ",e?.erro?el("div",{class:"np-sem"},"Acompanhamento indisponível neste ambiente."):NPUI.carregando(2))}
+    const abrir=NPUI.btn("Abrir acompanhamento",{variante:"ghost",onclick:()=>AC.abrir(c.id)});
+    if(!r.iniciado)return NPUI.secao("Acompanhamento PJ",el("div",{class:"np-sem"},"Acompanhamento não iniciado para este cliente."),el("div",{style:"margin-top:6px"},abrir));
+    const a=r.a;const FASE={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};const pp=r.prox?NPUI.prazoTxt(r.prox.data):null;
+    const kv=NPUI.props([["Fase",FASE[a.fase]||a.fase],["Próxima reunião",pp?[pp.exata," ",el("span",{class:"np-marca "+(r.grupo==="vencida"?"crit":r.grupo==="semana"?"att":"")},r.prox.rotulo+" · prevista · "+pp.rel)]:el("span",{class:"np-sem"},"sem data prevista"),"serif"],
+      ["Acordos",a.acordos_liberado?NPUI.marca("liberado em "+fmtD(parseD((a.acordos_liberado_em||"").slice(0,10))),"ok"):el("span",{class:"np-sem"},"aguarda a R1 + Raio-X")],["Resp. estratégico",r.resp?NPUI.quem(r.resp.nome):el("span",{class:"np-sem"},"— ninguém —")],r.pend.length?["Pendências",`${r.pend.length} tarefa${r.pend.length===1?"":"s"} aberta${r.pend.length===1?"":"s"} do núcleo`]:null].filter(Boolean));
+    return NPUI.secao("Acompanhamento PJ",kv,el("div",{style:"margin-top:6px"},abrir))})();
   const corpo=[props,NPUI.secao("Valores",valores.children.length?valores:el("div",{class:"np-sem"},"Sem valores informados"),notaAlcada),
-    c?NPUI.secao("Reserva financeira do cliente",reserva):null,
+    c?NPUI.secao("Reserva financeira do cliente",reserva):null,secAcomp,
     n.proximo_passo?NPUI.secao("Próximo passo",el("div",{style:"white-space:pre-wrap"},n.proximo_passo)):null,
     n.aguardando?NPUI.secao("Aguardando",el("div",{},n.aguardando)):null,
     n.observacoes?NPUI.secao("Observações",el("div",{style:"white-space:pre-wrap"},n.observacoes)):null,
@@ -405,6 +414,12 @@ window.PP_NEG={lista:()=>X.neg,filtro:(f={})=>{limparN3();if(f.cliente!=null)X.f
   // null = sem permissão ou ainda não carregado (o chamador decide mostrar "carregando" ou nada); [] = carregado e vazio
   porCliente:cid=>(window.NPUI?.permite&&NPUI.permite("negociacoes")&&X.ok&&cid)?X.neg.filter(n=>n.cliente_id===cid):null,
   // abre a negociação pelo id: V3.1 → rota #negociacoes com o painel; V2 → ficha do cliente na aba Negociações. Nunca por objeto de outro módulo.
+  nova:c=>{if(!(window.NPUI?.permite&&NPUI.permite("negociacoes"))||readOnly())return false;openNegForm(c&&c.id?{id:c.id}:null,{});return true},
+  // linha compacta para blocos de outros módulos (B2): etapa, banco, cobrado → proposta/acordo, próximo passo, responsável; clique → abrir(id)
+  linhaCompacta:n=>{const ab=n.etapa!=="concluido";const emNeg=!NEG_FASE_ACORDO.includes(n.etapa);
+    return el("button",{type:"button",class:"np-vinc-it"+(ab?"":" fechada"),title:"Abrir a negociação",onclick:()=>window.PP_NEG.abrir(n.id)},
+      el("span",{class:"np-vinc-h"},NPUI.etapa(NEG_ETAPAS.map(([k,l])=>({k,label:l})),n.etapa),el("b",{},n.banco||"banco não informado"),el("span",{class:"np-vinc-et"},NEG_LABEL[n.etapa]||n.etapa),n.atrasada&&ab?NPUI.marca("vencido","crit"):null,paradaN(n)?NPUI.marca("parada","att"):null),
+      el("span",{class:"np-vinc-b"},NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo,rotuloAcordo:emNeg?"proposta":"acordo",sub:n.valor_acordo!=null&&emNeg?"proposta":null}),n.proximo_passo?el("span",{class:"np-vinc-p"},String(n.proximo_passo).slice(0,90)):null,NPUI.quem(n.responsavel_nome)))},
   abrir:id=>{if(!(window.NPUI?.permite&&NPUI.permite("negociacoes")))return false;const n=X.ok?X.neg.find(x=>x.id===id):null;
     if(!negV3()){if(n&&n.cliente_id){abrirClienteN3(n.cliente_id,"negociacoes");return true}return false}
     N3.abrirId=id;limparN3();S.tab="negociacoes";try{localStorage.setItem("pp-tab","negociacoes")}catch(_){}if(X.ok)render();else garantir();return true}};
