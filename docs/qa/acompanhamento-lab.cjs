@@ -81,6 +81,8 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
   return { ctx, pg, erros, escritas, leituras, perfil: P };
 }
 const ids = (pg) => pg.evaluate(() => [...document.querySelectorAll('#view-acompanhamento li.np-it[data-id]')].map(e => e.dataset.id).sort());
+/* abre o painel de um cliente e espera os dados dele chegarem (sem esqueleto aria-busy) — no CI o carregamento é mais lento que um tempo fixo */
+const abrirPainel = async (pg, id) => { await pg.click(`li.np-it[data-id="${id}"] .np-it-abrir`); await pg.waitForFunction(() => { const P = document.querySelector('.np-painel'); return P && !P.hidden && !P.querySelector('[aria-busy="true"]'); }, null, { timeout: 15000 }); await pg.waitForTimeout(250); };
 const grupos = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#view-acompanhamento .np-grp')].map(g => [g.dataset.g, [...g.querySelectorAll('li.np-it')].map(l => l.dataset.id)])));
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 (async () => {
@@ -126,7 +128,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     const novas2 = leituras.slice(n1).filter(l => /v_acompanhamento_pj|v_tarefas\?.*nucleo/.test(l)); if (!novas2.length) ok(`falha fechada (${nome}): PP_ACOMP não carrega a lista`); else falha(`falha fechada (${nome}) abrir: ` + JSON.stringify(novas2));
     await ctx.close(); }
   // escopo efetivo das consultas (sem tocar no banco): a lista lê v_acompanhamento_pj (security_invoker → RLS sou_equipe), colaboradores, v_tarefas filtrada por núcleo; o painel lê as três tabelas filtradas por cliente_id; clientes só de S.clientes
-  { const { ctx, pg, leituras } = await contexto(b, { perfil: 'lucas', casca: 'v3' }); await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(800);
+  { const { ctx, pg, leituras } = await contexto(b, { perfil: 'lucas', casca: 'v3' }); await abrirPainel(pg, 'c1');
     const L = leituras.filter(l => /v_acompanhamento_pj|v_tarefas|acompanhamento_pj\?|dividas_raio_x|atas_reuniao|colaboradores/.test(l)).map(l => l.replace(/select=[^&]*&?/, '').replace(/&$/, ''));
     const okEsc = L.some(l => /^\/rest\/v1\/v_acompanhamento_pj\??$/.test(l)) && L.some(l => /v_tarefas.*nucleo=eq\.acompanhamento_pj.*status=in/.test(l)) && ['acompanhamento_pj', 'dividas_raio_x', 'atas_reuniao'].every(t => L.some(l => new RegExp('^/rest/v1/' + t + '\\?.*cliente_id=eq\\.c1').test(l))) && !L.some(l => /v_tarefas\??$/.test(l));
     if (okEsc) ok('escopo das consultas: v_acompanhamento_pj inteira (RLS sou_equipe via security_invoker, como a aba), v_tarefas só do núcleo e abertas, tabelas do cliente só por cliente_id; clientes vêm de S.clientes (já filtrados ao perfil)'); else falha('escopo: ' + JSON.stringify(L));
@@ -150,7 +152,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   // ---------- 3. painel ----------
   rel.push('3. painel: dados reais do cliente selecionado');
   { const { ctx, pg, escritas, leituras } = await contexto(b, { perfil: 'admin', casca: 'v3' });
-    await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900);
+    await abrirPainel(pg, 'c1');
     const p = await pg.evaluate(() => { const P = document.querySelector('.np-painel'); const props = {}; P.querySelectorAll('.np-props dt').forEach(dt => props[dt.textContent.trim()] = dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim()); return { titulo: P.querySelector('h2').textContent, trilha: P.querySelector('.np-trilha-p').textContent, props, secoes: [...P.querySelectorAll('.np-sec h3')].map(h => h.textContent), ciclo: [...P.querySelectorAll('.np-ciclo li')].map(l => l.className.trim() + ':' + l.querySelector('.d').textContent), raio: [...P.querySelectorAll('.np-tab tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim()).join('|')), pend: [...P.querySelectorAll('.np-sec')].find(s => /Pendências/.test(s.textContent))?.querySelectorAll('.np-passos li').length, pendCrit: [...P.querySelectorAll('.np-sec')].find(s => /Pendências/.test(s.textContent))?.querySelectorAll('.np-passos li.crit').length, atas: [...P.querySelectorAll('.np-sec')].find(s => /Atas/.test(s.textContent))?.querySelectorAll('.np-passos li').length, pe: [...P.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()) }; });
     const pr = p.props;
     const okP = p.titulo === 'Empresa Alfa Ltda' && /Ciclo inicial/.test(pr['Fase']) && /dia 33 de 45/.test(pr['Fase']) && /R2 · há 3 dias/.test(pr['Próxima reunião']) && /Ana/.test(pr['Responsável']) && /Acordos \+ Jurídico/.test(pr['Direcionamento']) && /Ouro/.test(pr['Régua']) && /liberado em/.test(pr['Acordos']) && /planejada: formada/.test(pr['Reserva']) && /acumulada: R\$\s?180\.000\s*informada pelo cliente/.test(pr['Reserva']);
@@ -158,7 +160,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     if (okP && okC && p.raio.length === 2 && /Santander\|Capital de giro\|R\$\s?480\.000\|4 m\|Sócio A\|não/.test(p.raio[0]) && p.pend === 2 && p.pendCrit === 1 && p.atas === 2 && p.pe.join() === 'Registrar ata,Atualizar ciclo,Mais ações' && escritas.length === 0) ok(`painel c1: fase/próxima reunião/responsável/direcionamento/régua/acordos; reserva planejada (formada) × acumulada (R$ 180.000, informada pelo cliente); ciclo ●●◉○○ com datas; Raio-X 2 dívidas; 2 pendências (1 vencida, só do núcleo — a tarefa jurídica não entra); 2 atas; pé: ${p.pe.join(' · ')}; nenhuma escrita`); else falha('painel c1: ' + JSON.stringify(p));
     if (leituras.filter(l => /acompanhamento_pj\?.*cliente_id=eq\.c1|dividas_raio_x\?.*cliente_id=eq\.c1|atas_reuniao\?.*cliente_id=eq\.c1/.test(l)).length >= 3) ok('painel carregou acompanhamento_pj, dividas_raio_x e atas_reuniao do cliente c1 (mesmas consultas da aba)'); else falha('leituras: ' + JSON.stringify(leituras.filter(l => /acomp|divid|atas/.test(l))));
     // cliente não iniciado (c6) via Todos: painel sem inventar estado
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.evaluate(() => window.PP_ACOMP.filtro({ escopo: 'todos' })); await pg.waitForTimeout(250); await pg.click('li.np-it[data-id="c6"] .np-it-abrir'); await pg.waitForTimeout(700);
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.evaluate(() => window.PP_ACOMP.filtro({ escopo: 'todos' })); await pg.waitForTimeout(250); await abrirPainel(pg, 'c6');
     const p6 = await pg.evaluate(() => { const P = document.querySelector('.np-painel'); const props = {}; P.querySelectorAll('.np-props dt').forEach(dt => props[dt.textContent.trim()] = dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim()); return { props, pe: [...P.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()), ciclo: [...P.querySelectorAll('.np-ciclo li')].map(l => l.className.trim()) }; });
     if (/não iniciado/.test(p6.props['Fase']) && !('Acordos' in p6.props) && /não iniciada/.test(p6.props['Reserva']) && p6.pe[1] === 'Definir datas' && JSON.stringify(p6.ciclo) === JSON.stringify(['atual', '', '', '', ''])) ok('painel c6 (não iniciado): "acompanhamento não iniciado", sem Acordos, reserva "não iniciada", botão "Definir datas", ciclo sem passo feito'); else falha('painel c6: ' + JSON.stringify(p6));
     await ctx.close(); }
@@ -167,9 +169,9 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   { const { ctx, pg, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' });
     const modalInfo = () => pg.evaluate(() => ({ h2: document.querySelector('#modalHost h2')?.textContent, urls: [...document.querySelectorAll('#modalHost input[type=url]')].map(i => i.value), dates: [...document.querySelectorAll('#modalHost input[type=date]')].map(i => i.value), aberto: !!document.querySelector('#modalHost .modal') }));
     const fecharModal = () => pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
-    await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(800); await pg.click('.np-p-pe button:has-text("Registrar ata")'); await pg.waitForTimeout(300); const m1 = await modalInfo(); await fecharModal();
+    await abrirPainel(pg, 'c1'); await pg.click('.np-p-pe button:has-text("Registrar ata")'); await pg.waitForTimeout(300); const m1 = await modalInfo(); await fecharModal();
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
-    await pg.click('li.np-it[data-id="c2"] .np-it-abrir'); await pg.waitForTimeout(800); await pg.click('.np-p-pe button:has-text("Registrar ata")'); await pg.waitForTimeout(300); const m2 = await modalInfo();
+    await abrirPainel(pg, 'c2'); await pg.click('.np-p-pe button:has-text("Registrar ata")'); await pg.waitForTimeout(300); const m2 = await modalInfo();
     if (m1.h2 === 'Registrar ata' && m1.urls[0] === 'https://drive.example/c1' && m2.h2 === 'Registrar ata' && m2.urls[0] === 'https://drive.example/c2') ok('Registrar ata: modal da aba (formAta) pré-preenchido com a pasta do cliente aberto — c1 e depois c2, sem resíduo'); else falha('ata modal: ' + JSON.stringify({ m1, m2 }));
     // salvar a ata de c2: a escrita leva cliente_id c2
     await pg.fill('#modalHost textarea', 'Onboarding realizado com a Beta.'); const antes = escritas.length; await pg.click('#modalHost .modal .btn.primary, #modalHost .modal button[type=submit], #modalHost .modal .actions .btn.primary'); await pg.waitForTimeout(700);
@@ -177,17 +179,17 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     if (ata && /"cliente_id":"c2"/.test(ata) && !w.some(e => /"cliente_id":"c1"/.test(e))) ok('salvar ata com c2 aberto: POST atas_reuniao{cliente_id:c2}; nada gravado em c1'); else falha('ata gravação: ' + JSON.stringify(w));
     // Atualizar ciclo em c2 (onboarding): datas do c2 no modal; salvar → upsert acompanhamento_pj{cliente_id:c2} + clientes id=eq.c2
     await pg.waitForTimeout(500); await pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
-    const aberto2 = await pg.evaluate(() => !document.querySelector('.np-painel').hidden && document.querySelector('.np-painel h2').textContent); if (aberto2 !== 'Beta Comércio ME') { await pg.click('li.np-it[data-id="c2"] .np-it-abrir'); await pg.waitForTimeout(800); }
+    const aberto2 = await pg.evaluate(() => !document.querySelector('.np-painel').hidden && document.querySelector('.np-painel h2').textContent); if (aberto2 !== 'Beta Comércio ME') { await abrirPainel(pg, 'c2'); }
     await pg.click('.np-p-pe button:has-text("Atualizar ciclo"), .np-p-pe button:has-text("Definir datas")'); await pg.waitForTimeout(300); const mc = await modalInfo();
     const antes2 = escritas.length; await pg.click('#modalHost .modal .btn.primary, #modalHost .modal .actions .btn.primary'); await pg.waitForTimeout(700); const w2 = escritas.slice(antes2);
     if (mc.h2 === 'Ciclo de acompanhamento' && mc.dates[0] === dia(2) && w2.some(e => /POST \/rest\/v1\/acompanhamento_pj.*"cliente_id":"c2"/.test(e)) && w2.some(e => /PATCH \/rest\/v1\/clientes\?id=eq\.c2/.test(e)) && !w2.some(e => /c1/.test(e))) ok(`Atualizar ciclo em c2: modal com a data de onboarding do c2 (${mc.dates[0]}); salvar → upsert acompanhamento_pj{cliente_id:c2} + PATCH clientes?id=eq.c2; nada em c1`); else falha('ciclo: ' + JSON.stringify({ mc, w2 }));
     // Criar tarefas do ciclo em c8 (ciclo com R1/R2/R3 futuras): consulta e inserções só com cliente_id c8
     await pg.waitForTimeout(500); await pg.evaluate(() => document.querySelector('#modalHost').replaceChildren()); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
-    await pg.click('li.np-it[data-id="c8"] .np-it-abrir'); await pg.waitForTimeout(800); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(200); const antes3 = escritas.length; await pg.click('#np-pop [role="menuitem"]:has-text("Criar tarefas do ciclo")'); await pg.waitForTimeout(800);
+    await abrirPainel(pg, 'c8'); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(200); const antes3 = escritas.length; await pg.click('#np-pop [role="menuitem"]:has-text("Criar tarefas do ciclo")'); await pg.waitForTimeout(800);
     const w3 = escritas.slice(antes3); const ins = w3.find(e => /POST \/rest\/v1\/tarefas[ ?]/.test(e)); const t3 = await pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
     if (ins && /"cliente_id":"c8"/.test(ins) && !/"cliente_id":"c[^8]"/.test(ins) && /"nucleo":"acompanhamento_pj"/.test(ins) && /tarefa\(s\) do ciclo criada/.test(t3)) ok(`Criar tarefas do ciclo em c8: POST tarefas só com cliente_id c8 (núcleo acompanhamento_pj); toast "${t3}"`); else falha('tarefas ciclo: ' + JSON.stringify({ w3, t3 }));
     // Incluir dívida em c3: modal + gravação com c3
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.click('li.np-it[data-id="c3"] .np-it-abrir'); await pg.waitForTimeout(800); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("Incluir dívida")'); await pg.waitForTimeout(300);
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await abrirPainel(pg, 'c3'); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("Incluir dívida")'); await pg.waitForTimeout(300);
     await pg.fill('#modalHost input[placeholder="Ex.: Santander"]', 'Sicoob'); const antes4 = escritas.length; await pg.click('#modalHost .modal .btn.primary, #modalHost .modal .actions .btn.primary'); await pg.waitForTimeout(700); const w4 = escritas.slice(antes4);
     if (w4.some(e => /POST \/rest\/v1\/dividas_raio_x.*"cliente_id":"c3".*"banco":"Sicoob"/.test(e)) && !w4.some(e => /"cliente_id":"c[^3]"/.test(e))) ok('Incluir dívida com c3 aberto: POST dividas_raio_x{cliente_id:c3}'); else falha('dívida: ' + JSON.stringify(w4));
     const todas = escritas.filter(e => /POST|PATCH/.test(e)); const clientesTocados = [...new Set(todas.flatMap(e => [...e.matchAll(/"cliente_id":"(c\d)"|id=eq\.(c\d)/g)].map(m => m[1] || m[2])))].sort();
@@ -225,7 +227,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   // ---------- 6b. acessibilidade específica: contraste e alvos (marcas, etapa, ciclo, tabela, popover, painel) ----------
   rel.push('6b. contraste (texto 4,5:1; componentes 3:1) e alvos de toque (44 px) em 375/768/1024/1440');
   for (const tema of ['light', 'dark']) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', tema });
-    await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250);
+    await abrirPainel(pg, 'c1'); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250);
     const pares = [
       { sel: '.np-resumo b', nome: 'número do resumo' }, { sel: '.np-resumo b.crit', nome: 'número crítico' }, { sel: '.np-resumo b.att', nome: 'número atenção' }, { sel: '.np-resumo span', nome: 'rótulo do resumo' },
       { sel: '.np-chipf[aria-pressed="true"]', nome: 'chip ativo' }, { sel: '.np-chipf[aria-pressed="false"]', nome: 'chip inativo' }, { sel: '.np-grp.crit .np-grp-h .t', nome: 'cabeça Reunião vencida' }, { sel: '.np-grp.att .np-grp-h .t', nome: 'cabeça Esta semana' }, { sel: '.np-grp-h .n', nome: 'contagem do grupo' },
@@ -247,14 +249,14 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     if (!m375.ruins.length && !m375.ausentesObrigatorios.length) ok(`${tema} 375: ${m375.medidos.length} pares exclusivos do celular medidos; menor ${m375.minimo.toFixed(2)}:1`); else falha(`${tema} 375: ` + m375.ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1`).join('; ') + (m375.ausentesObrigatorios.length ? ' · OBRIGATÓRIOS não encontrados: ' + m375.ausentesObrigatorios.join(', ') : ''));
     await c375.ctx.close(); }
   for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]]) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h }); await pg.evaluate(() => {});
-    const a1 = await medirAlvos(pg, '#view-acompanhamento'); await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250); const a2 = await medirAlvos(pg, '.np-painel'); await pg.keyboard.press('Escape');
+    const a1 = await medirAlvos(pg, '#view-acompanhamento'); await abrirPainel(pg, 'c1'); await pg.click('.np-p-pe button:has-text("Mais ações")'); await pg.waitForTimeout(250); const a2 = await medirAlvos(pg, '.np-painel'); await pg.keyboard.press('Escape');
     const todos = [...a1, ...a2]; const pequenos = todos.filter(a => w < 900 ? (a.h < 44 || (a.icone && a.w < 44)) : (!a.inline && (a.h < 24 || (a.icone && a.w < 24)))); // toque (≤ 900): 44 px; ponteiro fino: WCAG 2.5.8 (24 px, links inline no texto isentos)
     if (!pequenos.length) ok(`${w}px: ${todos.length} alvos conferidos (${w < 900 ? '≥ 44 px no toque' : '≥ 24 px no ponteiro fino, links inline isentos'}) — lista, chips, painel, links de pendência/atas, popover`); else falha(`${w}px: alvos pequenos: ` + [...new Set(pequenos.map(a => `${a.nome} ${a.w}×${a.h}`))].join(', '));
     await ctx.close(); }
   for (const tema of ['light', 'dark']) for (const w of [375, 768, 1024, 1440]) {
     const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h: 900, tema });
     const sx = await pg.evaluate(() => document.documentElement.scrollWidth); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-lista.png`) });
-    if (w >= 1024 || tema === 'light') { await pg.click('li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(900); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-painel.png`) }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); }
+    if (w >= 1024 || tema === 'light') { await abrirPainel(pg, 'c1'); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-painel.png`) }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); }
     if (sx <= w && erros.length === 0) ok(`${tema} ${w}px: sem rolagem horizontal, sem erros`); else falha(`${tema} ${w}px: scrollWidth=${sx} erros=${JSON.stringify(erros.slice(0, 2))}`);
     await ctx.close(); }
   // ---------- 7. aba da ficha intacta (com a chave) e V2 ----------
