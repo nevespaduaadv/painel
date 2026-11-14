@@ -471,6 +471,84 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
     const roles = await pg.evaluate(() => ({ vinc: document.querySelectorAll('#view-acompanhamento .np-vinc-it[type=button]').length, list: !!document.querySelector('#view-acompanhamento .np-vinc-l') }));
     if (f1.tag === 'BUTTON' && /np-vinc-it/.test(f1.cls) && f1.foco && f2 === 'Fechar (Esc)') ok('teclado: a linha compacta é um <button> com foco visível; Enter abre a negociação e o foco vai para o painel ("Fechar (Esc)")'); else falha('teclado B2: ' + JSON.stringify([f1, f2, roles]));
     await ctx.close(); }
+  // ========== 7. B4 — atualização dos marcos na mesma sessão (anotação recalculada, sem metadado antigo) ==========
+  rel.push('7. B4 — mudança nos dados do acompanhamento na mesma sessão: anotações recalculadas');
+  { const { ctx, pg, erros, escritas, leituras } = await contexto(b, { hash: '#agenda', extraLS: { 'pp-agenda-modo': 'dia', 'pp-agenda-quem': 'equipe' } });
+    await pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await pg.waitForTimeout(1500);
+    const acompC1 = ACOMP.find(a => a.cliente_id === 'c1'); const r2Orig = acompC1.r2_data; const idxT1 = PRAZOS.findIndex(z => z.id === 't1'); const t1Prazo = PRAZOS[idxT1];
+    const lidasAc = () => leituras.filter(l => /v_acompanhamento_pj/.test(l)).length; const l0 = lidasAc();
+    const marcaDe = async (id) => (await itensDia(pg)).find(x => x.id === id)?.marcas || null;
+    await irDia(pg, -3); const antes = await marcaDe('prazo:tarefa:t1');
+    // (a) a data prevista da R2 muda de −3 para −1 (dado fictício alterado "no banco"); a lista é invalidada pelo mecanismo existente (PP_ACOMP.invalidar, o mesmo que formCiclo usa)
+    acompC1.r2_data = dia(-1); await pg.evaluate(() => window.PP_ACOMP.invalidar('c1')); await pg.waitForFunction(() => window.PP_ACOMP.estado().carregado, null, { timeout: 8000 }); await pg.waitForTimeout(600);
+    await irDia(pg, -3); let it = await itensDia(pg); const t1Dep = it.find(x => x.id === 'prazo:tarefa:t1'); const semMarco3 = !it.some(x => /^marco:/.test(x.id));
+    await irDia(pg, -1); it = await itensDia(pg); const m1 = it.find(x => /^marco:r2:c1:/.test(x.id));
+    if (antes && antes.includes('marco R2') && t1Dep && !t1Dep.marcas.some(m => /marco/.test(m)) && semMarco3 && m1 && m1.marcas.includes('previsto · não realizado') && lidasAc() === l0 + 1) ok('(a) R2 prevista movida de −3 para −1: a tarefa do ciclo em −3 PERDE a anotação "marco R2" (datas já não coincidem) e o marco passa a aparecer em −1 como "previsto · não realizado"; 1 releitura de v_acompanhamento_pj pelo mecanismo existente'); else falha('(a): ' + JSON.stringify([antes, t1Dep, semMarco3, m1, lidasAc() - l0]));
+    // (b) R2 marcada como realizada e a tarefa do ciclo concluída (sai da v_prazos); agenda recarregada pelo mecanismo existente
+    acompC1.r2_feita = true; PRAZOS.splice(idxT1, 1); await pg.evaluate(() => { window.PP_ACOMP.invalidar('c1'); window.PP_AGENDA.recarregar(); }); await pg.waitForFunction(() => window.PP_ACOMP.estado().carregado, null, { timeout: 8000 }); await pg.waitForTimeout(900);
+    await irDia(pg, -1); it = await itensDia(pg); const mReal = it.find(x => /^marco:r2:c1:/.test(x.id));
+    await irDia(pg, -3); it = await itensDia(pg); const semT1 = !it.some(x => x.id === 'prazo:tarefa:t1') && !it.some(x => x.marcas.some(m => /marco/.test(m)));
+    if (mReal && mReal.marcas.includes('realizada') && !mReal.marcas.includes('previsto · não realizado') && semT1) ok('(b) R2 marcada como realizada e tarefa concluída: marco em −1 passa a "realizada"; nada sobra em −3 (sem tarefa, sem anotação antiga)'); else falha('(b): ' + JSON.stringify([mReal, it]));
+    // (c) compromissos sem vínculo comprovado continuam intactos em todas as passagens
+    await irDia(pg, 12); it = await itensDia(pg); const visitaOk = it.some(x => x.id === 'e-avulso-c1') && it.some(x => /^marco:r3:c1:/.test(x.id));
+    await irDia(pg, 2); it = await itensDia(pg); const onbOk = it.some(x => x.id === 'e-onb-c2') && it.some(x => /^marco:onb:c2:/.test(x.id)) && !it.find(x => x.id === 'e-onb-c2').marcas.some(m => /marco/.test(m));
+    if (visitaOk && onbOk) ok('(c) "Visita à fábrica" (+12) e "Onboarding — Beta Comércio" (+2) seguem ao lado dos marcos, sem anotação inferida, depois das atualizações'); else falha('(c): ' + JSON.stringify([visitaOk, onbOk]));
+    // (d) perda de permissão de Acompanhamento PJ na mesma sessão: marcos somem, anotações somem (t-r1-c8 em +5 era "marco R1"), nenhuma leitura nova
+    await irDia(pg, 5); const antes8 = await marcaDe('prazo:tarefa:t-r1-c8'); const l1 = lidasAc();
+    await pg.evaluate(() => { window.__ta = PP.temAcesso; PP.temAcesso = (t) => (t === 'clientes' || t === 'acompanhamento') ? false : window.__ta(t); render(); }); await pg.waitForTimeout(600);
+    it = await itensDia(pg); const t8sem = it.find(x => x.id === 'prazo:tarefa:t-r1-c8'); const semMarcos5 = !it.some(x => /^marco:/.test(x.id));
+    await irDia(pg, 2); it = await itensDia(pg); const semMarcos2 = !it.some(x => /^marco:/.test(x.id)) && it.some(x => x.id === 'e-onb-c2');
+    const nenhumMarcoDom = await pg.evaluate(() => [...document.querySelectorAll('#view-agenda .np-marca')].every(m => !/marco/.test(m.textContent)));
+    if (antes8 && antes8.includes('marco R1') && t8sem && !t8sem.marcas.some(m => /marco/.test(m)) && semMarcos5 && semMarcos2 && nenhumMarcoDom && lidasAc() === l1) ok('(d) permissão de Acompanhamento PJ retirada na sessão: marcos desaparecem, a tarefa do ciclo perde a anotação, compromissos ficam, nenhuma leitura nova'); else falha('(d): ' + JSON.stringify([antes8, t8sem, semMarcos5, semMarcos2, nenhumMarcoDom, lidasAc() - l1]));
+    // (e) permissão de volta: anotações e marcos voltam sem recarregar nada
+    await pg.evaluate(() => { PP.temAcesso = window.__ta; render(); }); await pg.waitForTimeout(600); await irDia(pg, 5); const volta8 = await marcaDe('prazo:tarefa:t-r1-c8');
+    if (volta8 && volta8.includes('marco R1') && lidasAc() === l1) ok('(e) permissão de volta: a anotação "marco R1" reaparece (recalculada), sem nova consulta'); else falha('(e): ' + JSON.stringify([volta8, lidasAc() - l1]));
+    if (!escritas.length && !erros.length) ok('seção 7: nenhuma escrita, sem erros de página'); else falha('seção 7 escritas/erros: ' + JSON.stringify([escritas, erros]));
+    acompC1.r2_data = r2Orig; acompC1.r2_feita = false; PRAZOS.splice(idxT1, 0, t1Prazo); // restaura as fixtures para as seções seguintes
+    await ctx.close(); }
+  // ========== 8. B5 — teclado no listbox combinado (Clientes do núcleo + Negociações + Acompanhamento PJ) ==========
+  rel.push('8. B5 — teclado no listbox combinado');
+  { const { ctx, pg, erros, escritas } = await contexto(b, { hash: '#painel' }); await pg.waitForTimeout(500);
+    await pg.evaluate(() => { window.PP_NEG.carregar(); window.PP_ACOMP.carregarLista(); }); await pg.waitForFunction(() => window.PP_NEG.estado().carregado && window.PP_ACOMP.estado().carregado, null, { timeout: 8000 });
+    const selecionada = () => pg.evaluate(() => { const ops = [...document.querySelectorAll('#busca .res [role=option]')]; const sel = ops.filter(o => o.getAttribute('aria-selected') === 'true'); return { total: ops.length, nSel: sel.length, idx: ops.indexOf(sel[0]), txt: sel[0]?.firstChild?.textContent || null, grupo: (() => { let e = sel[0]; while (e && e.previousElementSibling) { e = e.previousElementSibling; if (e.classList.contains('grp-h')) return e.textContent; } return null; })(), listbox: document.querySelectorAll('#busca .res[role=listbox]').length }; });
+    await digitar(pg, 'gama'); let s0 = await selecionada();
+    if (s0.total === 3 && s0.nSel === 0 && s0.listbox === 1) ok('"gama": um único listbox com 3 opções (Clientes, Negociações, Acompanhamento PJ), nenhuma selecionada ainda'); else falha('gama listbox: ' + JSON.stringify(s0));
+    await pg.keyboard.press('ArrowDown'); const s1 = await selecionada(); await pg.keyboard.press('ArrowDown'); const s2 = await selecionada(); await pg.keyboard.press('ArrowDown'); const s3 = await selecionada(); await pg.keyboard.press('ArrowDown'); const s4 = await selecionada(); await pg.keyboard.press('ArrowUp'); const s5 = await selecionada();
+    if (s1.idx === 0 && s1.grupo === 'Clientes' && s2.idx === 1 && s2.grupo === 'Negociações' && s3.idx === 2 && s3.grupo === 'Acompanhamento PJ' && s4.idx === 0 && s5.idx === 2 && [s1, s2, s3, s4, s5].every(x => x.nSel === 1)) ok('↓ percorre Clientes → Negociações → Acompanhamento PJ e volta ao início; ↑ volta; sempre exatamente uma opção com aria-selected=true'); else falha('setas: ' + JSON.stringify([s1, s2, s3, s4, s5]));
+    // Enter na opção de Acompanhamento PJ (3ª) → painel de c3 em #acompanhamento; nenhuma abertura dupla (negociação da Gama NÃO abre)
+    const n3antes = await pg.evaluate(() => !!document.querySelector('#view-negociacoes .np-painel:not([hidden])'));
+    await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'acompanhamento', null, { timeout: 8000 }); await esperaPainel(pg, '#view-acompanhamento'); await pg.waitForTimeout(400);
+    const e1 = await pg.evaluate(() => ({ tab: S.tab, h2: document.querySelector('#view-acompanhamento .np-painel h2')?.textContent, negAberto: !!document.querySelector('#view-negociacoes .np-painel') && !document.querySelector('#view-negociacoes .np-painel').hidden && !document.querySelector('#view-negociacoes').hidden, res: !!document.querySelector('#busca .res'), val: document.querySelector('#buscaGlobal').value, foco: document.activeElement.id }));
+    if (e1.h2 === 'Gama Indústria SA' && !e1.negAberto && !e1.res && e1.val === '' && e1.foco !== 'buscaGlobal') ok('Enter na 3ª opção → #acompanhamento com o painel de c3; a negociação da Gama não abre junto; busca fechada e limpa; foco sai do campo'); else falha('enter acomp: ' + JSON.stringify([e1, n3antes]));
+    // Enter na opção de Negociações (2ª) → painel de n4
+    await digitar(pg, 'gama'); await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('ArrowDown'); const s6 = await selecionada(); await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); await esperaPainel(pg, '#view-negociacoes'); await pg.waitForTimeout(400);
+    const e2 = await pg.evaluate(() => ({ h2: document.querySelector('#view-negociacoes .np-painel h2')?.textContent, atual: document.querySelector('#view-negociacoes li[aria-current="true"]')?.dataset.id }));
+    if (s6.grupo === 'Negociações' && e2.h2 === 'Gama | Sicoob | Financiamento' && e2.atual === 'n4') ok('Enter na 2ª opção (Negociações) → #negociacoes com o painel de n4 (Gama · Sicoob)'); else falha('enter neg: ' + JSON.stringify([s6, e2]));
+    // Enter na 1ª (Clientes, núcleo) → ficha do cliente c3 como antes
+    await digitar(pg, 'gama'); await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'clientes' && S.sel === 'c3', null, { timeout: 8000 });
+    ok('Enter na 1ª opção (Clientes) → ficha do cliente c3 (comportamento original do núcleo preservado)');
+    // Enter sem seleção abre a primeira (regra original do núcleo)
+    await digitar(pg, 'sicoob'); await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); ok('Enter sem seleção na caixa própria abre a primeira opção (mesma regra do núcleo)');
+    // Escape fecha tudo (núcleo + V3.1) e tira o foco do campo; a caixa não volta sozinha
+    await digitar(pg, 'gama'); await pg.keyboard.press('Escape'); await pg.waitForTimeout(250);
+    const esc = await pg.evaluate(() => ({ res: document.querySelectorAll('#busca .res').length, foco: document.activeElement.id, val: document.querySelector('#buscaGlobal').value }));
+    if (esc.res === 0 && esc.foco !== 'buscaGlobal') ok('Escape: listbox removido (nenhuma caixa restante) e foco sai do campo'); else falha('escape: ' + JSON.stringify(esc));
+    // Tab: entra nas opções (são <button>), o foco é visível e Enter no botão focado abre o destino certo
+    await digitar(pg, 'gama'); await pg.keyboard.press('Tab'); await pg.keyboard.press('Tab'); await pg.keyboard.press('Tab');
+    const tab = await pg.evaluate(() => { const a = document.activeElement; const r = a.closest('#busca .res'); const ops = [...document.querySelectorAll('#busca .res [role=option]')]; return { dentro: !!r, idx: ops.indexOf(a), txt: a.firstChild?.textContent, foco: getComputedStyle(a).outlineStyle !== 'none' || getComputedStyle(a).boxShadow !== 'none' || getComputedStyle(a).backgroundColor !== 'rgba(0, 0, 0, 0)' }; });
+    await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'acompanhamento', null, { timeout: 8000 }); await pg.waitForTimeout(300); const tabH2 = await pg.evaluate(() => document.querySelector('#view-acompanhamento .np-painel h2')?.textContent);
+    if (tab.dentro && tab.idx === 2 && tab.txt === 'Gama Indústria SA' && tabH2 === 'Gama Indústria SA') ok('Tab ×3 leva o foco à 3ª opção (Acompanhamento PJ · Gama) e Enter no botão abre o painel de c3'); else falha('tab: ' + JSON.stringify([tab, tabH2]));
+    // ARIA: um listbox, options com role, cabeçalhos de grupo; nenhuma duplicidade de ids
+    const aria = await pg.evaluate(() => { document.querySelector('#buscaGlobal').focus(); return { role: document.querySelector('#busca .res')?.getAttribute('role') }; });
+    await digitar(pg, 'gama'); const aria2 = await pg.evaluate(() => ({ listbox: document.querySelectorAll('#busca [role=listbox]').length, ops: document.querySelectorAll('#busca [role=listbox] [role=option]').length, grupos: [...document.querySelectorAll('#busca .res .grp-h')].map(h => h.textContent) }));
+    if (aria2.listbox === 1 && aria2.ops === 3 && aria2.grupos.join('|') === 'Clientes|Negociações|Acompanhamento PJ') ok('ARIA: um listbox, 3 options, cabeçalhos Clientes | Negociações | Acompanhamento PJ'); else falha('aria: ' + JSON.stringify([aria, aria2]));
+    if (!escritas.length && !erros.length) ok('seção 8: nenhuma escrita, sem erros de página'); else falha('seção 8: ' + JSON.stringify([escritas, erros]));
+    await ctx.close();
+    // V2: teclado da busca original intacto (↓ seleciona, Enter abre a ficha)
+    const v2 = await contexto(b, { casca: 'v2', hash: '#painel' }); await v2.pg.waitForTimeout(400); await digitar(v2.pg, 'gama'); await v2.pg.keyboard.press('ArrowDown'); const v2s = await v2.pg.evaluate(() => ({ sel: document.querySelectorAll('#busca .res [role=option][aria-selected="true"]').length, ops: document.querySelectorAll('#busca .res [role=option]').length }));
+    await v2.pg.keyboard.press('Enter'); await v2.pg.waitForFunction(() => S.tab === 'clientes' && S.sel === 'c3', null, { timeout: 8000 });
+    if (v2s.sel === 1 && v2s.ops === 1) ok('V2: busca original com teclado igual (1 opção, ↓ seleciona, Enter abre a ficha de c3)'); else falha('V2 teclado: ' + JSON.stringify(v2s));
+    await v2.ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.') + '\n'; fs.writeFileSync(path.join(OUT, 'relatorio-integracoes-lab.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch(e => { console.log(rel.join('\n')); console.error(e); process.exit(2); });

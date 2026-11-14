@@ -40,6 +40,8 @@ const recarregar=()=>{A.ok=false;carregar()};
    cliente no mesmo dia NUNCA são descartados: aparecem como contexto no painel do marco. */
 const MARCO_T={onb:"Onboarding (ONB)",r1:"R1",r2:"R2",r3:"R3",mensal:"Reunião mensal"};
 function marcosAgenda(){
+  // a anotação `marco` dos prazos/compromissos é recalculada do zero a cada passagem: nada de metadado antigo quando o acompanhamento muda, a lista é recarregada ou a permissão some
+  for(const x of A.prazos)if(x.marco)delete x.marco;for(const x of A.eventos)if(x.marco)delete x.marco;
   if(typeof agendaV3!=="function"||!agendaV3())return [];const AC=window.PP_ACOMP;let pode=false;try{pode=AC?.podeVer?.()===true}catch(_){pode=false}if(!pode)return [];
   let ms=null;try{ms=AC.marcos()}catch(_){ms=null}
   if(ms===null){const e=AC.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)AC.carregarLista?.();return []}
