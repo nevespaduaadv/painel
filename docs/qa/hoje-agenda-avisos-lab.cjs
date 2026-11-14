@@ -13,9 +13,16 @@ let BASE = '';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json' };
 const servir = () => new Promise((res) => { const srv = http.createServer((q, r) => { const f = path.join(RAIZ, decodeURIComponent(new URL(q.url, 'http://x').pathname)); if (!f.startsWith(RAIZ) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r); }); srv.listen(0, '127.0.0.1', () => { BASE = `http://127.0.0.1:${srv.address().port}`; res(srv); }); });
 /* ---------- fixtures fictícias ---------- */
-const hoje = new Date(); const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const dia = (n) => { const d = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + n); return iso(d); };
-const ts = (n, h, m = 0) => { const d = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + n, h, m); return d.toISOString(); };
+/* Relógio FIXO (determinismo): quarta-feira, 11/11/2026 10:00 em Brasília — nas fixtures (aritmética em UTC, sem depender do TZ do runner) e no navegador
+   (timezoneId America/Sao_Paulo + clock.install no mesmo instante). A lógica de datas da aplicação (hojeISO em UTC-3, hojeLocal) não muda; só deixa de
+   depender do dia/hora reais: resultados iguais em dia útil, fim de semana, qualquer fuso e qualquer horário. */
+const FIXO = { ano: 2026, mes: 11, dia: 11, hora: 10, minuto: 0 }; const pad2 = (n) => String(n).padStart(2, '0');
+const AGORA_ISO = `${FIXO.ano}-${pad2(FIXO.mes)}-${pad2(FIXO.dia)}T${pad2(FIXO.hora)}:${pad2(FIXO.minuto)}:00-03:00`; const AGORA = new Date(AGORA_ISO);
+const hoje = { getFullYear: () => FIXO.ano, getMonth: () => FIXO.mes - 1, getDate: () => FIXO.dia, getHours: () => FIXO.hora }; // mesma interface usada nas fixtures
+const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const baseUTC = Date.UTC(FIXO.ano, FIXO.mes - 1, FIXO.dia);
+const dia = (n) => { const d = new Date(baseUTC + n * 864e5); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; };
+const ts = (n, h, m = 0) => new Date(`${dia(n)}T${pad2(h)}:${pad2(m)}:00-03:00`).toISOString();
 const COLAB = [{ id: 'col-ana', perfil_id: 'u-admin', nome: 'Ana Teste', nucleo: 'socios', ativo: true, agenda_sync: true, agenda_sync_em: ts(0, 8) }, { id: 'col-caio', perfil_id: 'u-jur', nome: 'Caio Teste', nucleo: 'juridico', ativo: true }, { id: 'col-bia', perfil_id: 'u-bia', nome: 'Bia Teste', nucleo: 'comercial', ativo: true }];
 const CLIENTES = [{ id: 'c1', nome: 'Empresa Alfa Ltda', cnpj: '00.000.000/0001-01', cidade: 'Franca/SP', status: 'ativo' }, { id: 'c2', nome: 'Beta Comércio ME', cnpj: '00.000.000/0001-02', cidade: 'Ribeirão Preto/SP', status: 'ativo' }];
 const faixa = (n) => n < 0 ? 'atrasada' : n === 0 ? 'hoje' : n <= 7 ? 'd7' : 'depois';
@@ -51,10 +58,11 @@ const AVISOS = [
   { id: 'a3', titulo: 'Confraternização', texto: 'Dia 19, às 19h.', areas: null, fixado: false, expira_em: null, publicado_em: ts(-10, 9), autor_nome: 'Direção', leituras: 9, lida: true },
 ];
 const PERFIS = { admin: { id: 'u-admin', nome: 'Ana Teste', papel: 'admin', acessos: [] }, juridico: { id: 'u-jur', nome: 'Caio Teste', papel: 'colaborador', acessos: ['juridico', 'clientes'] } };
-const sessao = (perfil) => ({ access_token: 'lab', refresh_token: 'lab', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user: { id: perfil.id, email: perfil.id + '@lab', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } });
+const sessao = (perfil) => ({ access_token: 'lab', refresh_token: 'lab', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Math.max(Date.now(), AGORA.getTime()) / 1000) + 86400 * 365, user: { id: perfil.id, email: perfil.id + '@lab', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } });
 async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', hash = '#painel', extraLS = {}, cron = false } = {}) {
   const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = []; const leituras = [];
-  const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: w < 900 });
+  const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: w < 900, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR' });
+  await ctx.clock.install({ time: AGORA }); // Date/Timers do navegador partem do instante fixo e correm normalmente
   await ctx.addInitScript(({ s, ref, casca, tema, extraLS }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); if (casca === 'v3') localStorage.setItem('np-casca', 'v3'); localStorage.setItem('pp-tema', tema); for (const [k, v] of Object.entries(extraLS)) localStorage.setItem(k, v); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema, extraLS });
   await ctx.route(/supabase\.co/, async (rota) => {
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
