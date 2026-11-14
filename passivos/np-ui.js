@@ -177,15 +177,15 @@ const permite = (tab) => { try { if (typeof equipe !== "function" || !equipe()) 
    → { fechar, erroCampo, avisoCampo, erroGeral, el } */
 const FORM_MSG = {
   obrigatorio: "Preencha este campo.", descartar: "Descartar as alterações?", continuar: "Continuar editando", descartarBtn: "Descartar",
-  salvando: "Salvando…", excluindo: "Excluindo…", indisponivel: "O serviço está temporariamente indisponível — tente de novo em instantes. Nada foi gravado.", sessao: "Sua sessão expirou — entre de novo e tente outra vez.", resumoErros: (n) => `${n} campos precisam de atenção:`, semConexao: "Sem conexão com o banco — tente de novo.",
-  bd: { "23505": "Já existe um registro igual.", "23503": "Este registro faz referência a algo que não existe mais.", "23514": "Um dos valores não é aceito pelo banco.", "42501": "Sem permissão para gravar este registro.", PGRST301: "Sem permissão para gravar este registro.", PGRST116: "Registro não encontrado — pode ter sido excluído por outra pessoa.", "22007": "Data inválida.", "22P02": "Um dos valores está em formato inválido." },
+  salvando: "Salvando…", excluindo: "Excluindo…", indisponivel: "O serviço está temporariamente indisponível e não foi possível confirmar se a operação foi concluída. Feche este formulário, confira o registro na lista e só então tente de novo.", semConexaoDesc: "Falha de comunicação: não foi possível confirmar se a operação foi concluída. Confira o registro na lista antes de tentar de novo.", sessao: "Sua sessão expirou — entre de novo e tente outra vez. Nada foi gravado.", resumoErros: (n) => `${n} campos precisam de atenção:`, semConexao: "Sem conexão com o banco — tente de novo.",
+  bd: { "23505": "Já existe um registro igual. Nada foi gravado.", "23503": "Este registro faz referência a algo que não existe mais. Nada foi gravado.", "23514": "Um dos valores não é aceito pelo banco. Nada foi gravado.", "42501": "Sem permissão para gravar este registro. Nada foi gravado.", PGRST301: "Sem permissão para gravar este registro. Nada foi gravado.", PGRST116: "Registro não encontrado — pode ter sido excluído por outra pessoa. Nada foi gravado.", "22007": "Data inválida. Nada foi gravado.", "22P02": "Um dos valores está em formato inválido. Nada foi gravado." }, // recusas explícitas do banco: resultado conhecido
 };
 const traduzErroBD = (e) => { if (!e) return "Não foi possível salvar."; const code = String(e.code || ""); const st = Number(e.status || 0); const m = String(e.message || e);
   if (/^NP_/.test(code)) return m; /* mensagens já em português geradas pelo próprio formulário/persistência */
   if (FORM_MSG.bd[code]) return FORM_MSG.bd[code];
   if (st >= 500 || /^5\d\d$/.test(code) || /upstream|unavailable|indispon|gateway|timeout|timed out|overloaded|too many/i.test(m)) return FORM_MSG.indisponivel;
   if (st === 401 || code === "401") return FORM_MSG.sessao;
-  if (/Failed to fetch|NetworkError|network|fetch|ECONN|offline/i.test(m)) return FORM_MSG.semConexao;
+  if (/Failed to fetch|NetworkError|network|fetch|ECONN|offline|aborted/i.test(m)) return FORM_MSG.semConexaoDesc; // resultado desconhecido: o pedido pode ter chegado ao banco
   return m || "Não foi possível salvar."; };
 const detalheDe = (e) => { if (!e) return ""; if (/^NP_/.test(String(e.code || ""))) return ""; return [e.status ? "HTTP " + e.status : null, e.code ? "código " + e.code : null, e.message, e.detalhe].filter(Boolean).join(" · "); };
 const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, origem, aoFechar, rotuloSalvar = "Salvar" } = {}) => {

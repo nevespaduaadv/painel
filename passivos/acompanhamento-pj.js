@@ -109,8 +109,15 @@ function cardDividas(c,st){
 const erroBD=(error,status)=>{const e=new Error(error.message);e.code=error.code;e.status=status;e.detalhe=[error.details,error.hint].filter(Boolean).join(" · ");return e};
 /* confirmar (V3.1): a operação só é considerada feita quando o banco devolve a linha da ata selecionada (id + cliente_id como condição);
    0 linhas = registro inexistente/alterado ou filtrado pela RLS → erro, nunca "sucesso". A V2 continua sem essa exigência (comportamento de antes). */
-const confirmarLinha=(data,aid,cid,oque)=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const ok=aid?ls.some(l=>l.id===aid&&(!cid||!l.cliente_id||l.cliente_id===cid)):ls.length>0;
-  if(!ok){const e=new Error(aid?`A ata não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`:"O banco não confirmou a inclusão da ata.");e.code=aid?"NP_NAO_ENCONTRADA":"NP_SEM_CONFIRMACAO";throw e}};
+/* Identidade estrita: edição/exclusão só confirmam com uma linha devolvida cujo id === ata selecionada E cliente_id === cliente do formulário;
+   inclusão só confirma com uma linha com id válido (texto não vazio) E cliente_id === cliente do formulário.
+   Duas situações distintas: (a) 0 linhas em UPDATE/DELETE = comprovadamente nada feito (o banco respondeu e nenhuma linha casou);
+   (b) resposta presente mas sem id/cliente ou divergente = resultado NÃO confirmado — a operação pode ter ocorrido; orienta conferir. */
+const npErro=(msg,code)=>{const e=new Error(msg);e.code=code;return e};
+const confirmarLinha=(data,aid,cid,oque)=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
+  if(aid){if(!ls.length)throw npErro(`A ata não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
+    if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ata selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
+  if(!ls.some(l=>l&&idOk(l.id)&&l.cliente_id===cid))throw npErro("A inclusão não pôde ser confirmada pelo banco. Feche este formulário e confira se a ata já aparece na lista antes de tentar de novo.","NP_NAO_CONFIRMADA")};
 async function salvarAta(cid,aid,v,{preservarAutor=false,confirmar=false}={}){
   const row={cliente_id:cid,tipo:v.tipo,data:v.data||hojeISO(),titulo:(v.titulo||"").trim()||null,resumo:(v.resumo||"").trim()||null,link_pasta:(v.link_pasta||"").trim()||null,link_gravacao:(v.link_gravacao||"").trim()||null,participantes:(v.participantes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
   if(!aid||!preservarAutor)row.autor_id=meuColab()?.id||null;
