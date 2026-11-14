@@ -229,5 +229,6 @@
     else if (e.key === "ArrowUp" && ops.length) { e.preventDefault(); idx = (idx - 1 + ops.length) % ops.length; ops.forEach((o, i) => o.setAttribute("aria-selected", String(i === idx))); }
     else if (e.key === "Enter" && ops.length) { e.preventDefault(); (ops[idx] || ops[0]).click(); } });
   document.addEventListener("click", e => { if (!box.contains(e.target)) limpar(); });
-  document.head.append(el("style", {}, `.busca .res .np-busca-est{padding:6px 12px 8px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:2px 4px}.busca .res .np-busca-est .np-busca-carregar{display:inline;width:auto;padding:0 2px;font:inherit;color:var(--info);text-decoration:underline;background:transparent;border:0;cursor:pointer}.busca .res .np-busca-est .np-busca-carregar[disabled]{color:var(--faint);text-decoration:none;cursor:default}`));
+  document.head.append(el("style", {}, `html.np-casca-v3 .busca .res .grp-h{color:var(--muted)} /* V3.1: cabeçalhos dos grupos da busca com contraste ≥ 4,5:1 (V2 mantém a cor de antes) */
+.busca .res .np-busca-est{padding:6px 12px 8px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:2px 4px}.busca .res .np-busca-est .np-busca-carregar{display:inline;width:auto;padding:0 2px;font:inherit;color:var(--info);text-decoration:underline;background:transparent;border:0;cursor:pointer}.busca .res .np-busca-est .np-busca-carregar[disabled]{color:var(--muted);text-decoration:none;cursor:default}`));
 })();

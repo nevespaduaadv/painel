@@ -410,6 +410,65 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
     const r2 = await v2.pg.evaluate(() => ({ h2: [...document.querySelectorAll('#view-clientes section h2')].map(h => h.textContent), v3: document.querySelectorAll('#view-clientes .np-v3-aba').length, barra: document.querySelectorAll('#view-clientes .ciclo-barra .ciclo-passo').length }));
     if (r2.h2.includes('Status do acompanhamento') && r2.h2.includes('Dívidas (ponto de partida)') && r2.h2.includes('Atas das reuniões') && r2.v3 === 0 && r2.barra === 5) ok('V2 (casca desligada): aba da ficha exatamente como antes (Status do acompanhamento com 5 passos, Dívidas, Atas; nenhum bloco V3.1)'); else falha('V2 aba: ' + JSON.stringify(r2));
     await v2.ctx.close(); }
+  // ========== 6. acessibilidade e responsividade dos blocos novos ==========
+  rel.push('6. Contraste, alvos de toque e teclado nos blocos novos (claro/escuro, 375/1440)');
+  for (const tema of ['light', 'dark']) {
+    // painel do cliente (secNeg + linha compacta) e painel da negociação (bloco Acompanhamento PJ)
+    const { ctx, pg } = await contexto(b, { hash: '#acompanhamento', tema });
+    await pg.waitForFunction(() => document.querySelectorAll('#view-acompanhamento li.np-it[data-id]').length >= 5, null, { timeout: 12000 }); await abrirAcomp(pg, 'c1'); await esperaSecao(pg, '#view-acompanhamento', 'Negociações');
+    const pares = [{ sel: '#view-acompanhamento .np-vinc-it .np-vinc-h b', nome: 'linha compacta banco' }, { sel: '#view-acompanhamento .np-vinc-it .np-vinc-et', nome: 'linha compacta etapa' }, { sel: '#view-acompanhamento .np-vinc-it .np-vinc-p', nome: 'linha compacta próximo passo', opcional: true }, { sel: '#view-acompanhamento .np-vinc-it .np-marca', nome: 'linha compacta marca' }, { sel: '#view-acompanhamento .np-vinc-it .np-val b', nome: 'linha compacta valor', opcional: true }, { sel: '#view-acompanhamento .np-painel .np-rodape span', nome: 'rodapé seção' }, { sel: '#view-acompanhamento .np-painel .np-sem', nome: 'texto secundário (sem)' , opcional: true }];
+    const m = await medirContraste(pg, pares);
+    if (!m.ruins.length && !m.ausentesObrigatorios.length) ok(`B2 ${tema}: ${m.medidos.length} pares ≥ mínimo (texto 4,5:1); menor ${m.minimo.toFixed(2)}:1`); else falha(`B2 ${tema} contraste: ruins=${JSON.stringify(m.ruins.map(p => [p.nome, p.r.toFixed(2), p.fg, p.bg]))} ausentes=${JSON.stringify(m.ausentesObrigatorios)}`);
+    await pg.click('#view-acompanhamento .np-painel .np-vinc-it >> nth=0'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); await esperaPainel(pg, '#view-negociacoes'); await esperaSecao(pg, '#view-negociacoes', 'Acompanhamento PJ');
+    const m2 = await medirContraste(pg, [{ sel: '#view-negociacoes .np-painel .np-props dt', nome: 'rótulo' }, { sel: '#view-negociacoes .np-painel .np-props dd', nome: 'valor' }, { sel: '#view-negociacoes .np-painel .np-marca', nome: 'marca' }, { sel: '#view-negociacoes .np-painel .np-marca.ok', nome: 'marca ok' }, { sel: '#view-negociacoes .np-painel .np-marca.crit', nome: 'marca crítica', opcional: true }, { sel: '#view-negociacoes .np-painel .np-btn.ghost', nome: 'botão fantasma' }, { sel: '#view-negociacoes .np-painel .np-sem', nome: 'sem', opcional: true }]);
+    if (!m2.ruins.length && !m2.ausentesObrigatorios.length) ok(`bloco Acompanhamento PJ ${tema}: ${m2.medidos.length} pares ≥ mínimo; menor ${m2.minimo.toFixed(2)}:1`); else falha(`bloco acomp ${tema}: ruins=${JSON.stringify(m2.ruins.map(p => [p.nome, p.r.toFixed(2), p.fg, p.bg]))} ausentes=${JSON.stringify(m2.ausentesObrigatorios)}`);
+    await ctx.close();
+    // agenda: linha do marco, marcas, painel do marco, chip da grade; busca: estados e grupos
+    const ag = await contexto(b, { hash: '#agenda', tema, extraLS: { 'pp-agenda-modo': 'dia', 'pp-agenda-quem': 'equipe' } }); await ag.pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await ag.pg.waitForTimeout(1200); await irDia(ag.pg, 12);
+    await ag.pg.click('#view-agenda .np-it[data-id^="marco:r3:c1"] .np-it-abrir'); await esperaPainel(ag.pg, '#view-agenda'); await ag.pg.waitForTimeout(300);
+    const m3 = await medirContraste(ag.pg, [{ sel: '#view-agenda .np-it[data-id^="marco:"] .np-it-prazo .d', nome: 'coluna previsto' }, { sel: '#view-agenda .np-it[data-id^="marco:"] .np-marca', nome: 'marca marco' }, { sel: '#view-agenda .np-it[data-id^="marco:"] .np-it-abrir .tx', nome: 'título marco' }, { sel: '#view-agenda .np-painel .np-props dd', nome: 'painel valor' }, { sel: '#view-agenda .np-painel .np-marca', nome: 'painel marca' }, { sel: '#view-agenda .np-painel .np-vinc .np-btn', nome: 'compromisso do dia (botão)' }, { sel: '#view-agenda .np-painel .np-vinc .np-sem', nome: 'hora do compromisso' }, { sel: '#view-agenda .np-resumo span', nome: 'resumo rótulo' }]);
+    if (!m3.ruins.length && !m3.ausentesObrigatorios.length) ok(`B4 ${tema}: ${m3.medidos.length} pares ≥ mínimo; menor ${m3.minimo.toFixed(2)}:1`); else falha(`B4 ${tema}: ruins=${JSON.stringify(m3.ruins.map(p => [p.nome, p.r.toFixed(2), p.fg, p.bg]))} ausentes=${JSON.stringify(m3.ausentesObrigatorios)}`);
+    await ag.pg.evaluate(() => { NPUI.pref.set('np-agenda-vista', 'grade'); window.PP_AGENDA.ir(null, 'semana'); }); await ag.pg.waitForTimeout(600);
+    const m4 = await medirContraste(ag.pg, [{ sel: '#view-agenda .ag-ev.marco', nome: 'chip marco (texto)' }, { sel: '#view-agenda .ag-ev.marco', nome: 'chip marco (borda)', prop: 'borderLeftColor', minimo: 3 }, { sel: '#view-agenda .ag-legenda span', nome: 'legenda' }]);
+    if (!m4.ruins.length && !m4.ausentesObrigatorios.length) ok(`grade ${tema}: chip do marco legível (texto ≥ 4,5:1, borda ≥ 3:1); menor ${m4.minimo.toFixed(2)}:1`); else falha(`grade ${tema}: ruins=${JSON.stringify(m4.ruins.map(p => [p.nome, p.r.toFixed(2), p.fg, p.bg]))} ausentes=${JSON.stringify(m4.ausentesObrigatorios)}`);
+    await ag.pg.evaluate(() => { NPUI.pref.set('np-agenda-vista', 'lista'); }); await ag.ctx.close();
+    const bu = await contexto(b, { hash: '#painel', tema }); await bu.pg.waitForTimeout(400); await digitar(bu.pg, 'alfa');
+    const m5 = await medirContraste(bu.pg, [{ sel: '#busca .res .grp-h', nome: 'grupo da busca (núcleo, V3.1)' }, { sel: '#busca .res .np-busca-est', nome: 'estado da busca' }, { sel: '#busca .res .np-busca-est .np-busca-carregar', nome: 'carregar para buscar' }]);
+    await bu.pg.click('#busca .np-busca-est .np-busca-carregar >> nth=0'); await bu.pg.waitForFunction(() => document.querySelector('#busca .res .np-busca-extra .grp-h'), null, { timeout: 8000 });
+    const m6 = await medirContraste(bu.pg, [{ sel: '#busca .res .np-busca-extra .grp-h', nome: 'grupo novo da busca' }, { sel: '#busca .res .np-busca-extra [role=option] small', nome: 'resultado (subtítulo)' }, { sel: '#busca .res .np-busca-est .np-busca-carregar[disabled]', nome: 'carregando…', opcional: true }]);
+    if (!m5.ruins.length && !m5.ausentesObrigatorios.length && !m6.ruins.length && !m6.ausentesObrigatorios.length) ok(`busca ${tema}: ${m5.medidos.length + m6.medidos.length} pares ≥ mínimo (cabeçalhos, estados, "carregar para buscar", resultados); menor ${Math.min(m5.minimo, m6.minimo).toFixed(2)}:1`); else falha(`busca ${tema}: ruins=${JSON.stringify([...m5.ruins, ...m6.ruins].map(p => [p.nome, p.r.toFixed(2), p.fg, p.bg]))} ausentes=${JSON.stringify([...m5.ausentesObrigatorios, ...m6.ausentesObrigatorios])}`);
+    await bu.ctx.close();
+  }
+  for (const w of [375, 1440]) { // alvos de toque/ponteiro nos blocos novos
+    const { ctx, pg } = await contexto(b, { hash: '#acompanhamento', w, h: 900 });
+    await pg.waitForFunction(() => document.querySelectorAll('#view-acompanhamento li.np-it[data-id]').length >= 5, null, { timeout: 12000 }); await abrirAcomp(pg, 'c1'); await esperaSecao(pg, '#view-acompanhamento', 'Negociações');
+    const grosso = w < 900; const minimo = grosso ? 44 : 24;
+    const alvos = (await medirAlvos(pg, '#view-acompanhamento .np-painel')).filter(a => /np-vinc|Nova negociação|Abrir|Mover|Editar|Mais ações|Registrar|Atualizar|Definir/.test(a.nome) || a.nome.startsWith('button')); const ruins = alvos.filter(a => (grosso || !a.inline) && Math.min(a.w, a.h) < minimo);
+    const vinc = await pg.evaluate(() => [...document.querySelectorAll('#view-acompanhamento .np-painel .np-vinc-it, #view-acompanhamento .np-painel .np-rodape .np-btn, #view-acompanhamento .np-painel .np-p-pe .np-btn')].map(e => { const r = e.getBoundingClientRect(); return { nome: e.className.split(' ')[0] + ':' + e.textContent.trim().slice(0, 18), w: Math.round(r.width), h: Math.round(r.height) }; }));
+    const ruinsV = vinc.filter(a => Math.min(a.w, a.h) < minimo);
+    if (vinc.length >= 4 && !ruinsV.length) ok(`painel do cliente ${w}px: ${vinc.length} alvos dos blocos novos/rodapé ≥ ${minimo} px (linhas compactas de negociação, Nova negociação, ações)`); else falha(`alvos painel ${w}px: ` + JSON.stringify(ruinsV.slice(0, 6)));
+    await pg.screenshot({ path: path.join(OUT, `b2-painel-cliente-${w}.png`) });
+    await pg.click('#view-acompanhamento .np-painel .np-vinc-it >> nth=0'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); await esperaPainel(pg, '#view-negociacoes'); await esperaSecao(pg, '#view-negociacoes', 'Acompanhamento PJ'); await pg.waitForTimeout(300);
+    const a2 = await medirAlvos(pg, '#view-negociacoes .np-painel'); const r2 = a2.filter(a => (grosso || !a.inline) && Math.min(a.w, a.h) < minimo);
+    if (a2.length && !r2.length) ok(`painel da negociação ${w}px: ${a2.length} alvos ≥ ${minimo} px`); else falha(`alvos negociação ${w}px: ` + JSON.stringify(r2.slice(0, 6)));
+    await pg.screenshot({ path: path.join(OUT, `b2-painel-negociacao-${w}.png`) });
+    const sw = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1); if (sw) ok(`${w}px: sem rolagem horizontal da página`); else falha(`${w}px: rolagem horizontal`);
+    await ctx.close();
+    const ag = await contexto(b, { hash: '#agenda', w, h: 900, extraLS: { 'pp-agenda-modo': 'dia', 'pp-agenda-quem': 'equipe' } }); await ag.pg.waitForFunction(() => document.querySelector('#view-agenda .np-grp'), null, { timeout: 10000 }); await ag.pg.waitForTimeout(1200); await irDia(ag.pg, 12);
+    await ag.pg.click('#view-agenda .np-it[data-id^="marco:r3:c1"] .np-it-abrir'); await esperaPainel(ag.pg, '#view-agenda'); await ag.pg.waitForTimeout(300);
+    const a3 = await medirAlvos(ag.pg, '#view-agenda .np-painel'); const r3 = a3.filter(a => (grosso || !a.inline) && Math.min(a.w, a.h) < minimo);
+    if (a3.length && !r3.length) ok(`painel do marco ${w}px: ${a3.length} alvos ≥ ${minimo} px`); else falha(`alvos marco ${w}px: ` + JSON.stringify(r3.slice(0, 6)));
+    await ag.pg.screenshot({ path: path.join(OUT, `b4-painel-marco-${w}.png`) }); await ag.ctx.close();
+  }
+  { // teclado: Tab alcança a linha compacta e Enter abre a negociação; Esc volta ao acompanhamento com o foco de volta
+    const { ctx, pg } = await contexto(b, { hash: '#acompanhamento' });
+    await pg.waitForFunction(() => document.querySelectorAll('#view-acompanhamento li.np-it[data-id]').length >= 5, null, { timeout: 12000 }); await abrirAcomp(pg, 'c1'); await esperaSecao(pg, '#view-acompanhamento', 'Negociações');
+    await pg.focus('#view-acompanhamento .np-painel .np-vinc-it >> nth=0'); await pg.keyboard.press('Shift+Tab'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(150); const f1 = await pg.evaluate(() => ({ tag: document.activeElement.tagName, cls: document.activeElement.className, foco: getComputedStyle(document.activeElement).boxShadow !== 'none' || getComputedStyle(document.activeElement).outlineStyle !== 'none' }));
+    await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); await esperaPainel(pg, '#view-negociacoes'); await pg.waitForTimeout(500);
+    const f2 = await pg.evaluate(() => document.activeElement.getAttribute('aria-label'));
+    const roles = await pg.evaluate(() => ({ vinc: document.querySelectorAll('#view-acompanhamento .np-vinc-it[type=button]').length, list: !!document.querySelector('#view-acompanhamento .np-vinc-l') }));
+    if (f1.tag === 'BUTTON' && /np-vinc-it/.test(f1.cls) && f1.foco && f2 === 'Fechar (Esc)') ok('teclado: a linha compacta é um <button> com foco visível; Enter abre a negociação e o foco vai para o painel ("Fechar (Esc)")'); else falha('teclado B2: ' + JSON.stringify([f1, f2, roles]));
+    await ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.') + '\n'; fs.writeFileSync(path.join(OUT, 'relatorio-integracoes-lab.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch(e => { console.log(rel.join('\n')); console.error(e); process.exit(2); });
