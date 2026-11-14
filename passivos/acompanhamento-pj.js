@@ -123,6 +123,7 @@ function cardAtas(c,st){
 
 /* ---------- montagem da aba ---------- */
 function renderAba(c,host,ind){
+  if(acompV3()){renderAbaV3(c,host,ind);return} // Fase 4B · A4 — V3.1 ligada: mesmos blocos da visão transversal
   const st=A.cache[c.id];if(!st?.ok){carregar(c.id);host.append(el("div",{class:"note"},"Carregando acompanhamento…"));return}
   if(st.erro&&/acompanhamento_pj|dividas_raio_x|atas_reuniao/.test(st.erro))host.append(el("div",{class:"card",style:"padding:10px 14px;border-left:3px solid var(--warn)"},"Rode a migração 0104 para ativar o Acompanhamento PJ."));
   host.append(cardCiclo(c,st));
@@ -267,7 +268,8 @@ function abrirPainelA3(cid,{origem,silencioso}={}){
   A3.painel.abrir({id:cid,trilha:m.trilha,titulo:c.nome,corpo:m.corpo,pe:m.pe,origem:silencioso?null:origem});
 }
 /* conteúdo do painel a partir do cliente atual (S.clientes) e do registro atual — reutilizado na abertura e na atualização silenciosa */
-function montarPainelA3(c){
+/* seções do cliente (V3.1): usadas pelo painel transversal E pela aba Acompanhamento PJ da ficha (Fase 4B · A4) — mesmos dados, mesmas gravações */
+function secoesA3(c){
   const cid=c.id;const st=A.cache[cid];
   const r=registrosA3().find(x=>x.c.id===cid);const a=r?.a||null;const edita=podeEditar()&&!readOnly();
   const prox=r?.prox;const pp=prox?NPUI.prazoTxt(prox.data):null;
@@ -299,7 +301,23 @@ function montarPainelA3(c){
   const trilha=[el("span",{},"Clientes"),el("span",{class:"sep"}),el("span",{},"Acompanhamento PJ")];
   const pe=[edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
     (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
-  return {trilha,corpo:[props,secCiclo,secNeg,secRaio,secPend,secAtas],pe};
+  return {props,secCiclo,secNeg,secRaio,secPend,secAtas,trilha,pe,a,edita,st,r};
+}
+function montarPainelA3(c){const s=secoesA3(c);return {trilha:s.trilha,corpo:[s.props,s.secCiclo,s.secNeg,s.secRaio,s.secPend,s.secAtas],pe:s.pe}}
+/* Fase 4B · A4 — aba Acompanhamento PJ da ficha com a casca V3.1: reutiliza secoesA3 (ciclo, Raio-X, pendências, atas) e as MESMAS ações
+   (formAta, formCiclo, criarTarefasCiclo, formDivida); o card do Raio-X do formulário (ficha.js) e os hooks de fluxo/proteção continuam. V2 intacta. */
+function renderAbaV3(c,host,ind){
+  const st=A.cache[c.id];if(!st?.ok)carregar(c.id);
+  if(!A3.lista&&!A3.carregando)carregarLista();
+  if(A3.erro&&/acompanhamento_pj|v_acompanhamento/.test(A3.erro))host.append(NPUI.faixaErro({texto:"Acompanhamento PJ indisponível neste ambiente: rode a migração 0104.",acao:"Tentar de novo",onAcao:()=>carregarLista(true)}));
+  if(!st?.ok||!A3.lista){host.append(el("div",{class:"np-v3-aba"},NPUI.carregando(4)));return}
+  const s=secoesA3(c);const edita=s.edita;
+  host.append(el("div",{class:"np-v3-aba"},s.props,s.secCiclo));
+  if(window.PP_FICHA?.cardRaioX)window.PP_FICHA.cardRaioX(c,host,ind);
+  const acoes=el("div",{class:"np-v3-aba-acoes"},edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(s.a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,s.a)}):null,
+    edita?NPUI.btn("Criar tarefas do ciclo",{variante:"ghost",onclick:()=>criarTarefasCiclo(c,s.a)}):null,edita?NPUI.btn("Incluir dívida no Raio-X…",{variante:"ghost",onclick:()=>formDivida(c,null)}):null,
+    podeVerTransversal()?NPUI.btn("Ver na carteira",{variante:"ghost",title:"Abre este cliente na visão transversal do Acompanhamento PJ",onclick:()=>window.PP_ACOMP.abrir(c.id)}):null);
+  host.append(el("div",{class:"np-v3-aba"},s.secRaio,s.secPend,s.secAtas,acoes));
 }
 /* rota #acompanhamento: só com a casca V3.1 e permissão; fora disso, volta para Clientes (ou Hoje) — inclusive quando aberta por hash/URL */
 {const _r=render;render=function(){_r();const v=$("#view-acompanhamento");if(!v)return;
