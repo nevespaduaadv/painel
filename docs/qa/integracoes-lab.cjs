@@ -307,6 +307,62 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
     const v2lidas = v2.leituras.filter(l => /v_acompanhamento_pj/.test(l)).length;
     if (v2m.marco === 0 && !v2m.txt && !v2m.v3 && v2lidas === 0) ok('V2 (casca desligada): Agenda sem marcos, sem texto "marco previsto" e sem leitura extra de v_acompanhamento_pj'); else falha('V2 agenda: ' + JSON.stringify([v2m, v2lidas]));
     await v2.ctx.close(); }
+  // ========== 4. B5 — busca global integrada ==========
+  rel.push('4. B5 — busca global: Negociações e Acompanhamento PJ (só V3.1, só com permissão)');
+  const digitar = async (pg, q) => { await pg.waitForTimeout(300); /* o painel recém-aberto move o foco para o Fechar ~60 ms depois; espera antes de focar a busca */ await pg.fill('#buscaGlobal', ''); await pg.focus('#buscaGlobal'); await pg.type('#buscaGlobal', q, { delay: 20 }); await pg.waitForTimeout(350); };
+  const lerBusca = (pg) => pg.evaluate(() => { const r = document.querySelector('#busca .res'); if (!r) return null; const grupos = {}; let g = null; for (const n of r.children) { if (n.classList.contains('grp-h')) { g = n.textContent; grupos[g] = []; } else if (n.classList.contains('np-busca-extra')) { for (const m of n.children) { if (m.classList.contains('grp-h')) { g = m.textContent; grupos[g] = []; } else if (g) grupos[g].push(m.firstChild?.textContent || m.textContent); } } else if (n.classList.contains('np-busca-est')) grupos._estado = n.textContent; else if (g) grupos[g].push(n.firstChild?.textContent || n.textContent); } return { grupos, proprio: r.classList.contains('np-busca-res'), tab: S.tab, hash: location.hash }; });
+  { const { ctx, pg, erros, escritas, leituras } = await contexto(b, { hash: '#painel' });
+    await pg.waitForTimeout(600);
+    await digitar(pg, 'alfa'); let r = await lerBusca(pg);
+    if (r && r.grupos.Clientes?.length === 1 && !r.grupos['Negociações'] && /Negociações: ainda não carregadas/.test(r.grupos._estado || '') && /Acompanhamento PJ: ainda não carregado/.test(r.grupos._estado || '') && r.tab === 'painel' && r.hash === '#painel') ok('"alfa": grupo Clientes do núcleo intacto; Negociações e Acompanhamento PJ ainda NÃO carregados aparecem como estado explícito com "carregar para buscar" — nenhuma consulta disparada e nenhuma mudança de rota ao digitar'); else falha('alfa 1: ' + JSON.stringify(r));
+    let ln = leituras.filter(l => /v_negociacoes/.test(l)).length, la = leituras.filter(l => /v_acompanhamento_pj/.test(l)).length; if (ln === 0 && la === 0) ok('digitar não consulta v_negociacoes nem v_acompanhamento_pj'); else falha('consultas ao digitar: ' + JSON.stringify([ln, la]));
+    // carregar negociações pelo botão (mecanismo do próprio módulo) → grupo aparece com as 3 negociações da Alfa (inclusive a concluída, identificada pela etapa)
+    await pg.click('#busca .np-busca-est .np-busca-carregar >> nth=0'); await pg.waitForFunction(() => document.querySelector('#busca .res .np-busca-extra .grp-h') && [...document.querySelectorAll('#busca .res .grp-h')].some(h => h.textContent === 'Negociações'), null, { timeout: 8000 }); r = await lerBusca(pg);
+    ln = leituras.filter(l => /v_negociacoes/.test(l)).length;
+    if (r.grupos['Negociações']?.length === 3 && r.grupos['Negociações'].every(t => /Alfa/.test(t)) && ln === 1 && r.tab === 'painel' && /Acompanhamento PJ: ainda não carregado/.test(r.grupos._estado || '')) ok('"carregar para buscar" (Negociações) → 1 leitura de v_negociacoes pelo módulo; grupo "Negociações" com as 3 da Alfa (Santander, Itaú, Bradesco concluída); acompanhamento continua não carregado; rota inalterada'); else falha('alfa 2: ' + JSON.stringify([r, ln]));
+    await digitar(pg, 'alfa'); await digitar(pg, 'itau'); r = await lerBusca(pg); ln = leituras.filter(l => /v_negociacoes/.test(l)).length;
+    if (r.grupos['Negociações']?.length === 1 && /Itaú/.test(r.grupos['Negociações'][0]) && ln === 1) ok('"itau": só a negociação Itaú da Alfa; novas digitações não repetem a consulta (continua 1 leitura)'); else falha('itau: ' + JSON.stringify([r, ln]));
+    await digitar(pg, 'mensal'); r = await lerBusca(pg);
+    if (r && r.proprio && !Object.keys(r.grupos).some(k => k !== '_estado') && /Negociações: nenhum resultado/.test(r.grupos._estado) && /Acompanhamento PJ: ainda não carregado/.test(r.grupos._estado)) ok('"mensal" (nada carregado que combine): caixa própria só com os estados, porque há algo a carregar — "Negociações: nenhum resultado · Acompanhamento PJ: ainda não carregado · carregar para buscar"'); else falha('mensal estados: ' + JSON.stringify(r));
+    await pg.click('#busca .np-busca-est .np-busca-carregar'); await pg.waitForFunction(() => [...document.querySelectorAll('#busca .res .grp-h')].some(h => h.textContent === 'Acompanhamento PJ'), null, { timeout: 8000 });
+    r = await lerBusca(pg); la = leituras.filter(l => /v_acompanhamento_pj/.test(l)).length;
+    if (r && r.grupos['Acompanhamento PJ']?.length === 3 && ['Gama Indústria SA', 'Delta Transportes', 'Épsilon Alimentos'].every(n => r.grupos['Acompanhamento PJ'].includes(n)) && la === 1) ok('"mensal" → "carregar para buscar" (Acompanhamento PJ) → 1 leitura de v_acompanhamento_pj; grupo com os 3 clientes em fase mensal (Gama, Delta, Épsilon)'); else falha('mensal: ' + JSON.stringify([r, la]));
+    // abrir pelo clique → #negociacoes com o painel de n2
+    await digitar(pg, 'itau'); await pg.click('#busca .res .np-busca-extra [role=option] >> nth=0'); await pg.waitForFunction(() => S.tab === 'negociacoes', null, { timeout: 8000 }); await esperaPainel(pg, '#view-negociacoes'); await pg.waitForTimeout(300);
+    const pn = await painel(pg, '#view-negociacoes'); const lim = await pg.evaluate(() => ({ v: document.querySelector('#buscaGlobal').value, res: !!document.querySelector('#busca .res') }));
+    if (pn.titulo === 'Alfa | Itaú | Conta garantida' && lim.v === '' && !lim.res) ok('clique no resultado → #negociacoes com o painel de n2; busca fechada e limpa'); else falha('abrir n2 busca: ' + JSON.stringify([pn.titulo, lim]));
+    // caixa própria (núcleo sem resultado) + teclado: "sicoob" só existe em Negociações
+    await digitar(pg, 'sicoob'); r = await lerBusca(pg);
+    if (r && r.proprio && r.grupos['Negociações']?.length === 1 && /Gama/.test(r.grupos['Negociações'][0]) && !r.grupos.Clientes) ok('"sicoob" (nada no núcleo): caixa própria da V3.1 com a negociação da Gama'); else falha('sicoob: ' + JSON.stringify(r));
+    await pg.keyboard.press('ArrowDown'); const sel0 = await pg.evaluate(() => document.querySelector('#busca .res [role=option][aria-selected="true"]')?.textContent); await pg.keyboard.press('Enter'); await pg.waitForFunction(() => S.tab === 'negociacoes' && document.querySelector('#view-negociacoes .np-painel h2')?.textContent.startsWith('Gama'), null, { timeout: 8000 });
+    if (/Gama/.test(sel0 || '')) ok('teclado na caixa própria: ↓ seleciona, Enter abre a negociação da Gama (n4) — identidade preservada'); else falha('teclado busca: ' + sel0);
+    // acompanhamento: carregar e buscar por fase/cliente
+    await digitar(pg, 'gama'); r = await lerBusca(pg);
+    if (r && r.grupos.Clientes?.length === 1 && r.grupos['Negociações']?.length === 1 && r.grupos['Acompanhamento PJ']?.length === 1 && r.grupos['Acompanhamento PJ'][0] === 'Gama Indústria SA' && !r.grupos._estado) ok('"gama": Clientes (núcleo) + Negociações + Acompanhamento PJ no mesmo listbox, sem linha de estado (tudo carregado e com resultado)'); else falha('gama: ' + JSON.stringify([r, await pg.evaluate(() => ({ val: document.querySelector('#buscaGlobal').value, foco: document.activeElement.id || document.activeElement.className, html: document.querySelector('#busca').innerHTML.length, tab: S.tab, casca: document.documentElement.className }))]));
+    await pg.click('#busca .res .np-busca-extra [role=option] >> nth=-1'); await pg.waitForFunction(() => S.tab === 'acompanhamento', null, { timeout: 8000 }); await esperaPainel(pg, '#view-acompanhamento'); await pg.waitForTimeout(300); const pa = await painel(pg, '#view-acompanhamento');
+    if (pa.titulo === 'Gama Indústria SA') ok('resultado de Acompanhamento PJ → #acompanhamento com o painel de c3 (Gama)'); else falha('abrir c3 busca: ' + pa.titulo);
+    await digitar(pg, 'zeta'); r = await lerBusca(pg);
+    if (r && r.grupos.Clientes?.length === 1 && /Negociações: nenhum resultado/.test(r.grupos._estado || '') && /Acompanhamento PJ: nenhum resultado/.test(r.grupos._estado || '')) ok('"zeta" (cliente sem negociações nem acompanhamento): "nenhum resultado" explícito nos dois grupos — distinto de "não carregado"'); else falha('zeta: ' + JSON.stringify(r));
+    await digitar(pg, 'qwxz'); r = await lerBusca(pg);
+    if (r === null) ok('"qwxz": nada em lugar nenhum → nenhuma caixa aberta (estados não abrem caixa sozinhos)'); else falha('qwxz: ' + JSON.stringify(r));
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
+    ln = leituras.filter(l => /v_negociacoes/.test(l)).length; la = leituras.filter(l => /v_acompanhamento_pj/.test(l)).length;
+    if (ln === 1 && la === 1 && !escritas.length && !erros.length) ok('B5: ao todo 1 leitura de cada lista, nenhuma escrita, sem erros'); else falha('B5 total: ' + JSON.stringify([ln, la, escritas, erros]));
+    await digitar(pg, 'gama'); await pg.screenshot({ path: path.join(OUT, 'b5-busca-1440.png') }); await ctx.close(); }
+  { // erro ao carregar → "indisponíveis"; permissões; V2 intacta
+    const { ctx, pg } = await contexto(b, { hash: '#painel', negErro: true }); await pg.waitForTimeout(400);
+    await digitar(pg, 'alfa'); await pg.click('#busca .np-busca-est .np-busca-carregar >> nth=0'); await pg.waitForFunction(() => /Negociações: indisponíveis/.test(document.querySelector('#busca .res .np-busca-est')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+    const e1 = await lerBusca(pg); if (e1 && /Negociações: indisponíveis/.test(e1.grupos._estado || '')) ok('erro na view de negociações: estado "Negociações: indisponíveis" (≠ não carregado ≠ nenhum resultado)'); else falha('erro busca: ' + JSON.stringify(e1));
+    await ctx.close();
+    const pc = await contexto(b, { perfil: 'clientes', hash: '#painel' }); await pc.pg.waitForTimeout(400); await digitar(pc.pg, 'alfa'); const rc = await lerBusca(pc.pg);
+    if (rc && !/Negociações/.test(rc.grupos._estado || '') && !rc.grupos['Negociações'] && /Acompanhamento PJ/.test(rc.grupos._estado || '')) ok('perfil só-Clientes: nenhum grupo/estado de Negociações na busca; Acompanhamento PJ presente'); else falha('perm busca clientes: ' + JSON.stringify(rc));
+    await pc.ctx.close();
+    const pj = await contexto(b, { perfil: 'juridico', hash: '#painel' }); await pj.pg.waitForTimeout(400); await digitar(pj.pg, 'alfa'); const rj = await lerBusca(pj.pg);
+    if (rj && !/Acompanhamento PJ/.test(rj.grupos._estado || '') && !rj.grupos['Acompanhamento PJ'] && /Negociações/.test(rj.grupos._estado || '')) ok('perfil só-Jurídico: nenhum grupo/estado de Acompanhamento PJ; Negociações presente'); else falha('perm busca juridico: ' + JSON.stringify(rj));
+    await pj.ctx.close();
+    const v2 = await contexto(b, { casca: 'v2', hash: '#painel' }); await v2.pg.waitForTimeout(400); await digitar(v2.pg, 'alfa'); const r2 = await v2.pg.evaluate(() => ({ cls: document.querySelectorAll('#busca .res .grp-h').length, extra: document.querySelectorAll('#busca .np-busca-extra, #busca .np-busca-est').length, txt: document.querySelector('#busca .res')?.textContent }));
+    if (r2.cls === 1 && r2.extra === 0 && /Empresa Alfa/.test(r2.txt || '') && !/Negocia|Acompanhamento/.test(r2.txt || '')) ok('V2 (casca desligada): busca igual à de antes — só o grupo Clientes, nenhum grupo/estado novo'); else falha('V2 busca: ' + JSON.stringify(r2));
+    await v2.ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.') + '\n'; fs.writeFileSync(path.join(OUT, 'relatorio-integracoes-lab.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch(e => { console.log(rel.join('\n')); console.error(e); process.exit(2); });
