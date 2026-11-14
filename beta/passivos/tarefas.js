@@ -47,8 +47,8 @@ async function carregar(){
   try{
     const [t,c,p,tk,mo]=await Promise.all([SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
     if(t.error)throw t.error;
-    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;
-  }catch(e){console.warn("tarefas",e);toast("Não foi possível carregar as tarefas")}
+    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;T.erro=null;
+  }catch(e){console.warn("tarefas",e);T.erro=String(e.message||e);toast("Não foi possível carregar as tarefas")}
   finally{T.carregando=false}
   render();
 }
@@ -534,6 +534,7 @@ function marcasV3(t){
   if(tk){const d=diasAg(tk);m.push(NPUI.marca("aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:""),d>=5?"crit":d>=2?"att":"info"))}
   else if(t.status==="em_andamento")m.push(NPUI.marca("fazendo","info"));
   if(t.status==="concluida")m.push(NPUI.marca("feita","ok"));if(t.status==="cancelada")m.push(NPUI.marca("cancelada"));
+  if(t.nucleo==="acompanhamento_pj"&&t.cliente_id&&window.PP_ACOMP?.podeVer?.()===true){const mk=NPUI.marca("acomp");mk.title="Tarefa do núcleo Acompanhamento PJ";m.push(mk)} // Fase 4B · B3
   return m;
 }
 /* concluir pela lista: mesmo fluxo da V2 (marcar abre a tarefa com foco no andamento; desmarcar reabre) */
@@ -622,7 +623,8 @@ function filtrarV3(lista,f){return filtrar(lista,f).filter(t=>!f.cadeias||!!t.ca
 /* ---------- render ---------- */
 function renderTarefasV3(){
   const v=$("#view-tarefas");v.replaceChildren();v.classList.add("np-v3");V3.obra=null;V3.painel=null;clearInterval(V3.tick);
-  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)setTimeout(()=>abrirPainelV3(t),0)}
+  /* abertura pedida por id (deep link / PP_TAREFAS.abrir): vira a tarefa aberta e é montada UMA vez no fim, junto com a reabertura silenciosa — evita a corrida entre o painel anterior (view transition) e o novo (Fase 4B) */
+  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)V3.aberta=t.id;else toast("Tarefa não encontrada")}
   if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   const f=T.f;if(f.cadeias==null)f.cadeias=false;
   const abertas=T.tarefas.filter(t=>escopoOk(t)&&(t.status==="aberta"||t.status==="em_andamento"));
@@ -662,6 +664,8 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
       el:x.id===t.id?el("span",{},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null):el("button",{type:"button",class:"lnk",onclick:()=>abrirTarefaCompleta(x.id)},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?" · fatal":""),
       sub:(x.prazo?px.exata+" · "+px.rel:"sem prazo")+(x.responsavel_nome?" · "+NPUI.curto(x.responsavel_nome):"")+(x.status==="concluida"?" · feita":x.status==="cancelada"?" · cancelada":"")}})))});
   const desc=NPUI.secao("Descrição",t.descricao?el("p",{style:"white-space:pre-wrap"},t.descricao):el("p",{style:"color:var(--np-text-3)"},"Sem descrição."));
+  /* Fase 4B · B3: tarefa do núcleo Acompanhamento PJ com cliente → bloco cruzado só leitura + "Abrir acompanhamento" (contrato PP_ACOMP; null sem permissão). O vínculo é só cliente+núcleo: nada é inferido sobre negociações. */
+  const acomp=t.nucleo==="acompanhamento_pj"&&t.cliente_id&&window.PP_ACOMP?.bloco?window.PP_ACOMP.bloco(t.cliente_id):null;
   /* andamento: registro obrigatório para concluir (regra da controladoria) — mesma lógica da V2 */
   let temRegistro=false;const btnsConcluir=[];
   const com=el("textarea",{rows:3,class:"np-ta",placeholder:aberta?"O que você fez? Vai para o histórico ao clicar em Feito ou Concluir (Ctrl+Enter só registra). Avise alguém com @.":"Registrar ou avisar alguém com @. Ctrl+Enter envia."});
@@ -714,7 +718,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   ].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
   const pe=[btnConcluir,btnFeito,el("span",{class:"sp"}),aviso,mais,nota];
   const trilha=[el("span",{},t.cliente_nome||"Sem cliente"),el("span",{class:"sep"}),el("span",{},NUCLEOS[t.nucleo]||"—")];
-  V3.painel.abrir({id:t.id,trilha,titulo:t.titulo,corpo:[props,cadeia,desc,trab,andamento],pe,origem:silencioso?null:origem,foco:focoAndamento?()=>com.focus():null});
+  V3.painel.abrir({id:t.id,trilha,titulo:t.titulo,corpo:[props,cadeia,acomp,desc,trab,andamento],pe,origem:silencioso?null:origem,foco:focoAndamento?()=>com.focus():null});
   historico(t.id,hist);
 }
 document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;border:1px solid var(--np-ctrl);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.45 var(--np-ui);padding:8px 10px;resize:vertical}html.np-casca-v3 .np-ib.on{color:var(--np-ink);background:var(--np-sel)}`));
@@ -724,6 +728,11 @@ document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;b
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)}};
+window.PP_TAREFAS={lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
+  /* ---- contrato público (Fase 4B) ---- */
+  estado:()=>({carregado:T.ok,carregando:!!T.carregando,erro:T.erro||null,vazio:T.ok&&!T.tarefas.length}),
+  // null = ainda não carregado; [] = carregado e vazio. Filtra só por campos existentes (cliente_id, nucleo, status); nenhuma relação inferida.
+  porCliente:(cid,{nucleo,abertas=true}={})=>{if(!T.ok||!cid)return null;return T.tarefas.filter(t=>t.cliente_id===cid&&(!nucleo||t.nucleo===nucleo)&&(!abertas||t.status==="aberta"||t.status==="em_andamento"))},
+  carregar:()=>{garantir();return true}};
 window.__PP_LOGIN.then(()=>{if(equipe())tempoReal()});
 })();
