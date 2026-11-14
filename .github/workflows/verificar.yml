@@ -1,4 +1,4 @@
-# Verificação de geração em todo PR para main (G1–G3, N1–N3, T1) + laboratórios de QA (casca, tarefas, negociações, acompanhamento, hoje-agenda-avisos, integrações).
+# Verificação de geração em todo PR para main (G1–G3, N1–N3, T1) + laboratórios de QA (casca, tarefas, negociações, acompanhamento, hoje-agenda-avisos, integrações, formulários).
 # Não faz deploy, não publica, não escreve no repositório. Sem segredos: o gerador só usa chaves publicáveis já versionadas.
 name: verificar-geracao
 on:
@@ -40,6 +40,8 @@ jobs:
         run: NODE_PATH="$(npm root -g)" node docs/qa/hoje-agenda-avisos-lab.cjs "$RUNNER_TEMP/casca-lab/hoje"
       - name: Laboratório de integrações entre módulos (Fase 4B)
         run: NODE_PATH="$(npm root -g)" node docs/qa/integracoes-lab.cjs "$RUNNER_TEMP/casca-lab/integracoes"
+      - name: Laboratório de formulários (Fase 4C · NPUI.form + Registrar ata)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/formularios-lab.cjs "$RUNNER_TEMP/casca-lab/formularios"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4
