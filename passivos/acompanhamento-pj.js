@@ -104,15 +104,47 @@ function cardDividas(c,st){
 }
 
 /* ---------- 4) atas ---------- */
+/* persistência da ata — compartilhada pela V2 (formAta) e pela V3.1 (formAtaV3). cid/aid vêm do formulário aberto, nunca do estado atual da tela.
+   preservarAutor: na edição, NÃO reenvia autor_id (V3.1, decisão 14/11); a V2 continua enviando como sempre. Lança Error com .code do PostgREST. */
+async function salvarAta(cid,aid,v,{preservarAutor=false}={}){
+  const row={cliente_id:cid,tipo:v.tipo,data:v.data||hojeISO(),titulo:(v.titulo||"").trim()||null,resumo:(v.resumo||"").trim()||null,link_pasta:(v.link_pasta||"").trim()||null,link_gravacao:(v.link_gravacao||"").trim()||null,participantes:(v.participantes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
+  if(!aid||!preservarAutor)row.autor_id=meuColab()?.id||null;
+  const q=aid?SB.from("atas_reuniao").update(row).eq("id",aid):SB.from("atas_reuniao").insert({...row,created_by:PP.perfil?.id||null});
+  const {error}=await q;if(error){const e=new Error(error.message);e.code=error.code;throw e}
+  invalidar(cid);window.PP_DOSSIE?.invalidar?.(cid);
+}
+async function excluirAta(cid,aid){const {error}=await SB.from("atas_reuniao").delete().eq("id",aid);if(error){const e=new Error(error.message);e.code=error.code;throw e}invalidar(cid)}
 function formAta(c,a){
+  if(acompV3()&&window.NPUI?.form){formAtaV3(c,a);return} // Fase 4C · PoC: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   a=a||{};const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
   const body=el("div",{class:"form"},field("ata-tipo","Reunião",tipo),field("ata-data","Data",data),field("ata-tit","Título",tit),field("ata-part","Participantes",part),el("div",{class:"f full"},el("label",{},"Ata / resumo"),res),el("div",{class:"f full"},el("label",{},"Link da pasta"),lp,el("div",{class:"help"},"A gravação fica no Drive; aqui vai o link para quem precisar.")),el("div",{class:"f full"},el("label",{},"Link da gravação"),lg));
   const extra=a.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta ata?"))return;await SB.from("atas_reuniao").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
   modal(a.id?"Editar ata":"Registrar ata",body,async()=>{
     if(!res.value.trim()&&!lp.value.trim()&&!lg.value.trim())throw new Error("Escreva a ata ou informe o link");
-    const row={cliente_id:c.id,tipo:tipo.value,data:data.value||hojeISO(),titulo:tit.value.trim()||null,resumo:res.value.trim()||null,link_pasta:lp.value.trim()||null,link_gravacao:lg.value.trim()||null,participantes:part.value.trim()||null,autor_id:meuColab()?.id||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
-    const q=a.id?SB.from("atas_reuniao").update(row).eq("id",a.id):SB.from("atas_reuniao").insert({...row,created_by:PP.perfil?.id||null});const {error}=await q;if(error)throw new Error(error.message);
-    toast(a.id?"Ata atualizada":"Ata registrada no dossiê");invalidar(c.id);window.PP_DOSSIE?.invalidar?.(c.id)},extra);
+    await salvarAta(c.id,a.id||null,{tipo:tipo.value,data:data.value,titulo:tit.value,resumo:res.value,link_pasta:lp.value,link_gravacao:lg.value,participantes:part.value});
+    toast(a.id?"Ata atualizada":"Ata registrada no dossiê")},extra);
+}
+/* Fase 4C · Registrar ata na V3.1 (NPUI.form). Mesmos campos, mesma regra (resumo OU link), mesma persistência (salvarAta/excluirAta).
+   Identidade: cid e aid capturados na abertura — trocar de cliente com o formulário aberto não muda o destino da gravação. */
+const URL_OK=/^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+function normalizarLink(v){v=String(v||"").trim();if(!v)return "";if(/^[a-z]:\\|^\\\\/i.test(v))return v; /* caminho local: fica como está para a validação reprovar */ if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)&&/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(v))return "https://"+v;return v}
+function validarLink(v){const n=normalizarLink(v);if(!n)return null;if(/^[a-z]:\\|^\\\\/i.test(n))return "Use o link do Drive, não o caminho da pasta no computador.";if(!URL_OK.test(n))return "Informe um link válido (começando com https://).";return null}
+function formAtaV3(c,a){
+  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast("Você não tem permissão para registrar atas");return}
+  a=a||{};const cid=c.id,aid=a.id||null;const origem=document.activeElement;
+  const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Ex.: R2 — verificação da reserva",autocomplete:"off"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou",autocomplete:"off"}),
+    res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/…",inputmode:"url",autocomplete:"off"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação",inputmode:"url",autocomplete:"off"});
+  const futura=v=>{if(!v)return null;return v>hojeISO()?{aviso:"Data no futuro — confira antes de salvar."}:null};
+  const f=NPUI.form({titulo:aid?"Editar ata":"Registrar ata",contexto:[el("b",{},c.nome),aid?" · ata de "+fmtD(a.data)+" ("+(TIPO_ATA[a.tipo]||a.tipo)+")":" · nova ata do acompanhamento"],origem,
+    campos:[{id:"ata-tipo",label:"Reunião",el:tipo,obrigatorio:true},{id:"ata-data",label:"Data",el:data,obrigatorio:true,validar:futura},{id:"ata-tit",label:"Título",el:tit},{id:"ata-part",label:"Participantes",el:part},
+      {id:"ata-res",label:"Ata / resumo",el:res,condicional:true,ajuda:"Obrigatório quando não houver link da pasta nem da gravação."},
+      {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:"A gravação e a transcrição ficam no Drive; aqui vai o link para quem precisar.",validar:validarLink},
+      {id:"ata-lg",label:"Link da gravação",el:lg,condicional:true,validar:validarLink}],
+    validarTudo:v=>(!String(v["ata-res"]||"").trim()&&!String(v["ata-lp"]||"").trim()&&!String(v["ata-lg"]||"").trim())?[{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}]:[],
+    salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
+    excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid);toast("Ata excluída")}}:null});
+  return f;
 }
 function cardAtas(c,st){
   const sec=el("section",{class:"card section",id:"acomp-atas"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Atas das reuniões"),el("div",{class:"note"},"Onboarding, R1, R2, R3 e mensais. Cada ata registrada entra no dossiê (frente Estratégico).")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formAta(c,null)},"+ Ata"))));
@@ -290,7 +322,7 @@ function secoesA3(c){
   const pend=(r?.pend||[]).slice().sort((x,y)=>(x.prazo||"9999").localeCompare(y.prazo||"9999"));
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
   const atas=st?.ok?st.atas:null;
-  const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[(A.colab.find(k=>k.id===x.autor_id)?.nome||""),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
+  const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[autoriaAta(x),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
   /* Negociações do cliente (B2) — lidas pelo id do cliente no módulo de Negociações; cada uma só com os próprios valores (nenhuma soma global) */
   const secNeg=(()=>{const NG=window.PP_NEG;if(!NG?.podeVer||NG.podeVer()!==true)return null;const lista=NG.porCliente(cid);
     if(lista===null){const e=NG.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)NG.carregar?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Negociações",e?.erro?el("div",{class:"np-sem"},"Negociações indisponíveis no momento."):NPUI.carregando(2))}
@@ -303,6 +335,9 @@ function secoesA3(c){
     (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
   return {props,secCiclo,secNeg,secRaio,secPend,secAtas,trilha,pe,a,edita,st,r};
 }
+/* autoria (autor_id = colaboradores.id) e edição (updated_by = perfis.id, via colaboradores.perfil_id) — só leitura dos campos existentes */
+function autoriaAta(x){const autor=A.colab.find(k=>k.id===x.autor_id)?.nome;const partes=[];if(autor)partes.push("por "+NPUI.curto(autor));
+  const editada=x.updated_at&&x.created_at&&(new Date(x.updated_at)-new Date(x.created_at))>60e3;if(editada){const ed=A.colab.find(k=>k.perfil_id===x.updated_by)?.nome;partes.push("editada em "+fmtD(String(x.updated_at).slice(0,10))+(ed&&ed!==autor?" por "+NPUI.curto(ed):""))}return partes.join(" · ")}
 function montarPainelA3(c){const s=secoesA3(c);return {trilha:s.trilha,corpo:[s.props,s.secCiclo,s.secNeg,s.secRaio,s.secPend,s.secAtas],pe:s.pe}}
 /* Fase 4B · A4 — aba Acompanhamento PJ da ficha com a casca V3.1: reutiliza secoesA3 (ciclo, Raio-X, pendências, atas) e as MESMAS ações
    (formAta, formCiclo, criarTarefasCiclo, formDivida); o card do Raio-X do formulário (ficha.js) e os hooks de fluxo/proteção continuam. V2 intacta. */

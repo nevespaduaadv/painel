@@ -585,6 +585,50 @@ html.np-casca-v3 .np-v3-aba{min-width:0;max-width:100%}html.np-casca-v3 .np-v3-a
 html.np-casca-v3 .np-v3-aba-acoes{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--np-line)}
 @media (max-width:600px){html.np-casca-v3 .np-v3-aba{padding:12px}html.np-casca-v3 .np-v3-aba-acoes .np-btn{flex:1 1 auto}}
 
+/* Fase 4C · NPUI.form — invólucro de formulário da V3.1 (sobre #modalHost/.modal/.card do núcleo; o modal() da V2 não muda) */
+html.np-casca-v3 .np-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html.np-casca-v3 #modalHost .modal{z-index:60} /* acima do painel lateral em modo cheia (z-index 50): vale para o NPUI.form e para os modais da V2 abertos a partir da casca V3.1 */
+html.np-casca-v3 .modal.np-form-fundo{align-items:flex-start;padding:4vh 16px}
+html.np-casca-v3 .card.np-form{width:min(760px,100%);padding:0;gap:0;border-radius:var(--np-r-lg,14px);border:1px solid var(--np-line);background:var(--np-surface);color:var(--np-text);box-shadow:var(--np-shadow);overflow:hidden}
+html.np-casca-v3 .np-form .np-f-cab{display:flex;align-items:flex-start;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--np-line)}
+html.np-casca-v3 .np-form .np-f-cab>div{flex:1 1 auto;min-width:0}
+html.np-casca-v3 .np-form h2{margin:0;font:500 var(--np-fs-5)/1.2 var(--np-display);color:var(--np-text)}
+html.np-casca-v3 .np-form .np-f-ctx{margin:4px 0 0;font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-form .np-f-ctx b{color:var(--np-text);font-weight:500}
+html.np-casca-v3 .np-form .np-f-x{flex:none;width:36px;height:36px}
+html.np-casca-v3 .np-form .np-f-form{padding:14px 18px 4px}
+html.np-casca-v3 .np-form .np-f-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+html.np-casca-v3 .np-form .np-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+html.np-casca-v3 .np-form .np-f label{font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-form .np-f-opc{font-weight:400;color:var(--np-text-3)}
+html.np-casca-v3 .np-form .np-f-req{color:var(--np-crit)}
+html.np-casca-v3 .np-form .np-f input,html.np-casca-v3 .np-form .np-f select,html.np-casca-v3 .np-form .np-f textarea{min-height:40px;border:1px solid var(--np-line-2,var(--np-line));border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.4 var(--np-ui);padding:8px 10px}
+html.np-casca-v3 .np-form .np-f textarea{min-height:120px;resize:vertical}
+html.np-casca-v3 .np-form .np-f input:focus-visible,html.np-casca-v3 .np-form .np-f select:focus-visible,html.np-casca-v3 .np-form .np-f textarea:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-form .np-f.com-erro input,html.np-casca-v3 .np-form .np-f.com-erro select,html.np-casca-v3 .np-form .np-f.com-erro textarea{border-color:var(--np-crit)}
+html.np-casca-v3 .np-form .np-f .help{font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-form .np-f-erro{margin:0;font:500 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-crit)}
+html.np-casca-v3 .np-form .np-f-aviso{margin:0;font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-att)}
+html.np-casca-v3 .np-form .np-f-geral{margin:12px 18px 0;padding:10px 12px;border:1px solid var(--np-crit);border-left-width:3px;border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.4 var(--np-ui)}
+html.np-casca-v3 .np-form .np-f-geral b{color:var(--np-crit);font-weight:500}
+html.np-casca-v3 .np-form .np-f-geral ul{margin:6px 0 0;padding-left:18px}
+html.np-casca-v3 .np-form .np-f-geral a{color:var(--np-text)}
+html.np-casca-v3 .np-form .np-f-geral details{margin-top:6px;font-size:var(--np-fs-1);color:var(--np-text-3)}html.np-casca-v3 .np-form .np-f-geral code{word-break:break-word}
+html.np-casca-v3 .np-form .np-f-geral:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-form .np-f-acoes,html.np-casca-v3 .np-form .np-f-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 18px 16px;border-top:1px solid var(--np-line);margin:10px 0 0;background:var(--np-surface-2,var(--np-surface))}
+html.np-casca-v3 .np-form .np-f-acoes .sp{flex:1 1 auto}
+html.np-casca-v3 .np-form .np-f-confirm{flex-direction:column;align-items:stretch;border-top-color:var(--np-crit)}
+html.np-casca-v3 .np-form .np-f-confirm p{margin:0;font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-form .np-f-confirm-acoes{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+html.np-casca-v3 .np-form .btn{min-height:40px;border:1px solid var(--np-ctrl);background:var(--np-surface);color:var(--np-text);border-radius:var(--np-r);font:500 var(--np-fs-2)/1 var(--np-ui);padding:0 14px;box-shadow:none}
+html.np-casca-v3 .np-form .btn.primary{background:var(--np-ink);border-color:var(--np-ink);color:var(--np-inv)}html.np-casca-v3 .np-form .btn.primary:hover{background:var(--np-ink-2)}html.np-casca-v3 .np-form .btn.danger{color:var(--np-crit);border-color:var(--np-ctrl)}
+html.np-casca-v3 .np-form .btn:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-form .btn[disabled]{opacity:.6;cursor:default}
+html.np-casca-v3 .np-form[aria-busy="true"] .np-f-salvar::after{content:"";display:inline-block;width:12px;height:12px;margin-left:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:np-f-gira .8s linear infinite}
+@keyframes np-f-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-form[aria-busy="true"] .np-f-salvar::after{animation:none}}
+@media (max-width:600px){html.np-casca-v3 .np-form .np-f input,html.np-casca-v3 .np-form .np-f select{min-height:44px}html.np-casca-v3 .np-form .np-f-x{width:44px;height:44px}html.np-casca-v3 .modal.np-form-fundo{padding:0;align-items:stretch}html.np-casca-v3 .card.np-form{width:100%;min-height:100%;border-radius:0;border:0;display:flex;flex-direction:column}html.np-casca-v3 .np-form .np-f-form{flex:1 1 auto;overflow:auto}html.np-casca-v3 .np-form .np-f-acoes{position:sticky;bottom:0}html.np-casca-v3 .np-form .np-f-acoes .btn,html.np-casca-v3 .np-form .np-f-confirm-acoes .btn{flex:1 1 40%;min-height:44px}html.np-casca-v3 .np-form .np-f-acoes .sp{display:none}html.np-casca-v3 .np-form .np-f-campos{grid-template-columns:1fr}}
+
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -2007,7 +2051,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwfpxvn5";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwfudsl3";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
