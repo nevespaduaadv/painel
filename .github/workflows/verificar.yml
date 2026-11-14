@@ -10,6 +10,8 @@ jobs:
   verificar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      TZ: America/Sao_Paulo # os laboratórios geram datas "hoje ± n" na hora local e os módulos usam UTC-3: sem isto, entre 00h e 03h UTC os dias não batem
     steps:
       - uses: actions/checkout@v4
         with:
