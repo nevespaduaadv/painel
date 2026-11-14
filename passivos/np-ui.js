@@ -168,5 +168,77 @@ const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-
 /* Permissão falha-fechada para integrações entre módulos (Fase 4B): só equipe, fora do modo só leitura e com PP.temAcesso(tab)
    respondendo exatamente true. Função ausente, false, valor não estrito ou exceção ⇒ false. Nunca libera por conta própria. */
 const permite = (tab) => { try { if (typeof equipe !== "function" || !equipe()) return false; if (typeof readOnly === "function" && readOnly()) return false; if (typeof PP?.temAcesso !== "function") return false; return PP.temAcesso(tab) === true; } catch (_) { return false; } };
-window.NPUI = { permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+/* ---------- NPUI.form (Fase 4C) — invólucro de formulário da V3.1 ----------
+   Reaproveita #modalHost (irmão de #app: o próprio formulário nunca fica inerte) e as classes .modal/.card do núcleo; o modal() da V2 não muda.
+   Responsável só pela EXPERIÊNCIA: cabeçalho com formulário + cliente/registro, foco (inicial, preso, devolvido à origem), Escape/Cancelar/fundo com
+   proteção contra descarte, validação junto aos campos (blur + envio) com mensagens em português, aviso não bloqueante, envio com trava (sem dupla
+   chamada a salvar/excluir), erro do banco traduzido sem fechar, exclusão com confirmação acessível. A gravação em si é a função que o chamador passa.
+   form({ titulo, contexto, campos:[{id,label,el,ajuda,obrigatorio,validar}], validarTudo, salvar, excluir:{rotulo,confirmar,acao}, origem, aoFechar })
+   → { fechar, erroCampo, avisoCampo, erroGeral, el } */
+const FORM_MSG = {
+  obrigatorio: "Preencha este campo.", descartar: "Descartar as alterações?", continuar: "Continuar editando", descartarBtn: "Descartar",
+  salvando: "Salvando…", excluindo: "Excluindo…", resumoErros: (n) => `${n} campos precisam de atenção:`, semConexao: "Sem conexão com o banco — tente de novo.",
+  bd: { "23505": "Já existe um registro igual.", "23503": "Este registro faz referência a algo que não existe mais.", "23514": "Um dos valores não é aceito pelo banco.", "42501": "Sem permissão para gravar este registro.", PGRST301: "Sem permissão para gravar este registro.", PGRST116: "Registro não encontrado — pode ter sido excluído por outra pessoa.", "22007": "Data inválida.", "22P02": "Um dos valores está em formato inválido." },
+};
+const traduzErroBD = (e) => { if (!e) return "Não foi possível salvar."; const code = e.code || e.status || ""; if (FORM_MSG.bd[code]) return FORM_MSG.bd[code]; const m = String(e.message || e); if (/Failed to fetch|NetworkError|network|fetch/i.test(m)) return FORM_MSG.semConexao; return m || "Não foi possível salvar."; };
+const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, origem, aoFechar, rotuloSalvar = "Salvar" } = {}) => {
+  if (typeof needDb === "function" && !needDb()) return null;
+  const host = doc.querySelector("#modalHost"); if (!host) return null; host.replaceChildren();
+  const app = doc.querySelector("#app"); const origemEl = origem || doc.activeElement;
+  const uid = "npf" + Math.random().toString(36).slice(2, 8); let enviando = false, fechado = false;
+  const tit = el("h2", { id: uid + "-t" }, titulo); const ctx = contexto ? el("p", { class: "np-f-ctx", id: uid + "-c" }, contexto) : null;
+  const btnX = el("button", { type: "button", class: "np-ib np-f-x", "aria-label": "Fechar (Esc)" }, svgIco(I.x));
+  const geral = el("div", { class: "np-f-geral", role: "alert", hidden: "" }); const vivo = el("div", { class: "np-vh", "aria-live": "polite" });
+  const grade = el("div", { class: "form np-f-campos" });
+  const valorDe = (c) => c.el.type === "checkbox" ? c.el.checked : c.el.value; const inicial = new Map();
+  const porId = {}; const erroEl = {}; const avisoEl = {}; let cruzados = new Set(); // campos marcados pela regra cruzada (validarTudo), reavaliados a cada digitação
+  for (const c of campos) { if (!c || !c.el) continue; porId[c.id] = c; c.el.id = c.id; const lab = el("label", { for: c.id }, c.label, c.obrigatorio ? el("span", { class: "np-f-req", "aria-hidden": "true" }, " *") : c.condicional ? null : el("span", { class: "np-f-opc" }, " (opcional)")); // condicional: obrigatório por regra cruzada (sem "(opcional)")
+    const ajuda = c.ajuda ? el("div", { class: "help", id: c.id + "-h" }, c.ajuda) : null; erroEl[c.id] = el("p", { class: "np-f-erro", id: c.id + "-e", hidden: "" }); avisoEl[c.id] = el("p", { class: "np-f-aviso", id: c.id + "-a", hidden: "" });
+    c.el.setAttribute("aria-describedby", [ajuda ? c.id + "-h" : null, c.id + "-e", c.id + "-a"].filter(Boolean).join(" ")); if (c.obrigatorio) c.el.setAttribute("aria-required", "true");
+    grade.append(el("div", { class: "f np-f" + (c.el.tagName === "TEXTAREA" || c.largo ? " full" : ""), "data-campo": c.id }, lab, c.el, ajuda, erroEl[c.id], avisoEl[c.id]));
+    inicial.set(c.id, valorDe(c)); c.el.addEventListener("blur", () => validarCampo(c, { noBlur: true })); c.el.addEventListener("input", () => { if (c.el.getAttribute("aria-invalid") === "true" && !cruzados.has(c.id)) validarCampo(c, { noBlur: true }); if (cruzados.size) reavaliarCruzados(); }); }
+  const erroCampo = (id, msg) => { const c = porId[id]; if (!c) return; if (msg) { erroEl[id].textContent = msg; erroEl[id].hidden = false; c.el.setAttribute("aria-invalid", "true"); c.el.closest(".np-f")?.classList.add("com-erro"); } else { erroEl[id].hidden = true; erroEl[id].textContent = ""; c.el.removeAttribute("aria-invalid"); c.el.closest(".np-f")?.classList.remove("com-erro"); } };
+  const avisoCampo = (id, msg) => { const c = porId[id]; if (!c) return; avisoEl[id].hidden = !msg; avisoEl[id].textContent = msg || ""; if (msg) vivo.textContent = c.label + ": " + msg; };
+  const erroGeral = (msg, detalhe) => { geral.replaceChildren(); if (!msg) { geral.hidden = true; return; } geral.append(el("b", {}, msg)); if (detalhe && detalhe !== msg) geral.append(el("details", {}, el("summary", {}, "detalhes técnicos"), el("code", {}, String(detalhe).slice(0, 400)))); geral.hidden = false; };
+  const validarCampo = (c, { noBlur } = {}) => { const v = valorDe(c); let r = null; if (c.obrigatorio && (v == null || String(v).trim() === "")) r = FORM_MSG.obrigatorio; else if (typeof c.validar === "function") { try { r = c.validar(v, valores()); } catch (_) { r = null; } }
+    if (r && typeof r === "object" && r.aviso) { erroCampo(c.id, null); avisoCampo(c.id, r.aviso); return null; } avisoCampo(c.id, null); erroCampo(c.id, r || null); return r || null; };
+  const reavaliarCruzados = () => { let cruz = []; try { cruz = (typeof validarTudo === "function" && validarTudo(valores())) || []; } catch (_) { cruz = []; } const agora = new Set(cruz.filter(e => e && e.campo && porId[e.campo]).map(e => e.campo)); for (const id of cruzados) if (!agora.has(id)) erroCampo(id, null); for (const e of cruz) if (e && e.campo && porId[e.campo]) erroCampo(e.campo, e.msg); cruzados = agora; if (!cruzados.size && geral.querySelector("ul")) geral.hidden = true; };
+  const valores = () => { const o = {}; for (const c of campos) if (c && c.el) o[c.id] = valorDe(c); return o; };
+  const validarTodos = () => { const erros = []; for (const c of campos) { if (!c || !c.el) continue; const r = validarCampo(c); if (r) erros.push({ campo: c.id, msg: r }); }
+    cruzados = new Set(); if (typeof validarTudo === "function") { let cruz = []; try { cruz = validarTudo(valores()) || []; } catch (_) { cruz = []; } for (const e of cruz) { if (e && e.campo && porId[e.campo]) cruzados.add(e.campo); if (e && e.campo && porId[e.campo]) { erroCampo(e.campo, e.msg); if (!erros.some(x => x.campo === e.campo)) erros.push(e); } else if (e && e.msg) erros.push(e); } }
+    if (erros.length >= 2) { geral.replaceChildren(el("b", {}, FORM_MSG.resumoErros(erros.length)), el("ul", {}, ...erros.map(e => el("li", {}, porId[e.campo] ? el("a", { href: "#" + e.campo, onclick: (ev) => { ev.preventDefault(); porId[e.campo].el.focus(); } }, porId[e.campo].label + ": " + e.msg) : e.msg)))); geral.hidden = false; }
+    else if (erros.length === 1 && !porId[erros[0].campo]) erroGeral(erros[0].msg); else geral.hidden = true;
+    return erros; };
+  const alterado = () => { for (const c of campos) if (c && c.el && String(valorDe(c)) !== String(inicial.get(c.id))) return true; return false; };
+  const btnSalvar = el("button", { type: "submit", class: "btn primary np-f-salvar" }, rotuloSalvar); const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, "Cancelar");
+  const btnExcluir = excluir ? el("button", { type: "button", class: "btn danger np-f-excluir" }, excluir.rotulo || "Excluir") : null;
+  const confirmBox = el("div", { class: "np-f-confirm", role: "alertdialog", "aria-labelledby": uid + "-cf", hidden: "" });
+  const acoes = el("div", { class: "actions np-f-acoes" }, btnExcluir, el("span", { class: "sp" }), btnCancelar, btnSalvar);
+  const formEl = el("form", { class: "np-f-form", novalidate: "" }, grade); const card = el("div", { class: "card np-form", role: "dialog", "aria-modal": "true", "aria-labelledby": uid + "-t", "aria-describedby": ctx ? uid + "-c" : null }, el("div", { class: "np-f-cab" }, el("div", {}, tit, ctx), btnX), geral, vivo, formEl, confirmBox, acoes);
+  const fundo = el("div", { class: "modal np-form-fundo" }, card);
+  const restaurar = () => { if (fechado) return; fechado = true; host.replaceChildren(); app?.removeAttribute("inert"); doc.removeEventListener("keydown", teclas, true); try { aoFechar?.(); } catch (_) {} const alvo = (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") ? origemEl : null; setTimeout(() => { try { alvo ? alvo.focus() : doc.body.focus(); } catch (_) {} }, 0); };
+  const focaveis = () => [...card.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(e => !e.disabled && !e.hidden && e.offsetParent !== null && !e.closest("[hidden]"));
+  let confirmando = null; // {texto, onSim}
+  const pedirConfirmacao = (texto, rotuloSim, onSim, { perigo } = {}) => { confirmando = { onSim }; confirmBox.replaceChildren(el("p", { id: uid + "-cf" }, texto), el("div", { class: "np-f-confirm-acoes" }, el("button", { type: "button", class: "btn np-f-conf-nao", onclick: fecharConfirmacao }, FORM_MSG.continuar), el("button", { type: "button", class: ("btn np-f-conf-sim " + (perigo ? "danger" : "primary")), onclick: () => { const fn = confirmando?.onSim; fecharConfirmacao(); fn && fn(); } }, rotuloSim))); confirmBox.hidden = false; acoes.hidden = true; setTimeout(() => confirmBox.querySelector(".np-f-conf-nao")?.focus(), 0); };
+  const fecharConfirmacao = () => { confirmando = null; confirmBox.hidden = true; confirmBox.replaceChildren(); acoes.hidden = false; };
+  const tentarFechar = () => { if (enviando) return; if (confirmando) { fecharConfirmacao(); return; } if (alterado()) { pedirConfirmacao(FORM_MSG.descartar, FORM_MSG.descartarBtn, restaurar, { perigo: true }); return; } restaurar(); };
+  const travar = (on, txt) => { enviando = on; card.setAttribute("aria-busy", String(on)); btnSalvar.disabled = on; btnCancelar.disabled = on; btnX.disabled = on; if (btnExcluir) btnExcluir.disabled = on; if (on) { btnSalvar.dataset.rotulo = btnSalvar.textContent; btnSalvar.textContent = txt || FORM_MSG.salvando; vivo.textContent = txt || FORM_MSG.salvando; } else { if (btnSalvar.dataset.rotulo) btnSalvar.textContent = btnSalvar.dataset.rotulo; } };
+  const enviar = async () => { if (enviando || confirmando) return; const erros = validarTodos(); if (erros.length) { const c = porId[erros[0].campo]; (c ? c.el : geral).focus?.(); return; } erroGeral(null); travar(true, FORM_MSG.salvando);
+    try { await salvar(valores()); fechado || restaurar(); } catch (e) { travar(false); erroGeral(traduzErroBD(e), e && e.message); geral.focus?.(); } };
+  const excluirAgora = async () => { if (enviando || !excluir) return; erroGeral(null); travar(true, FORM_MSG.excluindo); try { await excluir.acao(); fechado || restaurar(); } catch (e) { travar(false); erroGeral(traduzErroBD(e), e && e.message); } };
+  btnSalvar.onclick = (e) => { e.preventDefault(); enviar(); }; formEl.addEventListener("submit", (e) => { e.preventDefault(); enviar(); });
+  btnCancelar.onclick = tentarFechar; btnX.onclick = tentarFechar; fundo.addEventListener("mousedown", (e) => { if (e.target === fundo) tentarFechar(); });
+  if (btnExcluir) btnExcluir.onclick = () => { if (enviando) return; pedirConfirmacao(excluir.confirmar || "Excluir este registro?", excluir.rotulo || "Excluir", excluirAgora, { perigo: true }); };
+  const teclas = (e) => { if (!card.isConnected) return; if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); tentarFechar(); return; }
+    if (e.key === "Tab") { const fs = focaveis(); if (!fs.length) return; const i = fs.indexOf(doc.activeElement); if (e.shiftKey && (i <= 0)) { e.preventDefault(); fs[fs.length - 1].focus(); } else if (!e.shiftKey && (i === fs.length - 1 || i === -1)) { e.preventDefault(); fs[0].focus(); } return; }
+    if (e.key === "Enter" && enviando) { e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === "Enter" && e.target && /^(INPUT|SELECT)$/.test(e.target.tagName) && card.contains(e.target)) { e.preventDefault(); enviar(); } };
+  doc.addEventListener("keydown", teclas, true);
+  host.append(fundo); geral.tabIndex = -1; app?.setAttribute("inert", "");
+  // segurança: se outro código esvaziar #modalHost (modal() da V2, limpezas antigas), o inert e os ouvintes são desfeitos — o app nunca fica travado
+  const obs = new MutationObserver(() => { if (!fundo.isConnected && !fechado) { obs.disconnect(); restaurar(); } else if (fechado) obs.disconnect(); }); obs.observe(host, { childList: true });
+  setTimeout(() => { const primeiro = campos.find(c => c && c.el && c.el.getAttribute("aria-invalid") === "true") || campos.find(c => c && c.el && !c.el.disabled); (primeiro ? primeiro.el : btnX).focus(); }, 0);
+  return { fechar: restaurar, erroCampo, avisoCampo, erroGeral, el: card, valores };
+};
+window.NPUI = { form, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();
