@@ -176,3 +176,59 @@
   window.PP_CASCA = { versao: "v3.1", modelo, emTrilho, fecharFly };
   try { renderNav(); } catch (_) {} // o módulo carrega depois do primeiro render
 })();
+
+/* Fase 4B · B5 — busca global integrada: grupos "Negociações" e "Acompanhamento PJ", SÓ com a casca V3.1 ligada e SÓ para quem tem permissão
+   (NPUI.permite(aba) === true, falha-fechado). Consome apenas as listas que os módulos já carregaram (PP_NEG.lista / PP_ACOMP.registros);
+   distingue "ainda não carregado" (botão explícito para carregar pelo mecanismo do próprio módulo), "nenhum resultado" e "indisponível";
+   nada muda de rota enquanto se digita — só o clique/Enter em um resultado abre (PP_NEG.abrir / PP_ACOMP.abrir). A busca V2 do núcleo fica intacta:
+   este bloco só acrescenta grupos ao mesmo listbox (ou cria o seu quando o núcleo não encontrou nada). */
+(() => {
+  const inp = document.querySelector("#buscaGlobal"), box = document.querySelector("#busca"); if (!inp || !box) return;
+  const html = document.documentElement; const ativa = () => html.classList.contains("np-casca-v3") && !!window.NPUI;
+  const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const permite = tab => { try { return window.NPUI?.permite?.(tab) === true; } catch (_) { return false; } };
+  let meu = null, est = null, espera = null;
+  const limpar = () => { if (meu) { meu.remove(); meu = null; } if (est) { est.remove(); est = null; } box.querySelectorAll(".res.np-busca-res").forEach(r => r.remove()); clearTimeout(espera); espera = null; };
+  const ir = fn => { limpar(); const r = box.querySelector(".res"); if (r) r.remove(); inp.value = ""; inp.blur(); fn(); };
+  const FASE = { onboarding: "Onboarding", ciclo: "Ciclo inicial", mensal: "Mensal", encerrado: "Encerrado" };
+  const op = (titulo, sub, onclick) => el("button", { role: "option", type: "button", onclick }, titulo, el("small", {}, sub));
+  const extra = () => {
+    limpar(); if (!ativa()) return;
+    const q = norm(inp.value.trim()); if (q.length < 2) return; const qd = q.replace(/\D/g, "");
+    const grupos = [], estados = []; let acionavel = false; // acionavel: há lista ainda não carregada (botão "carregar para buscar") — vale abrir a caixa mesmo sem resultado
+    if (permite("negociacoes")) {
+      const NG = window.PP_NEG; const e = NG?.estado ? NG.estado() : null;
+      if (!NG || !e) estados.push(el("span", {}, "Negociações: indisponíveis"));
+      else if (e.erro) estados.push(el("span", {}, "Negociações: indisponíveis"));
+      else if (!e.carregado) { const b = el("button", { type: "button", class: "np-busca-carregar", onclick: ev => { ev.stopPropagation(); if (e.carregando || !NG.carregar()) return; b.disabled = true; b.textContent = "carregando…"; const t0 = Date.now(); const aguardar = () => { const x = NG.estado(); if (x.carregado || x.erro || Date.now() - t0 > 15000) { if (document.activeElement === inp || inp.value) extra(); return; } espera = setTimeout(aguardar, 250); }; aguardar(); } }, e.carregando ? "carregando…" : "carregar para buscar"); if (e.carregando) b.disabled = true; estados.push(el("span", {}, "Negociações: ainda não carregadas · ", b)); acionavel = true; }
+      else { const ls = NG.lista().filter(n => norm(n.titulo).includes(q) || norm(n.banco).includes(q) || norm(n.cliente_nome).includes(q) || (qd.length >= 4 && String(n.numero_processo || "").replace(/\D/g, "").includes(qd))).slice(0, 6);
+        if (ls.length) grupos.push(["Negociações", ls.map(n => op(n.titulo || [n.cliente_nome, n.banco].filter(Boolean).join(" | "), [n.cliente_nome, n.banco, NG.etapas ? (Object.fromEntries(NG.etapas)[n.etapa] || n.etapa) : n.etapa, n.responsavel_nome].filter(Boolean).join(" · "), () => ir(() => NG.abrir(n.id))))]);
+        else estados.push(el("span", {}, "Negociações: nenhum resultado")); }
+    }
+    if (permite("acompanhamento")) {
+      const AC = window.PP_ACOMP; const e = AC?.estado ? AC.estado() : null;
+      if (!AC || !e) estados.push(el("span", {}, "Acompanhamento PJ: indisponível"));
+      else if (e.erro) estados.push(el("span", {}, "Acompanhamento PJ: indisponível"));
+      else if (!e.carregado) { const b = el("button", { type: "button", class: "np-busca-carregar", onclick: ev => { ev.stopPropagation(); if (e.carregando || !AC.carregarLista()) return; b.disabled = true; b.textContent = "carregando…"; const t0 = Date.now(); const aguardar = () => { const x = AC.estado(); if (x.carregado || x.erro || Date.now() - t0 > 15000) { if (document.activeElement === inp || inp.value) extra(); return; } espera = setTimeout(aguardar, 250); }; aguardar(); } }, e.carregando ? "carregando…" : "carregar para buscar"); if (e.carregando) b.disabled = true; estados.push(el("span", {}, "Acompanhamento PJ: ainda não carregado · ", b)); acionavel = true; }
+      else { const rs = AC.registros().filter(r => r.iniciado && (norm(r.c.nome).includes(q) || norm(r.c.cnpj).includes(q) || norm(r.c.nome_fantasia).includes(q) || norm(FASE[r.a?.fase]).includes(q) || (r.prox && norm(r.prox.rotulo) === q))).slice(0, 6);
+        if (rs.length) grupos.push(["Acompanhamento PJ", rs.map(r => { const p = r.prox ? NPUI.prazoTxt(r.prox.data) : null; return op(r.c.nome, [FASE[r.a?.fase] || r.a?.fase, p ? r.prox.rotulo + " prevista " + p.rel : "sem data prevista", r.resp?.nome ? NPUI.curto(r.resp.nome) : null].filter(Boolean).join(" · "), () => ir(() => AC.abrir(r.c.id))); })]);
+        else estados.push(el("span", {}, "Acompanhamento PJ: nenhum resultado")); }
+    }
+    if (!grupos.length && !estados.length) return;
+    let res = box.querySelector(".res"); let proprio = false;
+    if (!res) { if (!grupos.length && !acionavel) return; /* sem resultado em lugar nenhum e nada a carregar: não abre caixa só para dizer "nenhum resultado" */ res = el("div", { class: "res np-busca-res", role: "listbox" }); box.append(res); proprio = true; }
+    meu = el("div", { class: "np-busca-extra" }); for (const [t, items] of grupos) { meu.append(el("div", { class: "grp-h" }, t)); items.forEach(i => meu.append(i)); } res.append(meu);
+    if (estados.length) { est = el("div", { class: "np-busca-est" }); estados.forEach((s, i) => { if (i) est.append(" · "); est.append(s); }); res.append(est); }
+    if (proprio) meu.dataset.proprio = "1";
+  };
+  inp.addEventListener("input", extra); inp.addEventListener("focus", extra);
+  // teclado quando a caixa é só nossa (o núcleo não encontrou nada): ↑/↓ entre as opções, Enter abre, Esc fecha
+  inp.addEventListener("keydown", e => { if (!meu || !meu.dataset.proprio) { if (e.key === "Escape") limpar(); return; } const ops = [...meu.querySelectorAll("[role=option]")]; let idx = ops.findIndex(o => o.getAttribute("aria-selected") === "true");
+    if (e.key === "Escape") { limpar(); const r = box.querySelector(".res"); if (r) r.remove(); }
+    else if (e.key === "ArrowDown" && ops.length) { e.preventDefault(); idx = (idx + 1) % ops.length; ops.forEach((o, i) => o.setAttribute("aria-selected", String(i === idx))); }
+    else if (e.key === "ArrowUp" && ops.length) { e.preventDefault(); idx = (idx - 1 + ops.length) % ops.length; ops.forEach((o, i) => o.setAttribute("aria-selected", String(i === idx))); }
+    else if (e.key === "Enter" && ops.length) { e.preventDefault(); (ops[idx] || ops[0]).click(); } });
+  document.addEventListener("click", e => { if (!box.contains(e.target)) limpar(); });
+  document.head.append(el("style", {}, `html.np-casca-v3 .busca .res .grp-h{color:var(--muted)} /* V3.1: cabeçalhos dos grupos da busca com contraste ≥ 4,5:1 (V2 mantém a cor de antes) */
+.busca .res .np-busca-est{padding:6px 12px 8px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:2px 4px}.busca .res .np-busca-est .np-busca-carregar{display:inline;width:auto;padding:0 2px;font:inherit;color:var(--info);text-decoration:underline;background:transparent;border:0;cursor:pointer}.busca .res .np-busca-est .np-busca-carregar[disabled]{color:var(--muted);text-decoration:none;cursor:default}`));
+})();

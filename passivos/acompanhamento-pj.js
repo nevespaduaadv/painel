@@ -123,6 +123,7 @@ function cardAtas(c,st){
 
 /* ---------- montagem da aba ---------- */
 function renderAba(c,host,ind){
+  if(acompV3()){renderAbaV3(c,host,ind);return} // Fase 4B · A4 — V3.1 ligada: mesmos blocos da visão transversal
   const st=A.cache[c.id];if(!st?.ok){carregar(c.id);host.append(el("div",{class:"note"},"Carregando acompanhamento…"));return}
   if(st.erro&&/acompanhamento_pj|dividas_raio_x|atas_reuniao/.test(st.erro))host.append(el("div",{class:"card",style:"padding:10px 14px;border-left:3px solid var(--warn)"},"Rode a migração 0104 para ativar o Acompanhamento PJ."));
   host.append(cardCiclo(c,st));
@@ -267,7 +268,8 @@ function abrirPainelA3(cid,{origem,silencioso}={}){
   A3.painel.abrir({id:cid,trilha:m.trilha,titulo:c.nome,corpo:m.corpo,pe:m.pe,origem:silencioso?null:origem});
 }
 /* conteúdo do painel a partir do cliente atual (S.clientes) e do registro atual — reutilizado na abertura e na atualização silenciosa */
-function montarPainelA3(c){
+/* seções do cliente (V3.1): usadas pelo painel transversal E pela aba Acompanhamento PJ da ficha (Fase 4B · A4) — mesmos dados, mesmas gravações */
+function secoesA3(c){
   const cid=c.id;const st=A.cache[cid];
   const r=registrosA3().find(x=>x.c.id===cid);const a=r?.a||null;const edita=podeEditar()&&!readOnly();
   const prox=r?.prox;const pp=prox?NPUI.prazoTxt(prox.data):null;
@@ -289,10 +291,33 @@ function montarPainelA3(c){
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
   const atas=st?.ok?st.atas:null;
   const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[(A.colab.find(k=>k.id===x.autor_id)?.nome||""),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
+  /* Negociações do cliente (B2) — lidas pelo id do cliente no módulo de Negociações; cada uma só com os próprios valores (nenhuma soma global) */
+  const secNeg=(()=>{const NG=window.PP_NEG;if(!NG?.podeVer||NG.podeVer()!==true)return null;const lista=NG.porCliente(cid);
+    if(lista===null){const e=NG.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)NG.carregar?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Negociações",e?.erro?el("div",{class:"np-sem"},"Negociações indisponíveis no momento."):NPUI.carregando(2))}
+    const abertas=lista.filter(n=>n.etapa!=="concluido"),concl=lista.length-abertas.length;const nova=edita&&!readOnly()&&NG.nova?NPUI.btn("Nova negociação",{variante:"ghost",icone:"mais",onclick:()=>NG.nova(c)}):null;
+    return NPUI.secao(`Negociações${abertas.length?" · "+abertas.length+" aberta"+(abertas.length===1?"":"s"):""}`,
+      abertas.length?el("div",{class:"np-vinc-l"},abertas.map(n=>NG.linhaCompacta(n))):el("div",{class:"np-sem"},"Nenhuma negociação aberta para este cliente."),
+      el("div",{class:"np-rodape",style:"padding:6px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"},concl?el("span",{},`${concl} concluída${concl===1?"":"s"}`):null,nova))})();
   const trilha=[el("span",{},"Clientes"),el("span",{class:"sep"}),el("span",{},"Acompanhamento PJ")];
   const pe=[edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
     (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
-  return {trilha,corpo:[props,secCiclo,secRaio,secPend,secAtas],pe};
+  return {props,secCiclo,secNeg,secRaio,secPend,secAtas,trilha,pe,a,edita,st,r};
+}
+function montarPainelA3(c){const s=secoesA3(c);return {trilha:s.trilha,corpo:[s.props,s.secCiclo,s.secNeg,s.secRaio,s.secPend,s.secAtas],pe:s.pe}}
+/* Fase 4B · A4 — aba Acompanhamento PJ da ficha com a casca V3.1: reutiliza secoesA3 (ciclo, Raio-X, pendências, atas) e as MESMAS ações
+   (formAta, formCiclo, criarTarefasCiclo, formDivida); o card do Raio-X do formulário (ficha.js) e os hooks de fluxo/proteção continuam. V2 intacta. */
+function renderAbaV3(c,host,ind){
+  const st=A.cache[c.id];if(!st?.ok)carregar(c.id);
+  if(!A3.lista&&!A3.carregando)carregarLista();
+  if(A3.erro&&/acompanhamento_pj|v_acompanhamento/.test(A3.erro))host.append(NPUI.faixaErro({texto:"Acompanhamento PJ indisponível neste ambiente: rode a migração 0104.",acao:"Tentar de novo",onAcao:()=>carregarLista(true)}));
+  if(!st?.ok||!A3.lista){host.append(el("div",{class:"np-v3-aba"},NPUI.carregando(4)));return}
+  const s=secoesA3(c);const edita=s.edita;
+  host.append(el("div",{class:"np-v3-aba"},s.props,s.secCiclo));
+  if(window.PP_FICHA?.cardRaioX)window.PP_FICHA.cardRaioX(c,host,ind);
+  const acoes=el("div",{class:"np-v3-aba-acoes"},edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(s.a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,s.a)}):null,
+    edita?NPUI.btn("Criar tarefas do ciclo",{variante:"ghost",onclick:()=>criarTarefasCiclo(c,s.a)}):null,edita?NPUI.btn("Incluir dívida no Raio-X…",{variante:"ghost",onclick:()=>formDivida(c,null)}):null,
+    podeVerTransversal()?NPUI.btn("Ver na carteira",{variante:"ghost",title:"Abre este cliente na visão transversal do Acompanhamento PJ",onclick:()=>window.PP_ACOMP.abrir(c.id)}):null);
+  host.append(el("div",{class:"np-v3-aba"},s.secRaio,s.secPend,s.secAtas,acoes));
 }
 /* rota #acompanhamento: só com a casca V3.1 e permissão; fora disso, volta para Clientes (ou Hoje) — inclusive quando aberta por hash/URL */
 {const _r=render;render=function(){_r();const v=$("#view-acompanhamento");if(!v)return;
@@ -302,5 +327,29 @@ function montarPainelA3(c){
   renderAcompanhamentoV3()}}
 const invalidarLista=()=>{A3.lista=null};
 window.__PP_LOGIN?.then?.(()=>{try{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("acomp-pj");for(const t of ["acompanhamento_pj","atas_reuniao","dividas_raio_x"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{invalidarLista();if(S.tab==="acompanhamento")render()});ch.subscribe()}}catch(_){}});
-window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>registrosA3(),abrir:cid=>abrirPainelA3(cid),podeVer:podeVerTransversal,estado:()=>({esperando:A3.esperando,aberta:A3.aberta,lista:!!A3.lista,carregando:A3.carregando,erro:A3.erro,cache:Object.fromEntries(Object.entries(A.cache).map(([k,v])=>[k,{ok:!!v.ok,carregando:!!v.carregando,erro:v.erro||null,dividas:v.dividas?.length,atas:v.atas?.length}]))})};
+window.PP_ACOMP={invalidar,carregar,filtro:(f={})=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:"",...f};render()},filtroAtual:()=>({...A3.f}),registros:()=>podeVerTransversal()?registrosA3():[],podeVer:podeVerTransversal,
+  estado:()=>({carregado:!!A3.lista,carregando:A3.carregando,erro:A3.erro,vazio:!!A3.lista&&!A3.lista.length,esperando:A3.esperando,aberta:A3.aberta,lista:!!A3.lista,cache:Object.fromEntries(Object.entries(A.cache).map(([k,v])=>[k,{ok:!!v.ok,carregando:!!v.carregando,erro:v.erro||null,dividas:v.dividas?.length,atas:v.atas?.length}]))}),
+  /* ---- contrato público (Fase 4B) — falha-fechado ---- */
+  carregarLista:()=>{if(!podeVerTransversal())return false;carregarLista();return true},
+  // null = sem permissão ou lista ainda não carregada; {iniciado:false} = cliente visível sem acompanhamento; registro completo caso contrário
+  porCliente:cid=>{if(!podeVerTransversal()||!A3.lista||!cid)return null;const r=registrosA3().find(x=>x.c.id===cid);return r||null},
+  // marcos do ciclo com data gravada (previstos/realizados) — só leitura, para a Agenda; nunca cria nada
+  marcos:()=>{if(!podeVerTransversal()||!A3.lista)return null;const out=[];for(const a of A3.lista){const c=(S.clientes||[]).find(x=>x.id===a.cliente_id);if(!c||!a.fase||a.fase==="encerrado")continue;
+      for(const [k,l] of [["onb","Onboarding"],["r1","R1"],["r2","R2"],["r3","R3"]]){const d=diaISO(a[k+"_data"]);if(d)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:k,rotulo:l,data:d,realizada:!!a[k+"_feita"],responsavel_id:c.resp_estrategico_id||null})}
+      if(a.proxima_reuniao)out.push({cliente_id:c.id,cliente_nome:c.nome,chave:"mensal",rotulo:"Mensal",data:diaISO(a.proxima_reuniao),realizada:false,responsavel_id:c.resp_estrategico_id||null})}
+    return out},
+  /* bloco cruzado "Acompanhamento PJ" (Fase 4B) para os painéis de Negociações e Tarefas — só leitura, só dados gravados; null sem permissão/V3.1 */
+  bloco:(cid,{titulo="Acompanhamento PJ"}={})=>{if(!podeVerTransversal()||!window.NPUI||!cid)return null;const AC=window.PP_ACOMP;const r=AC.porCliente(cid);
+    if(r===null){const e=AC.estado();if(!e.carregado&&!e.carregando&&!e.erro)carregarLista();/* com erro não insiste: evita laço de recarga */
+      return NPUI.secao(titulo,e.erro?el("div",{class:"np-sem"},"Acompanhamento indisponível neste ambiente."):NPUI.carregando(2))}
+    const abrir=NPUI.btn("Abrir acompanhamento",{variante:"ghost",onclick:()=>AC.abrir(cid)});
+    if(!r.iniciado)return NPUI.secao(titulo,el("div",{class:"np-sem"},"Acompanhamento não iniciado para este cliente."),el("div",{style:"margin-top:6px"},abrir));
+    const a=r.a;const FASE={onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"};const pp=r.prox?NPUI.prazoTxt(r.prox.data):null;
+    const kv=NPUI.props([["Fase",FASE[a.fase]||a.fase],["Próxima reunião",pp?[pp.exata," ",el("span",{class:"np-marca "+(r.grupo==="vencida"?"crit":r.grupo==="semana"?"att":"")},r.prox.rotulo+" · prevista · "+pp.rel)]:el("span",{class:"np-sem"},"sem data prevista"),"serif"],
+      ["Acordos",a.acordos_liberado?NPUI.marca("liberado em "+fmtD((a.acordos_liberado_em||"").slice(0,10)),"ok"):el("span",{class:"np-sem"},"aguarda a R1 + Raio-X")],["Resp. estratégico",r.resp?NPUI.quem(r.resp.nome):el("span",{class:"np-sem"},"— ninguém —")],r.pend.length?["Pendências",`${r.pend.length} tarefa${r.pend.length===1?" aberta":"s abertas"} do núcleo`]:null].filter(Boolean));
+    return NPUI.secao(titulo,kv,el("div",{style:"margin-top:6px"},abrir))},
+  abrir:cid=>{if(!podeVerTransversal())return false;const c=(S.clientes||[]).find(x=>x.id===cid);if(!c)return false;
+    if(!acompV3()){S.tab="clientes";S.sel=cid;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render();return true}
+    const jaNaAba=S.tab==="acompanhamento";A3.aberta=cid;S.tab="acompanhamento";try{localStorage.setItem("pp-tab","acompanhamento")}catch(_){}
+    if(jaNaAba&&A3.painel&&A3.lista){abrirPainelA3(cid);return true}render();return true}};
 })();

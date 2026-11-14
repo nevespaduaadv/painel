@@ -15,7 +15,7 @@ const STATUS={prospect:"Prospect",onboarding:"Em onboarding",ativo:"Ativo",pausa
 const MON_STATUS={em_monitoramento:"Em monitoramento",nova_movimentacao:"Nova movimentação",pausado:"Pausado"};
 const AVAL={nao:"Não",socio:"Sócio",terceiro:"Terceiro"};
 const SITS=["Sem processo","Banco ajuizou ação","Cliente ajuizou ação","Execução em curso","Busca e apreensão","Acordo homologado"];
-const X={neg:[],mon:[],colabs:[],ok:false,carregando:false,fCli:"",fResp:"",concluidas:false};
+const X={neg:[],mon:[],colabs:[],ok:false,carregando:false,erro:null,fCli:"",fResp:"",concluidas:false};
 const hojeISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const addISO=(iso,n)=>{const d=parseD(iso)||hoje();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const tri=(v)=>sel({"":"—",true:"Sim",false:"Não"},v==null?"":String(v));
@@ -30,8 +30,8 @@ async function carregar(){
   try{
     const [n,m,c]=await Promise.all([SB.from("v_negociacoes").select("*").order("etapa_ordem").order("ordem").order("updated_at",{ascending:false}),
       SB.from("v_monitoramentos").select("*").order("proxima_checagem",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,nome,nucleo,ativo").order("nome")]);
-    if(n.error)throw n.error;X.neg=n.data||[];X.mon=m.data||[];X.colabs=c.data||[];X.ok=true;
-  }catch(e){console.warn("fluxo",e);toast("Não foi possível carregar negociações")}
+    if(n.error)throw n.error;X.neg=n.data||[];X.mon=m.data||[];X.colabs=c.data||[];X.ok=true;X.erro=null;
+  }catch(e){console.warn("fluxo",e);X.erro=String(e.message||e);toast("Não foi possível carregar negociações")}
   finally{X.carregando=false}
   render();
 }
@@ -232,7 +232,7 @@ function openMonForm(cid,m){
    Filtros V3.1 são client-side sobre X.neg (mesma consulta); os seletores da V2 (cliente, responsável, concluídas) continuam em "Mais filtros".
    ==================================================================================================================== */
 const negV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
-const N3={escopo:"abertas",atrasadas:false,paradas:false,minhas:false,bancos:new Set(),painel:null,obra:null,aberta:null,grupos:null,vista:null};
+const N3={escopo:"abertas",atrasadas:false,paradas:false,minhas:false,bancos:new Set(),painel:null,obra:null,aberta:null,grupos:null,vista:null,abrirId:null};
 const TEMP_TOM={frio:"info",morno:"att",quente:"crit"};
 const NEG_FASE_ACORDO=["formalizado","pagamento_pendente","concluido"]; // a partir daqui o valor do acordo deixa de ser proposta em negociação
 const paradaN=n=>n.dias_parada>15&&n.etapa!=="concluido";
@@ -341,6 +341,7 @@ function renderNegociacoesV3(){
   corpo.append(NPUI.rodape(`${lista.length} negociaç${lista.length===1?"ão":"ões"} com estes filtros`+(N3.escopo!=="abertas"&&somaC?` · ${BRL(somaC)} em acordos concluídos`:""),[["late","prazo vencido"],["att","parada há 15+ dias"]]));
   obra.append(corpo);v.append(obra);
   N3.painel=NPUI.painel({obra,label:"Detalhe da negociação",onClose:()=>{N3.aberta=null}});
+  if(N3.abrirId){const id=N3.abrirId;N3.abrirId=null;const n=X.neg.find(x=>x.id===id);if(n){N3.aberta=n.id;setTimeout(()=>abrirPainelN3(n,{silencioso:true}),0);return}toast("Negociação não encontrada")}
   if(N3.aberta){const n=X.neg.find(x=>x.id===N3.aberta);if(n)abrirPainelN3(n,{silencioso:true});else N3.aberta=null}
 }
 /* painel: os campos reais do formulário (openNegForm), em leitura; ações = Mover etapa (mesma escrita do kanban), Editar (modal atual), Abrir cliente */
@@ -382,8 +383,10 @@ function abrirPainelN3(n,{origem,silencioso}={}){
     ["Planejada",c.projeto_reserva?RESERVA[c.projeto_reserva]:el("span",{class:"np-sem"},"não iniciada")],
     ["Acumulada",c.reservaAcumulada?[BRL(+c.reservaAcumulada),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada"),"serif"],
   ]):null;
+  /* Acompanhamento PJ do cliente (B2) — só leitura dos dados existentes, pelo id do cliente; nada vira regra ou bloqueio aqui */
+  const secAcomp=c&&window.PP_ACOMP?.bloco?window.PP_ACOMP.bloco(c.id):null; // bloco cruzado só leitura (contrato PP_ACOMP; null sem permissão) — Fase 4B
   const corpo=[props,NPUI.secao("Valores",valores.children.length?valores:el("div",{class:"np-sem"},"Sem valores informados"),notaAlcada),
-    c?NPUI.secao("Reserva financeira do cliente",reserva):null,
+    c?NPUI.secao("Reserva financeira do cliente",reserva):null,secAcomp,
     n.proximo_passo?NPUI.secao("Próximo passo",el("div",{style:"white-space:pre-wrap"},n.proximo_passo)):null,
     n.aguardando?NPUI.secao("Aguardando",el("div",{},n.aguardando)):null,
     n.observacoes?NPUI.secao("Observações",el("div",{style:"white-space:pre-wrap"},n.observacoes)):null,
@@ -396,7 +399,23 @@ function abrirPainelN3(n,{origem,silencioso}={}){
   N3.painel.abrir({id:n.id,trilha,titulo:n.titulo||[n.cliente_nome,n.banco].filter(Boolean).join(" | "),corpo,pe:[btnMover,btnEditar,mais],origem:silencioso?null:origem});
 }
 function abrirClienteN3(cid,sub){S.tab="clientes";S.sel=cid;S.sub=sub||"resumo";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}
-window.PP_NEG={lista:()=>X.neg,filtro:(f={})=>{limparN3();if(f.cliente!=null)X.fCli=f.cliente;if(f.resp!=null)X.fResp=f.resp;if(f.escopo)N3.escopo=f.escopo;if(f.concluidas!=null)X.concluidas=f.concluidas;if(f.atrasadas!=null)N3.atrasadas=f.atrasadas;if(f.paradas!=null)N3.paradas=f.paradas;if(f.minhas!=null)N3.minhas=f.minhas;if(f.bancos)N3.bancos=new Set(f.bancos);render()},filtroAtual:()=>({cliente:X.fCli,resp:X.fResp,concluidas:X.concluidas,escopo:N3.escopo,atrasadas:N3.atrasadas,paradas:N3.paradas,minhas:N3.minhas,bancos:[...N3.bancos]}),etapas:NEG_ETAPAS};
+window.PP_NEG={lista:()=>X.neg,filtro:(f={})=>{limparN3();if(f.cliente!=null)X.fCli=f.cliente;if(f.resp!=null)X.fResp=f.resp;if(f.escopo)N3.escopo=f.escopo;if(f.concluidas!=null)X.concluidas=f.concluidas;if(f.atrasadas!=null)N3.atrasadas=f.atrasadas;if(f.paradas!=null)N3.paradas=f.paradas;if(f.minhas!=null)N3.minhas=f.minhas;if(f.bancos)N3.bancos=new Set(f.bancos);render()},filtroAtual:()=>({cliente:X.fCli,resp:X.fResp,concluidas:X.concluidas,escopo:N3.escopo,atrasadas:N3.atrasadas,paradas:N3.paradas,minhas:N3.minhas,bancos:[...N3.bancos]}),etapas:NEG_ETAPAS,
+  /* ---- contrato público (Fase 4B) — tudo falha-fechado: sem permissão, nada é lido nem devolvido ---- */
+  podeVer:()=>NPUI?.permite?NPUI.permite("negociacoes"):false,
+  estado:()=>({carregado:X.ok,carregando:X.carregando,erro:X.erro,vazio:X.ok&&!X.neg.length}),
+  carregar:()=>{if(!(window.NPUI?.permite&&NPUI.permite("negociacoes")))return false;garantir();return true},
+  // null = sem permissão ou ainda não carregado (o chamador decide mostrar "carregando" ou nada); [] = carregado e vazio
+  porCliente:cid=>(window.NPUI?.permite&&NPUI.permite("negociacoes")&&X.ok&&cid)?X.neg.filter(n=>n.cliente_id===cid):null,
+  // abre a negociação pelo id: V3.1 → rota #negociacoes com o painel; V2 → ficha do cliente na aba Negociações. Nunca por objeto de outro módulo.
+  nova:c=>{if(!(window.NPUI?.permite&&NPUI.permite("negociacoes"))||readOnly())return false;openNegForm(c&&c.id?{id:c.id}:null,{});return true},
+  // linha compacta para blocos de outros módulos (B2): etapa, banco, cobrado → proposta/acordo, próximo passo, responsável; clique → abrir(id)
+  linhaCompacta:n=>{const ab=n.etapa!=="concluido";const emNeg=!NEG_FASE_ACORDO.includes(n.etapa);
+    return el("button",{type:"button",class:"np-vinc-it"+(ab?"":" fechada"),title:"Abrir a negociação",onclick:()=>window.PP_NEG.abrir(n.id)},
+      el("span",{class:"np-vinc-h"},NPUI.etapa(NEG_ETAPAS.map(([k,l])=>({k,label:l})),n.etapa),el("b",{},n.banco||"banco não informado"),el("span",{class:"np-vinc-et"},NEG_LABEL[n.etapa]||n.etapa),n.atrasada&&ab?NPUI.marca("vencido","crit"):null,paradaN(n)?NPUI.marca("parada","att"):null),
+      el("span",{class:"np-vinc-b"},NPUI.val({cobrado:n.valor_cobrado,acordo:n.valor_acordo,rotuloAcordo:emNeg?"proposta":"acordo",sub:n.valor_acordo!=null&&emNeg?"proposta":null}),n.proximo_passo?el("span",{class:"np-vinc-p"},String(n.proximo_passo).slice(0,90)):null,NPUI.quem(n.responsavel_nome)))},
+  abrir:id=>{if(!(window.NPUI?.permite&&NPUI.permite("negociacoes")))return false;const n=X.ok?X.neg.find(x=>x.id===id):null;
+    if(!negV3()){if(n&&n.cliente_id){abrirClienteN3(n.cliente_id,"negociacoes");return true}return false}
+    N3.abrirId=id;limparN3();S.tab="negociacoes";try{localStorage.setItem("pp-tab","negociacoes")}catch(_){}if(X.ok)render();else garantir();return true}};
 
 /* ---------- Integração ---------- */
 window.PP_MOD=window.PP_MOD||{};

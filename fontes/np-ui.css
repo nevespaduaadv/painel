@@ -238,3 +238,18 @@ html.np-casca-v3 .np-v3 > .hub-tabs{display:none}
 }
 /* quadro de etapas (Negociações): sempre uma linha de colunas, com rolagem horizontal — como o kanban V2 */
 html.np-casca-v3 .np-quadro-neg{grid-template-columns:repeat(var(--n,7),minmax(200px,1fr));overflow-x:auto;scroll-snap-type:x proximity}html.np-casca-v3 .np-quadro-neg .np-colq{scroll-snap-align:start;min-width:0}
+
+/* ---- Fase 4B · blocos cruzados entre módulos (linha compacta de negociação, listas de vínculo) ---- */
+html.np-casca-v3 .np-vinc-l{display:flex;flex-direction:column;gap:4px}
+html.np-casca-v3 .np-vinc-it{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--np-line);border-radius:var(--np-r-sm);background:var(--np-surface);color:var(--np-text);font:inherit;cursor:pointer;min-height:44px}
+html.np-casca-v3 .np-vinc-it:hover{background:var(--np-sel)}html.np-casca-v3 .np-vinc-it:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-vinc-it.fechada{opacity:.75}
+html.np-casca-v3 .np-vinc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}html.np-casca-v3 .np-vinc-h b{font:500 var(--np-fs-2)/1.3 var(--np-ui)}html.np-casca-v3 .np-vinc-et{color:var(--np-text-3);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-vinc-b{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--np-fs-1)}html.np-casca-v3 .np-vinc-p{color:var(--np-text-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40ch}
+html.np-casca-v3 .np-vinc-b .np-quem{margin-left:auto}
+
+/* Fase 4B · A4 — aba Acompanhamento PJ da ficha com os blocos da visão transversal */
+html.np-casca-v3 .np-v3-aba{display:flex;flex-direction:column;gap:14px;background:var(--np-surface);border:1px solid var(--np-line);border-radius:var(--np-r);padding:14px 16px;margin:0 0 12px}
+html.np-casca-v3 .np-v3-aba{min-width:0;max-width:100%}html.np-casca-v3 .np-v3-aba>*{min-width:0}html.np-casca-v3 .np-v3-aba .np-sec{margin:0}
+html.np-casca-v3 .np-v3-aba-acoes{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--np-line)}
+@media (max-width:600px){html.np-casca-v3 .np-v3-aba{padding:12px}html.np-casca-v3 .np-v3-aba-acoes .np-btn{flex:1 1 auto}}
