@@ -106,14 +106,25 @@ function cardDividas(c,st){
 /* ---------- 4) atas ---------- */
 /* persistência da ata — compartilhada pela V2 (formAta) e pela V3.1 (formAtaV3). cid/aid vêm do formulário aberto, nunca do estado atual da tela.
    preservarAutor: na edição, NÃO reenvia autor_id (V3.1, decisão 14/11); a V2 continua enviando como sempre. Lança Error com .code do PostgREST. */
-async function salvarAta(cid,aid,v,{preservarAutor=false}={}){
+const erroBD=(error,status)=>{const e=new Error(error.message);e.code=error.code;e.status=status;e.detalhe=[error.details,error.hint].filter(Boolean).join(" · ");return e};
+/* confirmar (V3.1): a operação só é considerada feita quando o banco devolve a linha da ata selecionada (id + cliente_id como condição);
+   0 linhas = registro inexistente/alterado ou filtrado pela RLS → erro, nunca "sucesso". A V2 continua sem essa exigência (comportamento de antes). */
+const confirmarLinha=(data,aid,cid,oque)=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const ok=aid?ls.some(l=>l.id===aid&&(!cid||!l.cliente_id||l.cliente_id===cid)):ls.length>0;
+  if(!ok){const e=new Error(aid?`A ata não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`:"O banco não confirmou a inclusão da ata.");e.code=aid?"NP_NAO_ENCONTRADA":"NP_SEM_CONFIRMACAO";throw e}};
+async function salvarAta(cid,aid,v,{preservarAutor=false,confirmar=false}={}){
   const row={cliente_id:cid,tipo:v.tipo,data:v.data||hojeISO(),titulo:(v.titulo||"").trim()||null,resumo:(v.resumo||"").trim()||null,link_pasta:(v.link_pasta||"").trim()||null,link_gravacao:(v.link_gravacao||"").trim()||null,participantes:(v.participantes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
   if(!aid||!preservarAutor)row.autor_id=meuColab()?.id||null;
-  const q=aid?SB.from("atas_reuniao").update(row).eq("id",aid):SB.from("atas_reuniao").insert({...row,created_by:PP.perfil?.id||null});
-  const {error}=await q;if(error){const e=new Error(error.message);e.code=error.code;throw e}
+  let q=aid?SB.from("atas_reuniao").update(row).eq("id",aid):SB.from("atas_reuniao").insert({...row,created_by:PP.perfil?.id||null});
+  if(confirmar){if(aid)q=q.eq("cliente_id",cid);q=q.select("id,cliente_id")}
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar)confirmarLinha(data,aid,cid,"alterado");
   invalidar(cid);window.PP_DOSSIE?.invalidar?.(cid);
 }
-async function excluirAta(cid,aid){const {error}=await SB.from("atas_reuniao").delete().eq("id",aid);if(error){const e=new Error(error.message);e.code=error.code;throw e}invalidar(cid)}
+async function excluirAta(cid,aid,{confirmar=false}={}){
+  let q=SB.from("atas_reuniao").delete().eq("id",aid);if(confirmar)q=q.eq("cliente_id",cid).select("id,cliente_id");
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar)confirmarLinha(data,aid,cid,"excluído");
+  invalidar(cid)}
 function formAta(c,a){
   if(acompV3()&&window.NPUI?.form){formAtaV3(c,a);return} // Fase 4C · PoC: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   a=a||{};const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
@@ -142,8 +153,8 @@ function formAtaV3(c,a){
       {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:"A gravação e a transcrição ficam no Drive; aqui vai o link para quem precisar.",validar:validarLink},
       {id:"ata-lg",label:"Link da gravação",el:lg,condicional:true,validar:validarLink}],
     validarTudo:v=>(!String(v["ata-res"]||"").trim()&&!String(v["ata-lp"]||"").trim()&&!String(v["ata-lg"]||"").trim())?[{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}]:[],
-    salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
-    excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid);toast("Ata excluída")}}:null});
+    salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true,confirmar:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
+    excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
   return f;
 }
 function cardAtas(c,st){
