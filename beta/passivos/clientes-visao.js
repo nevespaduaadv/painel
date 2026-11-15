@@ -61,5 +61,5 @@
   }
   { const _rl = window.renderList; if (typeof _rl === "function") window.renderList = function () { _rl.apply(this, arguments); if (S.sel || S.tab !== "clientes") return; if (!(typeof equipe === "function" && equipe())) return; const m = $("#main"); if (!m) return; if (V.filtro && V.lista) { paginaFiltro(m); return; } const k = m.querySelector(".kpis"); if (!k || m.querySelector(".visao-clientes")) return; k.replaceWith(card()); }; }
   { const _r = render; render = function () { _r(); const v = $("#view-visao"); if (!v || v.hidden || S.tab !== "visao") return; if (PP.perfil?.papel !== "admin") return; if (v.querySelector(".clientes-graficos")) return; const alvo = v.querySelector("#s-carteira") || v.querySelector("section.sec"); if (!alvo) return; alvo.after(graficos()); }; }
-  window.PP_CLIENTES_VISAO = { recarregar: () => { V.lista = null; carregar(); } };
+  window.PP_CLIENTES_VISAO = { recarregar: () => { V.lista = null; carregar(); }, /* V3 · Carteira (só leitura): mesmos dados da visão geral, sem nova consulta */ dados: () => (V.lista ? { lista: V.lista, pass: V.pass || [] } : null), carregar: () => { if (!V.lista && !V.carregando) carregar(); } };
 })();
