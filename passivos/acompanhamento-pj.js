@@ -59,8 +59,9 @@ async function salvarCiclo(cid,ac,v,{confirmar=false}={}){
   const {data,error,status}=await q;if(error)throw erroBD(error,status);
   if(confirmar){const ls=Array.isArray(data)?data:(data?[data]:[]);if(!ls.some(l=>l&&l.cliente_id===cid))throw npErro("A gravação do ciclo não pôde ser confirmada pelo banco. Feche este formulário e confira o ciclo do cliente antes de tentar de novo.","NP_NAO_CONFIRMADA")}
   // espelha no cadastro (campos legados usados em outras telas)
-  const upd=SB.from("clientes").update({data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null}).eq("id",cid);let espelhoErro=null;
-  if(confirmar){try{const r=await upd;if(r?.error)espelhoErro=erroBD(r.error,r.status)}catch(e){espelhoErro=e}}else await upd.then(()=>{});
+  const esp={data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null};let espelhoErro=null;
+  if(confirmar){try{const r=await SB.from("clientes").update(esp).eq("id",cid).select("id");if(r?.error)espelhoErro=erroBD(r.error,r.status);else{const ls=Array.isArray(r.data)?r.data:(r.data?[r.data]:[]);if(!ls.some(l=>l&&l.id===cid))espelhoErro=semLinha("nenhuma linha de clientes atingida")}}catch(e){espelhoErro=e}}
+  else await SB.from("clientes").update(esp).eq("id",cid).then(()=>{});
   invalidar(cid);window.PP_PROTECAO?.invalidar?.(cid);
   return {row,espelhoErro}}
 /* Fase 4C.2 · Atualizar ciclo na V3.1 (NPUI.form): mesmos campos, mesmas regras, mesma persistência (salvarCiclo). Sem validações novas de ordem/datas. */
@@ -80,7 +81,10 @@ function formCicloV3(c,ac){
       {id:"ac-fase",label:"Fase",el:fase,obrigatorio:true},{id:"ac-prox",label:"Próxima reunião",el:prox,ajuda:"Depois do ciclo inicial: a reunião mensal."},
       {id:"ac-obs",label:"Observações",el:obs}],
     salvar:async v=>{const r=await salvarCiclo(cid,ac,{onb_data:v["ac-onb"],onb_feita:v["ac-onb-f"],r1_data:v["ac-r1"],r1_feita:v["ac-r1-f"],r2_data:v["ac-r2"],r2_feita:v["ac-r2-f"],r3_data:v["ac-r3"],r3_feita:v["ac-r3-f"],fase:v["ac-fase"],proxima_reuniao:v["ac-prox"],observacoes:v["ac-obs"]},{confirmar:true});
-      if(r.espelhoErro){const e=r.espelhoErro;return {parcial:{msg:"O ciclo foi gravado, mas o espelho no cadastro do cliente (data de onboarding e próxima reunião) não foi atualizado. Não reenvie: confira a ficha do cliente.",detalhe:[e.status?"HTTP "+e.status:null,e.code?"código "+e.code:null,e.message].filter(Boolean).join(" · ")}}}
+      if(r.espelhoErro){const e=r.espelhoErro,t=tipoFalha(e);const msg=t==="recusa"?"Confirmado: o ciclo foi gravado. Pendente: o espelho no cadastro do cliente (data de onboarding e próxima reunião) foi recusado pelo banco e NÃO foi atualizado. Não reenvie o ciclo — confira a ficha do cliente e ajuste lá, se precisar."
+          :t==="semLinha"?"Confirmado: o ciclo foi gravado. Pendente: o espelho no cadastro do cliente não atingiu nenhum registro (cliente não encontrado) — a ficha NÃO foi atualizada. Não reenvie o ciclo — confira o cadastro do cliente."
+          :"Confirmado: o ciclo foi gravado. Não confirmado: não foi possível saber se o espelho no cadastro do cliente (data de onboarding e próxima reunião) foi atualizado — o serviço não respondeu. Não reenvie o ciclo — confira a ficha do cliente antes de qualquer ajuste.";
+        return {parcial:{msg,detalhe:detalheFalha(e)}}}
       toast("Ciclo atualizado")}});
   return f;
 }
@@ -141,8 +145,8 @@ async function salvarDivida(cid,d,v,{confirmar=false}={}){
   let bemErro=null;
   if(row.avalista_tem_bens===true&&row.avalista_nome&&!(d.avalista_tem_bens===true)){
     const bem={cliente_id:cid,tipo:"outro",descricao:"Bens do avalista "+row.avalista_nome+" — detalhar",titular:"avalista",protecao:"exposto",observacoes:"Criado automaticamente pelo Raio-X (dívida "+row.banco+"). Substitua pela descrição real do bem."};
-    if(confirmar){try{const sel=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);if(sel.error)throw erroBD(sel.error,sel.status);
-        if(!(sel.data||[]).length){const ins=await SB.from("bens").insert(bem);if(ins.error)throw erroBD(ins.error,ins.status);window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}catch(e){bemErro=e}}
+    if(confirmar){let etapa="consulta";try{const sel=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);if(sel.error)throw erroBD(sel.error,sel.status);
+        if(!(sel.data||[]).length){etapa="inclusao";const ins=await SB.from("bens").insert(bem).select("id,cliente_id");if(ins.error)throw erroBD(ins.error,ins.status);const ls=Array.isArray(ins.data)?ins.data:(ins.data?[ins.data]:[]);if(!ls.some(l=>l&&l.id&&l.cliente_id===cid))throw semLinha("inclusão do bem sem linha devolvida");window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}catch(e){e.etapa=etapa;bemErro=e}}
     else{const {data:ex}=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);
       if(!(ex||[]).length){await SB.from("bens").insert(bem);window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}}
   invalidar(cid);return {row,bemErro}}
@@ -168,7 +172,13 @@ function formDividaV3(c,d){
       {id:"dv-gar",label:"Tem garantia?",el:gar},{id:"dv-gard",label:"Qual garantia",el:garD,condicional:true},
       {id:"dv-em",label:"Contrato em mãos?",el:em},{id:"dv-proc",label:"Tem processo?",el:proc},{id:"dv-obs",label:"Observações",el:obs}],
     salvar:async v=>{const r=await salvarDivida(cid,d,{banco:v["dv-banco"],tipo:v["dv-tipo"],valor:v["dv-valor"],atraso_meses:v["dv-atraso"],avalista:v["dv-av"],avalista_nome:v["dv-avn"],avalista_cpf:v["dv-avc"],avalista_tem_bens:v["dv-avb"],garantia:v["dv-gar"],garantia_descricao:v["dv-gard"],contrato_em_maos:v["dv-em"],processo:v["dv-proc"],observacoes:v["dv-obs"]},{confirmar:true});
-      if(r.bemErro){const e=r.bemErro;return {parcial:{msg:"A dívida foi gravada, mas o registro automático dos bens do avalista não foi criado. Não reenvie a dívida: se for o caso, cadastre o bem em Bens (titular avalista).",detalhe:[e.status?"HTTP "+e.status:null,e.code?"código "+e.code:null,e.message].filter(Boolean).join(" · ")}}}
+      if(r.bemErro){const e=r.bemErro,t=tipoFalha(e);const base="Confirmado: a dívida foi gravada. ";
+        const msg=e.etapa==="consulta"?(t==="desconhecido"?base+"Não confirmado: não foi possível verificar se o avalista já tem bens cadastrados (o serviço não respondeu); por isso nenhum bem foi criado automaticamente. Não reenvie a dívida — confira em Bens (titular avalista)."
+            :base+"Pendente: a verificação dos bens do avalista foi recusada pelo banco; nenhum bem foi criado automaticamente. Não reenvie a dívida — se for o caso, cadastre o bem em Bens (titular avalista).")
+          :t==="recusa"?base+"Pendente: o registro automático dos bens do avalista foi recusado pelo banco e NÃO foi criado. Não reenvie a dívida — se for o caso, cadastre o bem em Bens (titular avalista)."
+          :t==="semLinha"?base+"Não confirmado: o banco respondeu sem confirmar o registro automático dos bens do avalista. Não reenvie a dívida — confira em Bens (titular avalista) antes de cadastrar à mão."
+          :base+"Não confirmado: não foi possível saber se o registro automático dos bens do avalista foi criado — o serviço não respondeu. Não reenvie a dívida — confira em Bens (titular avalista) antes de cadastrar à mão.";
+        return {parcial:{msg,detalhe:detalheFalha(e)}}}
       toast(did?"Dívida atualizada":"Dívida incluída no Raio-X")},
     excluir:did?{rotulo:"Excluir",confirmar:`Excluir a dívida ${d.banco||""}${d.tipo?" ("+d.tipo+")":""} de ${c.nome} do Raio-X? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirDivida(cid,did,{confirmar:true});toast("Dívida excluída")}}:null});
   if(!f)return null;
@@ -202,6 +212,18 @@ const erroBD=(error,status)=>{const e=new Error(error.message);e.code=error.code
    Duas situações distintas: (a) 0 linhas em UPDATE/DELETE = comprovadamente nada feito (o banco respondeu e nenhuma linha casou);
    (b) resposta presente mas sem id/cliente ou divergente = resultado NÃO confirmado — a operação pode ter ocorrido; orienta conferir. */
 const npErro=(msg,code)=>{const e=new Error(msg);e.code=code;return e};
+/* Operações SECUNDÁRIAS (espelho em clientes, bens do avalista) — o que se pode afirmar depende do tipo de falha:
+   recusa      = o banco respondeu recusando (4xx/código PostgREST): a operação comprovadamente NÃO aconteceu;
+   semLinha    = o banco respondeu sem nenhuma linha atingida/devolvida: nada foi gravado (ou não dá para confirmar, no INSERT);
+   desconhecido = 5xx, timeout, conexão abortada, sem resposta: a operação PODE ter acontecido — nunca afirmar que não aconteceu. */
+const RECUSAS_BD=new Set(["23505","23503","23514","42501","PGRST301","PGRST116","22007","22P02","42P01","PGRST204","PGRST100","PGRST102"]);
+function tipoFalha(e){if(!e)return "desconhecido";const code=String(e.code||""),st=Number(e.status||0),m=String(e.message||e);
+  if(code==="NP_SEM_LINHA")return "semLinha";
+  if(st>=500||/^5\d\d$/.test(code)||/upstream|unavailable|indispon|gateway|timeout|timed out|overloaded|too many|Failed to fetch|NetworkError|network|ECONN|offline|aborted/i.test(m))return "desconhecido";
+  if(RECUSAS_BD.has(code)||(st>=400&&st<500)||/^(2[0-9A-Z]{4}|4[0-9A-Z]{4}|PGRST\d+)$/.test(code))return "recusa";
+  return "desconhecido"}
+const detalheFalha=e=>[e?.status?"HTTP "+e.status:null,e?.code&&!/^NP_/.test(e.code)?"código "+e.code:null,e?.message].filter(Boolean).join(" · ");
+const semLinha=(oque)=>npErro(oque,"NP_SEM_LINHA");
 const confirmarLinha=(data,aid,cid,oque,nome="ata")=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
   if(aid){if(!ls.length)throw npErro(`A ${nome} não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
     if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ${nome} selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
