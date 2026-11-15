@@ -114,19 +114,68 @@ function cardCiclo(c,st){
 
 /* ---------- 2) Raio-X: dívidas ---------- */
 function formDivida(c,d){
+  if(acompV3()&&window.NPUI?.form){formDividaV3(c,d);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   d=d||{};const banco=inp("text",d.banco||"",{placeholder:"Ex.: Santander"}),tipo=dl("dv-tipo",d.tipo||"",["Capital de giro","Cheque especial","Conta garantida","Financiamento","Cartão","Consórcio","Antecipação de recebíveis","Crédito rural","Outro"]),valor=inp("number",d.valor??"",{step:"0.01",placeholder:"0,00"}),atraso=inp("number",d.atraso_meses??"",{min:0,placeholder:"meses (0 = em dia)"}),
     av=tri(d.avalista===true?true:d.avalista===false?false:null),avN=inp("text",d.avalista_nome||"",{placeholder:"Nome do avalista"}),avC=inp("text",d.avalista_cpf||"",{placeholder:"CPF"}),avB=tri(d.avalista_tem_bens),gar=tri(d.garantia===true?true:d.garantia===false?false:null),garD=inp("text",d.garantia_descricao||"",{placeholder:"Ex.: HB20 alienado; casa hipotecada"}),em=tri(d.contrato_em_maos),proc=tri(d.processo),obs=el("textarea",{rows:2},d.observacoes||"");
   const body=el("div",{class:"form"},field("dv-banco","Banco",banco),field("dv-tipo","Tipo de dívida",tipo.wrap),field("dv-valor","Valor (R$)",valor),field("dv-atraso","Tempo de atraso (meses)",atraso),
     field("dv-av","Tem avalista?",av),field("dv-avn","Avalista",avN),field("dv-avc","CPF do avalista",avC),field("dv-avb","Avalista tem bens?",avB,"Se sim, o sistema abre uma linha em Bens (titular avalista) para você detalhar."),
     field("dv-gar","Tem garantia?",gar),field("dv-gard","Qual garantia",garD),field("dv-em","Contrato em mãos?",em),field("dv-proc","Tem processo?",proc),el("div",{class:"f full"},el("label",{},"Observações"),obs));
-  const extra=d.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta dívida do Raio-X?"))return;await SB.from("dividas_raio_x").delete().eq("id",d.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
+  const extra=d.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta dívida do Raio-X?"))return;await excluirDivida(c.id,d.id);$("#modalHost").replaceChildren();toast("Excluída")}},"Excluir"):null;
   modal(d.id?"Editar dívida":"Incluir dívida",body,async()=>{
     if(!banco.value.trim())throw new Error("Informe o banco");
-    const row={cliente_id:c.id,banco:banco.value.trim(),tipo:tipo.input.value.trim()||null,valor:valor.value===""?null:+valor.value,atraso_meses:atraso.value===""?null:+atraso.value,avalista:triVal(av)===true,avalista_nome:avN.value.trim()||null,avalista_cpf:avC.value.trim()||null,avalista_tem_bens:triVal(avB),garantia:triVal(gar)===true,garantia_descricao:garD.value.trim()||null,contrato_em_maos:triVal(em),processo:triVal(proc),observacoes:obs.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
-    const q=d.id?SB.from("dividas_raio_x").update(row).eq("id",d.id):SB.from("dividas_raio_x").insert({...row,created_by:PP.perfil?.id||null});const {error}=await q;if(error)throw new Error(error.message);
-    if(row.avalista_tem_bens===true&&row.avalista_nome&&!(d.avalista_tem_bens===true)){const {data:ex}=await SB.from("bens").select("id").eq("cliente_id",c.id).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);
-      if(!(ex||[]).length){await SB.from("bens").insert({cliente_id:c.id,tipo:"outro",descricao:"Bens do avalista "+row.avalista_nome+" — detalhar",titular:"avalista",protecao:"exposto",observacoes:"Criado automaticamente pelo Raio-X (dívida "+row.banco+"). Substitua pela descrição real do bem."});window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(c.id)}}
-    toast("Salvo");invalidar(c.id)},extra);
+    await salvarDivida(c.id,d,{banco:banco.value,tipo:tipo.input.value,valor:valor.value,atraso_meses:atraso.value,avalista:av.value,avalista_nome:avN.value,avalista_cpf:avC.value,avalista_tem_bens:avB.value,garantia:gar.value,garantia_descricao:garD.value,contrato_em_maos:em.value,processo:proc.value,observacoes:obs.value});
+    toast("Salvo")},extra);
+}
+/* persistência da dívida — compartilhada pela V2 (formDivida) e pela V3.1 (formDividaV3). Mesmo payload de sempre (INSERT com created_by / UPDATE por id);
+   mesma regra dos bens do avalista ("tem bens" = Sim com nome, antes não era Sim → cria "Bens do avalista … — detalhar" se ainda não existir).
+   confirmar (V3.1): UPDATE/DELETE também filtram por cliente_id e exigem a linha devolvida (id + cliente_id); INSERT exige id válido + cliente_id;
+   falha no cadastro secundário do bem vira {bemErro} para aviso de gravação parcial (a dívida não é reenviada). Na V2 tudo segue como antes. */
+const triDe=s=>s==="sim"||s===true?true:s==="nao"||s===false?false:null;
+function linhaDivida(cid,v){const t=x=>String(x??"").trim();return {cliente_id:cid,banco:t(v.banco),tipo:t(v.tipo)||null,valor:t(v.valor)===""?null:+v.valor,atraso_meses:t(v.atraso_meses)===""?null:+v.atraso_meses,avalista:triDe(v.avalista)===true,avalista_nome:t(v.avalista_nome)||null,avalista_cpf:t(v.avalista_cpf)||null,avalista_tem_bens:triDe(v.avalista_tem_bens),garantia:triDe(v.garantia)===true,garantia_descricao:t(v.garantia_descricao)||null,contrato_em_maos:triDe(v.contrato_em_maos),processo:triDe(v.processo),observacoes:t(v.observacoes)||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null}}
+async function salvarDivida(cid,d,v,{confirmar=false}={}){
+  d=d||{};const row=linhaDivida(cid,v);const did=d.id||null;
+  let q=did?SB.from("dividas_raio_x").update(row).eq("id",did):SB.from("dividas_raio_x").insert({...row,created_by:PP.perfil?.id||null});
+  if(confirmar){if(did)q=q.eq("cliente_id",cid);q=q.select("id,cliente_id")}
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar)confirmarLinha(data,did,cid,"alterado","dívida");
+  let bemErro=null;
+  if(row.avalista_tem_bens===true&&row.avalista_nome&&!(d.avalista_tem_bens===true)){
+    const bem={cliente_id:cid,tipo:"outro",descricao:"Bens do avalista "+row.avalista_nome+" — detalhar",titular:"avalista",protecao:"exposto",observacoes:"Criado automaticamente pelo Raio-X (dívida "+row.banco+"). Substitua pela descrição real do bem."};
+    if(confirmar){try{const sel=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);if(sel.error)throw erroBD(sel.error,sel.status);
+        if(!(sel.data||[]).length){const ins=await SB.from("bens").insert(bem);if(ins.error)throw erroBD(ins.error,ins.status);window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}catch(e){bemErro=e}}
+    else{const {data:ex}=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);
+      if(!(ex||[]).length){await SB.from("bens").insert(bem);window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}}
+  invalidar(cid);return {row,bemErro}}
+async function excluirDivida(cid,did,{confirmar=false}={}){
+  let q=SB.from("dividas_raio_x").delete().eq("id",did);if(confirmar)q=q.eq("cliente_id",cid).select("id,cliente_id");
+  const {data,error,status}=await q;if(confirmar){if(error)throw erroBD(error,status);confirmarLinha(data,did,cid,"excluído","dívida")}
+  invalidar(cid)}
+/* Fase 4C.2 · Incluir/Editar dívida na V3.1 (NPUI.form): mesmos campos, valores e payload. Campos de avalista/garantia aparecem quando a resposta é "Sim"
+   OU quando já têm valor (dado antigo nunca some nem é zerado: continua no formulário e no payload, como na V2). */
+function formDividaV3(c,d){
+  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast("Você não tem permissão para editar o Raio-X");return}
+  d=d||{};const cid=c.id,did=d.id||null,origem=document.activeElement;
+  const TIPOS=["Capital de giro","Cheque especial","Conta garantida","Financiamento","Cartão","Consórcio","Antecipação de recebíveis","Crédito rural","Outro"];
+  const banco=inp("text",d.banco||"",{placeholder:"Ex.: Santander",autocomplete:"off"}),tipo=inp("text",d.tipo||"",{list:"dv3-tipo-dl",placeholder:"Ex.: Capital de giro",autocomplete:"off"}),lista=el("datalist",{id:"dv3-tipo-dl"},TIPOS.map(o=>el("option",{value:o}))),
+    valor=inp("number",d.valor??"",{step:"0.01",min:"0",placeholder:"0,00",inputmode:"decimal"}),atraso=inp("number",d.atraso_meses??"",{min:"0",step:"1",placeholder:"meses (0 = em dia)",inputmode:"numeric"}),
+    av=tri(d.avalista===true?true:d.avalista===false?false:null),avN=inp("text",d.avalista_nome||"",{placeholder:"Nome do avalista",autocomplete:"off"}),avC=inp("text",d.avalista_cpf||"",{placeholder:"CPF",autocomplete:"off"}),avB=tri(d.avalista_tem_bens),
+    gar=tri(d.garantia===true?true:d.garantia===false?false:null),garD=inp("text",d.garantia_descricao||"",{placeholder:"Ex.: HB20 alienado; casa hipotecada",autocomplete:"off"}),em=tri(d.contrato_em_maos),proc=tri(d.processo),obs=el("textarea",{rows:2},d.observacoes||"");
+  const f=NPUI.form({titulo:did?"Editar dívida":"Incluir dívida",contexto:[el("b",{},c.nome),did?" · "+(d.banco||"dívida")+(d.tipo?" · "+d.tipo:""):" · nova dívida do Raio-X"],origem,
+    campos:[{id:"dv-banco",label:"Banco",el:banco,obrigatorio:true},{id:"dv-tipo",label:"Tipo de dívida",el:tipo,ajuda:el("span",{},"Capital de giro, cheque especial, conta garantida, financiamento, cartão… ",lista)},
+      {id:"dv-valor",label:"Valor (R$)",el:valor},{id:"dv-atraso",label:"Tempo de atraso (meses)",el:atraso,ajuda:"0 = em dia."},
+      {id:"dv-av",label:"Tem avalista?",el:av},{id:"dv-avn",label:"Avalista",el:avN,condicional:true},{id:"dv-avc",label:"CPF do avalista",el:avC,condicional:true},{id:"dv-avb",label:"Avalista tem bens?",el:avB,condicional:true,ajuda:"Se sim, o sistema abre uma linha em Bens (titular avalista) para você detalhar."},
+      {id:"dv-gar",label:"Tem garantia?",el:gar},{id:"dv-gard",label:"Qual garantia",el:garD,condicional:true},
+      {id:"dv-em",label:"Contrato em mãos?",el:em},{id:"dv-proc",label:"Tem processo?",el:proc},{id:"dv-obs",label:"Observações",el:obs}],
+    salvar:async v=>{const r=await salvarDivida(cid,d,{banco:v["dv-banco"],tipo:v["dv-tipo"],valor:v["dv-valor"],atraso_meses:v["dv-atraso"],avalista:v["dv-av"],avalista_nome:v["dv-avn"],avalista_cpf:v["dv-avc"],avalista_tem_bens:v["dv-avb"],garantia:v["dv-gar"],garantia_descricao:v["dv-gard"],contrato_em_maos:v["dv-em"],processo:v["dv-proc"],observacoes:v["dv-obs"]},{confirmar:true});
+      if(r.bemErro){const e=r.bemErro;return {parcial:{msg:"A dívida foi gravada, mas o registro automático dos bens do avalista não foi criado. Não reenvie a dívida: se for o caso, cadastre o bem em Bens (titular avalista).",detalhe:[e.status?"HTTP "+e.status:null,e.code?"código "+e.code:null,e.message].filter(Boolean).join(" · ")}}}
+      toast(did?"Dívida atualizada":"Dívida incluída no Raio-X")},
+    excluir:did?{rotulo:"Excluir",confirmar:`Excluir a dívida ${d.banco||""}${d.tipo?" ("+d.tipo+")":""} de ${c.nome} do Raio-X? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirDivida(cid,did,{confirmar:true});toast("Dívida excluída")}}:null});
+  if(!f)return null;
+  // condicionais sem perda: visíveis com "Sim" OU quando já há valor gravado/digitado; ocultar nunca apaga o valor (NPUI.form.mostrar)
+  const cond=()=>{const temAv=av.value==="sim";f.mostrar("dv-avn",temAv||!!avN.value.trim());f.mostrar("dv-avc",temAv||!!avC.value.trim());f.mostrar("dv-avb",temAv||avB.value!=="");f.mostrar("dv-gard",gar.value==="sim"||!!garD.value.trim())};
+  av.addEventListener("change",cond);gar.addEventListener("change",cond);cond();
+  return f;
 }
 function cardDividas(c,st){
   const edita=podeEditar();const ds=st.dividas;const total=ds.reduce((s,d)=>s+(+d.valor||0),0);const atras=ds.filter(d=>(d.atraso_meses||0)>0).length;
@@ -153,10 +202,10 @@ const erroBD=(error,status)=>{const e=new Error(error.message);e.code=error.code
    Duas situações distintas: (a) 0 linhas em UPDATE/DELETE = comprovadamente nada feito (o banco respondeu e nenhuma linha casou);
    (b) resposta presente mas sem id/cliente ou divergente = resultado NÃO confirmado — a operação pode ter ocorrido; orienta conferir. */
 const npErro=(msg,code)=>{const e=new Error(msg);e.code=code;return e};
-const confirmarLinha=(data,aid,cid,oque)=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
-  if(aid){if(!ls.length)throw npErro(`A ata não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
-    if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ata selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
-  if(!ls.some(l=>l&&idOk(l.id)&&l.cliente_id===cid))throw npErro("A inclusão não pôde ser confirmada pelo banco. Feche este formulário e confira se a ata já aparece na lista antes de tentar de novo.","NP_NAO_CONFIRMADA")};
+const confirmarLinha=(data,aid,cid,oque,nome="ata")=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
+  if(aid){if(!ls.length)throw npErro(`A ${nome} não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
+    if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ${nome} selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
+  if(!ls.some(l=>l&&idOk(l.id)&&l.cliente_id===cid))throw npErro(`A inclusão não pôde ser confirmada pelo banco. Feche este formulário e confira se a ${nome} já aparece na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA")};
 async function salvarAta(cid,aid,v,{preservarAutor=false,confirmar=false}={}){
   const row={cliente_id:cid,tipo:v.tipo,data:v.data||hojeISO(),titulo:(v.titulo||"").trim()||null,resumo:(v.resumo||"").trim()||null,link_pasta:(v.link_pasta||"").trim()||null,link_gravacao:(v.link_gravacao||"").trim()||null,participantes:(v.participantes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
   if(!aid||!preservarAutor)row.autor_id=meuColab()?.id||null;
@@ -383,7 +432,7 @@ function secoesA3(c){
   const passos=ETAPAS_PT.map(([k,label])=>{const d=k==="mensal"?diaISO(a?.proxima_reuniao):diaISO(a?.[k+"_data"]);const feita=k==="mensal"?(a?.fase==="mensal"||a?.fase==="encerrado"):!!a?.[k+"_feita"];return {label:k==="onb"?"Onboarding":label,data:d?fmtD(d):"—",feita,atual:a?a.etapa_atual===k:k==="onb"}});
   const secCiclo=NPUI.secao("Ciclo de acompanhamento",NPUI.ciclo(passos),a?.observacoes?el("div",{style:"margin-top:8px;white-space:pre-wrap;font-size:var(--np-fs-2)"},a.observacoes):null,!a?el("div",{class:"np-sem",style:"margin-top:8px"},"Defina a data do onboarding para começar."):null);
   const ds=st?.ok?st.dividas:null;
-  const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"}],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
+  const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"},...(edita?[{k:"acoes",label:"",render:d=>el("button",{type:"button",class:"lnk",onclick:()=>formDivida(c,d)},"editar")}]:[])],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
     ds&&ds.length?el("div",{class:"np-rodape",style:"padding:6px 0 0"},`${ds.length} dívida${ds.length===1?"":"s"} · ${BRL(ds.reduce((s,d)=>s+(+d.valor||0),0))} · ${ds.filter(d=>(d.atraso_meses||0)>0).length} em atraso`):null);
   const pend=(r?.pend||[]).slice().sort((x,y)=>(x.prazo||"9999").localeCompare(y.prazo||"9999"));
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
