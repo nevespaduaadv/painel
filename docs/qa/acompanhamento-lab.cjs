@@ -58,7 +58,9 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
     const json = (b, status = 200, extra = {}) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0', ...extra }, body: JSON.stringify(b) });
     if (m === 'GET') leituras.push(p + u.search);
-    if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && !p.startsWith('/auth/')) { escritas.push(m + ' ' + p + u.search + ' ' + (req.postData() || '').slice(0, 300)); return json(m === 'POST' && /rpc/.test(p) ? null : (m === 'POST' ? [{ id: 'novo-' + Date.now() }] : []), m === 'POST' ? 201 : 200); }
+    if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && !p.startsWith('/auth/')) { escritas.push(m + ' ' + p + u.search + ' ' + (req.postData() || '').slice(0, 300));
+      if (m === 'POST' && /return=representation/.test(req.headers()['prefer'] || '')) { let corpo = {}; try { corpo = JSON.parse(req.postData() || '{}'); } catch (_) {} const c0 = Array.isArray(corpo) ? corpo[0] : corpo; return json([{ id: 'novo-' + Date.now(), ...c0 }], 201); } // Fase 4C: a V3.1 confirma a linha devolvida (id + cliente_id) — o stub ecoa o corpo, como o PostgREST
+      return json(m === 'POST' && /rpc/.test(p) ? null : (m === 'POST' ? [{ id: 'novo-' + Date.now() }] : []), m === 'POST' ? 201 : 200); }
     if (p.startsWith('/auth/v1/user')) return json(s.user); if (p.startsWith('/auth/v1/token')) return json(s); if (p.startsWith('/auth/v1/logout')) return json({}, 204);
     if (p.startsWith('/realtime/')) return rota.abort(); if (p.startsWith('/rest/v1/rpc/')) return json(m === 'POST' ? [] : null);
     if (p.startsWith('/rest/v1/perfis')) return json(unico ? P : [P]);
