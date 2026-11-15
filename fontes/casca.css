@@ -184,3 +184,29 @@ html.np-casca-v3 #np-tree .tab.np-filho[aria-current="page"]::before{background:
 html.np-casca-v3 .np-rail #np-tree .tab.np-filho{padding-left:0}html.np-casca-v3 .np-rail #np-tree .tab.np-filho::before{display:none}
 /* destinos que só existem na casca V3.1 (ex.: Acompanhamento PJ transversal): invisíveis no menu V2 */
 html:not(.np-casca-v3) .np-v3-only{display:none!important}
+/* ---------- V2 (15/11): barra e lateral fiéis ao DESIGN.md §4 ----------
+   barra = menu · trilha "Grupo / Módulo" · espaço · vista (Lista/Quadro) · tema · conversas/avisos;
+   lateral = marca · Buscar · ação primária em tinta · árvore · pessoa (menu da conta). */
+html.np-casca-v3 #np-acao:empty{display:none}
+html.np-casca-v3 #np-acao{margin-top:8px}
+html.np-casca-v3 #np-acao .np-btn{width:100%;height:34px;justify-content:flex-start;padding:0 12px;font-size:var(--np-fs-3)}
+html.np-casca-v3 .np-rail #np-acao .np-btn{width:36px;padding:0;justify-content:center;font-size:0;margin:0 auto;gap:0}
+html.np-casca-v3 .np-rail #np-acao .np-btn svg{width:16px;height:16px}
+html.np-casca-v3 #np-barra-vista{display:flex;align-items:center;gap:6px;flex:none}
+html.np-casca-v3 #np-barra-vista:empty{display:none}
+html.np-casca-v3 #np-barra-vista .np-seg button{min-height:24px;padding:4px 10px}
+/* Visão do cliente e Sair saem da barra para o menu da conta; nome da pessoa fica no rodapé da lateral */
+html.np-casca-v3 header.top>.switch,html.np-casca-v3 header.top #userName,html.np-casca-v3 header.top #btnSair{display:none!important}
+html.np-casca-v3 .np-conta{appearance:none;border:0;background:transparent;color:var(--np-text-3);width:30px;height:30px;border-radius:var(--np-r);display:grid;place-items:center;cursor:pointer;flex:none}
+html.np-casca-v3 .np-conta:hover,html.np-casca-v3 .np-conta[aria-expanded="true"]{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .np-conta:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-rail .np-eu{flex-direction:column;gap:4px}
+/* busca: fora da barra; abre como paleta (DESIGN.md §5 "Paleta") quando recebe foco — pelo "Buscar" da lateral ou pelo atalho / */
+html.np-casca-v3 header.top #busca:not(:focus-within){position:absolute!important;width:1px!important;height:1px!important;flex:none!important;margin:0!important;padding:0!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap}
+html.np-casca-v3 header.top #busca:focus-within{position:fixed;z-index:85;top:calc(var(--np-topo,0px) + 12vh);left:50%;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));max-width:none;flex:none;margin:0;background:var(--np-surface);border:1px solid var(--np-line);border-radius:var(--np-r-lg);box-shadow:var(--np-shadow),0 0 0 100vmax color-mix(in srgb,var(--np-ink) 18%,transparent);padding:6px;overflow:visible;animation:np-paleta calc(var(--np-d2)*var(--np-slow)) var(--np-e-in)}
+html.np-casca-v3 header.top #busca:focus-within input{height:40px;font-size:var(--np-fs-4);border-color:transparent;background:transparent;padding-left:38px}
+html.np-casca-v3 header.top #busca:focus-within>svg{left:16px}
+html.np-casca-v3 header.top #busca:focus-within .res{left:-1px;right:-1px;top:calc(100% + 6px)}
+@keyframes np-paleta{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 header.top #busca:focus-within{animation:none}}
+@media (pointer:coarse),(hover:none){html.np-casca-v3 .np-conta{width:44px;height:44px}html.np-casca-v3 #np-acao .np-btn{height:44px}}

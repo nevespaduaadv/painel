@@ -192,10 +192,10 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
   { const { ctx, pg, erros, escritas } = await contexto(b, { casca: 'v3', hash: '#agenda', extraLS: { 'pp-agenda-modo': 'semana', 'pp-agenda-quem': 'equipe' } });
     await pg.waitForFunction(() => document.querySelectorAll('#view-agenda .np-grp').length >= 5, null, { timeout: 10000 }).catch(() => {});
     const r = await pg.evaluate(() => { const g = {}; document.querySelectorAll('#view-agenda .np-grp').forEach(x => g[x.dataset.g] = { n: +x.querySelector('.np-grp-h .n').textContent, itens: [...x.querySelectorAll('li.np-it[data-id]')].map(l => l.dataset.id), tom: x.className });
-      return { v3: document.querySelector('#view-agenda').classList.contains('np-v3'), grade: !!document.querySelector('#view-agenda .ag-grade'), resumo: document.querySelector('#view-agenda .np-resumo')?.textContent.replace(/\s+/g, ' ').trim(), chips: [...document.querySelectorAll('#view-agenda .np-chipf')].map(c => c.textContent.trim()), seg: [...document.querySelectorAll('#view-agenda .np-seg button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')), g, dir: [...document.querySelectorAll('#view-agenda .np-tb-dir button')].map(b => b.textContent.trim()).filter(Boolean) }; });
+      return { v3: document.querySelector('#view-agenda').classList.contains('np-v3'), grade: !!document.querySelector('#view-agenda .ag-grade'), resumo: document.querySelector('#view-agenda .np-resumo')?.textContent.replace(/\s+/g, ' ').trim(), chips: [...document.querySelectorAll('#view-agenda .np-chipf')].map(c => c.textContent.trim()), seg: [...document.querySelectorAll(':is(#view-agenda, #np-barra-vista) .np-seg button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')), g, dir: [...document.querySelectorAll('#view-agenda .np-tb-dir button, #np-acao button, #np-barra-vista button')].map(b => b.textContent.trim()).filter(Boolean) }; });
     if (r.v3 && !r.grade && Object.keys(r.g).length === 7) ok('Agenda em V3.1: 7 grupos (um por dia da semana), sem a grade de horas'); else falha('estrutura agenda: ' + JSON.stringify([r.v3, r.grade, Object.keys(r.g)]));
     if (r.seg.join() === 'Lista:true,Grade:false,Dia:false,Semana:true,Mês:false' && r.chips.slice(0, 2).join() === 'Minha agenda,Toda a equipe' && r.chips.includes('Pessoa…')) ok(`segmentos Lista/Grade e Dia/Semana/Mês; chips (${r.chips.join(' | ')})`); else falha('seg/chips agenda: ' + JSON.stringify([r.seg, r.chips]));
-    if (r.dir.slice(-1).join() === 'Compromisso' && r.dir.includes('Hoje')) ok(`ações à direita: ${r.dir.join(' · ')} + "Mais ações" (Sincronizar, Feriados, CSV)`); else falha('dir agenda: ' + r.dir.join(','));
+    if (r.dir.includes('Compromisso') && r.dir.includes('Hoje')) /* V2: em ≥ 901 px "Compromisso" fica na lateral (#np-acao) e Lista/Grade na barra */ ok(`ações à direita: ${r.dir.join(' · ')} + "Mais ações" (Sincronizar, Feriados, CSV)`); else falha('dir agenda: ' + r.dir.join(','));
     await pg.click('#view-agenda .np-ib[aria-label="Mais ações"]'); await pg.waitForTimeout(300); const ma = await pg.evaluate(() => [...document.querySelectorAll('#np-pop [role=menuitem]')].map(b => b.textContent.trim())); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
     if (ma.join() === 'Sincronizar com o Google,Feriados e suspensões de prazo,Exportar CSV') ok('"Mais ações": Sincronizar com o Google · Feriados · Exportar CSV (mesmas funções da V2)'); else falha('mais ações: ' + ma.join(','));
     await pg.evaluate(() => { window.__csv = null; const oc = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__csv = { nome: this.download }; fetch(this.href).then(r => r.text()).then(t => { window.__csv.cab = t.replace(/^\uFEFF/, '').split('\r\n')[0]; window.__csv.ls = t.split('\r\n').length - 1; }); return; } return oc.call(this); }; });
@@ -224,10 +224,10 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     await pg.click('#view-agenda li[data-id="prazo:processo:pr2"] .np-it-abrir'); await esperaPainel(pg);
     const pv2 = await pg.evaluate(() => ({ sec: document.querySelector('#view-agenda .np-painel .np-sec h3')?.textContent || null, trilha: document.querySelector('#view-agenda .np-painel .np-trilha-p')?.textContent.replace(/\s+/g, ' ').trim() }));
     if (pv2.sec === null && /Prazo fatal/.test(pv2.trilha)) ok('prazo processual pr2 (sem tarefa): sem seção de tarefas; trilha "Prazo fatal"'); else falha('pr2: ' + JSON.stringify(pv2));
-    await pg.click('#view-agenda .np-seg button[data-k="mes"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="mes"]'); await pg.waitForTimeout(700);
     const gfer = await pg.evaluate((k) => { const g = document.querySelector('#view-agenda .np-grp[data-g="d' + k + '"]'); return g ? { itens: [...g.querySelectorAll('li.np-it[data-id]')].map(l => l.dataset.id), marca: g.querySelector('.np-marca')?.textContent, n: g.querySelector('.np-grp-h .n').textContent } : null; }, dia(4));
     if (gfer && gfer.itens.some(i => /^fer:/.test(i)) && gfer.marca === 'forense' && gfer.n === '0') ok('feriado forense aparece como linha do dia (marca "forense"), sem contar como compromisso'); else falha('feriado: ' + JSON.stringify(gfer));
-    await pg.click('#view-agenda .np-seg button[data-k="semana"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="semana"]'); await pg.waitForTimeout(700);
     if (/\d+ fatais/.test(r.resumo) && /prazos/.test(r.resumo) && /compromissos/.test(r.resumo)) ok(`resumo da agenda: "${r.resumo}"`); else falha('resumo agenda: ' + r.resumo);
     // painel: audiência (Caio) com processo; ações Editar + Abrir o cliente (admin)
     await pg.click('#view-agenda li[data-id="e2"] .np-it-abrir'); await esperaPainel(pg);
@@ -257,27 +257,27 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     if (caio.chips.join() === 'Caio Teste' && caio.itens.includes('e2') && caio.itens.includes('prazo:processo:t7') && !caio.itens.includes('e1')) ok('agenda do Caio: só os itens dele (e2, t7); chip da pessoa ativo'); else falha('caio: ' + JSON.stringify(caio));
     // Dia e Mês
     await pg.click('#view-agenda .np-chipf:has-text("Toda a equipe")'); await pg.waitForTimeout(300);
-    await pg.click('#view-agenda .np-seg button[data-k="dia"]'); await pg.waitForTimeout(600);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="dia"]'); await pg.waitForTimeout(600);
     const d1 = await pg.evaluate(() => ({ g: document.querySelectorAll('#view-agenda .np-grp').length, n: document.querySelectorAll('#view-agenda li.np-it[data-id]').length }));
     if (d1.g === 1 && d1.n === 6) ok('vista Dia: 1 grupo (hoje) com 6 itens'); else falha('dia: ' + JSON.stringify(d1));
     // novo compromisso com data predefinida (dia em foco, 9h)
-    await pg.click('#view-agenda .np-tb-dir .np-btn.pri'); await pg.waitForTimeout(300);
+    await pg.click(':is(#view-agenda .np-tb-dir, #np-acao) .np-btn.pri'); await pg.waitForTimeout(300);
     const nf = await pg.evaluate(() => ({ t: document.querySelector('#modalHost h2')?.textContent, d: document.querySelector('#modalHost input[type=date]')?.value, h: [...document.querySelectorAll('#modalHost input[type=time]')].map(i => i.value) }));
     if (nf.t === 'Novo compromisso' && nf.d === iso(hoje) && nf.h.join() === '09:00,10:00') ok(`"Compromisso" abre o formulário atual com a data em foco (${nf.d}) e 9h–10h`); else falha('novo: ' + JSON.stringify(nf));
     await pg.evaluate(() => document.querySelector('#modalHost .btn:not(.primary)').click()); await pg.waitForTimeout(200);
-    await pg.click('#view-agenda .np-seg button[data-k="mes"]'); await pg.waitForTimeout(800);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="mes"]'); await pg.waitForTimeout(800);
     const m1 = await pg.evaluate(() => ({ g: document.querySelectorAll('#view-agenda .np-grp').length, vazios: document.querySelectorAll('#view-agenda .np-it-vazia').length }));
     if (m1.g >= 4 && m1.vazios === 0) ok(`vista Mês: só dias com itens (${m1.g}), sem linhas vazias`); else falha('mês agenda: ' + JSON.stringify(m1));
     // ---- modo Grade (componente da V2 reutilizado dentro da V3.1)
-    await pg.click('#view-agenda .np-seg button[data-k="grade"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="grade"]'); await pg.waitForTimeout(700);
     const gm = await pg.evaluate(() => ({ mes: !!document.querySelector('#view-agenda .np-grade-w .ag-mes'), lista: document.querySelectorAll('#view-agenda .np-grp').length, chips: document.querySelectorAll('#view-agenda .ag-mes .ag-ev').length }));
     if (gm.mes && gm.lista === 0 && gm.chips >= 8) ok(`Grade + Mês: grade mensal da V2 (${gm.chips} chips) dentro da obra V3.1`); else falha('grade mês: ' + JSON.stringify(gm));
-    await pg.click('#view-agenda .np-seg button[data-k="semana"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="semana"]'); await pg.waitForTimeout(700);
     const gs = await pg.evaluate(() => { const chips = [...document.querySelectorAll('#view-agenda .ag-grade .ag-ev')]; return { grade: !!document.querySelector('#view-agenda .np-grade-w .ag-grade'), chips: chips.length, slots: document.querySelectorAll('#view-agenda .ag-grade .ag-slot').length, inteiros: document.querySelectorAll('#view-agenda .ag-grade .ag-inteiro .ag-ev').length, fora: document.querySelector('#view-agenda .np-fora')?.textContent || '' }; });
-    await pg.click('#view-agenda .np-seg button[data-k="lista"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="lista"]'); await pg.waitForTimeout(700);
     const ls = await pg.evaluate(() => document.querySelectorAll('#view-agenda li.np-it[data-id]:not([data-id^="fer:"])').length);
     if (gs.grade && gs.slots === 7 * 13 && gs.chips === ls) ok(`Grade + Semana: grade de horas 7h–20h (${gs.slots} células) com ${gs.chips} chips = ${ls} linhas da Lista (mesmo conjunto; ${gs.inteiros} de dia inteiro/prazos)`); else falha('grade semana: ' + JSON.stringify([gs, ls]));
-    await pg.click('#view-agenda .np-seg button[data-k="grade"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="grade"]'); await pg.waitForTimeout(700);
     await pg.click('#view-agenda .ag-grade .ag-ev[title^="Reunião R1"]'); await esperaPainel(pg);
     const gp = await pg.evaluate(() => ({ titulo: document.querySelector('#view-agenda .np-painel h2')?.textContent, modal: !!document.querySelector('#modalHost h2') }));
     if (gp.titulo === 'Reunião R1 — Empresa Alfa' && !gp.modal) ok('clicar num chip da grade abre o painel V3.1 (não o modal da V2)'); else falha('chip grade: ' + JSON.stringify(gp));
@@ -286,25 +286,25 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     const gf = await pg.evaluate(() => ({ t: document.querySelector('#modalHost h2')?.textContent, h: document.querySelector('#modalHost input[type=time]')?.value }));
     if (gf.t === 'Novo compromisso' && gf.h === '10:00') ok('célula vazia da grade abre "Novo compromisso" no horário da célula (10h) — capacidade da V2 preservada'); else falha('célula: ' + JSON.stringify(gf));
     await pg.evaluate(() => document.querySelector('#modalHost .btn:not(.primary)').click()); await pg.waitForTimeout(200);
-    await pg.click('#view-agenda .np-seg button[data-k="dia"]'); await pg.waitForTimeout(600);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="dia"]'); await pg.waitForTimeout(600);
     const gd = await pg.evaluate(() => ({ cols: getComputedStyle(document.querySelector('#view-agenda .ag-grade')).gridTemplateColumns.split(' ').length, chips: document.querySelectorAll('#view-agenda .ag-grade .ag-ev').length }));
     if (gd.cols === 2 && gd.chips === 6) ok('Grade + Dia: uma coluna com os 6 itens de hoje'); else falha('grade dia: ' + JSON.stringify(gd));
-    await pg.click('#view-agenda .np-seg button[data-k="lista"]'); await pg.waitForTimeout(400);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="lista"]'); await pg.waitForTimeout(400);
     // Sincronizar (Mais ações) → POST functions/v1/chatguru/enviar {acao:"agenda"} (interceptado)
     await pg.click('#view-agenda .np-ib[aria-label="Mais ações"]'); await pg.waitForTimeout(200); await pg.click('#np-pop [role=menuitem]:has-text("Sincronizar")'); await pg.waitForTimeout(700);
     const sy = escritas.filter(e => /functions\/v1\/chatguru\/enviar/.test(e));
     if (sy.length === 1 && /"acao":"agenda"/.test(sy[0])) ok('"Sincronizar com o Google" = POST functions/v1/chatguru/enviar {acao:"agenda"} (interceptado; nenhuma sincronização real)'); else falha('sync: ' + JSON.stringify(sy));
     if (!erros.length) ok('Agenda sem erros de página'); else falha('erros agenda: ' + JSON.stringify(erros));
-    await pg.click('#view-agenda .np-seg button[data-k="semana"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: path.join(OUT, 'agenda-1440-light.png') });
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="semana"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: path.join(OUT, 'agenda-1440-light.png') });
     await ctx.close(); }
   // ========== 4. Avisos V3.1 ==========
   rel.push('4. Avisos em V3.1');
   { AVISOS.forEach(a => { a.lida = a.id === 'a3'; });
     const { ctx, pg, erros, escritas } = await contexto(b, { casca: 'v3', hash: '#avisos' });
     await pg.waitForFunction(() => document.querySelectorAll('#view-avisos li.np-it[data-id]').length >= 2, null, { timeout: 10000 }).catch(() => {});
-    const r = await pg.evaluate(() => ({ v3: document.querySelector('#view-avisos').classList.contains('np-v3'), cards: document.querySelectorAll('#view-avisos .card.av').length, resumo: document.querySelector('#view-avisos .np-resumo')?.textContent.replace(/\s+/g, ' ').trim(), chips: [...document.querySelectorAll('#view-avisos .np-chipf')].map(c => c.textContent.replace(/\d+$/, '').trim() + ':' + c.getAttribute('aria-pressed')), itens: [...document.querySelectorAll('#view-avisos li.np-it[data-id]')].map(l => l.dataset.id + ':' + (l.className.includes('r-att') ? 'att' : '-')), dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button')].map(b => b.textContent.trim()) }));
+    const r = await pg.evaluate(() => ({ v3: document.querySelector('#view-avisos').classList.contains('np-v3'), cards: document.querySelectorAll('#view-avisos .card.av').length, resumo: document.querySelector('#view-avisos .np-resumo')?.textContent.replace(/\s+/g, ' ').trim(), chips: [...document.querySelectorAll('#view-avisos .np-chipf')].map(c => c.textContent.replace(/\d+$/, '').trim() + ':' + c.getAttribute('aria-pressed')), itens: [...document.querySelectorAll('#view-avisos li.np-it[data-id]')].map(l => l.dataset.id + ':' + (l.className.includes('r-att') ? 'att' : '-')), dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button, #np-acao button, #np-barra-vista button')].map(b => b.textContent.trim()) }));
     if (r.v3 && !r.cards && /2 não lidos/.test(r.resumo) && /1 fixado/.test(r.resumo) && /3 publicados/.test(r.resumo)) ok(`Avisos em V3.1: resumo "${r.resumo}", sem cartões V2`); else falha('avisos estrutura: ' + JSON.stringify(r));
-    if (r.chips.join() === 'Não lidos:true,Fixados:false,Todos:false' && r.itens.join() === 'a1:att,a2:att' && r.dir.join() === 'Discord,Aviso') ok('filtro "Não lidos" ativo: a1 (fixado, primeiro) e a2 com régua de atenção; ações Discord e Aviso (admin)'); else falha('avisos chips/itens: ' + JSON.stringify([r.chips, r.itens, r.dir]));
+    if (r.chips.join() === 'Não lidos:true,Fixados:false,Todos:false' && r.itens.join() === 'a1:att,a2:att' && [...r.dir].sort().join() === 'Aviso,Discord') ok('filtro "Não lidos" ativo: a1 (fixado, primeiro) e a2 com régua de atenção; ações Discord e Aviso (admin)'); else falha('avisos chips/itens: ' + JSON.stringify([r.chips, r.itens, r.dir]));
     await pg.click('#view-avisos li[data-id="a1"] .np-it-abrir'); await esperaPainel(pg);
     const pn = await pg.evaluate(() => { const p = document.querySelector('#view-avisos .np-painel'); const props = {}; p.querySelectorAll('.np-props dt').forEach(dt => props[dt.textContent.trim()] = dt.nextElementSibling.textContent.trim()); return { titulo: p.querySelector('h2').textContent, props, txt: p.querySelector('.np-txt')?.textContent, pe: [...p.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()) }; });
     if (pn.titulo === 'Recesso de fim de ano' && pn.props.Para === 'todo o escritório' && pn.props.Leituras === '3' && /24\/12/.test(pn.txt) && /\n/.test(pn.txt) && pn.pe.join() === 'Marcar como lido,Editar') ok('painel do aviso: texto completo com quebras, publicado/por/para/leituras; ações Marcar como lido e Editar (admin)'); else falha('painel aviso: ' + JSON.stringify(pn));
@@ -315,11 +315,11 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     const todos = await pg.evaluate(() => [...document.querySelectorAll('#view-avisos .np-grp')].map(x => x.dataset.g + ':' + [...x.querySelectorAll('li.np-it[data-id]')].map(l => l.dataset.id).join('+')));
     if (todos.join() === 'novos:a2,lidos:a1+a3') ok('"Todos": grupos Não lidos (a2) e Lidos (a1 fixado primeiro, a3)'); else falha('todos: ' + todos.join(','));
     // Discord (admin): configuração atual dentro do painel; Salvar = PATCH escritorio id=eq.discord (interceptado)
-    await pg.click('#view-avisos .np-tb-dir button:has-text("Discord")'); await pg.waitForFunction(() => !!document.querySelector('#view-avisos .np-painel #dc-av'), null, { timeout: 8000 }).catch(() => {});
+    await pg.click(':is(#view-avisos .np-tb-dir, #np-acao, #np-barra-vista) button:has-text("Discord")'); await pg.waitForFunction(() => !!document.querySelector('#view-avisos .np-painel #dc-av'), null, { timeout: 8000 }).catch(() => {});
     await pg.fill('#view-avisos .np-painel #dc-av', '123456789012345678'); await pg.click('#view-avisos .np-painel button:has-text("Salvar")'); await pg.waitForTimeout(700);
     const dc = escritas.filter(e => /escritorio|chat_canais/.test(e));
     if (dc.length === 1 && /^PATCH \/rest\/v1\/escritorio\?id=eq\.discord/.test(dc[0]) && /"canal_avisos":"123456789012345678"/.test(dc[0]) && /"ponte_ativa":true/.test(dc[0])) ok('Discord no painel: Salvar = PATCH escritorio id=eq.discord com canal_avisos e ponte_ativa (mesma gravação da V2; chat_canais só quando existe)'); else falha('discord: ' + JSON.stringify(dc));
-    await pg.click('#view-avisos .np-tb-dir button:has-text("Aviso")'); await pg.waitForTimeout(300);
+    await pg.click(':is(#view-avisos .np-tb-dir, #np-acao, #np-barra-vista) button:has-text("Aviso")'); await pg.waitForTimeout(300);
     const nf = await pg.evaluate(() => document.querySelector('#modalHost h2')?.textContent); if (nf === 'Novo aviso') ok('"Aviso" (admin) abre o formulário atual (modal V2)'); else falha('novo aviso: ' + nf);
     await pg.evaluate(() => document.querySelector('#modalHost .btn:not(.primary)').click());
     if (!erros.length) ok('Avisos sem erros de página'); else falha('erros avisos: ' + JSON.stringify(erros));
@@ -359,7 +359,7 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
   rel.push('5. Perfil colaborador (Jurídico): escopo e ações restritas');
   { const { ctx, pg, erros } = await contexto(b, { perfil: 'juridico', casca: 'v3', hash: '#avisos' });
     await pg.waitForFunction(() => document.querySelectorAll('#view-avisos li.np-it[data-id]').length >= 1, null, { timeout: 10000 }).catch(() => {});
-    const r = await pg.evaluate(() => ({ dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button')].map(b => b.textContent.trim()), leituras: document.querySelectorAll('#view-avisos .np-num').length }));
+    const r = await pg.evaluate(() => ({ dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button, #np-acao button, #np-barra-vista button')].map(b => b.textContent.trim()), leituras: document.querySelectorAll('#view-avisos .np-num').length }));
     if (!r.dir.length && !r.leituras) ok('colaborador: sem "Aviso"/"Discord" e sem contagem de leituras (só admin)'); else falha('colab avisos: ' + JSON.stringify(r));
     await pg.click('#view-avisos li[data-id="a1"] .np-it-abrir'); await esperaPainel(pg); const pe = await pg.evaluate(() => [...document.querySelectorAll('#view-avisos .np-painel .np-p-pe button')].map(b => b.textContent.trim()));
     if (pe.join() === 'Marcar como lido') ok('colaborador: painel do aviso só com "Marcar como lido" (sem Editar)'); else falha('colab pe: ' + pe.join(','));

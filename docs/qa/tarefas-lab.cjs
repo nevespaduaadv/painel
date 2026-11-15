@@ -170,7 +170,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     const chk = await pg.evaluate((id) => ({ foco: document.activeElement.tagName, noPainel: !!document.activeElement.closest('.np-painel'), checked: document.querySelector(`.np-it[data-id="${id}"] .np-check`).checked, titulo: document.querySelector('.np-painel h2').textContent }), ta);
     if (chk.foco === 'TEXTAREA' && chk.noPainel && !chk.checked) ok('marcar uma aberta → não conclui direto: abre o painel com foco no andamento (nota obrigatória, como na V2)'); else falha('check: ' + JSON.stringify(chk));
     // Nova tarefa e CSV existem
-    const tb = await pg.evaluate(() => [...document.querySelectorAll('#view-tarefas .np-tb-dir button')].map(b => b.textContent.trim())); if (tb.includes('Nova tarefa') && tb.includes('CSV') && tb.includes('Lista') && tb.includes('Quadro')) ok(`toolbar: ${tb.join(' · ')}`); else falha('toolbar dir: ' + JSON.stringify(tb));
+    const tb = await pg.evaluate(() => [...document.querySelectorAll('#view-tarefas .np-tb-dir button, #np-acao button, #np-barra-vista button')].map(b => b.textContent.trim())); if (tb.includes('Nova tarefa') && tb.includes('CSV') && tb.includes('Lista') && tb.includes('Quadro')) ok(`toolbar: ${tb.join(' · ')}`); else falha('toolbar dir: ' + JSON.stringify(tb));
     if (!erros.length) ok('sem erros de página'); else falha('erros: ' + erros.join(' | '));
     await ctx.close(); }
   // ---------- 3b. navegação entre etapas da cadeia no painel ----------
@@ -224,7 +224,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
   // ---------- 5. quadro ----------
   rel.push('5. quadro (4 colunas da V2, régua, mover por teclado)');
   { const { ctx, pg, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' });
-    await pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
+    await pg.click(':is(#view-tarefas, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const q = await pg.evaluate(() => ({ cols: [...document.querySelectorAll('.np-colq h3 > span:first-child')].map(s => s.textContent), ns: [...document.querySelectorAll('.np-colq h3 .n')].map(s => +s.textContent), cards: document.querySelectorAll('.np-cardq').length, reguas: document.querySelectorAll('.np-cardq[class*="r-"]').length, por: document.querySelector('.np-colq h3 .por')?.textContent, vista: localStorage.getItem('np-tarefas-vista'), legado: localStorage.getItem('pp-tarefas-vista') }));
     const L = TAREFAS; const esperado = [L.filter(t => t.status === 'aberta').length, L.filter(t => t.status === 'em_andamento').length, L.filter(t => t.status === 'concluida').length];
     if (JSON.stringify(q.cols) === JSON.stringify(['A fazer', 'Fazendo', 'Feitas (7 dias)']) && JSON.stringify(q.ns) === JSON.stringify(esperado) && q.reguas >= 3 && q.vista === 'quadro' && q.legado === 'kanban') ok(`quadro: colunas ${q.cols.join(' · ')} com ${q.ns.join('/')} cartões (= colunas e regras da V2 com tickets desativados); ${q.reguas} cartões com régua; contagem por responsável "${q.por}"; preferência gravada (e a legada pp-tarefas-vista=kanban)`); else falha('quadro: ' + JSON.stringify({ q, esperado }));
@@ -251,7 +251,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
   rel.push('5b. quadro — equivalência com a V2 em todos os caminhos');
   { // tickets desativados: Fazendo → A fazer, mesma coluna, falha do banco
     const { ctx, pg, escritas, sim } = await contexto(b, { perfil: 'admin', casca: 'v3' });
-    await pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
+    await pg.click(':is(#view-tarefas, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const toastTxt = () => pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent.trim() : ''; });
     let antes = escritas.length; await pg.click('.np-colq[data-st="em_andamento"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("A fazer")'); await pg.waitForTimeout(600);
     if (escritas.slice(antes).some(e => /PATCH \/rest\/v1\/tarefas\S* .*"aberta"/.test(e))) ok('Fazendo → A fazer: PATCH tarefas{status:aberta} (volta, como o drop da V2)'); else falha('volta: ' + JSON.stringify(escritas.slice(antes)));
@@ -269,14 +269,14 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     if (t2 === err.toast) ok(`V2 e V3.1 reagem igual ao erro: "${t2}"`); else falha('erro V2 × V3: ' + JSON.stringify({ t2, v3: err.toast })); await e2.ctx.close();
     // só leitura: V3.1 não arrasta nem oferece "Mover para…"; nenhuma escrita
     const r3 = await contexto(b, { perfil: 'admin', casca: 'v3' }); await r3.pg.evaluate(() => { S.canWrite = false; render(); }); await r3.pg.waitForTimeout(300);
-    await r3.pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await r3.pg.waitForTimeout(400);
+    await r3.pg.click(':is(#view-tarefas, #np-barra-vista) .np-seg button:has-text("Quadro")'); await r3.pg.waitForTimeout(400);
     const ro = await r3.pg.evaluate(() => ({ drag: [...document.querySelectorAll('.np-cardq')].every(c => c.getAttribute('draggable') === 'false'), n: document.querySelectorAll('.np-cardq').length }));
     const antesRO = r3.escritas.length; await r3.pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await r3.pg.waitForTimeout(200);
     const itensRO = await r3.pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(b => b.disabled)); await r3.pg.keyboard.press('Escape');
     if (ro.drag && ro.n > 0 && itensRO.length === 3 && itensRO.every(Boolean) && r3.escritas.length === antesRO) ok(`só leitura no quadro: ${ro.n} cartões sem arrastar, "Mover para…" todo desabilitado, nenhuma escrita (V2 depende do RLS para recusar; V3.1 recusa antes)`); else falha('readOnly quadro: ' + JSON.stringify({ ro, itensRO })); await r3.ctx.close();
     // tickets ATIVOS (constante ligada só em memória): 4 colunas, cartão com ticket em "Aguardando área", regras de ticket iguais nas duas versões
     const estadoQuadro = (pg, v3) => pg.evaluate((v3) => { const cols = [...document.querySelectorAll(v3 ? '.np-colq' : '.kb-col')]; return cols.map(c => c.dataset.st + ':' + c.querySelectorAll(v3 ? '.np-cardq' : '.kb-card').length); }, v3);
-    const k3 = await contexto(b, { perfil: 'admin', casca: 'v3', tickets: true }); await k3.pg.click('#view-tarefas .np-seg button:has-text("Quadro")'); await k3.pg.waitForTimeout(500);
+    const k3 = await contexto(b, { perfil: 'admin', casca: 'v3', tickets: true }); await k3.pg.click(':is(#view-tarefas, #np-barra-vista) .np-seg button:has-text("Quadro")'); await k3.pg.waitForTimeout(500);
     const k2 = await contexto(b, { perfil: 'admin', casca: 'v2', tickets: true }); await k2.pg.click('#view-tarefas .tabs .tab:has-text("Kanban")'); await k2.pg.waitForTimeout(500);
     const q3 = await estadoQuadro(k3.pg, true), q2 = await estadoQuadro(k2.pg, false);
     if (q3.length === 4 && JSON.stringify(q3) === JSON.stringify(q2) && q3.some(x => x === 'aguardando:1')) ok(`tickets ativos: V2 e V3.1 com as mesmas 4 colunas e contagens (${q3.join(' · ')})`); else falha('tickets colunas: ' + JSON.stringify({ q3, q2 }));
@@ -317,7 +317,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     if (!r.esc.tudo && r.foraEscopo.length === 0 && r.n > 0) ok(`colaborador Jurídico: ${r.n} tarefas, todas dentro de escopoOk (${JSON.stringify(r.esc)})`); else falha('escopo: ' + JSON.stringify(r));
     await ctx.close();
     const c2 = await contexto(b, { perfil: 'admin', casca: 'v3' }); await c2.pg.evaluate(() => { S.canWrite = false; render(); }); await c2.pg.waitForTimeout(300);
-    const ro = await c2.pg.evaluate(() => ({ checks: document.querySelectorAll('#view-tarefas .np-check').length, nova: !!document.querySelector('#view-tarefas .np-tb-dir .np-btn.pri'), drag: document.querySelector('.np-cardq')?.getAttribute('draggable') }));
+    const ro = await c2.pg.evaluate(() => ({ checks: document.querySelectorAll('#view-tarefas .np-check').length, nova: !!document.querySelector(':is(#view-tarefas .np-tb-dir, #np-acao) .np-btn.pri'), drag: document.querySelector('.np-cardq')?.getAttribute('draggable') }));
     await c2.pg.click('#view-tarefas .np-it .np-it-abrir'); await c2.pg.waitForTimeout(400);
     const roP = await c2.pg.evaluate(() => [...document.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()));
     if (ro.checks === 0 && !ro.nova && !roP.includes('Concluir') && !roP.includes('Feito') && roP.includes('Mais ações')) ok(`só leitura (readOnly): sem checks, sem Nova tarefa, painel sem Concluir/Feito (${roP.join(' · ')})`); else falha('readOnly: ' + JSON.stringify({ ro, roP }));

@@ -151,7 +151,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     const tE = await toastTxt(pg); const etapaDepois = await pg.evaluate((id) => window.PP_NEG.lista().find(n => n.id === id).etapa, id);
     if (tE === 'Não foi possível mover' && etapaDepois === 'extrajudicial') ok(`erro do banco: toast "${tE}" (mesmo da V2), nada muda`); else falha('erro: ' + JSON.stringify({ tE, etapaDepois })); sim.falharPatch = false;
     // quadro: colunas = NEG_ETAPAS sem Concluído (X.concluidas=false), cartões = abertas; arrastar via PP_DND gera a mesma escrita
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await pg.click(':is(#view-negociacoes, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const q = await pg.evaluate(() => ({ cols: [...document.querySelectorAll('.np-colq')].map(c => c.dataset.etapa), cards: document.querySelectorAll('.np-cardq').length, drag: [...document.querySelectorAll('.np-cardq')].every(c => c.getAttribute('draggable') === 'true') }));
     antes = escritas.length; await pg.dragAndDrop(`.np-cardq[data-id="${NEGS[6].id}"]`, '.np-colq[data-etapa="extrajudicial"] .np-colq-b'); await pg.waitForTimeout(600);
     const wD = escritas.slice(antes);
@@ -191,9 +191,9 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   // ---------- 6. só leitura ----------
   rel.push('6. só leitura');
   { const { ctx, pg, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' }); await pg.evaluate(() => { S.canWrite = false; render(); }); await pg.waitForTimeout(300);
-    const ro = await pg.evaluate(() => ({ nova: !!document.querySelector('#view-negociacoes .np-tb-dir .np-btn.pri'), n: document.querySelectorAll('li.np-it').length }));
+    const ro = await pg.evaluate(() => ({ nova: !!document.querySelector(':is(#view-negociacoes .np-tb-dir, #np-acao) .np-btn.pri'), n: document.querySelectorAll('li.np-it').length }));
     await pg.click('#view-negociacoes li.np-it .np-it-abrir'); await pg.waitForTimeout(400); const pe = await pg.evaluate(() => [...document.querySelectorAll('.np-p-pe button')].map(b => b.textContent.trim()));
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400);
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.click(':is(#view-negociacoes, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400);
     const roQ = await pg.evaluate(() => ({ drag: [...document.querySelectorAll('.np-cardq')].every(c => c.getAttribute('draggable') === 'false'), mover: document.querySelectorAll('.np-cardq .np-ib').length }));
     if (!ro.nova && ro.n > 0 && !pe.includes('Mover etapa…') && !pe.includes('Editar') && pe.includes('Mais ações') && roQ.drag && roQ.mover === 0 && escritas.length === 0) ok(`só leitura: sem Nova negociação, painel sem Mover/Editar (${pe.join(' · ')}), quadro sem arrastar nem "Mover"`); else falha('readOnly: ' + JSON.stringify({ ro, pe, roQ }));
     await ctx.close(); }
@@ -226,7 +226,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
       { sel: '#np-pop .np-pop-i', nome: 'item do popover' }, { sel: '#np-pop .np-pop-i.atual', nome: 'item atual do popover' }, { sel: '.np-btn.pri', nome: 'botão primário' }, { sel: '.np-btn.ghost', nome: 'botão fantasma' }, { sel: '.np-btn:not(.pri):not(.ghost)', nome: 'botão secundário' },
     ];
     const m = await medirContraste(pg, pares); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
-    await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400);
+    await pg.click(':is(#view-negociacoes, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400);
     const mq = await medirContraste(pg, [{ sel: '.np-cardq .tx', nome: 'título do cartão' }, { sel: '.np-cardq .ctx', nome: 'contexto do cartão' }, { sel: '.np-cardq .pz', nome: 'prazo do cartão' }, { sel: '.np-cardq .pz.late', nome: 'prazo vencido do cartão' }, { sel: '.np-colq h3 > span:first-child', nome: 'título da coluna' }, { sel: '.np-colq h3 .n', nome: 'contagem da coluna' }]);
     const ruins = [...m.ruins, ...mq.ruins]; const n = m.medidos.length + mq.medidos.length; const faltam = [...m.ausentesObrigatorios, ...mq.ausentesObrigatorios];
     if (!ruins.length && !faltam.length) ok(`${tema} 1440: ${n} pares obrigatórios encontrados e medidos ≥ mínimo (texto 4,5:1, componentes 3:1); menor razão ${Math.min(m.minimo, mq.minimo).toFixed(2)}:1`); else falha(`${tema}: ` + (ruins.length ? 'contraste insuficiente: ' + ruins.map(p => `${p.nome} ${p.r.toFixed(2)}:1 (${p.fg} sobre ${p.bg})`).join('; ') : '') + (faltam.length ? ' · OBRIGATÓRIOS não encontrados: ' + faltam.join(', ') : ''));
@@ -239,7 +239,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
   for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]]) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h, touch: true });
     const a1 = await medirAlvos(pg, '#view-negociacoes'); await pg.click('li.np-it .np-it-abrir'); await pg.waitForTimeout(500); await pg.click('.np-p-pe button:has-text("Mover etapa")'); await pg.waitForTimeout(250);
     const a2 = await medirAlvos(pg, '.np-painel'); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
-    await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400); await pg.click('.np-cardq .np-ib'); await pg.waitForTimeout(250); const a3 = await medirAlvos(pg, '#view-negociacoes'); await pg.keyboard.press('Escape');
+    await pg.click(':is(#view-negociacoes, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(400); await pg.click('.np-cardq .np-ib'); await pg.waitForTimeout(250); const a3 = await medirAlvos(pg, '#view-negociacoes'); await pg.keyboard.press('Escape');
     const todos = [...a1, ...a2, ...a3]; const pequenos = todos.filter(a => a.h < 44 || (a.icone && a.w < 44));
     if (!pequenos.length) ok(`${w}px (toque): ${todos.length} alvos ≥ 44 px (lista, chips, painel, popover "Mover etapa", quadro e "Mover")`); else falha(`${w}px: alvos < 44: ` + [...new Set(pequenos.map(a => `${a.nome} ${a.w}×${a.h}`))].join(', '));
     await ctx.close(); }
@@ -257,7 +257,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w, h: w < 900 ? 900 : 900, tema });
     const sx = await pg.evaluate(() => document.documentElement.scrollWidth); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-lista.png`) });
     if (w >= 1024 || tema === 'light') { await pg.click('#view-negociacoes li.np-it .np-it-abrir'); await pg.waitForTimeout(600); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-painel.png`) }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); }
-    if (w === 1440) { await pg.click('#view-negociacoes .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-quadro.png`) }); }
+    if (w === 1440) { await pg.click(':is(#view-negociacoes, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(OUT, `v3-${tema}-${w}-quadro.png`) }); }
     if (sx <= w && erros.length === 0) ok(`${tema} ${w}px: sem rolagem horizontal, sem erros`); else falha(`${tema} ${w}px: scrollWidth=${sx} erros=${JSON.stringify(erros.slice(0, 2))}`);
     await ctx.close(); }
   for (const w of [375, 1440]) for (const tema of ['light', 'dark']) { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v2', w, tema }); await pg.screenshot({ path: path.join(OUT, `v2-${tema}-${w}-kanban.png`) }); await ctx.close(); }
