@@ -273,13 +273,22 @@ async function gravar(col,id,doc,{merge=false}={}){
   const d={...doc};delete d.id;
   const notaCampo=NOTA_CAMPO[col];let nota=null;
   if(notaCampo){nota=d[notaCampo]??"";delete d[notaCampo]}
-  if(merge){const {data:cur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();Object.assign(d,{...(cur?cur.dados:{}),...d})}
-  // correção 15/11 (homologação): o nome do cliente vai para a COLUNA clientes.nome já no INSERT (os gatilhos de tarefas automáticas leem a coluna)
-  // e permanece também no jsonb, como a Ficha cadastral sempre gravou (nome, cnpj, responsavel e reservaAcumulada vivem nos dois lugares).
-  // Na atualização parcial (merge) a coluna só muda se o nome vier explicitamente no pedido — o jsonb mesclado pode estar defasado em relação à coluna.
-  let nomeCliente=null,nomeExplicito=false;if(col==="clientes"){nomeExplicito=!merge||Object.prototype.hasOwnProperty.call(doc,"nome");nomeCliente=String(d.nome??"").trim()||null;if(nomeExplicito&&!nomeCliente)throw new Error("Informe o nome do cliente")}
-  if(col==="clientes"){for(const k of FICHA_COLS){if(k!=="nome")delete d[k]}if(nomeCliente)d.nome=nomeCliente;else delete d.nome}   // demais colunas da ficha não vão para o jsonb
-  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;if(col==="clientes"&&d.cnpj)row.cnpj=d.cnpj;if(col==="clientes"&&nomeExplicito&&nomeCliente)row.nome=nomeCliente;
+  // correção 15/11 (homologação): clientes.nome é COLUNA GERADA (generated always as dados->>'nome'); o nome só pode ir no jsonb.
+  // Antes, nome era apagado do jsonb por estar em FICHA_COLS e o cliente nascia sem nome (coluna gerada nula; gatilhos de tarefas
+  // sem o nome). Agora: nome aparado fica em dados.nome (a Ficha cadastral já grava assim); nunca enviar a coluna nome (o banco recusa).
+  // Nome vazio é recusado antes de qualquer leitura quando vem explícito (set, ou merge com a chave nome). Demais FICHA_COLS ficam fora do jsonb.
+  const explicitoNome=col==="clientes"&&(!merge||Object.prototype.hasOwnProperty.call(doc,"nome"));
+  if(explicitoNome&&!String(doc.nome??"").trim())throw new Error("Informe o nome do cliente");
+  // clientes: o formulário "Editar cliente" só conhece parte do jsonb (nome, cnpj, responsável, reserva, timeline); a Ficha cadastral e o ciclo
+  // (0092) guardam outras chaves ali (grupo, ciclo_concluido_em/resumo/por…). Por isso, para clientes, até o set() parte do jsonb ATUAL e só
+  // sobrepõe os campos enviados — nada que o formulário não mostra é apagado. Se a leitura do cadastro atual falhar, nada é gravado.
+  if(merge||col==="clientes"){const {data:cur,error:eCur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();
+    if(eCur&&col==="clientes")throw new Error("Não foi possível carregar o cadastro atual do cliente; nada foi gravado. Tente de novo.");
+    Object.assign(d,{...(cur?cur.dados:{}),...d})}
+  if(col==="clientes"){const nomeCliente=String(d.nome??"").trim()||null;for(const k of FICHA_COLS){if(k!=="nome")delete d[k]}if(nomeCliente)d.nome=nomeCliente;else delete d.nome}
+  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;
+  // coluna cnpj acompanha o formulário só quando o CNPJ vem no pedido (apagar o CNPJ limpa a coluna, como na Ficha cadastral)
+  if(col==="clientes"&&Object.prototype.hasOwnProperty.call(doc,"cnpj"))row.cnpj=String(doc.cnpj??"").trim()||null;
   const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
   if(notaCampo && !merge){
     const nid=(col==="clientes"?"cliente:":"contrato:")+id;
