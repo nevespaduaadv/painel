@@ -306,3 +306,7 @@ html.np-casca-v3 .np-form[aria-busy="true"] .np-f-salvar::after{content:"";displ
 @keyframes np-f-gira{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-form[aria-busy="true"] .np-f-salvar::after{animation:none}}
 @media (max-width:600px){html.np-casca-v3 .np-form .np-f input,html.np-casca-v3 .np-form .np-f select{min-height:44px}html.np-casca-v3 .np-form .np-f-x{width:44px;height:44px}html.np-casca-v3 .modal.np-form-fundo{padding:0;align-items:stretch}html.np-casca-v3 .card.np-form{width:100%;min-height:100%;border-radius:0;border:0;display:flex;flex-direction:column}html.np-casca-v3 .np-form .np-f-form{flex:1 1 auto;overflow:auto}html.np-casca-v3 .np-form .np-f-acoes{position:sticky;bottom:0}html.np-casca-v3 .np-form .np-f-acoes .btn,html.np-casca-v3 .np-form .np-f-confirm-acoes .btn{flex:1 1 40%;min-height:44px}html.np-casca-v3 .np-form .np-f-acoes .sp{display:none}html.np-casca-v3 .np-form .np-f-campos{grid-template-columns:1fr}}
+/* ---------- V3 (16/11) · Clientes → Carteira: lista com régua + painel (DESIGN.md §5) ---------- */
+html.np-casca-v3 .np-marca.late{color:var(--np-late)}
+html.np-casca-v3 .np-cart-total{margin-top:6px;text-align:right;font-size:var(--np-fs-2);color:var(--np-text-2)}
+html.np-casca-v3 .np-cart-total b{font:500 var(--np-fs-3)/1.2 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text)}
