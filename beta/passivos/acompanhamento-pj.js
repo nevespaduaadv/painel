@@ -249,6 +249,8 @@ function formAta(c,a){
   const extra=a.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta ata?"))return;await SB.from("atas_reuniao").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
   modal(a.id?"Editar ata":"Registrar ata",body,async()=>{
     if(!res.value.trim()&&!lp.value.trim()&&!lg.value.trim())throw new Error("Escreva a ata ou informe o link");
+    // correção aprovada (15/11): na V2, como na V3.1, a pasta GERAL do cliente (pré-preenchida) não é conteúdo suficiente da ata
+    if(!res.value.trim()&&!lg.value.trim()&&c.pasta_drive_url&&mesmoLink(lp.value,c.pasta_drive_url))throw new Error(MSG_ATA_SEM_CONTEUDO);
     await salvarAta(c.id,a.id||null,{tipo:tipo.value,data:data.value,titulo:tit.value,resumo:res.value,link_pasta:lp.value,link_gravacao:lg.value,participantes:part.value});
     toast(a.id?"Ata atualizada":"Ata registrada no dossiê")},extra);
 }
