@@ -2,7 +2,7 @@
    Casca V3.1 (Design System — Fase 1). Só vale sob html.np-casca-v3.
    Ativada pela chave localStorage "np-casca" = "v3" (Meu perfil → Navegação).
    A chave só escolhe CSS/render: acesso continua em PP.temAcesso, nas classes
-   area-*/*-only e na RLS. Fora da classe, nada aqui se aplica (casca V2 intacta).
+   area-x e x-only e na RLS. Fora da classe, nada aqui se aplica (casca V2 intacta).
    Camadas (z-index): barra 5 · véu da gaveta 9 · lateral 10/30 · menus 30 ·
    flyout 70 · dica 80 · modal (existente) acima.
    ============================================================================ */
