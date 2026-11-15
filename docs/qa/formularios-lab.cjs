@@ -201,6 +201,39 @@ const payload = (e) => { try { return JSON.parse(e.slice(e.indexOf(' {')).trim()
     if (seqE.every(x => x === 'conf') && /np-f-excluir/.test(voltaE)) ok('exclusão: Tab circula só na confirmação; "Continuar editando" devolve o foco ao botão Excluir'); else falha('foco exclusão: ' + JSON.stringify([seqE, voltaE]));
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
     if (!escritas.length && !erros.length) ok('seção 9: nenhuma escrita, sem erros'); else falha('seção 9: ' + JSON.stringify([escritas, erros])); await ctx.close(); }
+  // ========== 10. Registrar ata: a pasta geral do cliente não é conteúdo (decisão 14/11) ==========
+  rel.push('10. Registrar ata (V3.1): link da pasta GERAL pré-preenchido não basta; documento específico, gravação ou resumo bastam; V2 sem mudança');
+  { const { ctx, pg, erros, escritas } = await contexto(b, { hash: '#acompanhamento' }); await pg.waitForFunction(() => document.querySelectorAll('#view-acompanhamento li.np-it[data-id]').length >= 5, null, { timeout: 12000 });
+    const MSG = 'Escreva a ata ou informe o link do documento da ata ou da gravação. O link da pasta geral do cliente não substitui o conteúdo.';
+    await abrirForm(pg); const pre = await pg.evaluate(() => ({ lp: document.querySelector('#ata-lp').value, ajuda: document.querySelector('#ata-lp-h')?.textContent || '' }));
+    await pg.click('#modalHost .np-f-salvar'); await pg.waitForTimeout(250); let st = await estadoForm(pg);
+    if (pre.lp === 'https://drive.example/c1' && /pasta geral do cliente/.test(pre.ajuda) && st && st.erros.join() === MSG && st.invalid.join() === 'ata-res' && st.foco === 'ata-res' && escritas.length === 0) ok('Salvar sem digitar nada (só a pasta geral pré-preenchida): erro junto a "Ata / resumo" com a mensagem aprovada, foco no campo, NENHUMA gravação; ajuda do campo explica a pasta geral'); else falha('pasta geral: ' + JSON.stringify([pre, st, escritas]));
+    // variantes do MESMO link geral → continuam recusadas (normalização segura: barra final, maiúsculas no host, usp=, fragmento)
+    const iguais = ['https://drive.example/c1/', 'HTTPS://DRIVE.EXAMPLE/c1', 'https://drive.example/c1?usp=sharing', 'https://drive.example/c1#inicio', 'drive.example/c1'];
+    const recusa = {}; for (const v of iguais) { await pg.fill('#ata-lp', v); await pg.waitForTimeout(80); recusa[v] = (await estadoForm(pg)).erros.join(); }
+    if (Object.values(recusa).every(m => m === MSG)) ok(`variantes da pasta geral (barra final, HOST em maiúsculas, ?usp=sharing, #fragmento, sem https://) continuam recusadas: ${iguais.length}/${iguais.length}`); else falha('variantes iguais: ' + JSON.stringify(recusa));
+    // caminhos/identificadores DIFERENTES nunca são tratados como a pasta geral → aceitos como documento específico
+    const diferentes = ['https://drive.example/c1/ata-r2.docx', 'https://drive.example/c1-outro', 'https://drive.example/C1', 'https://drive.example/c1?id=2', 'https://docs.google.com/document/d/1AbC/edit'];
+    const aceita = {}; for (const v of diferentes) { await pg.fill('#ata-lp', v); await pg.waitForTimeout(80); aceita[v] = (await estadoForm(pg)).erros.join(); }
+    if (Object.values(aceita).every(m => m === '')) ok(`links com caminho, caixa do caminho ou identificador diferentes são aceitos como documento específico: ${diferentes.length}/${diferentes.length} (nenhum tratado como "equivalente")`); else falha('variantes diferentes: ' + JSON.stringify(aceita));
+    // pasta geral + gravação → aceita; pasta geral + resumo → aceita
+    await pg.fill('#ata-lp', 'https://drive.example/c1'); await pg.fill('#ata-lg', 'https://meet.google.com/abc-defg-hij'); await pg.waitForTimeout(80); const g = (await estadoForm(pg)).erros.join();
+    await pg.fill('#ata-lg', ''); await pg.fill('#ata-res', 'Resumo real da reunião'); await pg.waitForTimeout(80); const r = (await estadoForm(pg)).erros.join(); await pg.fill('#ata-res', '');
+    if (g === '' && r === '') ok('pasta geral + link da gravação → aceita; pasta geral + resumo → aceita'); else falha('gravação/resumo: ' + JSON.stringify([g, r]));
+    // gravação efetiva com documento específico: payload igual ao de sempre (link_pasta = documento), sem mudança de banco
+    await pg.fill('#ata-lp', 'https://drive.example/c1/ata-r2.docx'); await pg.click('#modalHost .np-f-salvar'); await pg.waitForTimeout(700); const ins = escritas.filter(e => /POST .*atas_reuniao/.test(e)); const p0 = ins[0] ? payload(ins[0]) : null; const fechado = await pg.evaluate(() => document.querySelector('#modalHost').children.length === 0);
+    if (ins.length === 1 && p0 && p0.link_pasta === 'https://drive.example/c1/ata-r2.docx' && p0.resumo === null && p0.cliente_id === 'c1' && Object.keys(p0).sort().join() === 'autor_id,cliente_id,created_by,data,link_gravacao,link_pasta,participantes,resumo,tipo,titulo,updated_at,updated_by' && fechado) ok('documento específico sem resumo: 1 INSERT com o MESMO payload de antes (12 colunas, link_pasta = documento), formulário fecha'); else falha('insert doc: ' + JSON.stringify([ins, p0, fechado]));
+    // editar ata antiga que só tem a pasta geral: salvar sem acrescentar conteúdo é recusado; com resumo, grava
+    await pg.waitForTimeout(400); await pg.evaluate(() => window.PP_ACOMP.invalidar?.()); await abrirForm(pg, { editarIdx: 0 }); const ed = await pg.evaluate(() => ({ lp: document.querySelector('#ata-lp').value, res: document.querySelector('#ata-res').value }));
+    await pg.fill('#ata-res', ''); await pg.fill('#ata-lg', ''); await pg.fill('#ata-lp', 'https://drive.example/c1'); const n0 = escritas.length; await pg.click('#modalHost .np-f-salvar'); await pg.waitForTimeout(250); st = await estadoForm(pg);
+    if (st && st.erros.join() === MSG && escritas.length === n0) ok('edição: esvaziar o conteúdo deixando só a pasta geral é recusada (nenhum PATCH)'); else falha('edição pasta geral: ' + JSON.stringify([ed, st, escritas.slice(n0)]));
+    await pg.fill('#ata-res', 'Conteúdo acrescentado na edição'); await pg.click('#modalHost .np-f-salvar'); await pg.waitForTimeout(700); const up = escritas.slice(n0).filter(e => /PATCH .*atas_reuniao/.test(e));
+    if (up.length === 1 && /cliente_id=eq\.c1/.test(up[0])) ok('edição com resumo acrescentado: 1 PATCH confirmado por id + cliente_id'); else falha('edição ok: ' + JSON.stringify(up));
+    if (!erros.length) ok('seção 10: sem erros de página'); else falha('seção 10 erros: ' + JSON.stringify(erros)); await ctx.close(); }
+  // V2 continua aceitando a pasta geral (comportamento preservado; correção específica da V2 é pendência registrada)
+  { const { ctx, pg, escritas } = await contexto(b, { casca: 'v2', hash: '#clientes' }); await pg.evaluate(() => { S.tab = 'clientes'; S.sel = 'c1'; S.sub = 'acompanhamento'; render(); }); await pg.waitForTimeout(1200);
+    await pg.click('#view-clientes #acomp-atas .btn:has-text("+ Ata")'); await pg.waitForTimeout(300); await pg.click('#modalHost .btn.primary'); await pg.waitForTimeout(600); const ins = escritas.filter(e => /POST .*atas_reuniao/.test(e)); const p0 = ins[0] ? payload(ins[0]) : null;
+    if (ins.length === 1 && p0 && p0.link_pasta === 'https://drive.example/c1' && p0.resumo === null) ok('V2 (sem a chave): Salvar só com a pasta geral continua gravando como antes — V2 intacta; correção própria da V2 fica como pendência'); else falha('V2 pasta geral: ' + JSON.stringify([ins, p0])); await ctx.close(); }
   // ========== 7. temas, 375/1440, contraste, alvos ==========
   rel.push('7. claro/escuro, 375 e 1440: contraste e alvos');
   for (const tema of ['light', 'dark']) for (const w of [375, 1440]) {

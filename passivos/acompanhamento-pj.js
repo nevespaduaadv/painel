@@ -147,6 +147,12 @@ function formAta(c,a){
 const URL_OK=/^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 function normalizarLink(v){v=String(v||"").trim();if(!v)return "";if(/^[a-z]:\\|^\\\\/i.test(v))return v; /* caminho local: fica como está para a validação reprovar */ if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)&&/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(v))return "https://"+v;return v}
 function validarLink(v){const n=normalizarLink(v);if(!n)return null;if(/^[a-z]:\\|^\\\\/i.test(n))return "Use o link do Drive, não o caminho da pasta no computador.";if(!URL_OK.test(n))return "Informe um link válido (começando com https://).";return null}
+/* Fase 4C.2 (decisão 14/11): o link da PASTA GERAL do cliente (c.pasta_drive_url) vem pré-preenchido, mas não conta como conteúdo da ata.
+   Comparação segura: só ignora esquema/host em maiúsculas, barra final, fragmento (#…) e os parâmetros de compartilhamento do Drive (usp=…);
+   caminhos ou identificadores diferentes NUNCA são tratados como a mesma pasta. */
+function chaveLink(v){const n=normalizarLink(v);if(!n||!URL_OK.test(n))return n.toLowerCase();try{const u=new URL(n);const q=[...u.searchParams.entries()].filter(([k])=>k!=="usp").map(([k,x])=>k+"="+x).join("&");return u.protocol.toLowerCase()+"//"+u.host.toLowerCase()+u.pathname.replace(/\/+$/,"")+(q?"?"+q:"")}catch(_){return n.toLowerCase()}}
+const mesmoLink=(a,b)=>{const ka=chaveLink(a),kb=chaveLink(b);return !!ka&&!!kb&&ka===kb};
+const MSG_ATA_SEM_CONTEUDO="Escreva a ata ou informe o link do documento da ata ou da gravação. O link da pasta geral do cliente não substitui o conteúdo.";
 function formAtaV3(c,a){
   let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
   if(!pode){toast("Você não tem permissão para registrar atas");return}
@@ -156,10 +162,13 @@ function formAtaV3(c,a){
   const futura=v=>{if(!v)return null;return v>hojeISO()?{aviso:"Data no futuro — confira antes de salvar."}:null};
   const f=NPUI.form({titulo:aid?"Editar ata":"Registrar ata",contexto:[el("b",{},c.nome),aid?" · ata de "+fmtD(a.data)+" ("+(TIPO_ATA[a.tipo]||a.tipo)+")":" · nova ata do acompanhamento"],origem,
     campos:[{id:"ata-tipo",label:"Reunião",el:tipo,obrigatorio:true},{id:"ata-data",label:"Data",el:data,obrigatorio:true,validar:futura},{id:"ata-tit",label:"Título",el:tit},{id:"ata-part",label:"Participantes",el:part},
-      {id:"ata-res",label:"Ata / resumo",el:res,condicional:true,ajuda:"Obrigatório quando não houver link da pasta nem da gravação."},
-      {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:"A gravação e a transcrição ficam no Drive; aqui vai o link para quem precisar.",validar:validarLink},
+      {id:"ata-res",label:"Ata / resumo",el:res,condicional:true,ajuda:"Obrigatório quando não houver link do documento da ata nem da gravação."},
+      {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:c.pasta_drive_url?"Vem preenchido com a pasta geral do cliente. Para registrar a ata por um documento externo, cole o link do documento da ata.":"A gravação e a transcrição ficam no Drive; aqui vai o link do documento da ata para quem precisar.",validar:validarLink},
       {id:"ata-lg",label:"Link da gravação",el:lg,condicional:true,validar:validarLink}],
-    validarTudo:v=>(!String(v["ata-res"]||"").trim()&&!String(v["ata-lp"]||"").trim()&&!String(v["ata-lg"]||"").trim())?[{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}]:[],
+    /* regra (14/11): resumo OU gravação OU link_pasta que não seja a pasta geral do cliente */
+    validarTudo:v=>{const res=String(v["ata-res"]||"").trim(),lpv=String(v["ata-lp"]||"").trim(),lgv=String(v["ata-lg"]||"").trim();if(res||lgv)return [];
+      if(!lpv)return [{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}];
+      if(c.pasta_drive_url&&mesmoLink(lpv,c.pasta_drive_url))return [{campo:"ata-res",msg:MSG_ATA_SEM_CONTEUDO}];return []},
     salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true,confirmar:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
     excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
   return f;
