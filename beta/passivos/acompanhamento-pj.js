@@ -31,7 +31,7 @@ const selColab=v=>sel({"":"—",...Object.fromEntries((A.colab||[]).filter(c=>c.
 /* ---------- 1) status do ciclo ---------- */
 function etapaAtual(ac){if(!ac||!ac.onb_feita)return"onb";if(!ac.r1_feita)return"r1";if(!ac.r2_feita)return"r2";if(!ac.r3_feita)return"r3";return"mensal"}
 function formCiclo(c,ac){
-  if(acompV3()&&window.NPUI?.form){formCicloV3(c,ac);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
+  if(acompV3()&&window.NPUI?.form){formCicloV3(c);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo (linha completa do ciclo, não a view); abaixo, a V2 intacta
   ac=ac||{};const onb=inp("date",ac.onb_data||c.data_onboarding||""),r1=inp("date",ac.r1_data||""),r2=inp("date",ac.r2_data||""),r3=inp("date",ac.r3_data||""),prox=inp("date",ac.proxima_reuniao||""),fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
   const fO=check("Onboarding realizado",!!ac.onb_feita),f1=check("R1 realizada",!!ac.r1_feita),f2=check("R2 realizada",!!ac.r2_feita),f3=check("R3 realizada",!!ac.r3_feita);
   const sugerir=el("button",{class:"btn sm",type:"button",onclick:()=>{if(!onb.value){toast("Informe a data do onboarding");return}r1.value=addDias(onb.value,15);r2.value=addDias(onb.value,30);r3.value=addDias(onb.value,45);toast("R1/R2/R3 sugeridas a cada 15 dias")}},"Sugerir R1/R2/R3 (15 em 15 dias)");
@@ -64,11 +64,27 @@ async function salvarCiclo(cid,ac,v,{confirmar=false}={}){
   else await SB.from("clientes").update(esp).eq("id",cid).then(()=>{});
   invalidar(cid);window.PP_PROTECAO?.invalidar?.(cid);
   return {row,espelhoErro}}
-/* Fase 4C.2 · Atualizar ciclo na V3.1 (NPUI.form): mesmos campos, mesmas regras, mesma persistência (salvarCiclo). Sem validações novas de ordem/datas. */
-function formCicloV3(c,ac){
+/* Correção 15/11 (homologação): a linha COMPLETA do ciclo para edição. v_acompanhamento_pj não expõe observacoes (nem todas as colunas);
+   editar a partir dela abria o formulário com Observações vazias e gravava null por cima do que estava no banco. Fonte, nesta ordem:
+   A.cache[cid].ac quando carregado para ESTE cliente e sem erro; senão leitura direta da tabela; se indisponível, não abre (nada é gravado). */
+const MSG_CICLO_INDISPONIVEL="Não foi possível carregar o ciclo deste cliente. Recarregue o acompanhamento e tente de novo. Nada foi alterado.";
+async function cicloCompleto(cid){
+  const st=A.cache[cid];
+  if(st?.ok&&!st.carregando&&!st.erro&&(st.ac==null||st.ac.cliente_id===cid))return {ac:st.ac||null};
+  try{const {data,error}=await SB.from("acompanhamento_pj").select("*").eq("cliente_id",cid).maybeSingle();
+    if(error)return {erro:error};if(data&&data.cliente_id!==cid)return {erro:npErro("linha de outro cliente","NP_CLIENTE_DIVERGENTE")};return {ac:data||null}}
+  catch(e){return {erro:e}}
+}
+/* Fase 4C.2 · Atualizar ciclo na V3.1 (NPUI.form): mesmos campos, mesmas regras, mesma persistência (salvarCiclo). Sem validações novas de ordem/datas.
+   O `ac` recebido (vindo da view, na V3.1) é descartado: o formulário só abre com a linha completa de cicloCompleto(). */
+function formCicloV3(c){
   let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
   if(!pode){toast("Você não tem permissão para atualizar o ciclo");return}
-  const cid=c.id,origem=document.activeElement;ac=ac||{};
+  const cid=c.id,origem=document.activeElement;
+  return cicloCompleto(cid).then(r=>{if(r.erro||!("ac" in r)){console.warn("ciclo",r.erro);toast(MSG_CICLO_INDISPONIVEL);return null}return abrirFormCicloV3(c,r.ac,origem)});
+}
+function abrirFormCicloV3(c,ac,origem){
+  const cid=c.id;ac=ac||{};
   const d=(v)=>inp("date",v||""),ck=(on)=>{const i=el("input",{type:"checkbox"});i.checked=!!on;return i};
   const onb=d(ac.onb_data||c.data_onboarding),r1=d(ac.r1_data),r2=d(ac.r2_data),r3=d(ac.r3_data),prox=d(ac.proxima_reuniao),fO=ck(ac.onb_feita),f1=ck(ac.r1_feita),f2=ck(ac.r2_feita),f3=ck(ac.r3_feita),
     fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
@@ -454,7 +470,8 @@ function secoesA3(c){
     ["Reserva",[el("span",{},"planejada: "+(c.projeto_reserva?RESERVA_L[c.projeto_reserva]:"não iniciada")),el("br"),el("span",{},"acumulada: "),c.reservaAcumulada?[el("b",{style:"font-family:var(--np-display)"},BRL(+c.reservaAcumulada)),el("small",{style:"margin-left:6px;color:var(--np-text-3)"},"informada pelo cliente")]:el("span",{class:"np-sem"},"não informada")]],
   ].filter(x=>x&&x[1]!=null));
   const passos=ETAPAS_PT.map(([k,label])=>{const d=k==="mensal"?diaISO(a?.proxima_reuniao):diaISO(a?.[k+"_data"]);const feita=k==="mensal"?(a?.fase==="mensal"||a?.fase==="encerrado"):!!a?.[k+"_feita"];return {label:k==="onb"?"Onboarding":label,data:d?fmtD(d):"—",feita,atual:a?a.etapa_atual===k:k==="onb"}});
-  const secCiclo=NPUI.secao("Ciclo de acompanhamento",NPUI.ciclo(passos),a?.observacoes?el("div",{style:"margin-top:8px;white-space:pre-wrap;font-size:var(--np-fs-2)"},a.observacoes):null,!a?el("div",{class:"np-sem",style:"margin-top:8px"},"Defina a data do onboarding para começar."):null);
+  const obsCiclo=st?.ok&&!st.erro?(st.ac?.observacoes||null):null; /* observações só existem na linha completa (cache), não na view */
+  const secCiclo=NPUI.secao("Ciclo de acompanhamento",NPUI.ciclo(passos),obsCiclo?el("div",{style:"margin-top:8px;white-space:pre-wrap;font-size:var(--np-fs-2)"},obsCiclo):null,!a?el("div",{class:"np-sem",style:"margin-top:8px"},"Defina a data do onboarding para começar."):null);
   const ds=st?.ok?st.dividas:null;
   const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"},...(edita?[{k:"acoes",label:"",render:d=>el("button",{type:"button",class:"lnk",onclick:()=>formDivida(c,d)},"editar")}]:[])],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
     ds&&ds.length?el("div",{class:"np-rodape",style:"padding:6px 0 0"},`${ds.length} dívida${ds.length===1?"":"s"} · ${BRL(ds.reduce((s,d)=>s+(+d.valor||0),0))} · ${ds.filter(d=>(d.atraso_meses||0)>0).length} em atraso`):null);
