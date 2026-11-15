@@ -63,8 +63,30 @@
   // aria-current="page"; grupo = botão com aria-expanded/aria-controls + lista. Mesmo itemNav() da V2, só os atributos mudam.
   const tree = el("nav", { id: "np-tree", "aria-label": "Módulos" });
   const eu = el("div", { class: "np-eu" });
-  side.append(ws, el("div", { class: "np-acoes" }, buscaBtn), tree, eu);
+  // V2 (15/11): ação primária do módulo em tinta na lateral (≥ 901 px) e alternador de vista na barra — DESIGN.md §4.
+  // Os nós são os mesmos que o módulo criou para a faixa (mesmos handlers); NPCasca.acomodar só os muda de lugar.
+  const acaoSlot = el("div", { id: "np-acao" });
+  side.append(ws, el("div", { class: "np-acoes" }, buscaBtn, acaoSlot), tree, eu);
   const trilha = el("span", { id: "np-trilha" }); brand?.before(trilha);
+  const vistaSlot = el("div", { id: "np-barra-vista", role: "group", "aria-label": "Vista" }); $("#btnTema")?.before(vistaSlot);
+  const tabAtual = () => { try { return S.tab; } catch (_) { return null; } };
+  window.NPCasca = {
+    acomodar(itens) {
+      if (!document.documentElement.classList.contains("np-casca-v3")) return itens;
+      if (matchMedia("(max-width:900px)").matches) { vistaSlot.replaceChildren(); acaoSlot.replaceChildren(); return itens; } // celular/tablet retrato: tudo fica na faixa
+      const resto = [], vistas = [], acoes = [];
+      for (const i of itens) {
+        if (i?.classList?.contains("np-seg") && [...i.querySelectorAll("button")].some(b => /^(Lista|Quadro|Grade)$/.test(b.textContent.trim()))) vistas.push(i);
+        else if (i?.classList?.contains("np-btn") && i.classList.contains("pri") && !acoes.length) acoes.push(i);
+        else resto.push(i);
+      }
+      vistaSlot.replaceChildren(...vistas); acaoSlot.replaceChildren(...acoes);
+      vistaSlot.dataset.tab = acaoSlot.dataset.tab = tabAtual() || "";
+      return resto;
+    },
+  };
+  // busca: a entrada é o "Buscar" da lateral (e o atalho /); o campo da barra vira paleta ao receber foco (CSS)
+  const inpBusca = $("#buscaGlobal"); if (inpBusca) { inpBusca.tabIndex = -1; inpBusca.addEventListener("keydown", e => { if (e.key === "Escape") setTimeout(() => inpBusca.blur(), 0); }); }
   const fly = el("nav", { id: "np-fly", "aria-label": "Itens do grupo" }), dica = el("div", { id: "np-dica", role: "tooltip" });
   document.body.append(fly, dica);
   // véu: fecha gaveta e expansão (o onclick inline do .sb-overlay já remove sb-aberta)
@@ -135,7 +157,16 @@
     const ini = nome ? nome.split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase() : "NP";
     const perfilBtn = m.perfil ? item(m.perfil) : null;
     if (perfilBtn) { perfilBtn.classList.remove("np-top"); perfilBtn.replaceChildren(el("i", { "aria-hidden": "true" }, ini), el("div", { class: "np-rot" }, el("b", {}, nome || "Meu perfil"), el("small", {}, "Meu perfil"))); perfilBtn.title = "Meu perfil"; }
-    eu.replaceChildren(el("div", { style: "flex:1;min-width:0" }, m.links.length ? el("div", { class: "np-links edit-only" }, m.links.map(l => el("a", { href: l.link }, l.label))) : "", perfilBtn || ""));
+    // menu da conta (DESIGN.md §4: pessoa logada no rodapé): Meu perfil, Visão do cliente e Sair — os mesmos controles da V2, acionados por clique
+    const conta = el("button", { type: "button", class: "np-conta", "aria-label": "Conta: perfil, visão do cliente e sair", title: "Conta", "aria-haspopup": "menu", "aria-expanded": "false", onclick: (e) => {
+      const vc = $("#viewClient"), sair = $("#btnSair"); let ro = false; try { ro = readOnly(); } catch (_) {}
+      NPUI.pop(e.currentTarget, [perfilBtn ? { label: "Meu perfil", onclick: () => perfilBtn.click() } : null,
+        (vc && !ro) ? { label: vc.checked ? "Sair da visão do cliente" : "Ver como o cliente", onclick: () => vc.click() } : null,
+        sair ? { label: "Sair", onclick: () => sair.click() } : null], { role: "menu", label: "Conta", refoco: e.currentTarget });
+    } }, ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'));
+    eu.replaceChildren(el("div", { style: "flex:1;min-width:0" }, m.links.length ? el("div", { class: "np-links edit-only" }, m.links.map(l => el("a", { href: l.link }, l.label))) : "", perfilBtn || ""), conta);
+    // troca de módulo: a vista e a ação do módulo anterior saem; o módulo novo preenche ao montar a faixa
+    if ((vistaSlot.dataset.tab || "") !== (tabAtual() || "")) { vistaSlot.replaceChildren(); acaoSlot.replaceChildren(); vistaSlot.dataset.tab = acaoSlot.dataset.tab = tabAtual() || ""; }
     // grupos sem nenhum item visível para este perfil somem (mesmas regras CSS de permissão da V2)
     requestAnimationFrame(() => { for (const grp of tree.querySelectorAll(".np-g")) { const algum = [...grp.querySelectorAll(".tab")].some(visivel); grp.dataset.vazio = algum ? "0" : "1"; } });
     // trilha e título da barra
