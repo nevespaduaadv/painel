@@ -274,12 +274,13 @@ async function gravar(col,id,doc,{merge=false}={}){
   const notaCampo=NOTA_CAMPO[col];let nota=null;
   if(notaCampo){nota=d[notaCampo]??"";delete d[notaCampo]}
   if(merge){const {data:cur}=await SB.from(TABELAS[col]).select("dados").eq("id",id).maybeSingle();Object.assign(d,{...(cur?cur.dados:{}),...d})}
-  // correção 15/11 (homologação): o nome do cliente vai para a COLUNA clientes.nome já no INSERT (os gatilhos de tarefas automáticas leem a coluna)
-  // e permanece também no jsonb, como a Ficha cadastral sempre gravou (nome, cnpj, responsavel e reservaAcumulada vivem nos dois lugares).
-  // Na atualização parcial (merge) a coluna só muda se o nome vier explicitamente no pedido — o jsonb mesclado pode estar defasado em relação à coluna.
-  let nomeCliente=null,nomeExplicito=false;if(col==="clientes"){nomeExplicito=!merge||Object.prototype.hasOwnProperty.call(doc,"nome");nomeCliente=String(d.nome??"").trim()||null;if(nomeExplicito&&!nomeCliente)throw new Error("Informe o nome do cliente")}
-  if(col==="clientes"){for(const k of FICHA_COLS){if(k!=="nome")delete d[k]}if(nomeCliente)d.nome=nomeCliente;else delete d.nome}   // demais colunas da ficha não vão para o jsonb
-  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;if(col==="clientes"&&d.cnpj)row.cnpj=d.cnpj;if(col==="clientes"&&nomeExplicito&&nomeCliente)row.nome=nomeCliente;
+  // correção 15/11 (homologação): clientes.nome é COLUNA GERADA (generated always as dados->>'nome'); o nome só pode ir no jsonb.
+  // Antes, nome era apagado do jsonb por estar em FICHA_COLS e o cliente nascia sem nome (coluna gerada nula; gatilhos de tarefas
+  // sem o nome). Agora: nome aparado fica em dados.nome (a Ficha cadastral já grava assim); nunca enviar a coluna nome (o banco recusa).
+  // Nome vazio é recusado quando vem explícito (INSERT/set) ou no merge sem nome herdado. Demais FICHA_COLS continuam fora do jsonb.
+  let nomeCliente=null;if(col==="clientes"){nomeCliente=String(d.nome??"").trim()||null;const explicito=!merge||Object.prototype.hasOwnProperty.call(doc,"nome");if(explicito&&!nomeCliente)throw new Error("Informe o nome do cliente")}
+  if(col==="clientes"){for(const k of FICHA_COLS){if(k!=="nome")delete d[k]}if(nomeCliente)d.nome=nomeCliente;else delete d.nome}
+  const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;if(col==="clientes"&&d.cnpj)row.cnpj=d.cnpj;
   const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
   if(notaCampo && !merge){
     const nid=(col==="clientes"?"cliente:":"contrato:")+id;
