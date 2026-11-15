@@ -354,8 +354,13 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     await pg.click('#np-barra-vista .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const quadro = await pg.evaluate(() => document.querySelectorAll('#view-tarefas .np-colq').length); if (quadro > 0) ok(`Quadro pela barra: ${quadro} colunas`); else falha('Quadro pela barra não abriu');
     // troca de módulo sem faixa V3.1: a vista/ação anteriores somem
-    await pg.evaluate(() => { S.tab = 'clientes'; render(); }); await pg.waitForTimeout(500);
-    const limpo = await pg.evaluate(() => ({ v: document.querySelector('#np-barra-vista').children.length, a: document.querySelector('#np-acao').children.length })); if (!limpo.v && !limpo.a) ok('ao trocar para tela sem faixa V3.1 a barra e a lateral não herdam controles do módulo anterior'); else falha('resíduo: ' + JSON.stringify(limpo));
+    // V3 (16/11): Clientes ganhou faixa V3.1 — a lateral mostra a ação DELA, nunca a do módulo anterior
+    await pg.evaluate(() => { S.tab = 'clientes'; S.sel = null; render(); }); await pg.waitForTimeout(700);
+    const cli = await pg.evaluate(() => ({ v: [...document.querySelectorAll('#np-barra-vista button')].map(b => b.textContent.trim()), a: [...document.querySelectorAll('#np-acao .np-btn')].map(b => b.textContent.trim()) }));
+    if (!cli.v.length && JSON.stringify(cli.a) === JSON.stringify(['+ Novo cliente'])) ok('Tarefas → Clientes: a lateral troca "Nova tarefa" por "+ Novo cliente" e a barra não herda Lista/Quadro'); else falha('Clientes: ' + JSON.stringify(cli));
+    // troca para tela ainda sem faixa V3.1: a vista/ação anteriores somem
+    await pg.evaluate(() => { S.tab = 'historico'; render(); }); await pg.waitForTimeout(500);
+    const limpo = await pg.evaluate(() => ({ v: document.querySelector('#np-barra-vista').children.length, a: document.querySelector('#np-acao').children.length })); if (!limpo.v && !limpo.a) ok('ao trocar para tela sem faixa V3.1 (Base de acordos) a barra e a lateral não herdam controles do módulo anterior'); else falha('resíduo: ' + JSON.stringify(limpo));
     // menu da conta: Meu perfil, Visão do cliente e Sair acionam os controles originais
     await pg.evaluate(() => { window.__sair = 0; document.querySelector('#btnSair').addEventListener('click', (e) => { e.stopImmediatePropagation(); e.preventDefault(); window.__sair++; }, true); });
     await pg.click('.np-conta'); await pg.waitForTimeout(250);
