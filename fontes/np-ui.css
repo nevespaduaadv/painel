@@ -280,6 +280,13 @@ html.np-casca-v3 .np-form .np-f-erro{margin:0;font:500 var(--np-fs-1)/1.35 var(-
 html.np-casca-v3 .np-form .np-f-aviso{margin:0;font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-att)}
 html.np-casca-v3 .np-form .np-f-geral{margin:12px 18px 0;padding:10px 12px;border:1px solid var(--np-crit);border-left-width:3px;border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.4 var(--np-ui)}
 html.np-casca-v3 .np-form .np-f-geral b{color:var(--np-crit);font-weight:500}
+/* Fase 4C.2 · campo checkbox (rótulo ao lado, alvo de 44px) e aviso de gravação parcial (âmbar: o principal foi salvo, o secundário não) */
+html.np-casca-v3 .np-form .np-f-check .np-f-check-l{display:flex;align-items:center;gap:10px;min-height:40px}
+html.np-casca-v3 .np-form .np-f-check input[type=checkbox]{width:20px;height:20px;min-height:0;margin:0;flex:none;accent-color:var(--np-ink)}
+html.np-casca-v3 .np-form .np-f-check label{cursor:pointer;min-height:44px;display:flex;align-items:center}
+html.np-casca-v3 .np-form .np-f-geral.np-f-parcial{border-color:var(--np-att)}html.np-casca-v3 .np-form .np-f-geral.np-f-parcial b{color:var(--np-att)}html.np-casca-v3 .np-form .np-f-geral.np-f-parcial p{margin:4px 0 0}
+html.np-casca-v3 .np-form .np-f .help .btn{margin-top:6px;min-height:36px}
+html.np-casca-v3 .np-form .np-f[hidden]{display:none}
 html.np-casca-v3 .np-form .np-f-geral ul{margin:6px 0 0;padding-left:18px}
 html.np-casca-v3 .np-form .np-f-geral a{color:var(--np-text)}
 html.np-casca-v3 .np-form .np-f-geral details{margin-top:6px;font-size:var(--np-fs-1);color:var(--np-text-3)}html.np-casca-v3 .np-form .np-f-geral code{word-break:break-word}

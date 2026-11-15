@@ -31,19 +31,62 @@ const selColab=v=>sel({"":"—",...Object.fromEntries((A.colab||[]).filter(c=>c.
 /* ---------- 1) status do ciclo ---------- */
 function etapaAtual(ac){if(!ac||!ac.onb_feita)return"onb";if(!ac.r1_feita)return"r1";if(!ac.r2_feita)return"r2";if(!ac.r3_feita)return"r3";return"mensal"}
 function formCiclo(c,ac){
+  if(acompV3()&&window.NPUI?.form){formCicloV3(c,ac);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   ac=ac||{};const onb=inp("date",ac.onb_data||c.data_onboarding||""),r1=inp("date",ac.r1_data||""),r2=inp("date",ac.r2_data||""),r3=inp("date",ac.r3_data||""),prox=inp("date",ac.proxima_reuniao||""),fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
   const fO=check("Onboarding realizado",!!ac.onb_feita),f1=check("R1 realizada",!!ac.r1_feita),f2=check("R2 realizada",!!ac.r2_feita),f3=check("R3 realizada",!!ac.r3_feita);
   const sugerir=el("button",{class:"btn sm",type:"button",onclick:()=>{if(!onb.value){toast("Informe a data do onboarding");return}r1.value=addDias(onb.value,15);r2.value=addDias(onb.value,30);r3.value=addDias(onb.value,45);toast("R1/R2/R3 sugeridas a cada 15 dias")}},"Sugerir R1/R2/R3 (15 em 15 dias)");
   const body=el("div",{class:"form"},field("ac-onb","Onboarding (ONB)",onb),el("div",{class:"f"},el("label",{}," "),fO.wrap),field("ac-r1","R1",r1),el("div",{class:"f"},el("label",{}," "),f1.wrap),field("ac-r2","R2",r2),el("div",{class:"f"},el("label",{}," "),f2.wrap),field("ac-r3","R3",r3),el("div",{class:"f"},el("label",{}," "),f3.wrap),
     el("div",{class:"f full"},sugerir),field("ac-fase","Fase",fase),field("ac-prox","Próxima reunião",prox,"Depois do ciclo inicial: a reunião mensal."),el("div",{class:"f full"},el("label",{},"Observações"),obs));
   modal("Ciclo de acompanhamento",body,async()=>{
-    const row={cliente_id:c.id,onb_data:onb.value||null,onb_feita:fO.input.checked,r1_data:r1.value||null,r1_feita:f1.input.checked,r2_data:r2.value||null,r2_feita:f2.input.checked,r3_data:r3.value||null,r3_feita:f3.input.checked,fase:fase.value,proxima_reuniao:prox.value||null,observacoes:obs.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
-    if(row.r1_feita&&!ac.r1_feita){const st=A.cache[c.id];if(!(st?.dividas||[]).length)throw new Error("Para concluir a R1, preencha o Raio-X (ao menos uma dívida) — é o que libera Acordos.");row.acordos_liberado=true;row.acordos_liberado_em=new Date().toISOString()}
-    if(row.r3_feita&&row.fase==="ciclo")row.fase="mensal";
-    const {error}=await SB.from("acompanhamento_pj").upsert(row,{onConflict:"cliente_id"});if(error)throw new Error(error.message);
-    // espelha no cadastro (campos legados usados em outras telas)
-    await SB.from("clientes").update({data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null}).eq("id",c.id).then(()=>{});
-    toast("Ciclo atualizado");invalidar(c.id);window.PP_PROTECAO?.invalidar?.(c.id)});
+    await salvarCiclo(c.id,ac,{onb_data:onb.value,onb_feita:fO.input.checked,r1_data:r1.value,r1_feita:f1.input.checked,r2_data:r2.value,r2_feita:f2.input.checked,r3_data:r3.value,r3_feita:f3.input.checked,fase:fase.value,proxima_reuniao:prox.value,observacoes:obs.value});
+    toast("Ciclo atualizado")});
+}
+/* persistência do ciclo — compartilhada pela V2 (formCiclo) e pela V3.1 (formCicloV3). Mesmo payload de sempre (UPSERT por cliente_id), mesmas regras:
+   R1 concluída exige ≥ 1 dívida no Raio-X e libera Acordos; R3 concluída na fase "ciclo" passa a "mensal"; espelho legado em clientes (data_onboarding/proxima_reuniao).
+   confirmar (V3.1): exige a linha devolvida com o cliente_id do formulário; o Raio-X é conferido com dado fresco quando o cache não está pronto (indisponível ≠ vazio);
+   o espelho em clientes que falhar vira {espelhoErro} para aviso de gravação parcial. Na V2 o espelho continua sendo ignorado, como sempre. */
+const MSG_R1_SEM_RAIOX="Para concluir a R1, preencha o Raio-X (ao menos uma dívida) — é o que libera Acordos.";
+async function dividasParaR1(cid,{confirmar}){const st=A.cache[cid];if(!confirmar)return st?.dividas||[]; /* V2: comportamento de sempre (cache; ausente = vazio) */
+  if(st?.ok&&!st.erro&&Array.isArray(st.dividas))return st.dividas;
+  const {data,error}=await SB.from("dividas_raio_x").select("id").eq("cliente_id",cid);
+  if(error)throw npErro("Não foi possível conferir o Raio-X (as dívidas deste cliente estão indisponíveis no momento). Feche, recarregue o acompanhamento e tente de novo. Nada foi gravado.","NP_RAIOX_INDISPONIVEL");
+  return data||[]}
+async function salvarCiclo(cid,ac,v,{confirmar=false}={}){
+  ac=ac||{};const row={cliente_id:cid,onb_data:v.onb_data||null,onb_feita:!!v.onb_feita,r1_data:v.r1_data||null,r1_feita:!!v.r1_feita,r2_data:v.r2_data||null,r2_feita:!!v.r2_feita,r3_data:v.r3_data||null,r3_feita:!!v.r3_feita,fase:v.fase,proxima_reuniao:v.proxima_reuniao||null,observacoes:String(v.observacoes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
+  if(row.r1_feita&&!ac.r1_feita){const ds=await dividasParaR1(cid,{confirmar});if(!ds.length)throw npErro(MSG_R1_SEM_RAIOX,"NP_R1_SEM_RAIOX");row.acordos_liberado=true;row.acordos_liberado_em=new Date().toISOString()}
+  if(row.r3_feita&&row.fase==="ciclo")row.fase="mensal";
+  let q=SB.from("acompanhamento_pj").upsert(row,{onConflict:"cliente_id"});if(confirmar)q=q.select("cliente_id");
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar){const ls=Array.isArray(data)?data:(data?[data]:[]);if(!ls.some(l=>l&&l.cliente_id===cid))throw npErro("A gravação do ciclo não pôde ser confirmada pelo banco. Feche este formulário e confira o ciclo do cliente antes de tentar de novo.","NP_NAO_CONFIRMADA")}
+  // espelha no cadastro (campos legados usados em outras telas)
+  const esp={data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null};let espelhoErro=null;
+  if(confirmar){try{const r=await SB.from("clientes").update(esp).eq("id",cid).select("id");if(r?.error)espelhoErro=erroBD(r.error,r.status);else{const ls=Array.isArray(r.data)?r.data:(r.data?[r.data]:[]);if(!ls.some(l=>l&&l.id===cid))espelhoErro=semLinha("nenhuma linha de clientes atingida")}}catch(e){espelhoErro=e}}
+  else await SB.from("clientes").update(esp).eq("id",cid).then(()=>{});
+  invalidar(cid);window.PP_PROTECAO?.invalidar?.(cid);
+  return {row,espelhoErro}}
+/* Fase 4C.2 · Atualizar ciclo na V3.1 (NPUI.form): mesmos campos, mesmas regras, mesma persistência (salvarCiclo). Sem validações novas de ordem/datas. */
+function formCicloV3(c,ac){
+  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast("Você não tem permissão para atualizar o ciclo");return}
+  const cid=c.id,origem=document.activeElement;ac=ac||{};
+  const d=(v)=>inp("date",v||""),ck=(on)=>{const i=el("input",{type:"checkbox"});i.checked=!!on;return i};
+  const onb=d(ac.onb_data||c.data_onboarding),r1=d(ac.r1_data),r2=d(ac.r2_data),r3=d(ac.r3_data),prox=d(ac.proxima_reuniao),fO=ck(ac.onb_feita),f1=ck(ac.r1_feita),f2=ck(ac.r2_feita),f3=ck(ac.r3_feita),
+    fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
+  let f=null;const sugerir=el("button",{class:"btn sm",type:"button",onclick:()=>{if(!onb.value){f?.avisoCampo("ac-onb","Informe a data do onboarding para sugerir R1/R2/R3.");onb.focus();return}r1.value=addDias(onb.value,15);r2.value=addDias(onb.value,30);r3.value=addDias(onb.value,45);f?.avisoCampo("ac-onb",null);f?.avisoCampo("ac-r1","R1/R2/R3 sugeridas a cada 15 dias a partir do onboarding — ajuste se precisar.")}},"Sugerir R1/R2/R3 (15 em 15 dias)");
+  f=NPUI.form({titulo:"Ciclo de acompanhamento",contexto:[el("b",{},c.nome),ac.onb_data?" · onboarding em "+fmtD(ac.onb_data):" · definir as datas do ciclo"],origem,
+    campos:[{id:"ac-onb",label:"Onboarding (ONB)",el:onb,ajuda:el("div",{},"Data da reunião de onboarding. ",sugerir)},{id:"ac-onb-f",label:"Onboarding realizado",el:fO},
+      {id:"ac-r1",label:"R1",el:r1},{id:"ac-r1-f",label:"R1 realizada",el:f1,ajuda:"Concluir a R1 exige ao menos uma dívida no Raio-X — é o que libera Acordos."},
+      {id:"ac-r2",label:"R2",el:r2},{id:"ac-r2-f",label:"R2 realizada",el:f2},
+      {id:"ac-r3",label:"R3",el:r3},{id:"ac-r3-f",label:"R3 realizada",el:f3,ajuda:"Com a R3 realizada, o ciclo inicial passa automaticamente para o acompanhamento mensal."},
+      {id:"ac-fase",label:"Fase",el:fase,obrigatorio:true},{id:"ac-prox",label:"Próxima reunião",el:prox,ajuda:"Depois do ciclo inicial: a reunião mensal."},
+      {id:"ac-obs",label:"Observações",el:obs}],
+    salvar:async v=>{const r=await salvarCiclo(cid,ac,{onb_data:v["ac-onb"],onb_feita:v["ac-onb-f"],r1_data:v["ac-r1"],r1_feita:v["ac-r1-f"],r2_data:v["ac-r2"],r2_feita:v["ac-r2-f"],r3_data:v["ac-r3"],r3_feita:v["ac-r3-f"],fase:v["ac-fase"],proxima_reuniao:v["ac-prox"],observacoes:v["ac-obs"]},{confirmar:true});
+      if(r.espelhoErro){const e=r.espelhoErro,t=tipoFalha(e);const msg=t==="recusa"?"Confirmado: o ciclo foi gravado. Pendente: o espelho no cadastro do cliente (data de onboarding e próxima reunião) foi recusado pelo banco e NÃO foi atualizado. Não reenvie o ciclo — confira a ficha do cliente e ajuste lá, se precisar."
+          :t==="semLinha"?"Confirmado: o ciclo foi gravado. Pendente: o espelho no cadastro do cliente não atingiu nenhum registro (cliente não encontrado) — a ficha NÃO foi atualizada. Não reenvie o ciclo — confira o cadastro do cliente."
+          :"Confirmado: o ciclo foi gravado. Não confirmado: não foi possível saber se o espelho no cadastro do cliente (data de onboarding e próxima reunião) foi atualizado — o serviço não respondeu. Não reenvie o ciclo — confira a ficha do cliente antes de qualquer ajuste.";
+        return {parcial:{msg,detalhe:detalheFalha(e)}}}
+      toast("Ciclo atualizado")}});
+  return f;
 }
 async function criarTarefasCiclo(c,ac){
   if(!ac?.onb_data){toast("Defina a data do onboarding primeiro");return}
@@ -75,19 +118,74 @@ function cardCiclo(c,st){
 
 /* ---------- 2) Raio-X: dívidas ---------- */
 function formDivida(c,d){
+  if(acompV3()&&window.NPUI?.form){formDividaV3(c,d);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   d=d||{};const banco=inp("text",d.banco||"",{placeholder:"Ex.: Santander"}),tipo=dl("dv-tipo",d.tipo||"",["Capital de giro","Cheque especial","Conta garantida","Financiamento","Cartão","Consórcio","Antecipação de recebíveis","Crédito rural","Outro"]),valor=inp("number",d.valor??"",{step:"0.01",placeholder:"0,00"}),atraso=inp("number",d.atraso_meses??"",{min:0,placeholder:"meses (0 = em dia)"}),
     av=tri(d.avalista===true?true:d.avalista===false?false:null),avN=inp("text",d.avalista_nome||"",{placeholder:"Nome do avalista"}),avC=inp("text",d.avalista_cpf||"",{placeholder:"CPF"}),avB=tri(d.avalista_tem_bens),gar=tri(d.garantia===true?true:d.garantia===false?false:null),garD=inp("text",d.garantia_descricao||"",{placeholder:"Ex.: HB20 alienado; casa hipotecada"}),em=tri(d.contrato_em_maos),proc=tri(d.processo),obs=el("textarea",{rows:2},d.observacoes||"");
   const body=el("div",{class:"form"},field("dv-banco","Banco",banco),field("dv-tipo","Tipo de dívida",tipo.wrap),field("dv-valor","Valor (R$)",valor),field("dv-atraso","Tempo de atraso (meses)",atraso),
     field("dv-av","Tem avalista?",av),field("dv-avn","Avalista",avN),field("dv-avc","CPF do avalista",avC),field("dv-avb","Avalista tem bens?",avB,"Se sim, o sistema abre uma linha em Bens (titular avalista) para você detalhar."),
     field("dv-gar","Tem garantia?",gar),field("dv-gard","Qual garantia",garD),field("dv-em","Contrato em mãos?",em),field("dv-proc","Tem processo?",proc),el("div",{class:"f full"},el("label",{},"Observações"),obs));
-  const extra=d.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta dívida do Raio-X?"))return;await SB.from("dividas_raio_x").delete().eq("id",d.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
+  const extra=d.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta dívida do Raio-X?"))return;await excluirDivida(c.id,d.id);$("#modalHost").replaceChildren();toast("Excluída")}},"Excluir"):null;
   modal(d.id?"Editar dívida":"Incluir dívida",body,async()=>{
     if(!banco.value.trim())throw new Error("Informe o banco");
-    const row={cliente_id:c.id,banco:banco.value.trim(),tipo:tipo.input.value.trim()||null,valor:valor.value===""?null:+valor.value,atraso_meses:atraso.value===""?null:+atraso.value,avalista:triVal(av)===true,avalista_nome:avN.value.trim()||null,avalista_cpf:avC.value.trim()||null,avalista_tem_bens:triVal(avB),garantia:triVal(gar)===true,garantia_descricao:garD.value.trim()||null,contrato_em_maos:triVal(em),processo:triVal(proc),observacoes:obs.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
-    const q=d.id?SB.from("dividas_raio_x").update(row).eq("id",d.id):SB.from("dividas_raio_x").insert({...row,created_by:PP.perfil?.id||null});const {error}=await q;if(error)throw new Error(error.message);
-    if(row.avalista_tem_bens===true&&row.avalista_nome&&!(d.avalista_tem_bens===true)){const {data:ex}=await SB.from("bens").select("id").eq("cliente_id",c.id).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);
-      if(!(ex||[]).length){await SB.from("bens").insert({cliente_id:c.id,tipo:"outro",descricao:"Bens do avalista "+row.avalista_nome+" — detalhar",titular:"avalista",protecao:"exposto",observacoes:"Criado automaticamente pelo Raio-X (dívida "+row.banco+"). Substitua pela descrição real do bem."});window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(c.id)}}
-    toast("Salvo");invalidar(c.id)},extra);
+    await salvarDivida(c.id,d,{banco:banco.value,tipo:tipo.input.value,valor:valor.value,atraso_meses:atraso.value,avalista:av.value,avalista_nome:avN.value,avalista_cpf:avC.value,avalista_tem_bens:avB.value,garantia:gar.value,garantia_descricao:garD.value,contrato_em_maos:em.value,processo:proc.value,observacoes:obs.value});
+    toast("Salvo")},extra);
+}
+/* persistência da dívida — compartilhada pela V2 (formDivida) e pela V3.1 (formDividaV3). Mesmo payload de sempre (INSERT com created_by / UPDATE por id);
+   mesma regra dos bens do avalista ("tem bens" = Sim com nome, antes não era Sim → cria "Bens do avalista … — detalhar" se ainda não existir).
+   confirmar (V3.1): UPDATE/DELETE também filtram por cliente_id e exigem a linha devolvida (id + cliente_id); INSERT exige id válido + cliente_id;
+   falha no cadastro secundário do bem vira {bemErro} para aviso de gravação parcial (a dívida não é reenviada). Na V2 tudo segue como antes. */
+const triDe=s=>s==="sim"||s===true?true:s==="nao"||s===false?false:null;
+function linhaDivida(cid,v){const t=x=>String(x??"").trim();return {cliente_id:cid,banco:t(v.banco),tipo:t(v.tipo)||null,valor:t(v.valor)===""?null:+v.valor,atraso_meses:t(v.atraso_meses)===""?null:+v.atraso_meses,avalista:triDe(v.avalista)===true,avalista_nome:t(v.avalista_nome)||null,avalista_cpf:t(v.avalista_cpf)||null,avalista_tem_bens:triDe(v.avalista_tem_bens),garantia:triDe(v.garantia)===true,garantia_descricao:t(v.garantia_descricao)||null,contrato_em_maos:triDe(v.contrato_em_maos),processo:triDe(v.processo),observacoes:t(v.observacoes)||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null}}
+async function salvarDivida(cid,d,v,{confirmar=false}={}){
+  d=d||{};const row=linhaDivida(cid,v);const did=d.id||null;
+  let q=did?SB.from("dividas_raio_x").update(row).eq("id",did):SB.from("dividas_raio_x").insert({...row,created_by:PP.perfil?.id||null});
+  if(confirmar){if(did)q=q.eq("cliente_id",cid);q=q.select("id,cliente_id")}
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar)confirmarLinha(data,did,cid,"alterado","dívida");
+  let bemErro=null;
+  if(row.avalista_tem_bens===true&&row.avalista_nome&&!(d.avalista_tem_bens===true)){
+    const bem={cliente_id:cid,tipo:"outro",descricao:"Bens do avalista "+row.avalista_nome+" — detalhar",titular:"avalista",protecao:"exposto",observacoes:"Criado automaticamente pelo Raio-X (dívida "+row.banco+"). Substitua pela descrição real do bem."};
+    if(confirmar){let etapa="consulta";try{const sel=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);if(sel.error)throw erroBD(sel.error,sel.status);
+        if(!(sel.data||[]).length){etapa="inclusao";const ins=await SB.from("bens").insert(bem).select("id,cliente_id");if(ins.error)throw erroBD(ins.error,ins.status);const ls=Array.isArray(ins.data)?ins.data:(ins.data?[ins.data]:[]);if(!ls.some(l=>l&&l.id&&l.cliente_id===cid))throw semLinha("inclusão do bem sem linha devolvida");window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}catch(e){e.etapa=etapa;bemErro=e}}
+    else{const {data:ex}=await SB.from("bens").select("id").eq("cliente_id",cid).eq("titular","avalista").ilike("descricao","%"+row.avalista_nome+"%").limit(1);
+      if(!(ex||[]).length){await SB.from("bens").insert(bem);window.PP_FICHA?.recarregar?.();window.PP_PROTECAO?.invalidar?.(cid)}}}
+  invalidar(cid);return {row,bemErro}}
+async function excluirDivida(cid,did,{confirmar=false}={}){
+  let q=SB.from("dividas_raio_x").delete().eq("id",did);if(confirmar)q=q.eq("cliente_id",cid).select("id,cliente_id");
+  const {data,error,status}=await q;if(confirmar){if(error)throw erroBD(error,status);confirmarLinha(data,did,cid,"excluído","dívida")}
+  invalidar(cid)}
+/* Fase 4C.2 · Incluir/Editar dívida na V3.1 (NPUI.form): mesmos campos, valores e payload. Campos de avalista/garantia aparecem quando a resposta é "Sim"
+   OU quando já têm valor (dado antigo nunca some nem é zerado: continua no formulário e no payload, como na V2). */
+function formDividaV3(c,d){
+  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast("Você não tem permissão para editar o Raio-X");return}
+  d=d||{};const cid=c.id,did=d.id||null,origem=document.activeElement;
+  const TIPOS=["Capital de giro","Cheque especial","Conta garantida","Financiamento","Cartão","Consórcio","Antecipação de recebíveis","Crédito rural","Outro"];
+  const banco=inp("text",d.banco||"",{placeholder:"Ex.: Santander",autocomplete:"off"}),tipo=inp("text",d.tipo||"",{list:"dv3-tipo-dl",placeholder:"Ex.: Capital de giro",autocomplete:"off"}),lista=el("datalist",{id:"dv3-tipo-dl"},TIPOS.map(o=>el("option",{value:o}))),
+    valor=inp("number",d.valor??"",{step:"0.01",min:"0",placeholder:"0,00",inputmode:"decimal"}),atraso=inp("number",d.atraso_meses??"",{min:"0",step:"1",placeholder:"meses (0 = em dia)",inputmode:"numeric"}),
+    av=tri(d.avalista===true?true:d.avalista===false?false:null),avN=inp("text",d.avalista_nome||"",{placeholder:"Nome do avalista",autocomplete:"off"}),avC=inp("text",d.avalista_cpf||"",{placeholder:"CPF",autocomplete:"off"}),avB=tri(d.avalista_tem_bens),
+    gar=tri(d.garantia===true?true:d.garantia===false?false:null),garD=inp("text",d.garantia_descricao||"",{placeholder:"Ex.: HB20 alienado; casa hipotecada",autocomplete:"off"}),em=tri(d.contrato_em_maos),proc=tri(d.processo),obs=el("textarea",{rows:2},d.observacoes||"");
+  const f=NPUI.form({titulo:did?"Editar dívida":"Incluir dívida",contexto:[el("b",{},c.nome),did?" · "+(d.banco||"dívida")+(d.tipo?" · "+d.tipo:""):" · nova dívida do Raio-X"],origem,
+    campos:[{id:"dv-banco",label:"Banco",el:banco,obrigatorio:true},{id:"dv-tipo",label:"Tipo de dívida",el:tipo,ajuda:el("span",{},"Capital de giro, cheque especial, conta garantida, financiamento, cartão… ",lista)},
+      {id:"dv-valor",label:"Valor (R$)",el:valor},{id:"dv-atraso",label:"Tempo de atraso (meses)",el:atraso,ajuda:"0 = em dia."},
+      {id:"dv-av",label:"Tem avalista?",el:av},{id:"dv-avn",label:"Avalista",el:avN,condicional:true},{id:"dv-avc",label:"CPF do avalista",el:avC,condicional:true},{id:"dv-avb",label:"Avalista tem bens?",el:avB,condicional:true,ajuda:"Se sim, o sistema abre uma linha em Bens (titular avalista) para você detalhar."},
+      {id:"dv-gar",label:"Tem garantia?",el:gar},{id:"dv-gard",label:"Qual garantia",el:garD,condicional:true},
+      {id:"dv-em",label:"Contrato em mãos?",el:em},{id:"dv-proc",label:"Tem processo?",el:proc},{id:"dv-obs",label:"Observações",el:obs}],
+    salvar:async v=>{const r=await salvarDivida(cid,d,{banco:v["dv-banco"],tipo:v["dv-tipo"],valor:v["dv-valor"],atraso_meses:v["dv-atraso"],avalista:v["dv-av"],avalista_nome:v["dv-avn"],avalista_cpf:v["dv-avc"],avalista_tem_bens:v["dv-avb"],garantia:v["dv-gar"],garantia_descricao:v["dv-gard"],contrato_em_maos:v["dv-em"],processo:v["dv-proc"],observacoes:v["dv-obs"]},{confirmar:true});
+      if(r.bemErro){const e=r.bemErro,t=tipoFalha(e);const base="Confirmado: a dívida foi gravada. ";
+        const msg=e.etapa==="consulta"?(t==="desconhecido"?base+"Não confirmado: não foi possível verificar se o avalista já tem bens cadastrados (o serviço não respondeu); por isso nenhum bem foi criado automaticamente. Não reenvie a dívida — confira em Bens (titular avalista)."
+            :base+"Pendente: a verificação dos bens do avalista foi recusada pelo banco; nenhum bem foi criado automaticamente. Não reenvie a dívida — se for o caso, cadastre o bem em Bens (titular avalista).")
+          :t==="recusa"?base+"Pendente: o registro automático dos bens do avalista foi recusado pelo banco e NÃO foi criado. Não reenvie a dívida — se for o caso, cadastre o bem em Bens (titular avalista)."
+          :t==="semLinha"?base+"Não confirmado: o banco respondeu sem confirmar o registro automático dos bens do avalista. Não reenvie a dívida — confira em Bens (titular avalista) antes de cadastrar à mão."
+          :base+"Não confirmado: não foi possível saber se o registro automático dos bens do avalista foi criado — o serviço não respondeu. Não reenvie a dívida — confira em Bens (titular avalista) antes de cadastrar à mão.";
+        return {parcial:{msg,detalhe:detalheFalha(e)}}}
+      toast(did?"Dívida atualizada":"Dívida incluída no Raio-X")},
+    excluir:did?{rotulo:"Excluir",confirmar:`Excluir a dívida ${d.banco||""}${d.tipo?" ("+d.tipo+")":""} de ${c.nome} do Raio-X? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirDivida(cid,did,{confirmar:true});toast("Dívida excluída")}}:null});
+  if(!f)return null;
+  // condicionais sem perda: visíveis com "Sim" OU quando já há valor gravado/digitado; ocultar nunca apaga o valor (NPUI.form.mostrar)
+  const cond=()=>{const temAv=av.value==="sim";f.mostrar("dv-avn",temAv||!!avN.value.trim());f.mostrar("dv-avc",temAv||!!avC.value.trim());f.mostrar("dv-avb",temAv||avB.value!=="");f.mostrar("dv-gard",gar.value==="sim"||!!garD.value.trim())};
+  av.addEventListener("change",cond);gar.addEventListener("change",cond);cond();
+  return f;
 }
 function cardDividas(c,st){
   const edita=podeEditar();const ds=st.dividas;const total=ds.reduce((s,d)=>s+(+d.valor||0),0);const atras=ds.filter(d=>(d.atraso_meses||0)>0).length;
@@ -114,10 +212,22 @@ const erroBD=(error,status)=>{const e=new Error(error.message);e.code=error.code
    Duas situações distintas: (a) 0 linhas em UPDATE/DELETE = comprovadamente nada feito (o banco respondeu e nenhuma linha casou);
    (b) resposta presente mas sem id/cliente ou divergente = resultado NÃO confirmado — a operação pode ter ocorrido; orienta conferir. */
 const npErro=(msg,code)=>{const e=new Error(msg);e.code=code;return e};
-const confirmarLinha=(data,aid,cid,oque)=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
-  if(aid){if(!ls.length)throw npErro(`A ata não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
-    if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ata selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
-  if(!ls.some(l=>l&&idOk(l.id)&&l.cliente_id===cid))throw npErro("A inclusão não pôde ser confirmada pelo banco. Feche este formulário e confira se a ata já aparece na lista antes de tentar de novo.","NP_NAO_CONFIRMADA")};
+/* Operações SECUNDÁRIAS (espelho em clientes, bens do avalista) — o que se pode afirmar depende do tipo de falha:
+   recusa      = o banco respondeu recusando (4xx/código PostgREST): a operação comprovadamente NÃO aconteceu;
+   semLinha    = o banco respondeu sem nenhuma linha atingida/devolvida: nada foi gravado (ou não dá para confirmar, no INSERT);
+   desconhecido = 5xx, timeout, conexão abortada, sem resposta: a operação PODE ter acontecido — nunca afirmar que não aconteceu. */
+const RECUSAS_BD=new Set(["23505","23503","23514","42501","PGRST301","PGRST116","22007","22P02","42P01","PGRST204","PGRST100","PGRST102"]);
+function tipoFalha(e){if(!e)return "desconhecido";const code=String(e.code||""),st=Number(e.status||0),m=String(e.message||e);
+  if(code==="NP_SEM_LINHA")return "semLinha";
+  if(st>=500||/^5\d\d$/.test(code)||/upstream|unavailable|indispon|gateway|timeout|timed out|overloaded|too many|Failed to fetch|NetworkError|network|ECONN|offline|aborted/i.test(m))return "desconhecido";
+  if(RECUSAS_BD.has(code)||(st>=400&&st<500)||/^(2[0-9A-Z]{4}|4[0-9A-Z]{4}|PGRST\d+)$/.test(code))return "recusa";
+  return "desconhecido"}
+const detalheFalha=e=>[e?.status?"HTTP "+e.status:null,e?.code&&!/^NP_/.test(e.code)?"código "+e.code:null,e?.message].filter(Boolean).join(" · ");
+const semLinha=(oque)=>npErro(oque,"NP_SEM_LINHA");
+const confirmarLinha=(data,aid,cid,oque,nome="ata")=>{const ls=Array.isArray(data)?data:(data?[data]:[]);const idOk=v=>typeof v==="string"&&v.trim().length>0;
+  if(aid){if(!ls.length)throw npErro(`A ${nome} não foi encontrada — pode ter sido excluída ou alterada por outra pessoa. Nada foi ${oque}.`,"NP_NAO_ENCONTRADA");
+    if(!ls.some(l=>l&&l.id===aid&&l.cliente_id===cid))throw npErro(`O banco respondeu sem confirmar a ${nome} selecionada (identificação ausente ou divergente). Feche este formulário e confira o registro na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA");return}
+  if(!ls.some(l=>l&&idOk(l.id)&&l.cliente_id===cid))throw npErro(`A inclusão não pôde ser confirmada pelo banco. Feche este formulário e confira se a ${nome} já aparece na lista antes de tentar de novo.`,"NP_NAO_CONFIRMADA")};
 async function salvarAta(cid,aid,v,{preservarAutor=false,confirmar=false}={}){
   const row={cliente_id:cid,tipo:v.tipo,data:v.data||hojeISO(),titulo:(v.titulo||"").trim()||null,resumo:(v.resumo||"").trim()||null,link_pasta:(v.link_pasta||"").trim()||null,link_gravacao:(v.link_gravacao||"").trim()||null,participantes:(v.participantes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
   if(!aid||!preservarAutor)row.autor_id=meuColab()?.id||null;
@@ -147,6 +257,12 @@ function formAta(c,a){
 const URL_OK=/^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 function normalizarLink(v){v=String(v||"").trim();if(!v)return "";if(/^[a-z]:\\|^\\\\/i.test(v))return v; /* caminho local: fica como está para a validação reprovar */ if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)&&/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(v))return "https://"+v;return v}
 function validarLink(v){const n=normalizarLink(v);if(!n)return null;if(/^[a-z]:\\|^\\\\/i.test(n))return "Use o link do Drive, não o caminho da pasta no computador.";if(!URL_OK.test(n))return "Informe um link válido (começando com https://).";return null}
+/* Fase 4C.2 (decisão 14/11): o link da PASTA GERAL do cliente (c.pasta_drive_url) vem pré-preenchido, mas não conta como conteúdo da ata.
+   Comparação segura: só ignora esquema/host em maiúsculas, barra final, fragmento (#…) e os parâmetros de compartilhamento do Drive (usp=…);
+   caminhos ou identificadores diferentes NUNCA são tratados como a mesma pasta. */
+function chaveLink(v){const n=normalizarLink(v);if(!n||!URL_OK.test(n))return n.toLowerCase();try{const u=new URL(n);const q=[...u.searchParams.entries()].filter(([k])=>k!=="usp").map(([k,x])=>k+"="+x).join("&");return u.protocol.toLowerCase()+"//"+u.host.toLowerCase()+u.pathname.replace(/\/+$/,"")+(q?"?"+q:"")}catch(_){return n.toLowerCase()}}
+const mesmoLink=(a,b)=>{const ka=chaveLink(a),kb=chaveLink(b);return !!ka&&!!kb&&ka===kb};
+const MSG_ATA_SEM_CONTEUDO="Escreva a ata ou informe o link do documento da ata ou da gravação. O link da pasta geral do cliente não substitui o conteúdo.";
 function formAtaV3(c,a){
   let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
   if(!pode){toast("Você não tem permissão para registrar atas");return}
@@ -156,10 +272,13 @@ function formAtaV3(c,a){
   const futura=v=>{if(!v)return null;return v>hojeISO()?{aviso:"Data no futuro — confira antes de salvar."}:null};
   const f=NPUI.form({titulo:aid?"Editar ata":"Registrar ata",contexto:[el("b",{},c.nome),aid?" · ata de "+fmtD(a.data)+" ("+(TIPO_ATA[a.tipo]||a.tipo)+")":" · nova ata do acompanhamento"],origem,
     campos:[{id:"ata-tipo",label:"Reunião",el:tipo,obrigatorio:true},{id:"ata-data",label:"Data",el:data,obrigatorio:true,validar:futura},{id:"ata-tit",label:"Título",el:tit},{id:"ata-part",label:"Participantes",el:part},
-      {id:"ata-res",label:"Ata / resumo",el:res,condicional:true,ajuda:"Obrigatório quando não houver link da pasta nem da gravação."},
-      {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:"A gravação e a transcrição ficam no Drive; aqui vai o link para quem precisar.",validar:validarLink},
+      {id:"ata-res",label:"Ata / resumo",el:res,condicional:true,ajuda:"Obrigatório quando não houver link do documento da ata nem da gravação."},
+      {id:"ata-lp",label:"Link da pasta",el:lp,condicional:true,ajuda:c.pasta_drive_url?"Vem preenchido com a pasta geral do cliente. Para registrar a ata por um documento externo, cole o link do documento da ata.":"A gravação e a transcrição ficam no Drive; aqui vai o link do documento da ata para quem precisar.",validar:validarLink},
       {id:"ata-lg",label:"Link da gravação",el:lg,condicional:true,validar:validarLink}],
-    validarTudo:v=>(!String(v["ata-res"]||"").trim()&&!String(v["ata-lp"]||"").trim()&&!String(v["ata-lg"]||"").trim())?[{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}]:[],
+    /* regra (14/11): resumo OU gravação OU link_pasta que não seja a pasta geral do cliente */
+    validarTudo:v=>{const res=String(v["ata-res"]||"").trim(),lpv=String(v["ata-lp"]||"").trim(),lgv=String(v["ata-lg"]||"").trim();if(res||lgv)return [];
+      if(!lpv)return [{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}];
+      if(c.pasta_drive_url&&mesmoLink(lpv,c.pasta_drive_url))return [{campo:"ata-res",msg:MSG_ATA_SEM_CONTEUDO}];return []},
     salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true,confirmar:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
     excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
   return f;
@@ -335,7 +454,7 @@ function secoesA3(c){
   const passos=ETAPAS_PT.map(([k,label])=>{const d=k==="mensal"?diaISO(a?.proxima_reuniao):diaISO(a?.[k+"_data"]);const feita=k==="mensal"?(a?.fase==="mensal"||a?.fase==="encerrado"):!!a?.[k+"_feita"];return {label:k==="onb"?"Onboarding":label,data:d?fmtD(d):"—",feita,atual:a?a.etapa_atual===k:k==="onb"}});
   const secCiclo=NPUI.secao("Ciclo de acompanhamento",NPUI.ciclo(passos),a?.observacoes?el("div",{style:"margin-top:8px;white-space:pre-wrap;font-size:var(--np-fs-2)"},a.observacoes):null,!a?el("div",{class:"np-sem",style:"margin-top:8px"},"Defina a data do onboarding para começar."):null);
   const ds=st?.ok?st.dividas:null;
-  const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"}],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
+  const secRaio=NPUI.secao("Raio-X · dívidas",ds?NPUI.tabela([{k:"banco",label:"Banco"},{k:"tipo",label:"Tipo"},{k:"valor",label:"Valor",num:true,render:d=>d.valor!=null?BRL(+d.valor):null},{k:"atraso",label:"Atraso",render:d=>d.atraso_meses==null?null:d.atraso_meses===0?"em dia":d.atraso_meses+" m"},{k:"avalista",label:"Avalista",render:d=>d.avalista?(d.avalista_nome||"sim"):"não"},{k:"garantia",label:"Garantia",render:d=>d.garantia?(d.garantia_descricao||"sim"):"não"},...(edita?[{k:"acoes",label:"",render:d=>el("button",{type:"button",class:"lnk",onclick:()=>formDivida(c,d)},"editar")}]:[])],ds,{vazio:"Nenhuma dívida mapeada ainda (preenchida na R1; é o que libera Acordos).",label:"Dívidas do Raio-X"}):NPUI.carregando(2),
     ds&&ds.length?el("div",{class:"np-rodape",style:"padding:6px 0 0"},`${ds.length} dívida${ds.length===1?"":"s"} · ${BRL(ds.reduce((s,d)=>s+(+d.valor||0),0))} · ${ds.filter(d=>(d.atraso_meses||0)>0).length} em atraso`):null);
   const pend=(r?.pend||[]).slice().sort((x,y)=>(x.prazo||"9999").localeCompare(y.prazo||"9999"));
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
