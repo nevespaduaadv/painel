@@ -334,6 +334,48 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     if (okIso) ok('np-casca=v3 do principal não liga a V3.1 no beta; ligar no beta grava np-casca-beta/np-trilho-beta e não toca nas chaves do principal'); else falha('isolamento beta: ' + JSON.stringify({ prod1, beta1, rotuloCard, beta2, prod2 }));
     if (beta2.tema === 'dark' && prod2.tema === 'dark' && prod2.ls['pp-tema'] === 'dark') ok('tema continua compartilhado (pp-tema) entre beta e principal, como hoje'); else falha('tema: ' + JSON.stringify({ beta2: beta2.tema, prod2: prod2.tema }));
     await ctx.close(); }
+  // ---------- 12. V2 (15/11): barra, ação primária na lateral, menu da conta e busca como paleta ----------
+  rel.push('12. V2 — barra (vista), ação primária em tinta na lateral, menu da conta, busca como paleta');
+  { const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w: 1440, h: 900, tema: 'light' });
+    await pg.evaluate(() => { S.tab = 'tarefas'; render(); }); await pg.waitForTimeout(900);
+    const v2 = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden';
+      const acao = document.querySelector('#np-acao .np-btn.pri'); const vista = [...document.querySelectorAll('#np-barra-vista .np-seg button')].map(x => x.textContent.trim());
+      return { acao: acao && vis(acao) ? acao.textContent.trim() : null, acaoNaFaixa: !!document.querySelector('#view-tarefas .np-tb-dir .np-btn.pri'), vista, vistaNaFaixa: !!document.querySelector('#view-tarefas .np-tb-dir .np-seg'),
+        switchVis: vis(document.querySelector('header.top>.switch')), sairVis: vis(document.querySelector('#btnSair')), nomeVis: vis(document.querySelector('header.top #userName')),
+        buscaW: Math.round(document.querySelector('#busca').getBoundingClientRect().width), faixa: Math.round(document.querySelector('#view-tarefas .np-toolbar').getBoundingClientRect().height) }; });
+    if (v2.acao === 'Nova tarefa' && !v2.acaoNaFaixa && v2.vista.join('|') === 'Lista|Quadro' && !v2.vistaNaFaixa) ok('1440: "Nova tarefa" em tinta na lateral e Lista/Quadro na barra (nós movidos da faixa, sem duplicar)'); else falha('V2 lugares: ' + JSON.stringify(v2));
+    if (!v2.switchVis && !v2.sairVis && !v2.nomeVis && v2.buscaW <= 2) ok('barra sem Visão do cliente, nome, Sair e campo de busca (ficam no menu da conta e na paleta)'); else falha('V2 barra: ' + JSON.stringify(v2));
+    if (v2.faixa <= 42) ok(`faixa de ferramentas com ${v2.faixa} px em 1440 (DS: 38)`); else falha('faixa alta: ' + v2.faixa);
+    // ação primária continua funcionando (abre o mesmo formulário)
+    await pg.click('#np-acao .np-btn.pri'); await pg.waitForTimeout(500);
+    const modal = await pg.evaluate(() => !!document.querySelector('#modalHost .modal, #modalHost [role="dialog"]')); if (modal) ok('"Nova tarefa" da lateral abre o formulário'); else falha('Nova tarefa não abriu');
+    await pg.evaluate(() => document.querySelector('#modalHost').replaceChildren());
+    // Quadro pela barra
+    await pg.click('#np-barra-vista .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
+    const quadro = await pg.evaluate(() => document.querySelectorAll('#view-tarefas .np-colq').length); if (quadro > 0) ok(`Quadro pela barra: ${quadro} colunas`); else falha('Quadro pela barra não abriu');
+    // troca de módulo sem faixa V3.1: a vista/ação anteriores somem
+    await pg.evaluate(() => { S.tab = 'clientes'; render(); }); await pg.waitForTimeout(500);
+    const limpo = await pg.evaluate(() => ({ v: document.querySelector('#np-barra-vista').children.length, a: document.querySelector('#np-acao').children.length })); if (!limpo.v && !limpo.a) ok('ao trocar para tela sem faixa V3.1 a barra e a lateral não herdam controles do módulo anterior'); else falha('resíduo: ' + JSON.stringify(limpo));
+    // menu da conta: Meu perfil, Visão do cliente e Sair acionam os controles originais
+    await pg.evaluate(() => { window.__sair = 0; document.querySelector('#btnSair').addEventListener('click', (e) => { e.stopImmediatePropagation(); e.preventDefault(); window.__sair++; }, true); });
+    await pg.click('.np-conta'); await pg.waitForTimeout(250);
+    const menu = await pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(x => x.textContent.trim()));
+    await pg.click('#np-pop [role="menuitem"]:has-text("Sair")'); await pg.waitForTimeout(200);
+    const sair = await pg.evaluate(() => window.__sair);
+    if (menu.join('|') === 'Meu perfil|Ver como o cliente|Sair' && sair === 1) ok('menu da conta: Meu perfil · Ver como o cliente · Sair (Sair aciona o botão original)'); else falha('menu da conta: ' + JSON.stringify({ menu, sair }));
+    // busca: "Buscar" da lateral abre a paleta; Esc fecha
+    await pg.click('.np-busca-btn'); await pg.waitForTimeout(250);
+    const pal = await pg.evaluate(() => { const r = document.querySelector('#busca').getBoundingClientRect(); return { foco: document.activeElement?.id, w: Math.round(r.width), pos: getComputedStyle(document.querySelector('#busca')).position }; });
+    await pg.keyboard.press('Escape'); await pg.waitForTimeout(250);
+    const fechou = await pg.evaluate(() => document.activeElement?.id !== 'buscaGlobal' && document.querySelector('#busca').getBoundingClientRect().width <= 2);
+    if (pal.foco === 'buscaGlobal' && pal.pos === 'fixed' && pal.w >= 500 && fechou) ok(`"Buscar" abre a paleta (${pal.w} px, fixa) e Esc fecha`); else falha('paleta: ' + JSON.stringify({ pal, fechou }));
+    if (!erros.length) ok('V2: sem erros de página'); else falha('erros V2: ' + erros.join(' | '));
+    await ctx.close(); }
+  { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3', w: 375, h: 812, tema: 'light' });
+    await pg.evaluate(() => { S.tab = 'tarefas'; render(); }); await pg.waitForTimeout(900);
+    const m = await pg.evaluate(() => ({ faixa: !!document.querySelector('#view-tarefas .np-tb-dir .np-btn.pri'), seg: !!document.querySelector('#view-tarefas .np-tb-dir .np-seg'), lateral: document.querySelector('#np-acao').children.length, titulo: (() => { const a = document.querySelector('#brandArea'); return a.scrollWidth <= a.clientWidth + 1; })() }));
+    if (m.faixa && m.seg && !m.lateral && m.titulo) ok('375: ação e vista continuam na faixa (a lateral é gaveta) e o título da barra não é cortado'); else falha('375 V2: ' + JSON.stringify(m));
+    await ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + (falhas ? `\n\n${falhas} falha(s).` : '\n\nTudo certo.');
   console.log(txt); fs.writeFileSync(path.join(OUT, 'relatorio.txt'), txt); process.exit(falhas ? 1 : 0);
