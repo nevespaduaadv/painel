@@ -31,19 +31,58 @@ const selColab=v=>sel({"":"—",...Object.fromEntries((A.colab||[]).filter(c=>c.
 /* ---------- 1) status do ciclo ---------- */
 function etapaAtual(ac){if(!ac||!ac.onb_feita)return"onb";if(!ac.r1_feita)return"r1";if(!ac.r2_feita)return"r2";if(!ac.r3_feita)return"r3";return"mensal"}
 function formCiclo(c,ac){
+  if(acompV3()&&window.NPUI?.form){formCicloV3(c,ac);return} // Fase 4C.2: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
   ac=ac||{};const onb=inp("date",ac.onb_data||c.data_onboarding||""),r1=inp("date",ac.r1_data||""),r2=inp("date",ac.r2_data||""),r3=inp("date",ac.r3_data||""),prox=inp("date",ac.proxima_reuniao||""),fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
   const fO=check("Onboarding realizado",!!ac.onb_feita),f1=check("R1 realizada",!!ac.r1_feita),f2=check("R2 realizada",!!ac.r2_feita),f3=check("R3 realizada",!!ac.r3_feita);
   const sugerir=el("button",{class:"btn sm",type:"button",onclick:()=>{if(!onb.value){toast("Informe a data do onboarding");return}r1.value=addDias(onb.value,15);r2.value=addDias(onb.value,30);r3.value=addDias(onb.value,45);toast("R1/R2/R3 sugeridas a cada 15 dias")}},"Sugerir R1/R2/R3 (15 em 15 dias)");
   const body=el("div",{class:"form"},field("ac-onb","Onboarding (ONB)",onb),el("div",{class:"f"},el("label",{}," "),fO.wrap),field("ac-r1","R1",r1),el("div",{class:"f"},el("label",{}," "),f1.wrap),field("ac-r2","R2",r2),el("div",{class:"f"},el("label",{}," "),f2.wrap),field("ac-r3","R3",r3),el("div",{class:"f"},el("label",{}," "),f3.wrap),
     el("div",{class:"f full"},sugerir),field("ac-fase","Fase",fase),field("ac-prox","Próxima reunião",prox,"Depois do ciclo inicial: a reunião mensal."),el("div",{class:"f full"},el("label",{},"Observações"),obs));
   modal("Ciclo de acompanhamento",body,async()=>{
-    const row={cliente_id:c.id,onb_data:onb.value||null,onb_feita:fO.input.checked,r1_data:r1.value||null,r1_feita:f1.input.checked,r2_data:r2.value||null,r2_feita:f2.input.checked,r3_data:r3.value||null,r3_feita:f3.input.checked,fase:fase.value,proxima_reuniao:prox.value||null,observacoes:obs.value.trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
-    if(row.r1_feita&&!ac.r1_feita){const st=A.cache[c.id];if(!(st?.dividas||[]).length)throw new Error("Para concluir a R1, preencha o Raio-X (ao menos uma dívida) — é o que libera Acordos.");row.acordos_liberado=true;row.acordos_liberado_em=new Date().toISOString()}
-    if(row.r3_feita&&row.fase==="ciclo")row.fase="mensal";
-    const {error}=await SB.from("acompanhamento_pj").upsert(row,{onConflict:"cliente_id"});if(error)throw new Error(error.message);
-    // espelha no cadastro (campos legados usados em outras telas)
-    await SB.from("clientes").update({data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null}).eq("id",c.id).then(()=>{});
-    toast("Ciclo atualizado");invalidar(c.id);window.PP_PROTECAO?.invalidar?.(c.id)});
+    await salvarCiclo(c.id,ac,{onb_data:onb.value,onb_feita:fO.input.checked,r1_data:r1.value,r1_feita:f1.input.checked,r2_data:r2.value,r2_feita:f2.input.checked,r3_data:r3.value,r3_feita:f3.input.checked,fase:fase.value,proxima_reuniao:prox.value,observacoes:obs.value});
+    toast("Ciclo atualizado")});
+}
+/* persistência do ciclo — compartilhada pela V2 (formCiclo) e pela V3.1 (formCicloV3). Mesmo payload de sempre (UPSERT por cliente_id), mesmas regras:
+   R1 concluída exige ≥ 1 dívida no Raio-X e libera Acordos; R3 concluída na fase "ciclo" passa a "mensal"; espelho legado em clientes (data_onboarding/proxima_reuniao).
+   confirmar (V3.1): exige a linha devolvida com o cliente_id do formulário; o Raio-X é conferido com dado fresco quando o cache não está pronto (indisponível ≠ vazio);
+   o espelho em clientes que falhar vira {espelhoErro} para aviso de gravação parcial. Na V2 o espelho continua sendo ignorado, como sempre. */
+const MSG_R1_SEM_RAIOX="Para concluir a R1, preencha o Raio-X (ao menos uma dívida) — é o que libera Acordos.";
+async function dividasParaR1(cid,{confirmar}){const st=A.cache[cid];if(!confirmar)return st?.dividas||[]; /* V2: comportamento de sempre (cache; ausente = vazio) */
+  if(st?.ok&&!st.erro&&Array.isArray(st.dividas))return st.dividas;
+  const {data,error}=await SB.from("dividas_raio_x").select("id").eq("cliente_id",cid);
+  if(error)throw npErro("Não foi possível conferir o Raio-X (as dívidas deste cliente estão indisponíveis no momento). Feche, recarregue o acompanhamento e tente de novo. Nada foi gravado.","NP_RAIOX_INDISPONIVEL");
+  return data||[]}
+async function salvarCiclo(cid,ac,v,{confirmar=false}={}){
+  ac=ac||{};const row={cliente_id:cid,onb_data:v.onb_data||null,onb_feita:!!v.onb_feita,r1_data:v.r1_data||null,r1_feita:!!v.r1_feita,r2_data:v.r2_data||null,r2_feita:!!v.r2_feita,r3_data:v.r3_data||null,r3_feita:!!v.r3_feita,fase:v.fase,proxima_reuniao:v.proxima_reuniao||null,observacoes:String(v.observacoes||"").trim()||null,updated_at:new Date().toISOString(),updated_by:PP.perfil?.id||null};
+  if(row.r1_feita&&!ac.r1_feita){const ds=await dividasParaR1(cid,{confirmar});if(!ds.length)throw npErro(MSG_R1_SEM_RAIOX,"NP_R1_SEM_RAIOX");row.acordos_liberado=true;row.acordos_liberado_em=new Date().toISOString()}
+  if(row.r3_feita&&row.fase==="ciclo")row.fase="mensal";
+  let q=SB.from("acompanhamento_pj").upsert(row,{onConflict:"cliente_id"});if(confirmar)q=q.select("cliente_id");
+  const {data,error,status}=await q;if(error)throw erroBD(error,status);
+  if(confirmar){const ls=Array.isArray(data)?data:(data?[data]:[]);if(!ls.some(l=>l&&l.cliente_id===cid))throw npErro("A gravação do ciclo não pôde ser confirmada pelo banco. Feche este formulário e confira o ciclo do cliente antes de tentar de novo.","NP_NAO_CONFIRMADA")}
+  // espelha no cadastro (campos legados usados em outras telas)
+  const upd=SB.from("clientes").update({data_onboarding:row.onb_data,proxima_reuniao:row.proxima_reuniao||row.r1_data||null}).eq("id",cid);let espelhoErro=null;
+  if(confirmar){try{const r=await upd;if(r?.error)espelhoErro=erroBD(r.error,r.status)}catch(e){espelhoErro=e}}else await upd.then(()=>{});
+  invalidar(cid);window.PP_PROTECAO?.invalidar?.(cid);
+  return {row,espelhoErro}}
+/* Fase 4C.2 · Atualizar ciclo na V3.1 (NPUI.form): mesmos campos, mesmas regras, mesma persistência (salvarCiclo). Sem validações novas de ordem/datas. */
+function formCicloV3(c,ac){
+  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast("Você não tem permissão para atualizar o ciclo");return}
+  const cid=c.id,origem=document.activeElement;ac=ac||{};
+  const d=(v)=>inp("date",v||""),ck=(on)=>{const i=el("input",{type:"checkbox"});i.checked=!!on;return i};
+  const onb=d(ac.onb_data||c.data_onboarding),r1=d(ac.r1_data),r2=d(ac.r2_data),r3=d(ac.r3_data),prox=d(ac.proxima_reuniao),fO=ck(ac.onb_feita),f1=ck(ac.r1_feita),f2=ck(ac.r2_feita),f3=ck(ac.r3_feita),
+    fase=sel({onboarding:"Onboarding",ciclo:"Ciclo inicial (45 dias)",mensal:"Acompanhamento mensal",encerrado:"Encerrado"},ac.fase||"onboarding"),obs=el("textarea",{rows:3,placeholder:"Observações do acompanhamento (o que ficou combinado, pendências do cliente…)"},ac.observacoes||"");
+  let f=null;const sugerir=el("button",{class:"btn sm",type:"button",onclick:()=>{if(!onb.value){f?.avisoCampo("ac-onb","Informe a data do onboarding para sugerir R1/R2/R3.");onb.focus();return}r1.value=addDias(onb.value,15);r2.value=addDias(onb.value,30);r3.value=addDias(onb.value,45);f?.avisoCampo("ac-onb",null);f?.avisoCampo("ac-r1","R1/R2/R3 sugeridas a cada 15 dias a partir do onboarding — ajuste se precisar.")}},"Sugerir R1/R2/R3 (15 em 15 dias)");
+  f=NPUI.form({titulo:"Ciclo de acompanhamento",contexto:[el("b",{},c.nome),ac.onb_data?" · onboarding em "+fmtD(ac.onb_data):" · definir as datas do ciclo"],origem,
+    campos:[{id:"ac-onb",label:"Onboarding (ONB)",el:onb,ajuda:el("div",{},"Data da reunião de onboarding. ",sugerir)},{id:"ac-onb-f",label:"Onboarding realizado",el:fO},
+      {id:"ac-r1",label:"R1",el:r1},{id:"ac-r1-f",label:"R1 realizada",el:f1,ajuda:"Concluir a R1 exige ao menos uma dívida no Raio-X — é o que libera Acordos."},
+      {id:"ac-r2",label:"R2",el:r2},{id:"ac-r2-f",label:"R2 realizada",el:f2},
+      {id:"ac-r3",label:"R3",el:r3},{id:"ac-r3-f",label:"R3 realizada",el:f3,ajuda:"Com a R3 realizada, o ciclo inicial passa automaticamente para o acompanhamento mensal."},
+      {id:"ac-fase",label:"Fase",el:fase,obrigatorio:true},{id:"ac-prox",label:"Próxima reunião",el:prox,ajuda:"Depois do ciclo inicial: a reunião mensal."},
+      {id:"ac-obs",label:"Observações",el:obs}],
+    salvar:async v=>{const r=await salvarCiclo(cid,ac,{onb_data:v["ac-onb"],onb_feita:v["ac-onb-f"],r1_data:v["ac-r1"],r1_feita:v["ac-r1-f"],r2_data:v["ac-r2"],r2_feita:v["ac-r2-f"],r3_data:v["ac-r3"],r3_feita:v["ac-r3-f"],fase:v["ac-fase"],proxima_reuniao:v["ac-prox"],observacoes:v["ac-obs"]},{confirmar:true});
+      if(r.espelhoErro){const e=r.espelhoErro;return {parcial:{msg:"O ciclo foi gravado, mas o espelho no cadastro do cliente (data de onboarding e próxima reunião) não foi atualizado. Não reenvie: confira a ficha do cliente.",detalhe:[e.status?"HTTP "+e.status:null,e.code?"código "+e.code:null,e.message].filter(Boolean).join(" · ")}}}
+      toast("Ciclo atualizado")}});
+  return f;
 }
 async function criarTarefasCiclo(c,ac){
   if(!ac?.onb_data){toast("Defina a data do onboarding primeiro");return}
