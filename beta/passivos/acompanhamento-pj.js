@@ -13,6 +13,15 @@ const hojeISO=()=>new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
 const addDias=(iso,n)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const meuColab=()=>A.colab?.find(c=>c.perfil_id===PP.perfil?.id);
 const podeEditar=()=>{if(PP.perfil?.papel==="admin")return true;const m=meuColab();return !!m&&(m.frente==="estrategico"||["acompanhamento_pj","pos_vendas","socios"].includes(m.nucleo))||(PP.perfil?.acessos||[]).includes("protecao")};
+/* Atas (0107, 15/11): espelho das políticas do banco — a decisão final é da RLS; aqui só se mostra o que o banco permite.
+   criar  = podeEditar() OU núcleo Acordos ativo (Acordos entra SÓ nas atas; ciclo, Raio-X e proteção seguem com podeEditar);
+   editar/excluir = ESTÁGIO 1 do piloto: bloqueados para todos (sem policy de UPDATE/DELETE no banco) até a 0108 (vínculo ata ↔ dossiê).
+   Estágio 2 (com a 0108): trocar o padrão de atasEdicaoLiberada() para true → editar = autor OU podeEditar(); excluir = admin.
+   window.NP_FLAGS.atasEdicao existe só para os laboratórios exercitarem os fluxos de edição/exclusão antes do estágio 2 — o banco continua decidindo. */
+const atasEdicaoLiberada=()=>window.NP_FLAGS?.atasEdicao===true;
+const podeEditarAta=()=>{if(podeEditar())return true;const m=meuColab();return !!m&&m.nucleo==="acordos"&&m.ativo!==false};
+const podeAlterarAta=a=>atasEdicaoLiberada()&&!!a?.id&&(podeEditar()||(!!meuColab()&&a.autor_id===meuColab().id));
+const podeExcluirAta=()=>atasEdicaoLiberada()&&PP.perfil?.papel==="admin";
 const SN=v=>v===true?"Sim":v===false?"Não":"—";
 const check=(label,checked)=>{const i=el("input",{type:"checkbox",style:"width:16px;height:16px;flex:none;margin:0;accent-color:var(--gold)"});i.checked=!!checked;return {wrap:el("label",{style:"display:flex;gap:8px;align-items:center;font-size:14px;padding:8px 0"},i,label),input:i}};
 const dl=(id,value,opcoes)=>{const i=inp("text",value,{list:id+"-dl"});return {wrap:el("div",{},i,el("datalist",{id:id+"-dl"},opcoes.map(o=>el("option",{value:o})))),input:i}};
@@ -260,14 +269,14 @@ async function excluirAta(cid,aid,{confirmar=false}={}){
   invalidar(cid)}
 function formAta(c,a){
   if(acompV3()&&window.NPUI?.form){formAtaV3(c,a);return} // Fase 4C · PoC: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
-  a=a||{};const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
+  a=a||{};if(a.id?!podeAlterarAta(a):!podeEditarAta()){toast(a.id?"A edição de atas está bloqueada nesta etapa do piloto":"Você não tem permissão para registrar atas");return} /* 0107: mesma regra do banco */const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
   const body=el("div",{class:"form"},field("ata-tipo","Reunião",tipo),field("ata-data","Data",data),field("ata-tit","Título",tit),field("ata-part","Participantes",part),el("div",{class:"f full"},el("label",{},"Ata / resumo"),res),el("div",{class:"f full"},el("label",{},"Link da pasta"),lp,el("div",{class:"help"},"A gravação fica no Drive; aqui vai o link para quem precisar.")),el("div",{class:"f full"},el("label",{},"Link da gravação"),lg));
-  const extra=a.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta ata?"))return;await SB.from("atas_reuniao").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
+  const extra=a.id&&podeExcluirAta()?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta ata?"))return;await SB.from("atas_reuniao").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
   modal(a.id?"Editar ata":"Registrar ata",body,async()=>{
     if(!res.value.trim()&&!lp.value.trim()&&!lg.value.trim())throw new Error("Escreva a ata ou informe o link");
     // correção aprovada (15/11): na V2, como na V3.1, a pasta GERAL do cliente (pré-preenchida) não é conteúdo suficiente da ata
     if(!res.value.trim()&&!lg.value.trim()&&c.pasta_drive_url&&mesmoLink(lp.value,c.pasta_drive_url))throw new Error(MSG_ATA_SEM_CONTEUDO);
-    await salvarAta(c.id,a.id||null,{tipo:tipo.value,data:data.value,titulo:tit.value,resumo:res.value,link_pasta:lp.value,link_gravacao:lg.value,participantes:part.value});
+    await salvarAta(c.id,a.id||null,{tipo:tipo.value,data:data.value,titulo:tit.value,resumo:res.value,link_pasta:lp.value,link_gravacao:lg.value,participantes:part.value},{preservarAutor:true}); // 0107: a V2 também deixa de reenviar autor_id (o banco já o torna imutável)
     toast(a.id?"Ata atualizada":"Ata registrada no dossiê")},extra);
 }
 /* Fase 4C · Registrar ata na V3.1 (NPUI.form). Mesmos campos, mesma regra (resumo OU link), mesma persistência (salvarAta/excluirAta).
@@ -282,9 +291,9 @@ function chaveLink(v){const n=normalizarLink(v);if(!n||!URL_OK.test(n))return n.
 const mesmoLink=(a,b)=>{const ka=chaveLink(a),kb=chaveLink(b);return !!ka&&!!kb&&ka===kb};
 const MSG_ATA_SEM_CONTEUDO="Escreva a ata ou informe o link do documento da ata ou da gravação. O link da pasta geral do cliente não substitui o conteúdo.";
 function formAtaV3(c,a){
-  let pode=false;try{pode=podeEditar()===true&&!readOnly()}catch(_){pode=false}
-  if(!pode){toast("Você não tem permissão para registrar atas");return}
-  a=a||{};const cid=c.id,aid=a.id||null;const origem=document.activeElement;
+  a=a||{};let pode=false;try{pode=(a.id?podeAlterarAta(a):podeEditarAta())&&!readOnly()}catch(_){pode=false}
+  if(!pode){toast(a.id?"A edição de atas está bloqueada nesta etapa do piloto":"Você não tem permissão para registrar atas");return}
+  const cid=c.id,aid=a.id||null;const origem=document.activeElement;
   const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Ex.: R2 — verificação da reserva",autocomplete:"off"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou",autocomplete:"off"}),
     res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/…",inputmode:"url",autocomplete:"off"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação",inputmode:"url",autocomplete:"off"});
   const futura=v=>{if(!v)return null;return v>hojeISO()?{aviso:"Data no futuro — confira antes de salvar."}:null};
@@ -298,13 +307,13 @@ function formAtaV3(c,a){
       if(!lpv)return [{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}];
       if(c.pasta_drive_url&&mesmoLink(lpv,c.pasta_drive_url))return [{campo:"ata-res",msg:MSG_ATA_SEM_CONTEUDO}];return []},
     salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true,confirmar:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
-    excluir:aid?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
+    excluir:aid&&podeExcluirAta()?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
   return f;
 }
 function cardAtas(c,st){
-  const sec=el("section",{class:"card section",id:"acomp-atas"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Atas das reuniões"),el("div",{class:"note"},"Onboarding, R1, R2, R3 e mensais. Cada ata registrada entra no dossiê (frente Estratégico).")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formAta(c,null)},"+ Ata"))));
+  const sec=el("section",{class:"card section",id:"acomp-atas"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Atas das reuniões"),el("div",{class:"note"},"Onboarding, R1, R2, R3 e mensais. Cada ata registrada entra no dossiê (frente Estratégico).")),el("div",{class:"actions"},podeEditarAta()?el("button",{class:"btn sm primary",onclick:()=>formAta(c,null)},"+ Ata"):null)));
   if(!st.atas.length)sec.append(el("div",{class:"empty"},"Nenhuma ata registrada."));
-  else sec.append(el("div",{class:"tl"},st.atas.map(a=>{const autor=A.colab.find(x=>x.id===a.autor_id)?.nome;return el("div",{class:"tl-item"},el("div",{class:"tl-h"},el("span",{class:"pill c"},TIPO_ATA[a.tipo]||a.tipo),el("b",{},fmtD(a.data)),a.titulo?el("span",{},a.titulo):null,autor?el("span",{class:"note"},"· "+autor):null,el("span",{style:"margin-left:auto;display:flex;gap:6px"},a.link_pasta?el("a",{class:"btn sm",href:a.link_pasta,target:"_blank",rel:"noopener"},"Pasta"):null,a.link_gravacao?el("a",{class:"btn sm",href:a.link_gravacao,target:"_blank",rel:"noopener"},"Gravação"):null,el("button",{class:"btn sm",onclick:()=>formAta(c,a)},"Editar"))),a.resumo?el("div",{class:"tl-b"},a.resumo):null,a.participantes?el("div",{class:"note"},"Participantes: "+a.participantes):null)})));
+  else sec.append(el("div",{class:"tl"},st.atas.map(a=>{const autor=A.colab.find(x=>x.id===a.autor_id)?.nome;return el("div",{class:"tl-item"},el("div",{class:"tl-h"},el("span",{class:"pill c"},TIPO_ATA[a.tipo]||a.tipo),el("b",{},fmtD(a.data)),a.titulo?el("span",{},a.titulo):null,autor?el("span",{class:"note"},"· "+autor):null,el("span",{style:"margin-left:auto;display:flex;gap:6px"},a.link_pasta?el("a",{class:"btn sm",href:a.link_pasta,target:"_blank",rel:"noopener"},"Pasta"):null,a.link_gravacao?el("a",{class:"btn sm",href:a.link_gravacao,target:"_blank",rel:"noopener"},"Gravação"):null,podeAlterarAta(a)?el("button",{class:"btn sm",onclick:()=>formAta(c,a)},"Editar"):null)),a.resumo?el("div",{class:"tl-b"},a.resumo):null,a.participantes?el("div",{class:"note"},"Participantes: "+a.participantes):null)})));
   return sec;
 }
 
@@ -478,7 +487,7 @@ function secoesA3(c){
   const pend=(r?.pend||[]).slice().sort((x,y)=>(x.prazo||"9999").localeCompare(y.prazo||"9999"));
   const secPend=NPUI.secao("Pendências (tarefas do núcleo)",pend.length?NPUI.passos(pend.map(t=>{const p=NPUI.prazoTxt(t.prazo);const venc=t.prazo&&t.prazo<hojeISO();return {estado:venc?"crit":"",el:el("button",{type:"button",class:"lnk",style:"text-align:left",onclick:()=>{if(window.PP_TAREFAS?.abrir)PP_TAREFAS.abrir(t.id)}},t.titulo),sub:(t.prazo?p.exata+" · "+p.rel:"sem prazo")+(t.responsavel_nome?" · "+NPUI.curto(t.responsavel_nome):"")}})):el("div",{class:"np-sem"},"Nenhuma tarefa aberta do núcleo para este cliente."));
   const atas=st?.ok?st.atas:null;
-  const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[autoriaAta(x),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,edita?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
+  const secAtas=NPUI.secao("Atas",atas?(atas.length?NPUI.passos(atas.map(x=>({estado:"ok",el:el("span",{},el("b",{},TIPO_ATA[x.tipo]||x.tipo)," · ",fmtD(x.data),x.titulo?" · "+x.titulo:""),sub:[autoriaAta(x),x.link_pasta?el("a",{href:x.link_pasta,target:"_blank",rel:"noopener",style:"margin-left:8px"},"pasta"):null,x.link_gravacao?el("a",{href:x.link_gravacao,target:"_blank",rel:"noopener",style:"margin-left:8px"},"gravação"):null,podeAlterarAta(x)&&!readOnly()?el("button",{type:"button",class:"lnk",style:"margin-left:8px",onclick:()=>formAta(c,x)},"editar"):null]}))):el("div",{class:"np-sem"},"Nenhuma ata registrada.")):NPUI.carregando(2));
   /* Negociações do cliente (B2) — lidas pelo id do cliente no módulo de Negociações; cada uma só com os próprios valores (nenhuma soma global) */
   const secNeg=(()=>{const NG=window.PP_NEG;if(!NG?.podeVer||NG.podeVer()!==true)return null;const lista=NG.porCliente(cid);
     if(lista===null){const e=NG.estado?.();if(e&&!e.carregado&&!e.carregando&&!e.erro)NG.carregar?.();/* com erro não insiste: evita laço de recarga */return NPUI.secao("Negociações",e?.erro?el("div",{class:"np-sem"},"Negociações indisponíveis no momento."):NPUI.carregando(2))}
@@ -487,9 +496,10 @@ function secoesA3(c){
       abertas.length?el("div",{class:"np-vinc-l"},abertas.map(n=>NG.linhaCompacta(n))):el("div",{class:"np-sem"},"Nenhuma negociação aberta para este cliente."),
       el("div",{class:"np-rodape",style:"padding:6px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"},concl?el("span",{},`${concl} concluída${concl===1?"":"s"}`):null,nova))})();
   const trilha=[el("span",{},"Clientes"),el("span",{class:"sep"}),el("span",{},"Acompanhamento PJ")];
-  const pe=[edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
+  const editaAta=podeEditarAta()&&!readOnly();
+  const pe=[editaAta?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,a)}):null,
     (()=>{const m=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[edita?{label:"Criar tarefas do ciclo",onclick:()=>criarTarefasCiclo(c,a)}:null,edita?{label:"Incluir dívida no Raio-X…",onclick:()=>formDivida(c,null)}:null,{label:"Abrir ficha do cliente",onclick:()=>{S.tab="clientes";S.sel=c.id;S.sub="acompanhamento";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});m.setAttribute("aria-haspopup","menu");m.setAttribute("aria-expanded","false");return m})()];
-  return {props,secCiclo,secNeg,secRaio,secPend,secAtas,trilha,pe,a,edita,st,r};
+  return {props,secCiclo,secNeg,secRaio,secPend,secAtas,trilha,pe,a,edita,editaAta,st,r};
 }
 /* autoria (autor_id = colaboradores.id) e edição (updated_by = perfis.id, via colaboradores.perfil_id) — só leitura dos campos existentes */
 function autoriaAta(x){const autor=A.colab.find(k=>k.id===x.autor_id)?.nome;const partes=[];if(autor)partes.push("por "+NPUI.curto(autor));
@@ -505,7 +515,7 @@ function renderAbaV3(c,host,ind){
   const s=secoesA3(c);const edita=s.edita;
   host.append(el("div",{class:"np-v3-aba"},s.props,s.secCiclo));
   if(window.PP_FICHA?.cardRaioX)window.PP_FICHA.cardRaioX(c,host,ind);
-  const acoes=el("div",{class:"np-v3-aba-acoes"},edita?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(s.a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,s.a)}):null,
+  const acoes=el("div",{class:"np-v3-aba-acoes"},s.editaAta?NPUI.btn("Registrar ata",{variante:"pri",onclick:()=>formAta(c,null)}):null,edita?NPUI.btn(s.a?"Atualizar ciclo":"Definir datas",{onclick:()=>formCiclo(c,s.a)}):null,
     edita?NPUI.btn("Criar tarefas do ciclo",{variante:"ghost",onclick:()=>criarTarefasCiclo(c,s.a)}):null,edita?NPUI.btn("Incluir dívida no Raio-X…",{variante:"ghost",onclick:()=>formDivida(c,null)}):null,
     podeVerTransversal()?NPUI.btn("Ver na carteira",{variante:"ghost",title:"Abre este cliente na visão transversal do Acompanhamento PJ",onclick:()=>window.PP_ACOMP.abrir(c.id)}):null);
   host.append(el("div",{class:"np-v3-aba"},s.secRaio,s.secPend,s.secAtas,acoes));
