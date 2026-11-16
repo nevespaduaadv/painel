@@ -1085,6 +1085,7 @@ function renderCalib(){
 /* ---------- Formulários ---------- */
 function needDb(){if(S.db)return true;toast(S.dbStatus==="pending"?"Conectando ao banco de dados, aguarde alguns segundos…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta.");return false}
 function modal(title,body,onSave,extra){
+  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
   if(!needDb())return;
   const host=$("#modalHost");host.replaceChildren();
   const close=()=>host.replaceChildren();

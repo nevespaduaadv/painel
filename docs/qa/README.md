@@ -87,6 +87,12 @@ NODE_PATH=<módulos> node docs/qa/ficha-lab.cjs
 ```
 Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios do c1. Verifica cabeçalho (valor e marcas com as contas da Carteira), **uma única ação em tinta**, 8 abas numa linha (rolagem e ←/→), Dossiê V3.1 (régua das frentes pelo estado, linha do tempo, filtros e ações iguais aos da V2), "Editar dados da empresa", V2 intacta, nenhuma gravação, 375 px sem rolagem lateral, alvos ≥ 44 px e contraste nos dois temas.
 
+## Laboratório dos modais e formulários V3.1 (entrega visual V5)
+```
+NODE_PATH=<módulos> node docs/qa/modais-lab.cjs
+```
+Exercita o `modal()` **real** (o mesmo que os módulos chamam) com a casca V3.1 ligada e desligada. Verifica: `role=dialog`, `aria-modal`, `aria-labelledby` = título, `#app` inerte, foco inicial no primeiro campo, Tab/Shift+Tab presos, Escape/fundo/X/Cancelar fechando direto sem alteração e perguntando "Descartar as alterações?" quando a pessoa alterou algo (preenchimento por código não conta), "Continuar editando" devolvendo o foco; envio com trava (clique duplo + Enter + Escape durante o envio ⇒ `onSave` uma vez, "Salvando…", `aria-busy`); erro no próprio diálogo, sem fechar (42501 traduzido com detalhe técnico, `Error` do módulo, 503 como resultado desconhecido), nova tentativa livre e rótulo renomeado pelo módulo restaurado; compatibilidade (Salvar removido, classe no `.card`, `#modalHost` esvaziado por exclusões da V2, formulário aberto dentro do `onSave`); "Novo cliente" real com banco lento ⇒ 1 POST; V2 sem mudança; 375 px em tela cheia (campos e alvos ≥ 44 px, sem rolagem lateral) e contraste em 375/1024 px nos dois temas.
+
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
 PGLAB_HOST=<socket ou host> PGLAB_PORT=<porta> PGLAB_UID=<uuid de um perfil admin do banco local> NODE_PATH=<módulos> node docs/qa/clientes-pg-lab.cjs
