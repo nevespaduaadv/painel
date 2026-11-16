@@ -9,7 +9,7 @@ permissions:
 jobs:
   verificar:
     runs-on: ubuntu-latest
-    timeout-minutes: 25 # oito laboratórios somam ~10 min no runner; o de formulários (Fase 4C) não cabia nos 10 min
+    timeout-minutes: 35 # dez laboratórios somam ~21 min no runner (15/11: ~19 min com nove); folga para o runner lento
     env:
       TZ: America/Sao_Paulo # os laboratórios geram datas "hoje ± n" na hora local e os módulos usam UTC-3: sem isto, entre 00h e 03h UTC os dias não batem
     steps:
