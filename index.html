@@ -667,6 +667,137 @@ html.np-casca-v3 .np-form[aria-busy="true"] .np-f-salvar::after{content:"";displ
 html.np-casca-v3 .np-marca.late{color:var(--np-late)}
 html.np-casca-v3 .np-cart-total{margin-top:6px;text-align:right;font-size:var(--np-fs-2);color:var(--np-text-2)}
 html.np-casca-v3 .np-cart-total b{font:500 var(--np-fs-3)/1.2 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text)}
+/* ---------- V4 (16/11) · Ficha do cliente na V3.1 (DESIGN.md §3–5). #main.np-ficha é marcado por ficha-v3.js; com a V2 nada disto vale ---------- */
+html.np-casca-v3 #main.np-ficha{gap:14px;color:var(--np-text);font-family:var(--np-ui);min-width:0}
+html.np-casca-v3 .np-ficha>.crumbs{margin:0;font-size:var(--np-fs-2);color:var(--np-text-3);gap:6px}
+html.np-casca-v3 .np-ficha>.crumbs :is(a,button){color:var(--np-text-2);font-weight:500}
+html.np-casca-v3 .np-ficha>.crumbs .btn-voltar{appearance:none;border:0;background:none;padding:0 6px 0 0;height:28px;box-shadow:none;font:500 var(--np-fs-2)/1 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-ficha>.crumbs .btn-voltar:hover{color:var(--np-text);text-decoration:underline;background:none}
+html.np-casca-v3 .np-ficha>.crumbs .sep{color:var(--np-text-3)}
+/* cabeçalho: nome, contexto, valor (serifa) e marcas; ações à direita com UMA primária em tinta */
+html.np-casca-v3 .np-ficha>.np-ficha-cab{align-items:flex-start;gap:12px 24px;margin:0}
+html.np-casca-v3 .np-ficha-id{min-width:0;flex:1 1 360px}
+html.np-casca-v3 .np-ficha-nome{font:600 var(--np-fs-7)/1.2 var(--np-ui);letter-spacing:-.005em;color:var(--np-text);margin:0;overflow-wrap:anywhere}
+html.np-casca-v3 .np-ficha-ctx{margin:4px 0 0;font-size:var(--np-fs-2);line-height:1.45;color:var(--np-text-2)}
+html.np-casca-v3 .np-ficha-marcas{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin-top:8px}
+html.np-casca-v3 .np-ficha-val{font-size:var(--np-fs-2);color:var(--np-text-2)}
+html.np-casca-v3 .np-ficha-val b{font:400 var(--np-fs-6)/1 var(--np-display);color:var(--np-text);font-variant-numeric:tabular-nums;margin-right:2px}
+html.np-casca-v3 .np-ficha-val.vazio{color:var(--np-text-3)}
+html.np-casca-v3 .np-ficha-acoes{gap:8px;flex-wrap:wrap;align-items:center}
+/* botões da V2 dentro da ficha: secundário = folha com fio; primário = tinta; ações de seção ficam secundárias (uma primária por tela) */
+html.np-casca-v3 .np-ficha .btn{appearance:none;border:1px solid var(--np-ctrl);background:var(--np-surface);color:var(--np-text);font:500 var(--np-fs-2)/1 var(--np-ui);padding:0 12px;height:32px;border-radius:var(--np-r);box-shadow:none;filter:none;letter-spacing:0}
+html.np-casca-v3 .np-ficha .btn:hover{background:var(--np-hover);border-color:var(--np-ctrl);filter:none}
+html.np-casca-v3 .np-ficha .btn.primary{background:var(--np-ink);border-color:var(--np-ink);color:var(--np-inv);font-weight:500}
+html.np-casca-v3 .np-ficha .btn.primary:hover{background:var(--np-ink-2);filter:none}
+html.np-casca-v3 .np-ficha .section-h .btn.primary{background:var(--np-surface);border-color:var(--np-ctrl);color:var(--np-text)}
+html.np-casca-v3 .np-ficha .section-h .btn.primary:hover{background:var(--np-hover)}
+html.np-casca-v3 .np-ficha>.actions .btn[aria-pressed="true"]{background:var(--np-sel);border-color:var(--np-ink);color:var(--np-text);font-weight:600}
+html.np-casca-v3 .np-ficha .btn.danger{color:var(--np-crit)}
+html.np-casca-v3 .np-ficha a.btn{text-decoration:none}
+html.np-casca-v3 .np-ficha .btn[disabled]{opacity:.45;cursor:not-allowed}
+html.np-casca-v3 .np-ficha :is(.btn,.subtab,.btn-voltar,.lnk,a):focus-visible{outline:none;box-shadow:var(--np-focus)}
+/* abas: uma linha só; no celular rolam na horizontal com desvanecimento na ponta (sem quebrar em três linhas) */
+html.np-casca-v3 .np-ficha>.subtabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;gap:0;border-bottom:1px solid var(--np-line);margin:0}
+html.np-casca-v3 .np-ficha>.subtabs::-webkit-scrollbar{display:none}
+/* máscara: só a opacidade importa ("black" = opaco), não é cor de interface */
+html.np-casca-v3 .np-ficha>.subtabs[data-rola="ini"]{-webkit-mask-image:linear-gradient(90deg,black calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,black calc(100% - 40px),transparent)}
+html.np-casca-v3 .np-ficha>.subtabs[data-rola="meio"]{-webkit-mask-image:linear-gradient(90deg,transparent,black 40px,black calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,transparent,black 40px,black calc(100% - 40px),transparent)}
+html.np-casca-v3 .np-ficha>.subtabs[data-rola="fim"]{-webkit-mask-image:linear-gradient(90deg,transparent,black 40px);mask-image:linear-gradient(90deg,transparent,black 40px)}
+html.np-casca-v3 .np-ficha .subtab{flex:none;height:40px;padding:0 12px;margin:0 0 -1px;display:inline-flex;align-items:center;gap:6px;font:400 var(--np-fs-3)/1 var(--np-ui);color:var(--np-text-2);border:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap;background:none}
+html.np-casca-v3 .np-ficha .subtab:hover{color:var(--np-text);background:var(--np-hover)}
+html.np-casca-v3 .np-ficha .subtab[aria-selected="true"]{color:var(--np-text);font-weight:500;border-bottom-color:var(--np-ink)}
+html.np-casca-v3 .np-ficha .subtab .cnt{margin:0;font:500 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-3);font-variant-numeric:tabular-nums;background:none;padding:0}
+/* seções: folha com fio, título 13/600, sem caixa alta */
+html.np-casca-v3 .np-ficha .card{background:var(--np-surface);border:1px solid var(--np-line);border-radius:var(--np-r-lg);box-shadow:none;color:var(--np-text)}
+html.np-casca-v3 .np-ficha .card.section{padding:16px 18px;gap:12px}
+html.np-casca-v3 .np-ficha .section-h{align-items:center;gap:8px 12px}
+html.np-casca-v3 .np-ficha .card :is(h2,h3):not(.np-vazio h3,.np-sec>h3){font:600 var(--np-fs-2)/1.3 var(--np-ui);letter-spacing:.01em;color:var(--np-text);text-transform:none}
+html.np-casca-v3 .np-ficha .note{font-size:var(--np-fs-2);color:var(--np-text-3)}
+html.np-casca-v3 .np-ficha .eyebrow{font:600 var(--np-fs-2)/1.3 var(--np-ui);letter-spacing:.01em;text-transform:none;color:var(--np-text-2)}
+html.np-casca-v3 .np-ficha .empty{color:var(--np-text-3);font-size:var(--np-fs-2)}
+html.np-casca-v3 .np-ficha .kv .k{font-size:var(--np-fs-2);color:var(--np-text-3);font-weight:500}
+html.np-casca-v3 .np-ficha .kv .v{font-size:var(--np-fs-3);color:var(--np-text);font-weight:500}
+/* indicadores = resumo em serifa numa faixa só (em vez de quatro cartões) */
+html.np-casca-v3 .np-ficha .kpis{gap:1px;background:var(--np-line);border:1px solid var(--np-line);border-radius:var(--np-r-lg);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+html.np-casca-v3 .np-ficha .kpis>.kpi{border:0;border-radius:0;background:var(--np-surface);padding:12px 16px}
+html.np-casca-v3 .np-ficha .kpi .l{font:500 var(--np-fs-2)/1.3 var(--np-ui);letter-spacing:0;text-transform:none;color:var(--np-text-2)}
+html.np-casca-v3 .np-ficha .kpi .v{font:500 var(--np-fs-7)/1.15 var(--np-display);letter-spacing:0;margin-top:6px;color:var(--np-text);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-ficha .kpi .h{font-size:var(--np-fs-1);color:var(--np-text-3);margin-top:4px}
+/* pílulas da V2 viram marcas (serifa itálica; cor só semântica) */
+html.np-casca-v3 .np-ficha .pill{background:none;border:0;padding:0;border-radius:0;opacity:1;font:italic 500 var(--np-fs-2)/1.2 var(--np-display);color:var(--np-text-2);white-space:nowrap}
+html.np-casca-v3 .np-ficha .pill.e3{color:var(--np-late)}html.np-casca-v3 .np-ficha .pill.e2{color:var(--np-att)}html.np-casca-v3 .np-ficha .pill.c{color:var(--np-info)}html.np-casca-v3 .np-ficha .pill.e1{color:var(--np-ok)}html.np-casca-v3 .np-ficha .pill.g{color:var(--np-text-2)}
+/* tabelas compactas: cabeçalho sem caixa alta, número em serifa à direita */
+html.np-casca-v3 .np-ficha table{font-size:var(--np-fs-2);color:var(--np-text)}
+html.np-casca-v3 .np-ficha th{font:500 var(--np-fs-1)/1.3 var(--np-ui);letter-spacing:0;text-transform:none;color:var(--np-text-3);border-bottom:1px solid var(--np-line);padding:8px 10px}
+html.np-casca-v3 .np-ficha td{border-bottom:1px solid var(--np-line);padding:8px 10px}
+html.np-casca-v3 .np-ficha td.num{font:400 var(--np-fs-3)/1.3 var(--np-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Dossiê V3.1: régua nas frentes (estado), passos na linha do tempo */
+html.np-casca-v3 .np-dossie{display:flex;flex-direction:column;gap:16px}
+html.np-casca-v3 .np-dossie .np-sec{margin:0}
+html.np-casca-v3 .np-dossie-fix{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+html.np-casca-v3 .np-dossie-fix li{border-left:3px solid var(--np-ink);padding:1px 0 1px 10px}
+html.np-casca-v3 .np-dossie-fix p{margin:0;white-space:pre-wrap;font-size:var(--np-fs-3);line-height:1.45}
+html.np-casca-v3 .np-dossie-fix small{display:block;margin-top:2px;color:var(--np-text-3);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-dossie-frentes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--np-line);border-radius:var(--np-r-lg);overflow:hidden}
+html.np-casca-v3 .np-dossie-frente{position:relative;padding:12px 14px 8px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+html.np-casca-v3 .np-dossie-frente+.np-dossie-frente{border-left:1px solid var(--np-line)}
+html.np-casca-v3 .np-dossie-frente::before{content:"";position:absolute;left:0;top:0;bottom:0;width:0}
+html.np-casca-v3 .np-dossie-frente.r-late::before{width:2px;background:var(--np-late)}
+html.np-casca-v3 .np-dossie-frente.r-att::before{width:2px;background:var(--np-att-s)}
+html.np-casca-v3 .np-dossie-frente .cab{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0}
+html.np-casca-v3 .np-dossie-frente h3{margin:0;font:600 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-dossie-resp{height:28px;padding:0 8px;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+html.np-casca-v3 .np-dossie-frente p{margin:0}
+html.np-casca-v3 .np-dossie-frente .ult{font-size:var(--np-fs-2);color:var(--np-text-2)}
+html.np-casca-v3 .np-dossie-frente .ult .q{font:400 var(--np-fs-3)/1.2 var(--np-display);color:var(--np-text)}
+html.np-casca-v3 .np-dossie-frente .txt{font-size:var(--np-fs-2);line-height:1.45;color:var(--np-text);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+html.np-casca-v3 .np-dossie-frente .mk{display:flex;flex-wrap:wrap;gap:2px 12px}
+html.np-casca-v3 .np-dossie-frente .pe{margin-top:auto;padding-top:2px}
+html.np-casca-v3 .np-dossie-frente .pe .np-btn{padding:0 6px;margin-left:-6px}
+html.np-casca-v3 .np-dossie-linha{display:flex;flex-direction:column;gap:8px;min-width:0}
+html.np-casca-v3 .np-dossie-tlh{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+html.np-casca-v3 .np-dossie-tlh h3{margin:0;font:600 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-dossie-tlh h3 .n{font:500 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-3);margin-left:4px;font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-dossie-tlh .fer{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+html.np-casca-v3 .np-dossie select{height:32px;border:1px solid var(--np-ctrl);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1 var(--np-ui);padding:0 6px;max-width:100%}
+html.np-casca-v3 .np-dossie select:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-dossie-grupo{display:inline-flex;gap:6px;align-items:center;font-size:var(--np-fs-2);color:var(--np-text-2);cursor:pointer}
+html.np-casca-v3 .np-dossie-grupo input{width:16px;height:16px;margin:0;accent-color:var(--np-ink)}
+html.np-casca-v3 .np-dossie .np-filtros{display:flex;flex-wrap:wrap;gap:2px}
+html.np-casca-v3 .np-dossie-tl{list-style:none;margin:0;padding:0}
+html.np-casca-v3 .np-dossie-tl li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-dossie-tl time{display:flex;flex-direction:column;gap:2px}
+html.np-casca-v3 .np-dossie-tl time b{font:400 var(--np-fs-5)/1.15 var(--np-display);color:var(--np-text);white-space:nowrap}
+html.np-casca-v3 .np-dossie-tl time span{font-size:var(--np-fs-1);color:var(--np-text-3)}
+html.np-casca-v3 .np-dossie-tl .c{min-width:0;position:relative;padding-left:14px;border-left:1px solid var(--np-line)}
+html.np-casca-v3 .np-dossie-tl .c::before{content:"";position:absolute;left:-4px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--np-surface);border:1.5px solid var(--np-text-3)}
+html.np-casca-v3 .np-dossie-tl li.reg .c::before{background:var(--np-ink);border-color:var(--np-ink)}
+html.np-casca-v3 .np-dossie-tl .m{margin:0;font-size:var(--np-fs-2);color:var(--np-text-2);line-height:1.4}
+html.np-casca-v3 .np-dossie-tl .m .emp{color:var(--np-text)}
+html.np-casca-v3 .np-dossie-tl .t{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--np-fs-3);line-height:1.45;color:var(--np-text)}
+html.np-casca-v3 .np-dossie-tl li.sis .t{color:var(--np-text-2)}
+html.np-casca-v3 .np-dossie .lnk{appearance:none;border:0;background:none;padding:0;color:var(--np-text);font:500 var(--np-fs-2)/1.3 var(--np-ui);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+html.np-casca-v3 .np-dossie-pag{display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;padding-top:6px;border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-dossie-pag .np-btn[aria-current="page"]{background:var(--np-sel);color:var(--np-text);font-weight:600}
+html.np-casca-v3 .np-dossie-pag .reti{color:var(--np-text-3);padding:0 2px}
+html.np-casca-v3 .np-dossie-pag .note{margin-left:8px}
+@media (max-width:1023px){html.np-casca-v3 .np-dossie-frentes{grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .np-dossie-frente+.np-dossie-frente{border-left:0;border-top:1px solid var(--np-line)}}
+@media (max-width:760px){
+  html.np-casca-v3 .np-ficha .card.section{padding:14px 14px}
+  html.np-casca-v3 .np-ficha-acoes{width:100%}
+  html.np-casca-v3 .np-dossie-tl li{grid-template-columns:minmax(0,1fr);gap:4px}
+  html.np-casca-v3 .np-dossie-tl time{flex-direction:row;gap:8px;align-items:baseline}
+  html.np-casca-v3 .np-dossie-tl .c{border-left:0;padding-left:0}html.np-casca-v3 .np-dossie-tl .c::before{display:none}
+  html.np-casca-v3 .np-dossie-tlh .fer{width:100%}
+}
+@media (hover:none),(max-width:760px){
+  html.np-casca-v3 .np-ficha .btn,html.np-casca-v3 .np-dossie .np-btn,html.np-casca-v3 .np-dossie select{height:44px;min-height:44px}
+  html.np-casca-v3 .np-ficha .subtab{height:44px}
+  html.np-casca-v3 .np-ficha>.crumbs .btn-voltar{height:44px}
+  html.np-casca-v3 .np-dossie .np-chipf{min-height:44px}
+  html.np-casca-v3 .np-dossie .lnk{display:inline-flex;align-items:center;min-height:44px}
+  html.np-casca-v3 .np-dossie-grupo{min-height:44px}
+}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -2103,7 +2234,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwie4rmw";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwiiwsta";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");

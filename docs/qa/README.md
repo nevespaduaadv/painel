@@ -81,6 +81,12 @@ NODE_PATH=<módulos> node docs/qa/carteira-lab.cjs
 ```
 Reaproveita servidor, fixtures e `contexto()` do laboratório de integrações, com rotas extras (contratos em atraso, em acordo e quitado; cliente PF; ficha de passagem; processos ativos). Verifica: mesmas contas da V2 (saldo sem quitados, atraso, negociação); grupos pela situação dos contratos em ordem alfabética; régua e coluna de prazo pelo próximo prazo; marcas itálicas e nenhuma pílula; filtros (escopo exclusivo, atributos cumulativos, busca sem acento e por CNPJ); painel (props, contratos do próprio cliente, prazos, bloco do Acompanhamento PJ, troca de linha com o painel aberto); "Editar cliente", "Abrir ficha" e Exportar CSV iguais à V2; o contrato `PP_CARTEIRA` da V2 intacto; nenhuma gravação; casca V2 com a lista original; perfil sem Clientes sem desenho nem leitura; 375 px nos dois temas (sem rolagem lateral, contraste, alvos de 44 px, painel em tela cheia, Esc devolve o foco).
 
+## Laboratório da Ficha do cliente V3.1 (entrega visual V4)
+```
+NODE_PATH=<módulos> node docs/qa/ficha-lab.cjs
+```
+Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios do c1. Verifica cabeçalho (valor e marcas com as contas da Carteira), **uma única ação em tinta**, 8 abas numa linha (rolagem e ←/→), Dossiê V3.1 (régua das frentes pelo estado, linha do tempo, filtros e ações iguais aos da V2), "Editar dados da empresa", V2 intacta, nenhuma gravação, 375 px sem rolagem lateral, alvos ≥ 44 px e contraste nos dois temas.
+
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
 PGLAB_HOST=<socket ou host> PGLAB_PORT=<porta> PGLAB_UID=<uuid de um perfil admin do banco local> NODE_PATH=<módulos> node docs/qa/clientes-pg-lab.cjs

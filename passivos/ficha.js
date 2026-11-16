@@ -43,7 +43,7 @@ function cardRaioX(c,host,ind){
   const sit=el("section",{class:"card section"},el("h2",{},"Situação atual"),c.situacao_atual?el("div",{style:"white-space:pre-wrap"},c.situacao_atual):el("div",{class:"note"},"Opera? Fatura? Está negativado? Registre aqui."),
     el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},pill("Negativado",c.negativado,"e3"),pill("Maquininha",c.usa_maquininha,"g"),pill("Consórcio",c.tem_consorcio,"g"),c.outros_cnpjs?el("span",{class:"pill g"},"Outros CNPJs: "+c.outros_cnpjs):null),
     c.assuntos_interesse?el("div",{class:"note"},el("b",{},"Quer discutir: "),c.assuntos_interesse):null,c.disponibilidade?el("div",{class:"note"},el("b",{},"Disponibilidade: "),c.disponibilidade):null);
-  host.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Raio-X da empresa"),el("div",{class:"note"},"Fonte: formulário de onboarding + R1. O que Acordos e Jurídico precisam ver de bate-pronto.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openFichaForm(c,"raio")},"Editar Raio-X"))),
+  host.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Dados da empresa"),el("div",{class:"note"},"Fonte: formulário de onboarding + R1. O que Acordos e Jurídico precisam ver de bate-pronto.")),el("div",{class:"actions edit-only"},el("button",{class:"btn sm primary",onclick:()=>openFichaForm(c,"raio")},"Editar dados da empresa"))),
     el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"},kv("Segmento",c.segmento),kv("Faturamento mensal",c.faturamento_mensal?BRL(+c.faturamento_mensal):null),kv("Funcionários",c.funcionarios),kv("Reserva acumulada",c.reservaAcumulada?BRL(+c.reservaAcumulada):null),kv("Pasta no Drive",c.pasta_drive_url?el("a",{href:c.pasta_drive_url,target:"_blank",rel:"noopener"},"abrir pasta"):null))));
   host.append(el("div",{class:"row2",style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px"},hist,sit));
   // Indicadores
@@ -116,7 +116,7 @@ function openFichaForm(c,modo="cadastro"){
     field("f-hist","O que aconteceu",hist),field("f-sit","Situação atual",sit),field("f-ass","Assuntos que quer discutir",ass),field("f-disp","Disponibilidade para reuniões",disp),field("f-obs","Respostas do onboarding (texto livre)",obs),
     field("f-repq","Qualificação do representante",repq,"Nacionalidade, estado civil, profissão — entra na qualificação da peça."),field("f-pdrive","Pasta do cliente no Drive",pdrive)];
   const body=el("div",{class:"form"},...(modo==="raio"?RAIO:CAD));
-  modal(modo==="raio"?"Raio-X da empresa":"Ficha cadastral",body,async()=>{
+  modal(modo==="raio"?"Dados da empresa":"Ficha cadastral",body,async()=>{
     if(!nome.value.trim())throw new Error("Informe o nome");
     const cols={endereco:ender.value.trim()||null,representante:rep.value.trim()||null,representante_cpf:repcpf.value.trim()||null,representante_qualificacao:repq.value.trim()||null,nome_fantasia:fant.value.trim()||null,tipo_pessoa:tipo.value,cnpj:cnpj.value.trim()||null,cpf_titular:cpf.value.trim()||null,cidade:cidade.value.trim()||null,uf:uf.value||null,segmento:seg.value.trim()||null,
       faturamento_mensal:fat.value===""?null:+fat.value,funcionarios:func.value===""?null:+func.value,closer:closer.value.trim()||null,origem:origem.input.value.trim()||null,plano:plano.input.value.trim()||null,status:status.value,
