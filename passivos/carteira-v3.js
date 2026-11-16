@@ -196,5 +196,5 @@
   { const _rl = window.renderList; if (typeof _rl === "function") window.renderList = function () {
       if (!(ligado() && S.tab === "clientes" && !S.sel)) { K.painel = null; K.obra = null; return _rl.apply(this, arguments); }
       renderCarteira(); }; }
-  window.PP_CARTEIRA_V3 = { ativo: ligado, filtro: (f = {}) => { K.f = { ...LIMPO, ...f }; if (S.tab === "clientes" && !S.sel) renderList(); }, filtroAtual: () => ({ ...K.f }), registros: () => (ligado() ? registros() : []), abrir: (cid) => { if (S.tab !== "clientes" || S.sel) return false; abrirPainel(cid); return true; }, estado: () => ({ prazos: K.prazos ? K.prazos.length : null, colab: K.colab ? K.colab.length : null, erro: K.erro, aberta: K.aberta }) };
+  window.PP_CARTEIRA_V3 = { ativo: ligado, filtro: (f = {}) => { K.f = { ...LIMPO, ...f }; if (S.tab === "clientes" && !S.sel) renderList(); }, filtroAtual: () => ({ ...K.f }), registros: () => (ligado() ? registros() : []), registro: (cid) => (ligado() ? registros().find((r) => r.c.id === cid) || null : null), marcas: (r) => (ligado() && r ? marcas(r) : []), abrir: (cid) => { if (S.tab !== "clientes" || S.sel) return false; abrirPainel(cid); return true; }, estado: () => ({ prazos: K.prazos ? K.prazos.length : null, colab: K.colab ? K.colab.length : null, erro: K.erro, aberta: K.aberta }) };
 })();
