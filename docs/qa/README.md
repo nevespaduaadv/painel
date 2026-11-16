@@ -81,6 +81,13 @@ NODE_PATH=<módulos> node docs/qa/carteira-lab.cjs
 ```
 Reaproveita servidor, fixtures e `contexto()` do laboratório de integrações, com rotas extras (contratos em atraso, em acordo e quitado; cliente PF; ficha de passagem; processos ativos). Verifica: mesmas contas da V2 (saldo sem quitados, atraso, negociação); grupos pela situação dos contratos em ordem alfabética; régua e coluna de prazo pelo próximo prazo; marcas itálicas e nenhuma pílula; filtros (escopo exclusivo, atributos cumulativos, busca sem acento e por CNPJ); painel (props, contratos do próprio cliente, prazos, bloco do Acompanhamento PJ, troca de linha com o painel aberto); "Editar cliente", "Abrir ficha" e Exportar CSV iguais à V2; o contrato `PP_CARTEIRA` da V2 intacto; nenhuma gravação; casca V2 com a lista original; perfil sem Clientes sem desenho nem leitura; 375 px nos dois temas (sem rolagem lateral, contraste, alvos de 44 px, painel em tela cheia, Esc devolve o foco).
 
+## Controle financeiro com ativação controlada (0105 + 0112)
+PostgreSQL 16 e 17, fora do CI: esquema equivalente ao da produção + 0104/0107/0108 + `perfis-teste-ficticios.sql` + `sql/0112-preparo.sql`; depois:
+1. **transação revertida** (0105 + 0112 + erro provocado): nada fica (colunas, configuração, agendamento, tarefas);
+2. **instalação** `0105 + 0112` numa transação só (`psql -1`): estruturas criadas, régua desligada, sem agendamento, nenhuma tarefa;
+3. `sql/0112-matriz.sql` (29 casos): rotina desligada cria 0 (1ª e 2ª execução), prévia, ativação só pela administradora, data de corte, limite, executor e prioridade, acumulado escolhido pelo Financeiro (idempotente), desativação, auditoria;
+4. **acidente**: reexecutar a 0105 sozinha recria o agendamento, mas a trava na inserção impede qualquer tarefa; reaplicar a 0112 repara.
+
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
 PGLAB_HOST=<socket ou host> PGLAB_PORT=<porta> PGLAB_UID=<uuid de um perfil admin do banco local> NODE_PATH=<módulos> node docs/qa/clientes-pg-lab.cjs
