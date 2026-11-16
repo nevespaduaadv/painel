@@ -108,6 +108,11 @@ const tinta = (pg) => pg.evaluate(() => { const ink = getComputedStyle(document.
   { const { ctx, pg, erros, escritas } = await abrirFicha(b, { sub: 'acompanhamento' }); await pg.waitForTimeout(800);
     const r = await pg.evaluate(() => ({ titulo: [...document.querySelectorAll('#main h2')].some((x) => x.textContent === 'Dados da empresa'), botao: [...document.querySelectorAll('#main button')].some((x) => x.textContent === 'Editar dados da empresa'), antigo: /Raio-X da empresa|Editar Raio-X/.test(document.querySelector('#main').textContent) }));
     if (r.titulo && r.botao && !r.antigo) ok('Acompanhamento PJ: seção "Dados da empresa" com o botão "Editar dados da empresa"; nenhum "Editar Raio-X"'); else falha('renomeação: ' + JSON.stringify(r));
+    const ab = await pg.evaluate(() => { const host = [...document.querySelectorAll('#main > .main')].pop(); const secs = [...host.children].map((x) => (x.querySelector('h2,h3')?.textContent || '').trim()); return { sel: document.querySelector('#main > .subtabs [aria-selected="true"]')?.textContent.trim(), dossie: !!document.querySelector('#main .np-dossie') || secs.includes('Dossiê'), primeira: secs[0] }; });
+    if (ab.sel === 'Acompanhamento PJ' && !ab.dossie && /Ciclo de acompanhamento|Status do acompanhamento/.test(ab.primeira)) ok(`aba Acompanhamento PJ selecionada abre direto no ciclo ("${ab.primeira}"), sem repetir o Dossiê (que continua na aba própria)`); else falha('aba acompanhamento: ' + JSON.stringify(ab));
+    await pg.evaluate(() => { S.sub = 'dossie'; render(); }); await pg.waitForTimeout(500); const naAba = await pg.evaluate(() => ({ sel: document.querySelector('#main > .subtabs [aria-selected="true"]')?.textContent.trim(), dossie: !!document.querySelector('#main .np-dossie') }));
+    if (naAba.sel === 'Dossiê' && naAba.dossie) ok('aba Dossiê continua com o histórico completo'); else falha('aba dossiê: ' + JSON.stringify(naAba));
+    await pg.evaluate(() => { S.sub = 'acompanhamento'; render(); }); await pg.waitForTimeout(500);
     await pg.evaluate(() => [...document.querySelectorAll('#main button')].find((x) => x.textContent === 'Editar dados da empresa').click()); await pg.waitForTimeout(400);
     const mt = await pg.evaluate(() => document.querySelector('#modalHost')?.textContent || ''); if (/Dados da empresa/.test(mt) && !/Raio-X/.test(mt)) ok('o formulário abre com o mesmo nome ("Dados da empresa")'); else falha('modal: ' + mt.slice(0, 80));
     await pg.evaluate(() => [...document.querySelectorAll('#modalHost button')].find((x) => /Cancelar/.test(x.textContent))?.click()); await pg.waitForTimeout(300);
@@ -122,6 +127,9 @@ const tinta = (pg) => pg.evaluate(() => { const ink = getComputedStyle(document.
   { const { ctx, pg, erros } = await abrirFicha(b, { casca: 'v2' });
     const e = await pg.evaluate(() => ({ ficha: document.querySelector('#main').classList.contains('np-ficha'), dossie: !!document.querySelector('.np-dossie'), tl: !!document.querySelector('#main ul.tl'), eyebrow: !!document.querySelector('#main .head .eyebrow'), verde: getComputedStyle([...document.querySelectorAll('#main .head .btn.primary')][0]).backgroundColor }));
     if (!e.ficha && !e.dossie && e.tl && e.eyebrow && /rgb\(27, 130, 69\)/.test(e.verde)) ok('casca V2: ficha e Dossiê da V2 sem nenhuma mudança visual'); else falha('v2: ' + JSON.stringify(e));
+    await pg.evaluate(() => { S.sub = 'acompanhamento'; render(); }); await pg.waitForTimeout(900);
+    const a2 = await pg.evaluate(() => { const host = [...document.querySelectorAll('#main > .main')].pop(); const secs = [...host.children].map((x) => (x.querySelector('h2,h3')?.textContent || '').trim()); return { dossie: secs.includes('Dossiê') || !!document.querySelector('#main ul.tl'), primeira: secs[0] }; });
+    if (!a2.dossie && /Status do acompanhamento|Ciclo de acompanhamento/.test(a2.primeira)) ok(`V2: aba Acompanhamento PJ sem o Dossiê repetido; começa em "${a2.primeira}"`); else falha('v2 acompanhamento: ' + JSON.stringify(a2));
     if (!erros.length) ok('V2 sem erros de página'); else falha('erros v2: ' + erros.join(' | ')); await ctx.close(); }
 
   // ========== 5. 375 px, alvos e contraste ==========
