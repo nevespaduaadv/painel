@@ -81,6 +81,10 @@ NODE_PATH=<módulos> node docs/qa/carteira-lab.cjs
 ```
 Reaproveita servidor, fixtures e `contexto()` do laboratório de integrações, com rotas extras (contratos em atraso, em acordo e quitado; cliente PF; ficha de passagem; processos ativos). Verifica: mesmas contas da V2 (saldo sem quitados, atraso, negociação); grupos pela situação dos contratos em ordem alfabética; régua e coluna de prazo pelo próximo prazo; marcas itálicas e nenhuma pílula; filtros (escopo exclusivo, atributos cumulativos, busca sem acento e por CNPJ); painel (props, contratos do próprio cliente, prazos, bloco do Acompanhamento PJ, troca de linha com o painel aberto); "Editar cliente", "Abrir ficha" e Exportar CSV iguais à V2; o contrato `PP_CARTEIRA` da V2 intacto; nenhuma gravação; casca V2 com a lista original; perfil sem Clientes sem desenho nem leitura; 375 px nos dois temas (sem rolagem lateral, contraste, alvos de 44 px, painel em tela cheia, Esc devolve o foco).
 
+## Segurança da exclusão de clientes e bens (0111)
+- **Banco (PostgreSQL 16 e 17, fora do CI):** esquema equivalente ao da produção + 0104/0107/0108(/0109/0110) + `perfis-teste-ficticios.sql` + `sql/0111-preparo.sql` + a 0111 (duas vezes, idempotente) + `sql/0111-matriz.sql` (38 casos: DELETE pela API por perfil e anônimo, dono do banco fora da função, encerrar, exclusão definitiva com e sem trabalho, instantâneo na auditoria, bens por perfil e situação, rebaixamento de proteção, exclusão autorizada).
+- **Front (no CI):** `NODE_PATH=<módulos> node docs/qa/exclusao-lab.cjs` — botões por perfil, motivo, função do banco, mensagens quando o banco recusa e nenhum "excluído" falso, nas cascas V2 e V3.1.
+
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
 PGLAB_HOST=<socket ou host> PGLAB_PORT=<porta> PGLAB_UID=<uuid de um perfil admin do banco local> NODE_PATH=<módulos> node docs/qa/clientes-pg-lab.cjs

@@ -44,6 +44,8 @@ jobs:
         run: NODE_PATH="$(npm root -g)" node docs/qa/carteira-lab.cjs "$RUNNER_TEMP/casca-lab/carteira"
       - name: Laboratório de formulários (Fase 4C · NPUI.form + Registrar ata)
         run: NODE_PATH="$(npm root -g)" node docs/qa/formularios-lab.cjs "$RUNNER_TEMP/casca-lab/formularios"
+      - name: Laboratório da exclusão de clientes e bens (0111, front)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/exclusao-lab.cjs "$RUNNER_TEMP/casca-lab/exclusao"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4
