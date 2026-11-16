@@ -128,6 +128,11 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Compatibilidade**: o 1º `button.btn.primary` do host é o Salvar e o 1º `.card` é o diálogo (módulos que renomeiam/removem o Salvar ou acrescentam classe continuam funcionando; o rótulo renomeado volta após o envio); esvaziar `#modalHost` (exclusões da V2) encerra o diálogo e libera o `#app`; um formulário aberto dentro do `onSave` não é apagado pelo anterior.
 - 375 px: tela cheia, uma coluna, campos e botões 44 px, rodapé fixo. Contraste medido ≥ 4,5:1 nos dois temas. QA: `docs/qa/modais-lab.cjs` no workflow.
 
+### 4.8 V6 — um só tema escuro e Agenda (16/11)
+- **Tema único**: com a casca V3.1 ligada, as variáveis da V2 (`--bg`, `--surface`, `--surface-2`, `--line`, `--fg`, `--muted`, `--faint`, `--ok`, `--warn`, `--crit`, `--info`, `--btn-primary`, `--on-dark`, `--gold-soft`, `--ch-grid`, `--shadow`, `--shadow-pop`) apontam para os tokens `--np-*` (`fontes/casca.css`, seletor `html:root.np-casca-v3`, que vence os blocos escuros legados). As telas que ainda não migraram deixam o escuro marrom pelo grafite, e a primária da V2 deixa o verde pela tinta. Sem a casca, os valores legados de `fontes/tokens.css` não mudam.
+- **Agenda (semana)**: dias sem compromisso, prazo ou feriado viram **uma linha compacta por sequência** (`.np-ag-livres`: marca "Livre" em serifa itálica + "seg 9 · ter 10"), em vez de um grupo por dia com a instrução repetida; o modo Dia mantém o grupo com "Nada marcado"; período inteiro vazio mostra o estado vazio com a ação uma vez.
+- QA: `docs/qa/tema-lab.cjs` no workflow; `hoje-agenda-avisos-lab` conta grupos + dias livres = 7.
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |
