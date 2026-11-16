@@ -42,7 +42,90 @@
     const html = `<!doctype html><html lang=pt-BR><head><meta charset=utf-8><title>Dossiê — ${e(c.nome)}</title><style>body{font-family:Georgia,serif;color:#0C1F38;margin:28px 36px;font-size:12.5px}.cab{display:flex;justify-content:space-between;border-bottom:2px solid #B8964A;padding-bottom:10px;margin-bottom:16px}.marca{font-weight:700;letter-spacing:.04em}.marca small{display:block;font-family:Arial,sans-serif;font-weight:400;font-size:11px;color:#555}h1{font-size:18px;margin:0 0 12px}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}th{text-align:left;background:#0C1F38;color:#fff;padding:6px 8px}td{padding:6px 8px;border-bottom:1px solid #e4e4e4;vertical-align:top}.d{white-space:nowrap}.t{white-space:pre-wrap;max-width:420px}.n{color:#666;font-size:10.5px}@media print{body{margin:14mm 12mm}}</style></head><body><div class=cab><div class=marca>NEVES PÁDUA ADVOCACIA<small>OAB/SP 488.803 · Dossiê do cliente${fl && FRENTES[fl] ? " · " + FRENTES[fl] : ""}</small></div><div style="text-align:right;font-family:Arial,sans-serif;font-size:11px"><b>${e(c.nome)}</b><br>Emitido em ${new Date().toLocaleDateString("pt-BR")} · ${itens.length} registro(s)</div></div><h1>Linha do tempo</h1><table><thead><tr><th>Quando</th><th>Frente</th><th>Tipo</th><th>Registro</th><th>Quem</th></tr></thead><tbody>${linhas}</tbody></table><script>setTimeout(()=>window.print(),400)</script></body></html>`;
     const w = window.open("", "_blank"); if (!w) { toast("Permita pop-ups para gerar o PDF"); return; } w.document.write(html); w.document.close();
   }
+  /* ---------- V3.1 (entrega V4): mesma leitura, mesmos filtros e ações; régua nas frentes, passos na linha do tempo ---------- */
+  const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const pad = (n) => String(n).padStart(2, "0");
+  const diaLocal = (ts) => { const d = new Date(ts); return isNaN(d) ? null : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const nomeFrente = (k) => (FRENTES[k] || "").split(" /")[0] || "Sem frente";
+  const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
+  function cardDossieV3(c) {
+    const st = D.cache[c.id]; if (!st) carregar(c.id);
+    const box = el("section", { class: "card section np-dossie", "aria-busy": st && st.ok ? null : "true" });
+    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Dossiê"), el("div", { class: "note" }, "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")),
+      el("div", { class: "actions edit-only" }, NPUI.btn("Registrar", { onclick: () => window.PP_CARTEIRA?.registrar(c.id, {}) }))));
+    if (!st || !st.ok) { box.append(NPUI.carregando(4)); return box; }
+    // informações relevantes (fixadas): régua de tinta = o que o escritório marcou como essencial
+    const fix = st.itens.filter((i) => i.fixado);
+    box.append(NPUI.secao("Informações relevantes", fix.length
+      ? el("ul", { class: "np-dossie-fix" }, ...fix.map((i) => el("li", {}, el("p", {}, i.texto), el("small", {}, [i.autor, fmtD(i.quando)].filter(Boolean).join(" · ")))))
+      : el("p", { class: "note" }, "Nada fixado. Ao registrar uma “Informação do cliente”, marque “Fixar no perfil”.")));
+    // três frentes: a régua diz o estado (prazo vencido ou frente parada = atrasada; prazo em até 7 dias = atenção)
+    const porF = Object.fromEntries(st.frentes.map((f) => [f.frente, f]));
+    const frentes = el("div", { class: "np-dossie-frentes", role: "list", "aria-label": "Frentes do cliente" });
+    for (const [k, nome] of Object.entries(FRENTES)) {
+      const f = porF[k] || {}; const resp = f.responsavel_id ? st.colab.find((x) => x.id === f.responsavel_id)?.nome : null;
+      const padrao = st.colab.filter((x) => x.frente === k && x.ativo !== false).map((x) => NPUI.curto(x.nome));
+      const d = dias(f.ultimo_em); const p = f.proximo_prazo ? NPUI.prazoTxt(f.proximo_prazo) : null;
+      const regua = p && p.dias < 0 ? "late" : d != null && d > 30 ? "late" : p && p.dias <= 7 ? "att" : null;
+      const mk = [
+        p ? NPUI.marca((p.dias < 0 ? "prazo venceu " : "próximo prazo ") + (p.dias === 0 ? "hoje" : p.rel), p.dias < 0 ? "late" : p.dias <= 7 ? "att" : "") : null,
+        +f.tarefas_abertas ? NPUI.marca(plural(+f.tarefas_abertas, "tarefa aberta", "tarefas abertas")) : null,
+        k === "juridico" && +f.processos_ativos ? NPUI.marca(plural(+f.processos_ativos, "processo", "processos")) : null,
+        k === "negocial" && +f.negociacoes_abertas ? NPUI.marca(plural(+f.negociacoes_abertas, "negociação", "negociações")) : null,
+        d != null && d > 30 ? NPUI.marca(`parada há ${d} dias`, "late") : null].filter(Boolean);
+      const respTxt = resp ? NPUI.curto(resp) : padrao.length ? padrao.join(", ") : "sem responsável";
+      frentes.append(el("div", { class: "np-dossie-frente" + (regua ? " r-" + regua : ""), role: "listitem" },
+        el("div", { class: "cab" }, el("h3", {}, nome),
+          el("button", { type: "button", class: "np-btn ghost edit-only np-dossie-resp", title: "Responsável por esta frente neste cliente", "aria-label": `Responsável pela frente ${nomeFrente(k)}: ${respTxt}. Alterar`, onclick: () => definirResp(c, k, f.responsavel_id, st.colab) }, respTxt)),
+        el("p", { class: "ult" }, f.ultimo_em ? [el("span", { class: "q", title: fmtDH(f.ultimo_em) }, d === 0 ? "hoje" : d === 1 ? "ontem" : `há ${d} dias`), f.ultimo_autor ? " · " + f.ultimo_autor : ""] : "Sem registro nesta frente"),
+        f.ultimo_texto ? el("p", { class: "txt" }, f.ultimo_texto) : null,
+        mk.length ? el("p", { class: "mk" }, ...mk) : null,
+        el("div", { class: "pe edit-only" }, NPUI.btn("Registrar aqui", { variante: "ghost", onclick: () => window.PP_CARTEIRA?.registrar(c.id, { frente: k }) }))));
+    }
+    box.append(frentes);
+    // linha do tempo: filtros cumulativos de frente (chips), origem, ordem, exportar, 20 por página
+    const F = D.filtro[c.id] = D.filtro[c.id] && typeof D.filtro[c.id] === "object" ? D.filtro[c.id] : { frentes: new Set(), origem: "", ordem: "recente", pagina: 1 };
+    const cont = Object.fromEntries(Object.keys(FRENTES).map((k) => [k, st.itens.filter((i) => i.frente === k).length]));
+    const chips = el("div", { class: "np-filtros", role: "group", "aria-label": "Frentes" }, ...Object.keys(FRENTES).map((k) => NPUI.chip({ label: nomeFrente(k), n: cont[k], on: F.frentes.has(k), grupo: "frente", title: "Combine frentes", onclick: () => { if (F.frentes.has(k)) F.frentes.delete(k); else F.frentes.add(k); F.pagina = 1; render(); } })));
+    const fo = sel({ "": "Tudo", "__reg": "Só registros manuais", "__tar": "Só tarefas", "__anexo": "Só com anexo", "__cli": "Só o que o cliente vê" }, F.origem); fo.onchange = () => { F.origem = fo.value; F.pagina = 1; render(); }; fo.setAttribute("aria-label", "Origem");
+    const ord = sel({ recente: "Mais recentes primeiro", antiga: "Mais antigos primeiro", frente: "Por frente, depois data", tipo: "Por tipo, depois data", autor: "Por quem registrou" }, F.ordem); ord.onchange = () => { F.ordem = ord.value; F.pagina = 1; render(); }; ord.setAttribute("aria-label", "Ordem");
+    const cliG = (S.clientes || []).find((x) => x.id === c.id); const grupoNome = (cliG?.grupo || "").trim();
+    const gChk = grupoNome ? el("label", { class: "np-dossie-grupo" }, (() => { const i = el("input", { type: "checkbox" }); i.checked = !!D.grupo?.[c.id]; i.onchange = () => { D.grupo = D.grupo || {}; D.grupo[c.id] = i.checked; invalidar(c.id); render(); }; return i; })(), "Incluir as empresas do grupo “" + grupoNome + "”") : null;
+    let itens = st.itens.filter((i) => !F.frentes.size || F.frentes.has(i.frente));
+    itens = itens.filter((i) => F.origem === "__reg" ? i.origem === "registro" : F.origem === "__tar" ? i.origem === "tarefa" : F.origem === "__anexo" ? (i.anexos && i.anexos.length) || i.tem_anexo : F.origem === "__cli" ? i.visivel_cliente : true);
+    const cmpQ = (a, b) => String(b.quando).localeCompare(String(a.quando));
+    itens = [...itens].sort(F.ordem === "antiga" ? (a, b) => -cmpQ(a, b) : F.ordem === "frente" ? (a, b) => String(a.frente || "z").localeCompare(String(b.frente || "z")) || cmpQ(a, b) : F.ordem === "tipo" ? (a, b) => rotuloTipo(a).localeCompare(rotuloTipo(b)) || cmpQ(a, b) : F.ordem === "autor" ? (a, b) => String(a.autor || "z").localeCompare(String(b.autor || "z")) || cmpQ(a, b) : cmpQ);
+    const POR = 20, total = itens.length, paginas = Math.max(1, Math.ceil(total / POR)); if (F.pagina > paginas) F.pagina = paginas; const ini = (F.pagina - 1) * POR; const pag = itens.slice(ini, ini + POR);
+    const filtrado = F.frentes.size || F.origem;
+    const lista = el("ol", { class: "np-dossie-tl" }, ...pag.map((i) => {
+      const sistema = i.origem !== "registro"; const q = NPUI.prazoTxt(diaLocal(i.quando));
+      const meta = [nomeFrente(i.frente), rotuloTipo(i), i.autor].filter(Boolean).join(" · ");
+      return el("li", { class: sistema ? "sis" : "reg" },
+        el("time", { datetime: i.quando, title: fmtDH(i.quando) }, el("b", {}, q.curta), el("span", {}, q.dias === 0 ? "hoje" : q.dias === -1 ? "ontem" : q.rel)),
+        el("div", { class: "c" },
+          el("p", { class: "m" }, meta, i.outra_empresa ? [" · ", el("span", { class: "emp" }, i.outra_empresa)] : null,
+            i.numero_cnj ? [" · ", el("button", { type: "button", class: "lnk", onclick: () => { S.sub = "processos"; render(); } }, i.numero_cnj)] : null,
+            i.fixado ? [" ", NPUI.marca("fixado")] : null, i.visivel_cliente ? [" ", NPUI.marca("cliente vê", "info")] : null),
+          el("p", { class: "t" }, i.texto),
+          i.tarefa_id && sistema ? el("button", { type: "button", class: "lnk", onclick: () => window.PP_TAREFAS?.abrir(i.tarefa_id) }, "Abrir tarefa") : null));
+    }));
+    const pager = paginas > 1 ? el("nav", { class: "np-dossie-pag", "aria-label": "Páginas da linha do tempo" },
+      NPUI.btn("Anterior", { variante: "ghost", disabled: F.pagina <= 1, onclick: () => { F.pagina--; render(); } }),
+      ...Array.from({ length: paginas }, (_, k) => k + 1).filter((n) => n === 1 || n === paginas || Math.abs(n - F.pagina) <= 2).reduce((acc, n, idx, arr) => { if (idx && n - arr[idx - 1] > 1) acc.push(el("span", { class: "reti", "aria-hidden": "true" }, "…")); const b = NPUI.btn(String(n), { variante: "ghost", onclick: () => { F.pagina = n; render(); } }); if (n === F.pagina) b.setAttribute("aria-current", "page"); b.setAttribute("aria-label", "Página " + n); acc.push(b); return acc; }, []),
+      NPUI.btn("Próxima", { variante: "ghost", disabled: F.pagina >= paginas, onclick: () => { F.pagina++; render(); } }),
+      el("span", { class: "note" }, `${ini + 1}–${Math.min(ini + POR, total)} de ${total}`)) : null;
+    const itensF = itens;
+    box.append(el("div", { class: "np-dossie-linha" },
+      el("div", { class: "np-dossie-tlh" }, el("h3", {}, "Linha do tempo ", el("span", { class: "n" }, String(total))),
+        el("div", { class: "fer" }, gChk, fo, ord, NPUI.btn("CSV", { variante: "ghost", title: "Exportar a linha do tempo filtrada (CSV)", onclick: () => exportarCSV(c, itensF) }), NPUI.btn("PDF", { variante: "ghost", title: "Gerar PDF da linha do tempo filtrada", onclick: () => exportarPDF(c, itensF, [...F.frentes].join(",")) }))),
+      chips,
+      total ? lista : filtrado ? NPUI.vazio({ titulo: "Nada com esses filtros", texto: "Tire um filtro para ver a linha do tempo inteira.", acao: "Limpar filtros", onAcao: () => { F.frentes.clear(); F.origem = ""; F.pagina = 1; render(); } })
+        : NPUI.vazio({ titulo: "Nenhum registro ainda", texto: "Use “Registrar” para contar o que foi feito com este cliente." }),
+      pager));
+    return box;
+  }
   function cardDossie(c) {
+    if (v3()) return cardDossieV3(c);
     const st = D.cache[c.id]; if (!st) { carregar(c.id); }
     const box = el("section", { class: "card section", style: "display:flex;flex-direction:column;gap:12px" });
     box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Dossiê"), el("div", { class: "note" }, "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm primary", onclick: () => window.PP_CARTEIRA?.registrar(c.id, {}) }, "+ Registrar"))));
