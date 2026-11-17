@@ -98,9 +98,9 @@ reset role; select public._como14(:'jur'); set role authenticated;
 select public._c14('17 confirmar com data diferente da sugerida é recusado: tem de ser "corrigir", com motivo (22023)',
   public._t14(format($$select public.publicacao_prazo_conferir(%s, 'confirmar', '2026-11-20')$$, :z1)) = '22023'
   and public._t14(format($$select public.publicacao_prazo_conferir(%s, 'corrigir', '2026-11-20')$$, :z1)) = '22023');
-select public._c14('18 o Jurídico CONFIRMA a sugestão e marca fatal: a tarefa já existente da publicação recebe o prazo (não se cria outra)',
+select public._c14('18 o Jurídico CONFIRMA a sugestão e marca fatal: nasce a tarefa DESTE prazo; a tarefa de análise não é mexida',
   public._t14(format($$select public.publicacao_prazo_conferir(%s, 'confirmar', null, true)$$, :z1)) = '00000');
-select public._c14('19 o Jurídico CORRIGE a segunda hipótese (outra data, com motivo), sem marcar fatal',
+select public._c14('19 o Jurídico CORRIGE a segunda hipótese do mesmo ato (data posterior à sugerida, com motivo), sem marcar fatal: nasce a tarefa deste outro prazo',
   public._t14(format($$select public.publicacao_prazo_conferir(%s, 'corrigir', '2026-12-04', false, 'Feriado local em 03/12')$$, :z2)) = '00000');
 select public._c14('20 prazo já conferido não muda sem reabertura (23514); reabrir exige motivo (22023)',
   public._t14(format($$select public.publicacao_prazo_conferir(%s, 'corrigir', '2026-11-21', false, 'tentando mudar')$$, :z1)) = '23514'
@@ -108,24 +108,59 @@ select public._c14('20 prazo já conferido não muda sem reabertura (23514); rea
 select public._c14('21 descartar a sugestão exige motivo; descartada, não cria tarefa',
   public._t14(format($$select public.publicacao_prazo_conferir(%s, 'descartar')$$, :z0)) = '22023'
   and public._t14(format($$select public.publicacao_prazo_conferir(%s, 'descartar', null, false, 'Ato já cumprido antes')$$, :z0)) = '00000');
+select public._c14('21b quem confere não revisa a própria conferência nem a de colega sem ser revisor (42501)',
+  public._t14(format($$select public.publicacao_prazo_revisar(%s, 'aprovar')$$, :z1)) = '42501' and not public.prazo_revisor() and public.pode_conferir_prazo());
 reset role; select public._como14(null);
-select public._c14('18b conferência: sugerido 19/11 = conferido 19/11; quem e quando; a tarefa da publicação ficou com 19/11 e fatal; nenhuma tarefa nova',
-  (select estado = 'confirmado' and data_sugerida = date '2026-11-19' and data_conferida = date '2026-11-19' and fatal and conferido_por = :'jur' and conferido_em is not null and tarefa_id = (select tarefa_id from public.publicacoes where id = :p43) from public.publicacao_prazos where id = :z1)
-  and (select prazo = date '2026-11-19' and prazo_fatal from public.tarefas where id = (select tarefa_id from public.publicacoes where id = :p43))
-  and (select count(*) = :t_antes from public.tarefas));
-select public._c14('19b conferência: sugerido 03/12, conferido 04/12, motivo guardado; impedimento de tarefas duplicadas — as duas hipóteses usam a mesma tarefa',
+select public._c14('18b conferência: sugerido 19/11 = conferido 19/11, fatal marcado pela pessoa, quem e quando; tarefa PRÓPRIA com 19/11 e fatal; a tarefa de análise segue como estava',
+  (select estado = 'confirmado' and data_sugerida = date '2026-11-19' and data_conferida = date '2026-11-19' and fatal and conferido_por = :'jur' and conferido_em is not null and tarefa_id is distinct from (select tarefa_id from public.publicacoes where id = :p43) from public.publicacao_prazos where id = :z1)
+  and (select t.prazo = date '2026-11-19' and t.prazo_fatal and t.publicacao_id = :p43 and t.status = 'aberta' from public.tarefas t join public.publicacao_prazos z on z.tarefa_id = t.id where z.id = :z1)
+  and (select not prazo_fatal and prazo = date '2026-11-13' from public.tarefas where id = (select tarefa_id from public.publicacoes where id = :p43)));
+select public._c14('19b conferência: sugerido 03/12, conferido 04/12, motivo guardado; cada hipótese tem a SUA tarefa e a sua data — exatamente uma por prazo conferido, nenhuma para o descartado',
   (select estado = 'corrigido' and data_sugerida = date '2026-12-03' and data_conferida = date '2026-12-04' and not fatal and observacao = 'Feriado local em 03/12' from public.publicacao_prazos where id = :z2)
-  and (select count(distinct tarefa_id) = 1 from public.publicacao_prazos where publicacao_id = :p43) and (select count(*) = :t_antes from public.tarefas));
-select public._c14('22 histórico de ajustes do prazo: sugerido → confirmado (com a tarefa vinculada), com autor',
-  (select string_agg(acao, ',' order by id) = 'sugerido,tarefa_vinculada,confirmado' from public.publicacao_prazo_historico where prazo_id = :z1)
+  and (select count(distinct tarefa_id) = 2 from public.publicacao_prazos where publicacao_id = :p43)
+  and (select t.prazo = date '2026-12-04' and not t.prazo_fatal from public.tarefas t join public.publicacao_prazos z on z.tarefa_id = t.id where z.id = :z2)
+  and (select tarefa_id is null from public.publicacao_prazos where id = :z0) and (select count(*) = :t_antes + 2 from public.tarefas));
+select public._c14('19c situações críticas ficam AGUARDANDO REVISÃO sem travar o trabalho (a tarefa já existe): prazo fatal, data posterior à sugerida, sugestão descartada',
+  (select revisao_pendente and revisao_motivo = 'prazo fatal' from public.publicacao_prazos where id = :z1) and (select revisao_pendente and revisao_motivo = 'data posterior à sugerida' from public.publicacao_prazos where id = :z2)
+  and (select revisao_pendente and revisao_motivo = 'sugestão descartada' from public.publicacao_prazos where id = :z0)
+  and (select prazos_em_revisao = 2 and prazos_conferidos = 2 and prazos_a_conferir = 0 from public.v_publicacoes_integracao where publicacao_id = :p43));
+select public._c14('19d conferir o prazo é a providência do ato: a publicação fica "gerou prazo", tratada por quem conferiu (regra que já existia para tarefa criada a partir da publicação)',
+  (select providencia = 'gerou_prazo' and tratada_por = :'jur' from public.publicacoes where id = :p43));
+select public._c14('22 histórico de ajustes do prazo: sugerido → tarefa criada → confirmado, com autor',
+  (select string_agg(acao, ',' order by id) = 'sugerido,tarefa_criada,confirmado' from public.publicacao_prazo_historico where prazo_id = :z1)
   and (select count(*) = 2 from public.publicacao_prazo_historico where prazo_id = :z1 and por = :'jur'));
+-- revisão por quem responde pelo Jurídico (aqui: a administradora)
+select public._como14(:'adm'); set role authenticated;
+select public._c14('22b a revisora APROVA o prazo fatal (fica quem revisou e quando) e DEVOLVE a correção (com motivo; sem motivo é 22023): o devolvido volta a "a conferir"',
+  public._t14(format($$select public.publicacao_prazo_revisar(%s, 'aprovar')$$, :z1)) = '00000'
+  and public._t14(format($$select public.publicacao_prazo_revisar(%s, 'devolver')$$, :z2)) = '22023'
+  and public._t14(format($$select public.publicacao_prazo_revisar(%s, 'devolver', 'Conferir a portaria do feriado')$$, :z2)) = '00000'
+  and public._t14(format($$select public.publicacao_prazo_revisar(%s, 'aprovar')$$, :z1)) = '23514');
+select public._c14('22c a revisora reabre a sugestão descartada e confirma como fatal: sendo ela a responsável, não fica pendente de revisão',
+  public._t14(format($$select public.publicacao_prazo_conferir(%s, 'reabrir', null, false, 'Ato não foi cumprido')$$, :z0)) = '00000'
+  and public._t14(format($$select public.publicacao_prazo_conferir(%s, 'confirmar', null, true)$$, :z0)) = '00000');
+reset role; select public._como14(null);
+select public._c14('22d conferência da revisão: aprovado com autoria; devolvido voltou a sugerido com a tarefa preservada; o da revisora sem pendência; tudo no histórico',
+  (select not revisao_pendente and revisado_por = :'adm' and revisado_em is not null and estado = 'confirmado' from public.publicacao_prazos where id = :z1)
+  and (select estado = 'sugerido' and not revisao_pendente and tarefa_id is not null from public.publicacao_prazos where id = :z2)
+  and (select estado = 'confirmado' and fatal and not revisao_pendente and tarefa_id is not null and conferido_por = :'adm' from public.publicacao_prazos where id = :z0)
+  and exists (select 1 from public.publicacao_prazo_historico where prazo_id = :z1 and acao = 'revisao_aprovada' and por = :'adm')
+  and exists (select 1 from public.publicacao_prazo_historico where prazo_id = :z2 and acao = 'revisao_devolvida' and observacao = 'Conferir a portaria do feriado'));
+select public._como14(:'jur'); set role authenticated;
+select public._c14('22e reconferência do prazo devolvido: a MESMA tarefa recebe a nova data (não nasce outra)',
+  public._t14(format($$select public.publicacao_prazo_conferir(%s, 'confirmar')$$, :z2)) = '00000');
+reset role; select public._como14(null);
+select public._c14('22f conferência: uma tarefa por prazo — 3 prazos conferidos, 3 tarefas de prazo; a do reconferido ficou com 03/12',
+  (select count(*) = :t_antes + 3 from public.tarefas)
+  and (select t.prazo = date '2026-12-03' from public.tarefas t join public.publicacao_prazos z on z.tarefa_id = t.id where z.id = :z2)
+  and exists (select 1 from public.publicacao_prazo_historico where prazo_id = :z2 and acao = 'tarefa_atualizada'));
 select public.sync_receber_intimacao('{"id_externo": "43", "numero_processo": "1111111-11.2026.8.26.0100", "data_publicacao": "2026-11-12", "texto": "Defiro o pedido. Intime-se.", "prazos": [{"chave": "k-43-a", "rotulo": "Embargos de declaração — 5 dias úteis", "data_fatal": "2026-11-25"}]}'::jsonb) as r \gset
 select public._c14('23 a plataforma muda a sugestão DEPOIS da conferência: o prazo conferido e a tarefa NÃO mudam; a mudança fica no histórico',
   (select estado = 'confirmado' and data_conferida = date '2026-11-19' and data_sugerida = date '2026-11-25' from public.publicacao_prazos where id = :z1)
-  and (select prazo = date '2026-11-19' from public.tarefas where id = (select tarefa_id from public.publicacoes where id = :p43))
+  and (select t.prazo = date '2026-11-19' and t.prazo_fatal from public.tarefas t join public.publicacao_prazos z on z.tarefa_id = t.id where z.id = :z1)
   and exists (select 1 from public.publicacao_prazo_historico where prazo_id = :z1 and acao = 'sugestao_alterada'));
-select public._c14('24 nada foi tratado, lido ou baixado automaticamente: as publicações vindas do Sync continuam sem providência e não lidas',
-  (select bool_and(providencia is null and not lida and not ignorada) from public.publicacoes where origem = 'sync'));
+select public._c14('24 nada foi tratado, lido ou baixado automaticamente: as publicações do Sync em que ninguém conferiu prazo continuam sem providência e não lidas',
+  (select bool_and(providencia is null and not lida and not ignorada) from public.publicacoes where origem = 'sync' and id <> :p43));
 -- ===== conciliação, eventos, permissões =====
 select public._como14(:'jur'); set role authenticated;
 select public._c14('25 o Jurídico concilia a fonte divergente ("é a mesma"); fica no histórico da publicação',

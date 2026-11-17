@@ -124,8 +124,8 @@ export async function verificarAssinatura(segredo, corpoBruto, cabecalho) {
 }
 
 // ---------- 3. cliente REST ----------
-// opções: chave (obrigatória), fetch, base, maxTentativas (padrão 4), esperaBaseMs (padrão 500), esperar(ms), limiteEsperaMs
-export function clienteSync({ chave, fetch: f = globalThis.fetch, base = BASE, maxTentativas = 4, esperaBaseMs = 500, limiteEsperaMs = 20000, esperar = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+// opções: chave (obrigatória), fetch, base, maxTentativas (padrão 4), esperaBaseMs (padrão 500), esperar(ms), limiteEsperaMs, tempoLimiteMs (padrão 15 s por pedido)
+export function clienteSync({ chave, fetch: f = globalThis.fetch, base = BASE, maxTentativas = 4, esperaBaseMs = 500, limiteEsperaMs = 20000, tempoLimiteMs = 15000, esperar = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   if (!chave) throw new ErroSync("sem_credencial", "Chave de acesso não configurada no servidor.");
   async function get(caminho, params = {}) {
     const u = new URL(caminho, base);
@@ -133,7 +133,7 @@ export function clienteSync({ chave, fetch: f = globalThis.fetch, base = BASE, m
     let ultimo = null;
     for (let t = 1; t <= maxTentativas; t++) {
       let r;
-      try { r = await f(u.toString(), { method: "GET", headers: { Authorization: `Bearer ${chave}`, Accept: "application/json" } }); }
+      try { r = await f(u.toString(), { method: "GET", headers: { Authorization: `Bearer ${chave}`, Accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(tempoLimiteMs) }); }   // sem seguir redirecionamento: a chave só vai ao endereço do fornecedor
       catch (e) { ultimo = new ErroSync("indisponivel", "Fornecedor inacessível (rede).", { tentativas: t }); if (t < maxTentativas) { await esperar(Math.min(esperaBaseMs * 2 ** (t - 1), limiteEsperaMs)); continue; } throw ultimo; }
       const pedido = r.headers?.get?.("x-request-id") || null;
       if (r.ok) { try { return { corpo: await r.json(), pedido }; } catch { throw new ErroSync("formato", "Resposta que não é JSON.", { status: r.status, pedido }); } }
@@ -193,11 +193,34 @@ export async function testarConexao({ db, cliente }) {
   }
 }
 
+// Amostra para CONFIRMAR O CONTRATO: consulta poucos registros e devolve só a FORMA (nomes de campo e tipo de cada valor),
+// nunca o conteúdo. Não grava publicação. Funciona com a integração desligada. É o segundo passo do primeiro teste real,
+// depois do teste de conexão.
+const forma = (v, nivel = 0) => v === null ? "nulo" : Array.isArray(v) ? (v.length && nivel < 5 ? [forma(v[0], nivel + 1)] : "lista") : typeof v === "object" ? (nivel < 5 ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, forma(v[k], nivel + 1)])) : "objeto")
+  : typeof v === "string" ? (/^\d{4}-\d{2}-\d{2}/.test(v) ? "texto(data)" : /^\d+$/.test(v) ? "texto(número)" : "texto") : typeof v === "number" ? "número" : typeof v === "boolean" ? "lógico" : typeof v;
+export async function amostrar({ db, cliente, itens = 3, dias = 7 }) {
+  const ex = await db.rpc("sync_execucao_abrir", { p_origem: "teste_conexao" });
+  try {
+    const api = cliente(); const n = Math.min(Math.max(Number(itens) || 3, 1), 5);
+    const i = await api.intimacoes({ status: "todas", dias, pagina: 1, itens: n }); const z = await api.prazos({ estado: "todas", dias, pagina: 1, itens: n });
+    const r = { intimacoes: forma(i.corpo), prazos: forma(z.corpo) };
+    let reconhecidos = null; try { const l = extrairLista(i.corpo); reconhecidos = l.slice(0, n).map((b) => { const m = mapearIntimacao(b); return m.ok ? "reconhecido" : { faltando: m.faltando }; }); } catch (e) { reconhecidos = { erro: e?.categoria || "formato" }; }
+    await db.rpc("sync_execucao_fechar", { p_id: ex, p_status: "ok", p_resumo: { amostra: true, registros: Array.isArray(reconhecidos) ? reconhecidos.length : 0 } });
+    return { ok: true, forma: r, mapeamento_candidato: reconhecidos };
+  } catch (e) {
+    await db.rpc("sync_execucao_fechar", { p_id: ex, p_status: "erro", p_erro: erroCurto(e) });
+    return { ok: false, categoria: e?.categoria || "erro" };
+  }
+}
+
 // Consulta periódica ou manual. Com a integração desligada: não chama o fornecedor, não grava publicações.
 export async function puxar({ db, cliente, origem = "manual", por = null }) {
   const { ativo, config } = await integracao(db);
   const ex = await db.rpc("sync_execucao_abrir", { p_origem: origem, p_por: por });
   if (!ativo) return { status: "desligada", execucao: ex };
+  // Os nomes de campo deste adaptador são CANDIDATOS, não contrato. Nenhuma ingestão acontece antes de alguém conferir o formato
+  // real (função amostrar) e registrar isso em integracoes.config.contrato_confirmado = true.
+  if (config.contrato_confirmado !== true) { await db.rpc("sync_execucao_fechar", { p_id: ex, p_status: "erro", p_erro: "contrato: formato real das respostas ainda não confirmado" }); return { status: "aguardando_contrato", execucao: ex }; }
   const c = CONTAGEM(); const dias = Math.min(Math.max(Number(config.janela_dias) || 7, 1), 60);
   const maxPag = Math.min(Math.max(Number(config.max_paginas) || 5, 1), 50);
   const itensInt = Math.min(Math.max(Number(config.itens_por_pagina) || 100, 1), 200), itensPz = Math.min(itensInt, 100);
@@ -237,10 +260,12 @@ async function entregar({ db, api, bruto, config, pz, c, ex }) {
 
 // Webhook. O corpo NÃO é tratado como fonte de dados (formato não documentado): serve de aviso; o conteúdo vem da API.
 // Respostas: 401 assinatura inválida/ausente · 200 repetido · 200 ignorado (integração desligada) · 200 processado · 202 aceito com falha de consulta
-export async function receberWebhook({ db, cliente, corpoBruto, assinatura, segredo }) {
+export async function receberWebhook({ db, cliente, corpoBruto, assinatura, segredo, agora = () => new Date() }) {
   const ok = await verificarAssinatura(segredo, corpoBruto, assinatura);
   const impressao = await sha256(corpoBruto || "");
-  if (!ok) { await db.rpc("sync_evento_registrar", { p_canal: "webhook", p_tipo: null, p_impressao: `inv:${impressao}`, p_assinatura_ok: false, p_corpo: null }); return { http: 401, status: "assinatura_invalida" }; }
+  // Assinatura inválida: recusa e anota no máximo UM registro por hora (com contador), sem o corpo — uma enxurrada de pedidos
+  // forjados não enche o banco nem deixa conteúdo de terceiros guardado.
+  if (!ok) { await db.rpc("sync_evento_registrar", { p_canal: "webhook", p_tipo: null, p_impressao: `inv:${agora().toISOString().slice(0, 13)}`, p_assinatura_ok: false, p_corpo: null }); return { http: 401, status: "assinatura_invalida" }; }
   let corpo = null; try { corpo = JSON.parse(corpoBruto); } catch { /* corpo que não é JSON: ainda vale como aviso */ }
   const { ativo, config } = await integracao(db); const m = mapaDe(config.mapa);
   const tipo = corpo && typeof corpo === "object" ? primeiro(corpo, m.tipo_evento) ?? null : null;

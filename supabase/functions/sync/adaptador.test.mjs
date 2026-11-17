@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { mapearIntimacao, prazosPorIntimacao, extrairLista, verificarAssinatura, clienteSync, puxar, testarConexao, receberWebhook, ErroSync } from "./adaptador.mjs";
+import { mapearIntimacao, prazosPorIntimacao, extrairLista, verificarAssinatura, clienteSync, puxar, testarConexao, receberWebhook, amostrar, ErroSync } from "./adaptador.mjs";
 
 // ---------- dublês ----------
 const resp = (status, corpo, cab = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: (k) => ({ "x-request-id": "req-teste", ...cab })[k.toLowerCase()] ?? null }, json: async () => { if (corpo === undefined) throw new Error("sem json"); return corpo; } });
@@ -17,7 +17,7 @@ function fornecedor(rotas) {            // rotas: { "/v1/intimacoes": [resposta1
   };
   return { f, chamadas };
 }
-function banco({ ativo = true, config = { janela_dias: 7, max_paginas: 3, itens_por_pagina: 2 } } = {}) {
+function banco({ ativo = true, config = { janela_dias: 7, max_paginas: 3, itens_por_pagina: 2, contrato_confirmado: true } } = {}) {
   const b = { ativo, config, execucoes: [], eventos: new Map(), publicacoes: new Map(), quarentena: [], estado: null, chamadas: [] };
   b.rpc = async (nome, a = {}) => {
     b.chamadas.push(nome);
@@ -133,7 +133,7 @@ test("13 falha no meio: autenticação recusada encerra com erro registrado; o q
 test("14 item em quarentena não vira publicação e a execução fica parcial; limite de páginas também marca parcial", async () => {
   const db = banco(); const a = fornecedor({ "/v1/prazos": [resp(200, { itens: [] })], "/v1/intimacoes": [resp(200, { itens: [{ id: "q1", texto: "sem processo" }] })] });
   const r = await puxar({ db, cliente: cli(a.f) }); assert.equal(r.status, "parcial"); assert.equal(r.resumo.quarentena, 1); assert.equal(db.publicacoes.size, 0); assert.deepEqual(db.quarentena[0].p_campos, ["id", "texto"]);
-  const db2 = banco({ config: { max_paginas: 2, itens_por_pagina: 1 } }); let n = 0;
+  const db2 = banco({ config: { max_paginas: 2, itens_por_pagina: 1, contrato_confirmado: true } }); let n = 0;
   const b = fornecedor({ "/v1/prazos": [resp(200, { itens: [] })], "/v1/intimacoes": () => resp(200, { itens: [intim("p" + ++n)] }) });
   const r2 = await puxar({ db: db2, cliente: cli(b.f) }); assert.equal(r2.status, "parcial"); assert.equal(r2.resumo.paginas, 2);
 });
@@ -164,4 +164,26 @@ test("18 webhook válido dispara a consulta; o MESMO webhook de novo não reproc
   assert.equal(r2.status, "repetido"); assert.equal(a.chamadas.length, n);
   const off = banco({ ativo: false }); const b = fornecedor({});
   assert.equal((await receberWebhook({ db: off, cliente: cli(b.f), corpoBruto: corpo, assinatura: ass, segredo: seg })).status, "ignorado_desligada"); assert.equal(b.chamadas.length, 0);
+});
+test("19 enxurrada de webhooks forjados: 50 corpos diferentes na mesma hora geram UM registro, sem conteúdo, e nenhuma consulta", async () => {
+  const db = banco(); const { f, chamadas } = fornecedor({}); const agora = () => new Date("2026-11-17T22:10:00Z");
+  for (let i = 0; i < 50; i++) assert.equal((await receberWebhook({ db, cliente: cli(f), corpoBruto: `{"n":${i},"dado":"sigiloso"}`, assinatura: "ff" + i, segredo: "s", agora })).http, 401);
+  assert.equal(db.eventos.size, 1); assert.equal([...db.eventos.keys()][0], "inv:2026-11-17T22"); assert.equal(chamadas.length, 0); assert.ok(!JSON.stringify([...db.eventos.values()]).includes("sigiloso"));
+});
+test("20 a chave só vai ao endereço do fornecedor: sem seguir redirecionamento, com tempo limite por pedido", async () => {
+  let init = null; const f = async (url, i) => { init = { url, ...i }; return resp(200, {}); };
+  await clienteSync({ chave: "k", fetch: f, ...semEspera }).conta();
+  assert.equal(new URL(init.url).origin, "https://api.sync.atendedireito.app"); assert.equal(init.redirect, "error"); assert.ok(init.signal instanceof AbortSignal);
+});
+test("21 sem o contrato confirmado NÃO há ingestão: integração ligada, mas nenhuma chamada e nenhuma publicação até alguém conferir o formato real", async () => {
+  const db = banco({ config: { janela_dias: 7 } }); const { f, chamadas } = fornecedor({ "/v1/intimacoes": [resp(200, { itens: [intim("a1")] })] });
+  const r = await puxar({ db, cliente: cli(f) });
+  assert.equal(r.status, "aguardando_contrato"); assert.equal(chamadas.length, 0); assert.equal(db.publicacoes.size, 0); assert.match(db.execucoes[0].erro, /^contrato: /);
+});
+test("22 amostra para confirmar o contrato: devolve só nomes de campo e tipos, nunca o conteúdo; não grava publicação; funciona com a integração desligada", async () => {
+  const db = banco({ ativo: false }); const { f, chamadas } = fornecedor({ "/v1/intimacoes": [resp(200, { dados: [{ uuid: "x9", autos: { cnj: "0001234-56.2026.8.26.0100" }, quando: "2026-11-16T10:00:00Z", conteudo: "TEXTO SIGILOSO" }], total: 1 })], "/v1/prazos": [resp(200, { dados: [] })] });
+  const r = await amostrar({ db, cliente: cli(f), itens: 50 });
+  assert.equal(r.ok, true); assert.deepEqual(r.forma.intimacoes, { dados: [{ autos: { cnj: "texto" }, conteudo: "texto", quando: "texto(data)", uuid: "texto" }], total: "número" });
+  assert.deepEqual(r.mapeamento_candidato, [{ faltando: ["id_externo", "numero_processo", "data_publicacao"] }]);
+  assert.ok(!JSON.stringify(r).includes("SIGILOSO") && !JSON.stringify(r).includes("0001234")); assert.equal(chamadas[0].params.itens, "5"); assert.ok(!db.chamadas.includes("sync_receber_intimacao"));
 });

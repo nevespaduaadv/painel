@@ -30,6 +30,9 @@ caso("integração desligada: nenhuma chamada ao fornecedor; publicações, tare
 r = await testarConexao({ db, cliente: cli(fornecedor([])) });
 caso("teste de conexão com a integração desligada: registra o estado e não grava publicação", r.ok && sql("select estado ->> 'conexao' from public.integracoes where id = 'sync'") === "ok" && num("select count(*) from public.publicacoes") === pubs0);
 sql("update public.integracoes set ativo = true where id = 'sync'");
+chamadas = 0; r = await puxar({ db, cliente: cli(fornecedor(itens, prazos)) });
+caso("ligada, mas sem o contrato confirmado: nenhuma chamada, nenhuma publicação", r.status === "aguardando_contrato" && chamadas === 0 && num("select count(*) from public.publicacoes") === pubs0, r.status);
+sql("update public.integracoes set config = config || '{\"contrato_confirmado\": true}'::jsonb where id = 'sync'");
 r = await puxar({ db, cliente: cli(fornecedor(itens, prazos)) });
 caso("recebimento: 4 itens → 2 novas, 1 anexada à publicação do DJEN, 1 em quarentena; execução parcial (há quarentena)", r.status === "parcial" && r.resumo.novas === 2 && r.resumo.anexadas === 1 && r.resumo.quarentena === 1, JSON.stringify(r.resumo));
 caso("vinculação: a nova do processo cadastrado ficou ligada ao processo e ao cliente, com origem Sync", sql("select (processo_id is not null) || '|' || (cliente_id is not null) || '|' || origem from public.publicacoes p join public.publicacao_fontes f on f.publicacao_id = p.id where f.id_externo = 'e2e-1'") === "true|true|sync");
