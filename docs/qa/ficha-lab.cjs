@@ -119,7 +119,8 @@ const tinta = (pg) => pg.evaluate(() => { const ink = getComputedStyle(document.
     for (const sub of ['cliente', 'passivos', 'processos', 'negociacoes', 'tarefas']) { await pg.evaluate((s) => { S.sub = s; render(); }, sub); await pg.waitForTimeout(500); }
     const t = await tinta(pg); const pas = await pg.evaluate(() => { S.sub = 'passivos'; render(); return [...document.querySelectorAll('#main > .actions .btn')].map((x) => x.textContent + ':' + x.getAttribute('aria-pressed')); });
     if (JSON.stringify(pas) === JSON.stringify(['Visão geral:true', 'Contratos:false', 'Reserva de quitação:false'])) ok('Passivos: sub-navegação com estado pressionado (aria-pressed) em vez de botão verde'); else falha('passivos: ' + JSON.stringify(pas));
-    if (!erros.length && !escritas.length) ok('Cadastro, Passivos, Jurídico, Negocial e Tarefas abrem sem erro e sem gravar'); else falha('abas: ' + JSON.stringify([erros, escritas, t]));
+    const grav = escritas.filter((x) => !/^POST \/rest\/v1\/rpc\/edita_protecao\b/.test(x)); /* 0111: edita_protecao() é consulta de permissão (RPC de leitura), não gravação */
+    if (!erros.length && !grav.length) ok('Cadastro, Passivos, Jurídico, Negocial e Tarefas abrem sem erro e sem gravar'); else falha('abas: ' + JSON.stringify([erros, grav, t]));
     await ctx.close(); }
 
   // ========== 4. V2 intacta ==========
