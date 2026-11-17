@@ -177,7 +177,7 @@
       });
       v.querySelectorAll("section.card.section").forEach((sec) => { if (!sec.querySelector("tbody tr")) sec.remove(); });
     }; }
-  window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso };
+  window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso, renderRelatorio, reabrir, limparAntigas };
   window.__PP_LOGIN?.then(() => { SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome").then(({ data }) => { T.colab = data || []; });
     SB.from("workflows_prazo").select("*").eq("ativo", true).order("ordem").then(({ data }) => { T.workflows = data || []; });
     SB.from("escritorio").select("dados").eq("id", "juridico").maybeSingle().then(({ data }) => { T.confereId = data?.dados?.conferencia_protocolo_id || null; }); });
