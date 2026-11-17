@@ -3,7 +3,7 @@
    asaas_clientes, asaas_sincronizacoes, escritorio('financeiro') (0055). Edge: /enviar acao asaas_* . */
 (()=>{
 "use strict";
-const F={ok:false,carregando:false,rows:[],mes:[],sinc:null,cfg:null,fStatus:"abertas",fCli:"",fTipo:"",q:""};
+const F={ok:false,carregando:false,erro:null,rows:[],mes:[],sinc:null,cfg:null,fStatus:"abertas",fCli:"",fTipo:"",q:""};
 const podeFin=()=>PP.perfil?.papel==="admin"||(PP.perfil?.acessos||[]).includes("financeiro");
 const TIPO={entrada:"Entrada",parcela:"Parcela",exito:"Êxito",mensalidade:"Mensalidade",outro:"Outro"};
 const ST={pendente:["Em aberto","g"],paga:["Paga","e1"],atrasada:["Atrasada","e3"],estornada:["Estornada","c"],cancelada:["Cancelada","c"],outra:["Outra","c"]};
@@ -26,16 +26,17 @@ async function carregar(){
       pag(SB.from("v_cobrancas").select("*").in("status",["paga","estornada","cancelada"]).gte("vencimento",desde).order("vencimento",{ascending:false})),
       SB.from("v_financeiro_mes").select("*").eq("mes",mesAtual()).maybeSingle(),
       SB.from("asaas_sincronizacoes").select("*").order("id",{ascending:false}).limit(1).maybeSingle(),SB.from("escritorio").select("dados").eq("id","financeiro").maybeSingle()]);
-    F.rows=[...ab,...pg];F.mes=m.data?[m.data]:[];F.sinc=s.data||null;F.cfg=e.data?.dados||{};F.ok=true;
-  }catch(e){console.warn("financeiro",e);toast("Não foi possível carregar o financeiro")}
+    F.rows=[...ab,...pg];F.mes=m.data?[m.data]:[];F.sinc=s.data||null;F.cfg=e.data?.dados||{};F.ok=true;F.erro=null;
+  }catch(e){console.warn("financeiro",e);F.erro=e;toast("Não foi possível carregar o financeiro")}
   finally{F.carregando=false}
   render();
 }
-const garantir=()=>{if(!F.ok&&!F.carregando)carregar();return F.ok};
-const invalidar=()=>{F.ok=false;garantir()};
+const garantir=()=>{if(!F.ok&&!F.carregando&&!F.erro)carregar();return F.ok};
+const invalidar=()=>{F.ok=false;F.erro=null;garantir()};
 
 function renderFinanceiro(){
   const v=$("#view-financeiro");v.replaceChildren();
+  v.classList.toggle("np-v3",finV3());if(finV3())return renderFinV3(v);
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Financeiro"),el("h1",{},"Cobranças"),el("div",{class:"sub"},"Entrada, parcelas e êxito cobrados pelo Asaas. Pagamentos dão baixa sozinhos (webhook) e marcam o cliente como adimplente ou não. A régua de cobrança por WhatsApp é opcional.")),
     el("div",{class:"actions"},el("button",{class:"btn",onclick:sincronizar},"Sincronizar com o Asaas"),el("button",{class:"btn primary",onclick:()=>openCobrancaForm(null)},"+ Nova cobrança"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -119,6 +120,103 @@ function openCobrancaForm(c){
     const j=await edge({acao:"asaas_cobrar",cliente_id:cli.value,tipo:tipo.value,valor:+valor.value,vencimento:venc.value,forma:forma.value,parcelas:+parc.value||1,descricao:desc.value.trim(),contrato_id:kon.value||null});
     toast(j.aviso||`${j.pagamentos} cobrança(s) criada(s)`);invalidar();try{notificar("clientes")}catch(_){}
   });
+}
+/* ---------- V10 · Cobranças em V3.1 (lista pelo vencimento + painel). Mesmos dados, mesmas contas e mesmas ações da V2. ---------- */
+const finV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const V3={aberta:null,painel:null,manterPop:false};
+const dBR=iso=>iso?String(iso).slice(0,10).split("-").reverse().join("/"):"—";
+const diasAte=iso=>iso?Math.round((new Date(iso.slice(0,10)+"T12:00:00")-new Date(hojeISO()+"T12:00:00"))/864e5):null;
+const grupoC=r=>r.status==="atrasada"?"atraso":r.status==="pendente"?(diasAte(r.vencimento)<=7?"semana":"avencer"):r.status==="paga"?"pagas":"outras";
+const GRUPOS_C=[["atraso","Em atraso","crit"],["semana","Vencem em até 7 dias","att"],["avencer","A vencer",""],["pagas","Pagas (últimos 120 dias)",""],["outras","Estornadas e canceladas",""]];
+const limparC=()=>{F.fStatus="abertas";F.fCli="";F.fTipo="";F.q=""};
+function filtrarC(){
+  let rows=F.rows.filter(r=>F.fStatus==="todas"||(F.fStatus==="abertas"?["pendente","atrasada"].includes(r.status):r.status===F.fStatus));
+  if(F.fCli==="sem")rows=rows.filter(r=>!r.cliente_id);else if(F.fCli)rows=rows.filter(r=>r.cliente_id===F.fCli);
+  if(F.fTipo)rows=rows.filter(r=>r.tipo===F.fTipo);
+  if(F.q){const t=F.q.toLowerCase();rows=rows.filter(r=>(r.descricao||"").toLowerCase().includes(t)||(r.cliente_nome||"").toLowerCase().includes(t))}
+  return rows.sort((a,b)=>(a.status==="atrasada"?0:1)-(b.status==="atrasada"?0:1)||(a.vencimento||"").localeCompare(b.vencimento||""));
+}
+function linhaC(r){
+  const pz=r.vencimento?NPUI.prazoTxt(r.vencimento):null,ab=["pendente","atrasada"].includes(r.status),d=diasAte(r.vencimento),m=[];
+  if(!r.cliente_id)m.push(NPUI.marca("sem cliente","att"));
+  if(r.regua_parada&&ab){const k=NPUI.marca("régua pausada");k.classList.add("np-so-largo");m.push(k)}
+  else if(r.regua_enviadas?.length&&ab){const k=NPUI.marca(`régua: ${r.regua_enviadas.length} msg`);k.classList.add("np-so-largo");k.title=r.regua_enviadas.join(", ");m.push(k)}
+  if(r.status==="paga")m.push(NPUI.marca(r.pago_em?"paga em "+dBR(r.pago_em).slice(0,5):"paga","ok"));
+  else if(!ab)m.push(NPUI.marca((ST[r.status]||[r.status])[0].toLowerCase()));
+  const ctx=[r.descricao||null,r.total_parcelas?`parcela ${r.parcela||"?"}/${r.total_parcelas}`:r.parcela?`parcela ${r.parcela}`:null,TIPO[r.tipo]||r.tipo].filter((x,i,l)=>x&&l.indexOf(x)===i).join(" · ");
+  return NPUI.linha({id:String(r.id),regua:r.status==="atrasada"?"late":ab&&d!=null&&d<=7?"att":null,atual:V3.aberta===r.id,riscado:r.status==="cancelada"||r.status==="estornada",
+    prazo:pz?{curta:pz.curta,rel:ab?pz.rel:"",exata:"Vencimento: "+pz.exata,tom:r.status==="atrasada"?"late":""}:null,
+    titulo:r.cliente_nome||"Sem cliente vinculado",contexto:ctx,direita:[...m,el("span",{class:"np-valor"},R$(r.valor))],titleAbrir:"Abrir a cobrança",onOpen:li=>abrirPainelC(r,{origem:li.querySelector(".np-it-abrir")})});
+}
+function estadoC(){
+  const adm=PP.perfil?.papel==="admin",on=!!F.cfg.regua_whatsapp;
+  const alt=adm?el("button",{type:"button",class:"np-link","aria-haspopup":"dialog","aria-expanded":"false",onclick:e=>NPUI.pop(e.currentTarget,()=>[el("div",{class:"np-pop-form np-fin-regua"},el("h4",{},"Régua de cobrança por WhatsApp"),
+      el("p",{class:"np-nota"},"3 dias antes, no dia, +1, +5 e +10 dias; depois, tarefa para o administrativo. Roda todo dia às 9h10. Hoje está "+(on?"ligada.":"desligada.")),
+      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Fechar",{variante:"ghost",onclick:()=>NPUI.fecharPop()}),NPUI.btn(on?"Desligar a régua":"Ligar a régua",{onclick:async()=>{
+        const {error}=await SB.from("escritorio").update({dados:{...F.cfg,regua_whatsapp:!on}}).eq("id","financeiro");if(error){toast("Não foi possível salvar");return}F.cfg.regua_whatsapp=!on;NPUI.fecharPop();toast(!on?"Régua ligada — roda todo dia às 9h10":"Régua desligada");render()}})))],
+      {role:"dialog",label:"Régua de cobrança",alinhar:"dir",refoco:()=>$("#view-financeiro .np-fin-estado .np-link")})},"Alterar"):null;
+  return el("div",{class:"np-pub-fontes np-fin-estado"},el("span",{},el("b",{},"Asaas")," · ",F.sinc?["última sincronização ",new Date(F.sinc.inicio).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}),F.sinc.ok?` · ${F.sinc.cobrancas} cobrança(s), ${F.sinc.clientes} cliente(s) vinculados`:[" · ",NPUI.marca("erro: "+(F.sinc.erro||""),"crit")]]:"ainda não sincronizado"),
+    el("span",{},el("b",{},"Régua por WhatsApp")," · ",NPUI.marca(on?"ligada":"desligada",on?"ok":"")," ",alt));
+}
+function filtrosC(){
+  const n=fn=>F.rows.filter(fn).length,chips=[];const C=(k,label,cnt,title)=>{const c=NPUI.chip({label,n:cnt,on:F.fStatus===k,grupo:"attr",title,onclick:()=>{F.fStatus=F.fStatus===k?"abertas":k;render()}});chips.push(c);return c};
+  C("atrasada","Em atraso",n(r=>r.status==="atrasada")).classList.add("crit");C("pendente","Em aberto",n(r=>r.status==="pendente"),"Ainda não venceram");C("paga","Pagas",n(r=>r.status==="paga"),"Pagas nos últimos 120 dias");C("todas","Todas",null,"Abertas e os últimos 120 dias");
+  const semCli=n(r=>!r.cliente_id&&["pendente","atrasada"].includes(r.status));
+  if(semCli)chips.push(NPUI.chip({label:"Sem cliente",n:semCli,on:F.fCli==="sem",grupo:"attr",title:"Cobranças do Asaas sem cliente vinculado. O vínculo é automático pelo CNPJ/CPF da ficha.",onclick:()=>{F.fCli=F.fCli==="sem"?"":"sem";render()}}));
+  const extras=[F.q.trim(),F.fCli&&F.fCli!=="sem"?F.fCli:"",F.fTipo].filter(Boolean).length;
+  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Busca, cliente, tipo",onclick:e=>NPUI.pop(e.currentTarget,()=>{
+    let t=null;const q=el("input",{type:"search",placeholder:"Descrição ou cliente…",value:F.q,"aria-label":"Buscar cobrança",oninput:ev=>{F.q=ev.target.value;clearTimeout(t);t=setTimeout(()=>{V3.manterPop=true;render()},300)}});
+    const clis=[...new Map(F.rows.filter(r=>r.cliente_id).map(r=>[r.cliente_id,r.cliente_nome||r.cliente_id])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+    const fc=sel({"":"Todos os clientes",sem:"Sem cliente vinculado",...Object.fromEntries(clis)},F.fCli);fc.onchange=()=>{F.fCli=fc.value;render()};
+    const ft=sel({"":"Todos os tipos",...TIPO},F.fTipo);ft.onchange=()=>{F.fTipo=ft.value;render()};
+    const L=(l,c)=>el("div",{},el("label",{},l),c);
+    return [el("div",{class:"np-pop-form"},L("Buscar",q),L("Cliente",fc),L("Tipo",ft),el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{limparC();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-financeiro .np-chipf[aria-haspopup="dialog"]')})});
+  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
+  return {chips,fixos:[mais]};
+}
+function renderFinV3(v){
+  V3.painel=null;
+  if(!garantir()){if(F.erro&&!F.carregando){v.append(NPUI.faixaErro({texto:"Não foi possível carregar as cobranças. Confira a conexão.",onAcao:()=>{F.erro=null;invalidar();render()}}));return}v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
+  const mes=mesAtual(),abertas=F.rows.filter(r=>["pendente","atrasada"].includes(r.status)),atras=F.rows.filter(r=>r.status==="atrasada"),mesRow=F.mes.find(m=>m.mes===mes)||{};
+  const aReceberMes=F.rows.filter(r=>r.status==="pendente"&&(r.vencimento||"").startsWith(mes)).reduce((a,r)=>a+(+r.valor||0),0),soma=l=>l.reduce((a,r)=>a+(+r.valor||0),0);
+  const resumo=NPUI.resumo([{n:R$(+mesRow.recebido||0),label:`recebido no mês (${mesRow.n_pagas||0})`},{n:R$(aReceberMes),label:"a vencer no mês"},{n:R$(soma(atras)),label:`em atraso (${atras.length} · ${new Set(atras.map(r=>r.cliente_id)).size} cliente${new Set(atras.map(r=>r.cliente_id)).size===1?"":"s"})`,tom:atras.length?"crit":"zero"},{n:R$(soma(abertas)),label:`em aberto (${abertas.length})`}]);
+  const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,[{label:"Sincronizar com o Asaas",onclick:sincronizar}],{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-financeiro .np-ib[aria-label="Mais ações"]')}));maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
+  const ro=typeof readOnly==="function"&&readOnly(),fl=filtrosC();
+  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[ro?null:maisAc,ro?null:NPUI.btn("Nova cobrança",{variante:"pri",icone:"mais",onclick:()=>openCobrancaForm(null)})]}),estadoC());
+  NPUI.reancorarPop();V3.manterPop=false;
+  const todos=filtrarC(),LIM=400,lista=todos.slice(0,LIM),obra=el("div",{class:"np-obra"}),corpo=el("div",{class:"np-corpo"});
+  if(!lista.length)corpo.append(NPUI.vazio(!F.rows.length?{titulo:"Nenhuma cobrança",texto:"As cobranças criadas no Asaas aparecem aqui depois da sincronização.",acao:ro?null:"Sincronizar com o Asaas",onAcao:sincronizar}
+    :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver as demais cobranças.",acao:"Limpar filtros",onAcao:()=>{limparC();render()}}));
+  else{
+    let ab={};try{ab=JSON.parse(NPUI.pref.get("np-fin-grupos")||"{}")||{}}catch(e){}
+    for(const [k,l,tom] of GRUPOS_C){const its=lista.filter(r=>grupoC(r)===k);if(!its.length)continue;
+      corpo.append(NPUI.grupo({id:"fin-"+k,titulo:l+" · "+R$(soma(its)),n:its.length,tom,aberto:ab[k]!=null?ab[k]!==false:true,onToggle:x=>{ab[k]=x;NPUI.pref.set("np-fin-grupos",JSON.stringify(ab))},itens:its.map(linhaC)}))}
+    corpo.append(NPUI.rodape(`${lista.length} ${lista.length===1?"cobrança":"cobranças"} na lista`+(todos.length>LIM?` · mostrando ${LIM} de ${todos.length}: use os filtros para refinar`:"")+(F.fStatus==="abertas"?" · pagas, estornadas e canceladas nos filtros":""),[["late","em atraso"],["att","vence em até 7 dias"]]));
+  }
+  obra.append(corpo);v.append(obra);
+  V3.painel=NPUI.painel({obra,label:"Detalhe da cobrança",onClose:()=>{V3.aberta=null}});
+  if(V3.aberta!=null){const r=F.rows.find(x=>x.id===V3.aberta);if(r)abrirPainelC(r,{silencioso:true});else V3.aberta=null}
+}
+function abrirPainelC(r,{origem}={}){
+  V3.aberta=r.id;if(!V3.painel)return;
+  const st=ST[r.status]||[r.status,"c"],ab=["pendente","atrasada"].includes(r.status),ro=typeof readOnly==="function"&&readOnly(),pz=r.vencimento?NPUI.prazoTxt(r.vencimento):null;
+  const props=NPUI.props([
+    ["Situação",[NPUI.marca(st[0].toLowerCase(),r.status==="atrasada"?"crit":r.status==="paga"?"ok":r.status==="pendente"?"att":""),r.status_asaas?el("span",{class:"np-sem"}," · Asaas: "+r.status_asaas):null,r.dias_atraso?el("span",{class:"np-sem"},` · ${r.dias_atraso} dia(s) de atraso`):null]],
+    ["Valor",R$(r.valor),"serif"],r.valor_liquido!=null?["Líquido",R$(r.valor_liquido)]:null,
+    ["Vencimento",pz?[pz.exata,ab&&pz.rel?[" ",el("span",{class:"np-marca "+(r.status==="atrasada"?"crit":"")},pz.rel)]:null]:null,"serif"],
+    ["Pago em",r.pago_em?dBR(r.pago_em):null],
+    ["Cliente",r.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(r.cliente_id),onclick:e=>{e.preventDefault();S.sel=r.cliente_id;S.tab="clientes";S.sub="geral";render()}},r.cliente_nome||r.cliente_id):NPUI.marca("sem cliente vinculado","att")],
+    ["Descrição",r.descricao||null],["Parcela",r.total_parcelas?`${r.parcela||"?"} de ${r.total_parcelas}`:r.parcela?String(r.parcela):null],["Tipo",TIPO[r.tipo]||r.tipo||null],["Forma",FORMA[r.forma]||r.forma||null],["Asaas",r.asaas_id||null],
+    ["Régua",r.regua_parada?"pausada para esta cobrança":r.regua_enviadas?.length?r.regua_enviadas.join(", "):"nenhuma mensagem"],
+  ].filter(x=>x&&x[1]!=null));
+  const obs=el("textarea",{rows:"3",placeholder:"Observações internas (ex.: cliente pediu nova data)","aria-label":"Observações internas"},r.observacoes||"");
+  const secObs=ro?(r.observacoes?NPUI.secao("Observações",el("p",{style:"white-space:pre-wrap"},r.observacoes)):null):NPUI.secao("Observações",obs,el("div",{},NPUI.btn("Salvar observação",{onclick:async()=>{const {error}=await SB.from("cobrancas").update({observacoes:obs.value.trim()||null}).eq("id",r.id);if(error){toast(error.message||"Não foi possível salvar");return}toast("Salvo");invalidar()}})));
+  const lk=(t,href)=>el("a",{class:"np-btn",href,target:"_blank",rel:"noopener"},t);
+  const pe=[r.link_fatura?lk("Abrir fatura",r.link_fatura):null,r.link_boleto?lk("Boleto PDF",r.link_boleto):null,
+    !ro&&r.asaas_id&&ab?NPUI.btn("Copiar Pix",{onclick:async()=>{try{const j=await edge({acao:"asaas_pix",asaas_id:r.asaas_id});await navigator.clipboard?.writeText(j.payload||"");toast("Pix copia-e-cola copiado")}catch(e){toast(e.message)}}}):null,
+    !ro&&ab?NPUI.btn(r.regua_parada?"Reativar régua":"Pausar régua",{variante:"ghost",title:"Só para esta cobrança",onclick:async()=>{const {error}=await SB.from("cobrancas").update({regua_parada:!r.regua_parada}).eq("id",r.id);if(error){toast("Não foi possível");return}toast(r.regua_parada?"Régua reativada":"Régua pausada para esta cobrança");invalidar()}}):null,
+    !ro&&!r.cliente_id?NPUI.btn("Vincular cliente",{onclick:()=>vincular(r)}):null].filter(Boolean);
+  V3.painel.abrir({trilha:[el("span",{},TIPO[r.tipo]||"Cobrança"),el("span",{class:"sep"}),el("span",{},dBR(r.vencimento))],titulo:r.cliente_nome||"Sem cliente vinculado",corpo:[props,secObs].filter(Boolean),pe,origem,id:String(r.id)});
 }
 /* ---------- card na ficha do cliente ---------- */
 function cardFinanceiro(c){
