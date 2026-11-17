@@ -10,7 +10,7 @@ const TIPOS_DOC={contrato_bancario:"Contrato bancário",contrato_honorarios:"Con
 const ORIGENS=["Meta Ads","Google","Indicação","Orgânico / Instagram","Parceiro","Base antiga","Outro"];
 const PLANOS=["Gestão de Passivos Bancários PJ","Superendividamento","Revisional","Defesa em execução","Estruturação societária","Outro"];
 const UFS="AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
-const F={cid:null,carregando:null,contatos:[],bens:[],documentos:[],acessos:[]};
+const F={cid:null,carregando:null,contatos:[],bens:[],documentos:[],acessos:[],editaProtecao:null};
 const SISTEMAS=["gov.br","e-CAC","Internet banking","Certificado digital","Serasa","Portal do tribunal","Outro"];
 const horasFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
 const check=(label,checked,help)=>{const i=el("input",{type:"checkbox",style:"width:16px;height:16px;flex:none;margin:0;accent-color:var(--gold)"});i.checked=!!checked;return {wrap:el("div",{class:"f",style:"justify-content:center"},el("label",{style:"display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px"},i,label),help?el("div",{class:"help"},help):null),input:i}};
@@ -23,6 +23,7 @@ const cnpjMask=v=>{const d=(v||"").replace(/\D/g,"");return d.length===14?d.repl
 async function carregar(cid){
   if(F.carregando===cid)return;F.carregando=cid;
   try{
+    if(F.editaProtecao==null&&equipe())SB.rpc("edita_protecao").then(({data})=>{F.editaProtecao=data===true;if(S.tab==="clientes"&&S.sel===cid)render()},()=>{F.editaProtecao=false});
     const [a,b,c,d]=await Promise.all([SB.from("contatos").select("*").eq("cliente_id",cid).order("principal",{ascending:false}).order("nome"),
       equipe()?SB.from("bens").select("*").eq("cliente_id",cid).order("tipo"):{data:[]},
       SB.from("documentos").select("*").eq("cliente_id",cid).order("data",{ascending:false,nullsFirst:false}),
@@ -144,7 +145,21 @@ function openContatoForm(c,x={}){
 function openBemForm(c,b={}){
   const tipo=sel(TIPOS_BEM,b.tipo||"veiculo"),desc=inp("text",b.descricao||"",{placeholder:"Ex.: Fiat Toro 2022 placa ABC1D23"}),tit=sel({"":"—",...TITULARES_BEM},b.titular||"PF"),onus=dl("b-onus",b.onus||"",["Livre","Financiado","Alienado fiduciariamente","Hipotecado","Penhorado","Bem de família","Usufruto","Vendido sem transferência"]),val=inp("number",b.valor_estimado||"",{step:"1000"}),obs=el("textarea",{},b.observacoes||"");
   const body=el("div",{class:"form"},field("b-tipo","Tipo",tipo),field("b-desc","Descrição",desc),field("b-tit","Titular",tit),field("b-onus","Ônus / situação",onus.wrap),field("b-val","Valor estimado (R$)",val),field("b-obs","Observações",obs));
-  const extra=b.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este bem?"))return;await SB.from("bens").delete().eq("id",b.id);$("#modalHost").replaceChildren();toast("Bem excluído");recarregar()}},"Excluir"):null;
+  /* 0111: excluir bem = quem conduz a proteção (edita_protecao) e só bem fora de proteção; bem em proteção ou protegido = só a
+     administradora, com motivo (bem_excluir_protegido). O botão só aparece para quem pode; a resposta do banco é conferida. */
+  const protegido=["em_protecao","protegido"].includes(b.protecao),admin=PP.perfil?.papel==="admin";
+  const podeExcluir=b.id&&(protegido?admin:F.editaProtecao===true);
+  const extra=podeExcluir?el("button",{class:"btn danger",onclick:async()=>{
+    if(protegido){let mot=body.querySelector("#b-motivo");
+      if(!mot){mot=el("textarea",{id:"b-motivo",rows:2,placeholder:"Ex.: bem vendido antes da proteção"});body.append(el("div",{class:"f full confirm"},el("label",{for:"b-motivo"},"Este bem está "+(b.protecao==="protegido"?"protegido":"em proteção")+". A exclusão exige autorização da administradora e fica registrada na auditoria e no dossiê. Motivo:"),mot));mot.focus();return}
+      const motivo=mot.value.trim();if(motivo.length<10){toast("Informe o motivo (pelo menos 10 caracteres). Nada foi excluído.");mot.focus();return}
+      const {error}=await SB.rpc("bem_excluir_protegido",{p_id:b.id,p_motivo:motivo});
+      if(error){toast("Nada foi excluído: "+(error.message||"sem permissão"));return}
+      $("#modalHost").replaceChildren();toast("Bem excluído com autorização");recarregar();return}
+    if(!confirmInline(body,"Excluir este bem?"))return;
+    const {data,error}=await SB.from("bens").delete().eq("id",b.id).select("id");
+    if(error||!data?.length){toast(error?"Não foi possível excluir: "+(error.message||"erro")+". Nada foi excluído.":"Você não tem permissão para excluir este bem; nada foi excluído.");return}
+    $("#modalHost").replaceChildren();toast("Bem excluído");recarregar()}},protegido?"Excluir (administradora)":"Excluir"):null;
   modal(b.id?"Editar bem":"Novo bem",body,async()=>{
     if(!desc.value.trim())throw new Error("Descreva o bem");
     const row={cliente_id:c.id,tipo:tipo.value,descricao:desc.value.trim(),titular:tit.value||null,onus:onus.input.value.trim()||null,valor_estimado:val.value===""?null:+val.value,observacoes:obs.value.trim()||null};
