@@ -130,6 +130,10 @@ const tinta = (pg) => pg.evaluate(() => { const ink = getComputedStyle(document.
     await pg.evaluate(() => { S.sub = 'acompanhamento'; render(); }); await pg.waitForTimeout(900);
     const a2 = await pg.evaluate(() => { const host = [...document.querySelectorAll('#main > .main')].pop(); const secs = [...host.children].map((x) => (x.querySelector('h2,h3')?.textContent || '').trim()); return { dossie: secs.includes('Dossiê') || !!document.querySelector('#main ul.tl'), primeira: secs[0] }; });
     if (!a2.dossie && /Status do acompanhamento|Ciclo de acompanhamento/.test(a2.primeira)) ok(`V2: aba Acompanhamento PJ sem o Dossiê repetido; começa em "${a2.primeira}"`); else falha('v2 acompanhamento: ' + JSON.stringify(a2));
+    // 17/11: Financeiro, Honorários e Fechamento também saem da aba Acompanhamento PJ e ficam nos lugares próprios
+    const tit = async (sub) => { await pg.evaluate((s) => { S.sub = s; render(); }, sub); await pg.waitForTimeout(1100); return pg.evaluate(() => [...document.querySelectorAll('#main > .main')].pop() ? [...[...document.querySelectorAll('#main > .main')].pop().querySelectorAll(':scope > .card h2, :scope > .card h3, :scope > section h2, :scope > .section h2')].map((x) => x.textContent.trim()) : []); };
+    const tA = await tit('acompanhamento'), tC = await tit('cliente'), tF = await tit('financeiro'); const tem = (l, re) => l.some((x) => re.test(x));
+    if (!tem(tA, /^Financeiro|Honorários|Fechamento/) && tem(tC, /Fechamento/) && tem(tF, /Financeiro|Cobran|Honorários/)) ok(`V2: aba Acompanhamento PJ sem Financeiro, Honorários e Fechamento; Fechamento segue no Cadastro; Financeiro/Honorários seguem na aba Financeiro (${tF.filter((x) => /Financeiro|Honorários|Cobran/.test(x)).slice(0, 3).join(', ')})`); else falha('duplicações: ' + JSON.stringify({ tA, tC, tF }));
     if (!erros.length) ok('V2 sem erros de página'); else falha('erros v2: ' + erros.join(' | ')); await ctx.close(); }
 
   // ========== 5. 375 px, alvos e contraste ==========
