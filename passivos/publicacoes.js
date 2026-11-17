@@ -3,7 +3,7 @@
 (()=>{
 "use strict";
 const U={lista:[],resumo:null,procs:[],colab:[],ok:false,carregando:false,periodo:"30",soNaoLidas:false,soSemVinculo:false,fCli:"",q:"",erro:null,aba:"lista",f:{pend:false,semProc:false,naoLidas:false,prazo:false,diverg:false,origem:""},
-  sync:{instalada:false,ativo:false,estado:{},fontes:new Map(),prazos:new Map()}};
+  sync:{instalada:false,ativo:false,estado:{},revisor:false,fontes:new Map(),prazos:new Map()}};
 const hojeISO=(n=0)=>{const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const nomeCli=id=>(S.clientes.find(c=>c.id===id)||{}).nome||id||"—";
 
@@ -28,9 +28,10 @@ async function carregarSync(){
     const i=await SB.from("integracoes").select("ativo,estado,atualizado_em").eq("id","sync").maybeSingle();
     if(i.error||!i.data){y.instalada=false;y.ativo=false;y.estado={};return}
     y.instalada=true;y.ativo=!!i.data.ativo;y.estado=i.data.estado||{};
+    try{const rv=await SB.rpc("prazo_revisor");y.revisor=rv.data===true}catch(e){y.revisor=false}   /* quem revisa as situações críticas; o banco confere de novo */
     const ids=U.lista.map(p=>p.id);if(!ids.length)return;
     const [f,z]=await Promise.all([SB.from("publicacao_fontes").select("id,publicacao_id,fonte,casamento,divergencias,conciliada_em,conciliacao,link,primeira_vez").in("publicacao_id",ids),
-      SB.from("publicacao_prazos").select("id,publicacao_id,origem,rotulo,data_sugerida,estado,data_conferida,fatal,conferido_por_nome,conferido_em,observacao,tarefa_id").in("publicacao_id",ids).order("data_sugerida")]);
+      SB.from("publicacao_prazos").select("id,publicacao_id,origem,rotulo,data_sugerida,estado,data_conferida,fatal,conferido_por,conferido_por_nome,conferido_em,observacao,tarefa_id,revisao_pendente,revisao_motivo,revisado_por_nome,revisado_em").in("publicacao_id",ids).order("data_sugerida")]);
     for(const r of f.data||[]){if(!y.fontes.has(r.publicacao_id))y.fontes.set(r.publicacao_id,[]);y.fontes.get(r.publicacao_id).push(r)}
     for(const r of z.data||[]){if(!y.prazos.has(r.publicacao_id))y.prazos.set(r.publicacao_id,[]);y.prazos.get(r.publicacao_id).push(r)}
   }catch(e){y.instalada=false}
@@ -141,6 +142,7 @@ const fontesDe=p=>{const fs=new Set((U.sync.fontes.get(p.id)||[]).map(f=>f.fonte
 const origemTxt=p=>["djen","sync","datajud"].filter(k=>fontesDe(p).has(k)).map(k=>ROT[k]).join(" + ");
 const prazosDe=p=>U.sync.prazos.get(p.id)||[];
 const aConferir=p=>prazosDe(p).filter(z=>z.estado==="sugerido").length;
+const emRevisao=p=>prazosDe(p).filter(z=>z.revisao_pendente).length;
 const divergDe=p=>(U.sync.fontes.get(p.id)||[]).filter(f=>!f.conciliada_em&&((f.divergencias||[]).length||f.casamento==="provavel"));
 const sitP=p=>p.ignorada?"ignorada":p.providencia?"analisada":(p.dias_para_tratar!=null&&p.dias_para_tratar<0)?"vencida":"pendente";
 const sitTxt=p=>p.ignorada?"ignorada":p.providencia?(p.providencia==="gerou_prazo"||p.providencia==="encaminhada"||p.tarefa_id?"com providência":"analisada"):p.lida?"pendente de análise":"recebida";
@@ -154,6 +156,7 @@ function linhaPub(p){
   const st=sitP(p),d=p.dias_para_tratar,m=[];
   if(p.sem_vinculo&&!p.ignorada)m.push(NPUI.marca("sem processo","att"));
   const nz=aConferir(p);if(nz){const k=NPUI.marca(nz===1?"prazo a conferir":nz+" prazos a conferir","att");k.title="Prazo sugerido pela plataforma. Só vale depois da conferência do Jurídico.";m.push(k)}
+  if(emRevisao(p)){const k=NPUI.marca("prazo em revisão","att");k.title="Conferido, aguardando a revisão de quem responde pelo Jurídico";m.push(k)}
   if(divergDe(p).length){const k=NPUI.marca("fontes divergentes","att");k.title="As fontes trazem informações diferentes. Abra para conciliar.";m.push(k)}
   if(fontesDe(p).has("sync")){const k=NPUI.marca(origemTxt(p),"info");k.classList.add("np-so-largo");k.title="Origem do registro";m.push(k)}
   if(p.providencia){m.push(NPUI.marca(PROVL[p.providencia]||p.providencia,p.providencia==="gerou_prazo"?"ok":""));if(p.tempestiva===false){const k=NPUI.marca("fora do prazo","crit");k.classList.add("np-so-largo");m.push(k)}}
@@ -204,8 +207,8 @@ function filtrosPub(){
 function renderPubV3(v){
   V3.painel=null;
   if(!garantir()){if(U.erro&&!U.carregando){v.append(NPUI.faixaErro({texto:"Não foi possível carregar as publicações. Confira a conexão.",onAcao:()=>{recarregar();render()}}));return}v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
-  const vivos=U.lista.filter(p=>!p.ignorada),nP=vivos.filter(p=>!p.providencia).length,nV=vivos.filter(p=>sitP(p)==="vencida").length,nS=vivos.filter(p=>p.sem_vinculo).length,nZ=vivos.filter(p=>aConferir(p)>0).length;
-  const resumo=NPUI.resumo([{n:nP,label:"a analisar",tom:nP?"":"zero"},{n:nV,label:"fora do prazo de análise",tom:nV?"crit":"zero"},{n:nS,label:"sem processo",tom:nS?"att":"zero"},U.sync.instalada?{n:nZ,label:nZ===1?"prazo a conferir":"prazos a conferir",tom:nZ?"att":"zero"}:null]);
+  const vivos=U.lista.filter(p=>!p.ignorada),nP=vivos.filter(p=>!p.providencia).length,nV=vivos.filter(p=>sitP(p)==="vencida").length,nS=vivos.filter(p=>p.sem_vinculo).length,nZ=vivos.filter(p=>aConferir(p)>0).length,nR=vivos.filter(p=>emRevisao(p)>0).length;
+  const resumo=NPUI.resumo([{n:nP,label:"a analisar",tom:nP?"":"zero"},{n:nV,label:"fora do prazo de análise",tom:nV?"crit":"zero"},{n:nS,label:"sem processo",tom:nS?"att":"zero"},U.sync.instalada?{n:nZ,label:nZ===1?"prazo a conferir":"prazos a conferir",tom:nZ?"att":"zero"}:null,U.sync.instalada&&nR?{n:nR,label:nR===1?"prazo em revisão":"prazos em revisão",tom:"att"}:null]);
   const lista=filtrarPub();
   const itensAc=[{label:"Buscar período no DJEN…",onclick:buscarPeriodo},{label:"Exportar CSV (lista filtrada)",onclick:()=>{if(!lista.length){toast("Nada para exportar");return}exportarCSV("publicacoes",lista,COLS_PUB);toast(`${lista.length} linha(s) exportada(s)`)}},
     PP.perfil?.papel==="admin"&&TR().limparAntigas?{label:"Dar ciência em lote…",onclick:()=>TR().limparAntigas()}:null].filter(Boolean);
@@ -234,7 +237,7 @@ function conferirPrazo(p,z,dec){
   const data=inp("date",dec==="corrigir"?(z.data_sugerida||""):(z.data_sugerida||"")),fatal=el("input",{type:"checkbox"}),obs=el("textarea",{rows:"3",placeholder:dec==="confirmar"?"Observação (opcional)":"Motivo (obrigatório)"});
   if(dec!=="corrigir")data.disabled=true;
   const T={confirmar:"Confirmar o prazo sugerido",corrigir:"Corrigir o prazo",descartar:"Descartar a sugestão",reabrir:"Reabrir a conferência"}[dec];
-  const body=el("div",{class:"form"},el("div",{class:"f full note"},(z.rotulo||"Prazo")+" · sugerido pela plataforma: "+dBR(z.data_sugerida)+". A sugestão é automática; o prazo passa a valer com a sua conferência nos autos."),
+  const body=el("div",{class:"form"},el("div",{class:"f full note"},(z.rotulo||"Prazo")+" · sugerido pela plataforma: "+dBR(z.data_sugerida)+". A sugestão é automática. Confira nos autos o tipo de ato, a regra processual aplicável e o calendário do juízo antes de registrar. Prazo fatal, data posterior à sugerida e descarte passam por revisão de quem responde pelo Jurídico."),
     dec==="confirmar"||dec==="corrigir"?el("div",{class:"f"},el("label",{},"Data do prazo"),data):null,
     dec==="confirmar"||dec==="corrigir"?el("div",{class:"f"},el("label",{style:"display:flex;gap:8px;align-items:center"},fatal,"Prazo fatal")):null,
     el("div",{class:"f full"},el("label",{},dec==="confirmar"?"Observação":"Motivo"),obs));
@@ -244,6 +247,14 @@ function conferirPrazo(p,z,dec){
     if(error)throw new Error(error.message||"Não foi possível registrar a conferência");
     toast(dec==="descartar"?"Sugestão descartada":dec==="reabrir"?"Conferência reaberta":"Prazo conferido");recarregar()});
   const b=$("button.np-f-salvar")||$("#modalHost button.btn.primary");if(b)b.textContent=dec==="descartar"?"Descartar":dec==="reabrir"?"Reabrir":"Registrar conferência";
+}
+function revisarPrazo(z,dec){
+  if(dec==="aprovar"){SB.rpc("publicacao_prazo_revisar",{p_prazo:z.id,p_decisao:"aprovar",p_obs:null}).then(({error})=>{if(error){toast(error.message||"Não foi possível registrar a revisão");return}toast("Revisão registrada");recarregar()});return}
+  const obs=el("textarea",{rows:"3",placeholder:"Motivo (obrigatório)"});
+  modal("Devolver para nova conferência",el("div",{class:"form"},el("div",{class:"f full note"},(z.rotulo||"Prazo")+" · conferido por "+(z.conferido_por_nome||"—")+". O prazo volta a “a conferir”; a tarefa não é apagada."),el("div",{class:"f full"},el("label",{},"Motivo"),obs)),async()=>{
+    if(obs.value.trim().length<5)throw new Error("Informe o motivo.");
+    const {error}=await SB.rpc("publicacao_prazo_revisar",{p_prazo:z.id,p_decisao:"devolver",p_obs:obs.value.trim()});if(error)throw new Error(error.message||"Não foi possível devolver");toast("Devolvido para nova conferência");recarregar()});
+  const b=$("button.np-f-salvar")||$("#modalHost button.btn.primary");if(b)b.textContent="Devolver";
 }
 async function conciliarFonte(f,dec){const {error}=await SB.rpc("publicacao_fonte_conciliar",{p_fonte:f.id,p_decisao:dec});if(error){toast(error.message||"Não foi possível conciliar");return}toast("Conciliação registrada");recarregar()}
 function abrirPainelPub(p,{origem}={}){
@@ -266,12 +277,13 @@ function abrirPainelPub(p,{origem}={}){
   const pzs=prazosDe(p);
   const secPz=pzs.length?NPUI.secao("Prazos",el("p",{class:"np-nota"},"A data sugerida vem da plataforma e não é prazo do escritório. Vale a data conferida por alguém do Jurídico."),
     el("ul",{class:"np-pub-pz"},pzs.map(z=>{const conf=z.estado==="confirmado"||z.estado==="corrigido";
-      return el("li",{class:"e-"+z.estado},el("div",{class:"t"},el("b",{},z.rotulo||"Prazo")," ",z.estado==="sugerido"?NPUI.marca("a conferir","att"):z.estado==="descartado"?NPUI.marca("descartado"):NPUI.marca(z.estado==="corrigido"?"corrigido":"confirmado","ok"),conf&&z.fatal?[" ",NPUI.marca("fatal","crit")]:null),
+      return el("li",{class:"e-"+z.estado},el("div",{class:"t"},el("b",{},z.rotulo||"Prazo")," ",z.estado==="sugerido"?NPUI.marca("a conferir","att"):z.estado==="descartado"?NPUI.marca("descartado"):NPUI.marca(z.estado==="corrigido"?"corrigido":"confirmado","ok"),conf&&z.fatal?[" ",NPUI.marca("fatal","crit")]:null,z.revisao_pendente?[" ",NPUI.marca("aguardando revisão","att")]:null),
         el("dl",{},el("dt",{},"Sugerido pela plataforma"),el("dd",{},dBR(z.data_sugerida)),conf?[el("dt",{},"Conferido"),el("dd",{class:"serif"},dBR(z.data_conferida))]:null,
           z.conferido_em?[el("dt",{},z.estado==="descartado"?"Descartado por":"Conferido por"),el("dd",{},(z.conferido_por_nome||"—")+" em "+dhBR(z.conferido_em))]:null,
           conf?[el("dt",{},"Registrado"),el("dd",{},z.tarefa_id?el("button",{type:"button",class:"np-link",onclick:()=>window.PP_TAREFAS?.abrir(z.tarefa_id)},"na tarefa"):"sem tarefa")]:null,
-          z.observacao?[el("dt",{},"Observação"),el("dd",{},z.observacao)]:null),
-        jur?el("div",{class:"ac"},z.estado==="sugerido"?[NPUI.btn("Confirmar",{onclick:()=>conferirPrazo(p,z,"confirmar")}),NPUI.btn("Corrigir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"corrigir")}),NPUI.btn("Descartar",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"descartar")})]:NPUI.btn("Reabrir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"reabrir")})):null)}))):null;
+          z.observacao?[el("dt",{},"Observação"),el("dd",{},z.observacao)]:null,
+          z.revisao_pendente?[el("dt",{},"Revisão"),el("dd",{},"pendente · "+(z.revisao_motivo||"situação crítica"))]:z.revisado_em?[el("dt",{},"Revisado por"),el("dd",{},(z.revisado_por_nome||"—")+" em "+dhBR(z.revisado_em))]:null),
+        jur?el("div",{class:"ac"},z.estado==="sugerido"?[NPUI.btn("Confirmar",{onclick:()=>conferirPrazo(p,z,"confirmar")}),NPUI.btn("Corrigir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"corrigir")}),NPUI.btn("Descartar",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"descartar")})]:[...(z.revisao_pendente&&U.sync.revisor&&z.conferido_por!==PP.perfil?.id?[NPUI.btn("Aprovar revisão",{onclick:()=>revisarPrazo(z,"aprovar")}),NPUI.btn("Devolver",{variante:"ghost",onclick:()=>revisarPrazo(z,"devolver")})]:[]),NPUI.btn("Reabrir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"reabrir")})]):null)}))):null;
   const dvs=divergDe(p);
   const secDv=dvs.length?NPUI.secao("Fontes divergentes",el("ul",{class:"np-pub-dv"},dvs.map(f=>el("li",{},el("div",{},el("b",{},ROT[f.fonte]||f.fonte)," · recebida em "+dhBR(f.primeira_vez)),
     el("ul",{},(f.divergencias||[]).map(x=>el("li",{},x.campo==="possivel_duplicata"?"Pode ser a mesma comunicação da publicação "+x.nosso+" (mesmo processo e mesmo dia, texto diferente).":[el("b",{},x.campo),": aqui “",String(x.nosso??"—").slice(0,160),"” · na fonte “",String(x.fonte??"—").slice(0,160),"”"]))),

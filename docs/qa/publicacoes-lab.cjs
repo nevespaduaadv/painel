@@ -33,7 +33,7 @@ const FONTES = [
 const PRAZOS = [
   { id: 11, publicacao_id: -1, origem: 'sync', rotulo: 'Embargos de declaração (5 dias)', data_sugerida: dia(7), estado: 'sugerido', data_conferida: null, fatal: null, tarefa_id: null },
   { id: 12, publicacao_id: -1, origem: 'sync', rotulo: 'Agravo de instrumento (15 dias)', data_sugerida: dia(21), estado: 'sugerido', data_conferida: null, fatal: null, tarefa_id: null },
-  { id: 13, publicacao_id: 105, origem: 'sync', rotulo: 'Apelação (15 dias)', data_sugerida: dia(14), estado: 'corrigido', data_conferida: dia(12), fatal: true, conferido_por_nome: 'Ana Teste', conferido_em: new Date().toISOString(), observacao: 'Feriado local conferido nos autos.', tarefa_id: 't-105' },
+  { id: 13, publicacao_id: 105, origem: 'sync', rotulo: 'Apelação (15 dias)', data_sugerida: dia(14), estado: 'corrigido', data_conferida: dia(12), fatal: true, conferido_por: 'u-outra', revisao_pendente: true, revisao_motivo: 'prazo fatal', conferido_por_nome: 'Ana Teste', conferido_em: new Date().toISOString(), observacao: 'Feriado local conferido nos autos.', tarefa_id: 't-105' },
 ];
 const REL = [{ mes: '2026-11', tratada_por_nome: 'Ana Teste', publicacoes: 5, tratadas: 1, tempestivas: 1, pendentes_vencidas: 1, gerou_prazo: 1, nada_a_fazer: 0, duplicidade: 0, encaminhadas: 0, media_dias_para_tratar: 1 }];
 const V = '#view-publicacoes';
@@ -98,13 +98,16 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     if (relOk) ok('vista "Tempestividade": relatório do módulo atual, sem a lista'); else falha('tempestividade');
     await pg.click(V + ' .np-seg button:has-text("Publicações")'); await pg.waitForTimeout(400);
     if (!escritas.length) ok('nenhuma gravação ao listar, filtrar, abrir o painel e trocar de vista'); else falha('escritas: ' + JSON.stringify(escritas.slice(0, 3)));
+    // ler não é tratar: marcar como lida muda só a leitura
+    await pg.click(`${V} li.np-it[data-id="101"] .np-it-abrir`); await pg.waitForTimeout(500); const nL = escritas.length; await pg.click(`${V} .np-painel .np-btn:has-text("Marcar como lida")`); await pg.waitForTimeout(600);
+    const wl = escritas.slice(nL); if (wl.length === 1 && /^PATCH \/rest\/v1\/publicacoes/.test(wl[0]) && /\{"lida":true\}/.test(wl[0]) && !/providencia|tratada/.test(wl[0])) ok('"Marcar como lida" grava só a leitura (lida = true): não registra providência nem tratamento'); else falha('lida: ' + JSON.stringify(wl));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
     await ctx.close(); }
   // ========== B. com a 0114 e dados fictícios do Sync ==========
   rel.push('B. Com a integração instalada e desligada, e registros fictícios vindos do Sync');
   { const { ctx, pg, erros, escritas } = await abrir(b, { sync: true });
     const e = await estado(pg);
-    if (/^5 a analisar/.test(e.resumo) && /1 prazo a conferir/.test(e.resumo)) ok(`resumo: "${e.resumo}"`); else falha('resumo: ' + e.resumo);
+    if (/^5 a analisar/.test(e.resumo) && /1 prazo a conferir/.test(e.resumo) && /1 prazo em revisão/.test(e.resumo) && e.l105.marcas.some(m => /^prazo em revisão\|att/.test(m))) ok(`resumo: "${e.resumo}"`); else falha('resumo: ' + e.resumo);
     if (e.chips.some(c => /^Prazo a conferir\s*1$/.test(c)) && e.chips.some(c => /^Fontes divergentes\s*1$/.test(c)) && /AtendeDireito Sync · desligada/.test(e.fontes)) ok('filtros "Prazo a conferir" e "Fontes divergentes"; integração mostrada como desligada'); else falha('chips: ' + JSON.stringify([e.chips, e.fontes]));
     if (e.s1 && e.s1.marcas.some(m => /^2 prazos a conferir\|att/.test(m)) && e.s1.marcas.some(m => /^Sync\|info/.test(m))) ok('recebida pelo Sync: marcas "2 prazos a conferir" e "Sync"'); else falha('-1: ' + JSON.stringify(e.s1));
     if (e.l105 && e.l105.marcas.some(m => /^DJEN \+ Sync\|info/.test(m)) && !e.l105.marcas.some(m => /conferir/.test(m))) ok('mesma comunicação nas duas fontes: UMA linha, marca "DJEN + Sync"; prazo já conferido não aparece como pendência'); else falha('105: ' + JSON.stringify(e.l105));
@@ -116,10 +119,10 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     const antes = escritas.length; await pg.click('button.np-f-salvar'); await pg.waitForTimeout(800);
     const ch = escritas.slice(antes).filter(x => /rpc\/publicacao_prazo_conferir/.test(x));
     if (ch.length === 1 && /"p_prazo":11/.test(ch[0]) && /"p_decisao":"confirmar"/.test(ch[0]) && /"p_fatal":false/.test(ch[0])) ok('Confirmar → uma chamada de conferência (prazo 11, decisão "confirmar", fatal só se marcado); nada antes do clique'); else falha('conferir: ' + JSON.stringify(escritas.slice(antes)));
-    if (antes === 0) ok('nenhuma gravação até a pessoa registrar a conferência'); else falha('escritas antes: ' + JSON.stringify(escritas.slice(0, 3)));
+    if (escritas.slice(0, antes).every(x => /rpc\/prazo_revisor/.test(x))) ok('nenhuma gravação até a pessoa registrar a conferência'); else falha('escritas antes: ' + JSON.stringify(escritas.slice(0, 3)));
     await pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 }); await pg.waitForTimeout(400);
     await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
-    if (p && p.prazos.length === 1 && /corrigido/.test(p.prazos[0].t) && /fatal/.test(p.prazos[0].t) && /Conferido por\s*Ana Teste/.test(p.prazos[0].dl) && /Registrado\s*na tarefa/.test(p.prazos[0].dl) && /Feriado local/.test(p.prazos[0].dl) && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Reabrir'])) ok('prazo conferido: sugerido × conferido lado a lado, "fatal" marcado pela pessoa, quem e quando, tarefa, observação; ação Reabrir'); else falha('painel 105: ' + JSON.stringify(p && p.prazos));
+    if (p && p.prazos.length === 1 && /corrigido/.test(p.prazos[0].t) && /fatal/.test(p.prazos[0].t) && /Conferido por\s*Ana Teste/.test(p.prazos[0].dl) && /Registrado\s*na tarefa/.test(p.prazos[0].dl) && /Feriado local/.test(p.prazos[0].dl) && /aguardando revisão/.test(p.prazos[0].t) && /Revisão\s*pendente · prazo fatal/.test(p.prazos[0].dl) && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Reabrir'])) ok('prazo conferido: sugerido × conferido lado a lado, "fatal" marcado pela pessoa, quem e quando, tarefa, observação; "aguardando revisão" visível; quem não é revisor só tem Reabrir'); else falha('painel 105: ' + JSON.stringify(p && p.prazos));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-conferido.png') });
     await pg.click(`${V} li.np-it[data-id="-2"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
     if (p && p.secoes.includes('Fontes divergentes') && /Pode ser a mesma comunicação da publicação 101/.test(p.diverg[0].tx) && JSON.stringify(p.diverg[0].ac) === JSON.stringify(['É a mesma comunicação', 'São comunicações diferentes'])) ok('fontes divergentes: explicação e conciliação humana ("é a mesma" / "são diferentes")'); else falha('painel -2: ' + JSON.stringify(p && p.diverg));
@@ -129,6 +132,13 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(600); p = await painel(pg);
     if (p && !p.todosBotoes.some(x => /Tratar|Atribuir|Confirmar|Vincular|Marcar/.test(x))) ok('só leitura: painel sem ações'); else falha('só leitura: ' + JSON.stringify(p && p.todosBotoes));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
+    await ctx.close(); }
+  { const { ctx, pg, escritas } = await abrir(b, { sync: true, escrita: (m, p) => /rpc\/prazo_revisor/.test(p) ? { status: 200, body: true } : null });
+    await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); const p = await painel(pg);
+    if (p && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Aprovar revisão', 'Devolver', 'Reabrir'])) ok('revisora (outra pessoa que não quem conferiu): Aprovar revisão e Devolver'); else falha('revisora: ' + JSON.stringify(p && p.prazos));
+    const n0 = escritas.length; await pg.click(`${V} .np-pub-pz .ac .np-btn:has-text("Aprovar revisão")`); await pg.waitForTimeout(700);
+    const ch = escritas.slice(n0).filter(x => /rpc\/publicacao_prazo_revisar/.test(x));
+    if (ch.length === 1 && /"p_prazo":13/.test(ch[0]) && /"p_decisao":"aprovar"/.test(ch[0])) ok('Aprovar revisão → uma chamada de revisão (prazo 13, "aprovar")'); else falha('revisar: ' + JSON.stringify(escritas.slice(n0)));
     await ctx.close(); }
   { const { ctx, pg } = await abrir(b, { sync: true, ativo: true }); const e = await estado(pg);
     if (/AtendeDireito Sync · ligada/.test(e.fontes)) ok('integração ligada e com conexão conferida aparece como "ligada"'); else falha('ligada: ' + e.fontes); await ctx.close(); }
