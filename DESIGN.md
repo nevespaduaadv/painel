@@ -137,8 +137,13 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Lista** (`passivos/processos.js`, `renderProcessosV3`): os processos em grupos pelo **próximo prazo** (`v_processos.dias_para_prazo`): Prazo vencido, Próximos 7 dias, Próximos 30 dias, Mais adiante, Sem prazo registrado. Régua: vinho = prazo vencido; fatal = prazo fatal em até 7 dias; âmbar = prazo em até 7 dias. Marcas (sem pílula): *fatal*, *incompleto*, *sem providência*, *DataJud com erro*, *fora da base* e a situação quando não é "ativo".
 - **Faixa**: as mesmas contas dos indicadores da V2 (ativos, prazo vencido, cadastro incompleto, sem providência); os cartões de indicador viram resumo + filtros com contagem. Busca, situação, cliente, responsável e área ficam em "Mais filtros".
 - **Painel**: dados do processo (`NPUI.props`), **DataJud** (data da última atualização ou o erro, e "Atualizar no DataJud" — a mesma chamada da V2) e os andamentos mais recentes, com a origem marcada. Ações iguais às da V2: Abrir ficha completa, Editar, + Andamento; "Novo processo" é a ação primária; exportação em "Mais ações" com as mesmas colunas (`COLS_EXP`).
-- **Fora desta entrega**: a ficha completa do processo (prazos, tarefas, pasta, relacionados, publicações) continua com a apresentação da V2 dentro da casca.
-- Laboratório: `docs/qa/processos-lab.cjs` (38 verificações; as 8 combinações, contraste, toque, teclado, V2 intacta, nenhuma gravação).
+- **Ficha completa** (`passivos/processo-ficha.js`, `fichaV3`): cabeçalho (cliente e pasta, número em serifa, ação × parte, marcas), ações (Prazo ou tarefa, + Andamento, Registrar, Editar, Abrir no cliente), dados em `NPUI.props`, Observações, DataJud e as **mesmas cinco seções** da V2 num controle segmentado: Prazos e tarefas (linhas com régua), Trabalho do escritório, Andamentos, Publicações e Pasta e relacionados. As duas últimas trazem o conteúdo dos módulos existentes (`PP_PUB_TRAT`, `PP_PASTAS`) com os tokens da V3.1; o redesenho delas é da V9 (Publicações) e das pastas.
+- **Navegação**: lista → painel → ficha completa → "← Processos" volta à lista com o painel aberto no mesmo processo.
+- **Seleção × urgência (vale para todas as listas V3.1)**: a linha selecionada com régua mantém a cor da régua (4 px); só a linha sem régua recebe a marca de seleção em tinta.
+- **Prazo fatal no celular**: "fatal" aparece em negrito junto da data ("14 nov **fatal** · há 3 dias"); a marca à direita fica só nas telas largas.
+- **Rodapé**: "N processos na lista" e, quando há outros fora, a razão ("mais 2 suspensos ou encerrados (Mais filtros › Situação)" ou "n fora dos filtros aplicados"). O resumo do topo conta sempre os processos ativos.
+- **Estados**: carregando (esqueleto), erro de carga (aviso com "Tentar de novo", sem novas tentativas em laço), sem processos, sem resultado nos filtros e só leitura (sem ações de escrita nem "Atualizar no DataJud").
+- Laboratório: `docs/qa/processos-lab.cjs` (65 verificações: lista, painel, ficha, navegação, botões, estados, só leitura, V2 intacta, as 8 combinações para lista, painel e ficha, contraste, toque, teclado).
 
 ## 5. Componentes
 
