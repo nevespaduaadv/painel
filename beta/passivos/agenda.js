@@ -278,6 +278,8 @@ function renderAgendaV3(){
     return}
   const feriadosDe=d=>A.feriados.filter(f=>f.data===iso(d));
   const grupos=[];
+  /* V6: dias sem nada viram UMA linha compacta por sequência ("Livre: ter 17 · qua 18"), em vez de um grupo com a instrução repetida em cada dia */
+  let livres=[];const fecharLivres=()=>{if(!livres.length)return;grupos.push(el("p",{class:"np-ag-livres"},el("span",{class:"np-ag-livres-r"},"Livre"),el("span",{},livres.join(" · "))));livres=[]};
   dias.forEach(d=>{const k=iso(d);const l=porDia(d);const fs=feriadosDe(d);const nac=fs.find(f=>f.tipo==="nacional");
     if(A.modo==="mes"&&!l.length&&!fs.length)return;
     if(A.modo==="mes"&&d.getMonth()!==A.ref.getMonth())return;
@@ -285,9 +287,11 @@ function renderAgendaV3(){
     const itens=[];
     fs.forEach(f=>itens.push(NPUI.linha({id:"fer:"+f.data+":"+f.nome,prazo:{curta:"feriado",rel:"",exata:f.nome},titulo:f.nome,contexto:ctxV3([(f.tipo||"")+(f.uf?" "+f.uf:"")+(f.comarca?" · "+f.comarca:""),f.tipo==="nacional"?"folga no escritório":"trabalhamos; conta para prazos"]),direita:[NPUI.marca(f.tipo==="nacional"?"folga":"forense",f.tipo==="nacional"?"crit":"")],titleAbrir:"Feriado",onOpen:()=>irPara("feriados")})));
     l.forEach(e=>itens.push(linhaAgV3(e)));
+    if(!itens.length&&A.modo!=="dia"){livres.push(d.toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","")+" "+d.getDate()+(k===hoje?" (hoje)":""));return}
     if(!itens.length)itens.push(el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Nada marcado."+(readOnly()?"":" Clique em Compromisso para marcar."))));
-    grupos.push(NPUI.grupo({id:"d"+k,titulo:lbl,n:l.length,tom:nac?"crit":null,aberto:A.modo!=="mes"||k>=hoje,itens}))});
-  if(!grupos.length)corpo.append(NPUI.vazio({titulo:"Nada neste período",texto:"Nenhum compromisso, prazo ou feriado."}));grupos.forEach(g=>corpo.append(g));
+    fecharLivres();grupos.push(NPUI.grupo({id:"d"+k,titulo:lbl,n:l.length,tom:nac?"crit":null,aberto:A.modo!=="mes"||k>=hoje,itens}))});
+  fecharLivres();
+  if(!grupos.some(g=>!g.classList?.contains("np-ag-livres")))corpo.append(NPUI.vazio({titulo:"Nada neste período",texto:"Nenhum compromisso, prazo ou feriado."+(readOnly()?"":" Use Compromisso para marcar.")}));else grupos.forEach(g=>corpo.append(g));
   corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período${nMar?` · ${nMar} marco${nMar===1?" previsto":"s previstos"} (Acompanhamento PJ)`:""} · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]));
   obra.append(corpo);v.append(obra);
   G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});

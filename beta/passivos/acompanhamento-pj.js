@@ -15,12 +15,13 @@ const meuColab=()=>A.colab?.find(c=>c.perfil_id===PP.perfil?.id);
 const podeEditar=()=>{if(PP.perfil?.papel==="admin")return true;const m=meuColab();return !!m&&(m.frente==="estrategico"||["acompanhamento_pj","pos_vendas","socios"].includes(m.nucleo))||(PP.perfil?.acessos||[]).includes("protecao")};
 /* Atas (0107, 15/11): espelho das políticas do banco — a decisão final é da RLS; aqui só se mostra o que o banco permite.
    criar  = podeEditar() OU núcleo Acordos ativo (Acordos entra SÓ nas atas; ciclo, Raio-X e proteção seguem com podeEditar);
-   editar/excluir = ESTÁGIO 1 do piloto: bloqueados para todos (sem policy de UPDATE/DELETE no banco) até a 0108 (vínculo ata ↔ dossiê).
-   Estágio 2 (com a 0108): trocar o padrão de atasEdicaoLiberada() para true → editar = autor OU podeEditar(); excluir = admin.
-   window.NP_FLAGS.atasEdicao existe só para os laboratórios exercitarem os fluxos de edição/exclusão antes do estágio 2 — o banco continua decidindo. */
-const atasEdicaoLiberada=()=>window.NP_FLAGS?.atasEdicao===true;
+   editar = ESTÁGIO 2 (0108, homologada no beta em 16/11 com administradora, Acompanhamento PJ, Acordos e Jurídico): o próprio autor ativo OU podeEditar()
+            (quem conduz o acompanhamento) — Acordos edita só as próprias atas; Jurídico comum só consulta;
+   excluir = só a administradora. A autoria original e o vínculo ata ↔ dossiê são protegidos pelo banco (atas_guard, 0108).
+   window.NP_FLAGS.atasEdicao === false desliga os controles (retorno ao estágio 1 sem publicar código) — o banco continua decidindo. */
+const atasEdicaoLiberada=()=>window.NP_FLAGS?.atasEdicao!==false;
 const podeEditarAta=()=>{if(podeEditar())return true;const m=meuColab();return !!m&&m.nucleo==="acordos"&&m.ativo!==false};
-const podeAlterarAta=a=>atasEdicaoLiberada()&&!!a?.id&&(podeEditar()||(!!meuColab()&&a.autor_id===meuColab().id));
+const podeAlterarAta=a=>atasEdicaoLiberada()&&!!a?.id&&(podeEditar()||(!!meuColab()&&meuColab().ativo!==false&&a.autor_id===meuColab().id));
 const podeExcluirAta=()=>atasEdicaoLiberada()&&PP.perfil?.papel==="admin";
 const SN=v=>v===true?"Sim":v===false?"Não":"—";
 const check=(label,checked)=>{const i=el("input",{type:"checkbox",style:"width:16px;height:16px;flex:none;margin:0;accent-color:var(--gold)"});i.checked=!!checked;return {wrap:el("label",{style:"display:flex;gap:8px;align-items:center;font-size:14px;padding:8px 0"},i,label),input:i}};
@@ -269,9 +270,9 @@ async function excluirAta(cid,aid,{confirmar=false}={}){
   invalidar(cid)}
 function formAta(c,a){
   if(acompV3()&&window.NPUI?.form){formAtaV3(c,a);return} // Fase 4C · PoC: com a casca V3.1 ligada, o invólucro novo; abaixo, a V2 intacta
-  a=a||{};if(a.id?!podeAlterarAta(a):!podeEditarAta()){toast(a.id?"A edição de atas está bloqueada nesta etapa do piloto":"Você não tem permissão para registrar atas");return} /* 0107: mesma regra do banco */const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
+  a=a||{};if(a.id?!podeAlterarAta(a):!podeEditarAta()){toast(a.id?"Você não tem permissão para editar esta ata":"Você não tem permissão para registrar atas");return} /* 0107: mesma regra do banco */const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Opcional"}),res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/… (pasta com gravação e transcrição)"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação (opcional)"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou"});
   const body=el("div",{class:"form"},field("ata-tipo","Reunião",tipo),field("ata-data","Data",data),field("ata-tit","Título",tit),field("ata-part","Participantes",part),el("div",{class:"f full"},el("label",{},"Ata / resumo"),res),el("div",{class:"f full"},el("label",{},"Link da pasta"),lp,el("div",{class:"help"},"A gravação fica no Drive; aqui vai o link para quem precisar.")),el("div",{class:"f full"},el("label",{},"Link da gravação"),lg));
-  const extra=a.id&&podeExcluirAta()?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta ata?"))return;await SB.from("atas_reuniao").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Excluída");invalidar(c.id)}},"Excluir"):null;
+  const extra=a.id&&podeExcluirAta()?el("button",{class:"btn danger",onclick:async(ev)=>{if(!confirm("Excluir esta ata? O registro no dossiê fica marcado como ata excluída."))return;const b=ev.currentTarget;b.disabled=true;try{await excluirAta(c.id,a.id,{confirmar:true});$("#modalHost").replaceChildren();toast("Ata excluída");window.PP_DOSSIE?.invalidar?.(c.id)}catch(e){b.disabled=false;toast(e.code==="42501"?"Você não tem permissão para excluir esta ata; nada foi excluído.":"Não foi possível excluir a ata: "+(e.message||"erro"))}}},"Excluir"):null;
   modal(a.id?"Editar ata":"Registrar ata",body,async()=>{
     if(!res.value.trim()&&!lp.value.trim()&&!lg.value.trim())throw new Error("Escreva a ata ou informe o link");
     // correção aprovada (15/11): na V2, como na V3.1, a pasta GERAL do cliente (pré-preenchida) não é conteúdo suficiente da ata
@@ -292,7 +293,7 @@ const mesmoLink=(a,b)=>{const ka=chaveLink(a),kb=chaveLink(b);return !!ka&&!!kb&
 const MSG_ATA_SEM_CONTEUDO="Escreva a ata ou informe o link do documento da ata ou da gravação. O link da pasta geral do cliente não substitui o conteúdo.";
 function formAtaV3(c,a){
   a=a||{};let pode=false;try{pode=(a.id?podeAlterarAta(a):podeEditarAta())&&!readOnly()}catch(_){pode=false}
-  if(!pode){toast(a.id?"A edição de atas está bloqueada nesta etapa do piloto":"Você não tem permissão para registrar atas");return}
+  if(!pode){toast(a.id?"Você não tem permissão para editar esta ata":"Você não tem permissão para registrar atas");return}
   const cid=c.id,aid=a.id||null;const origem=document.activeElement;
   const tipo=sel(TIPO_ATA,a.tipo||"r1"),data=inp("date",a.data||hojeISO()),tit=inp("text",a.titulo||"",{placeholder:"Ex.: R2 — verificação da reserva",autocomplete:"off"}),part=inp("text",a.participantes||"",{placeholder:"Quem participou",autocomplete:"off"}),
     res=el("textarea",{rows:6,placeholder:"O que foi tratado, o que ficou combinado, pendências e próximos passos."},a.resumo||""),lp=inp("url",a.link_pasta||c.pasta_drive_url||"",{placeholder:"https://drive.google.com/…",inputmode:"url",autocomplete:"off"}),lg=inp("url",a.link_gravacao||"",{placeholder:"Link direto da gravação",inputmode:"url",autocomplete:"off"});
@@ -307,7 +308,7 @@ function formAtaV3(c,a){
       if(!lpv)return [{campo:"ata-res",msg:"Escreva a ata ou informe o link da pasta ou da gravação."}];
       if(c.pasta_drive_url&&mesmoLink(lpv,c.pasta_drive_url))return [{campo:"ata-res",msg:MSG_ATA_SEM_CONTEUDO}];return []},
     salvar:async v=>{await salvarAta(cid,aid,{tipo:v["ata-tipo"],data:v["ata-data"],titulo:v["ata-tit"],resumo:v["ata-res"],link_pasta:normalizarLink(v["ata-lp"]),link_gravacao:normalizarLink(v["ata-lg"]),participantes:v["ata-part"]},{preservarAutor:true,confirmar:true});toast(aid?"Ata atualizada":"Ata registrada no dossiê")},
-    excluir:aid&&podeExcluirAta()?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? Esta ação não pode ser desfeita.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});toast("Ata excluída")}}:null});
+    excluir:aid&&podeExcluirAta()?{rotulo:"Excluir",confirmar:`Excluir a ata de ${fmtD(a.data)} (${TIPO_ATA[a.tipo]||a.tipo}) de ${c.nome}? O registro no dossiê fica marcado como ata excluída; a ata em si não pode ser recuperada.`,acao:async()=>{await excluirAta(cid,aid,{confirmar:true});window.PP_DOSSIE?.invalidar?.(cid);toast("Ata excluída")}}:null});
   return f;
 }
 function cardAtas(c,st){
