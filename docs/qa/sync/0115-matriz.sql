@@ -26,7 +26,29 @@ select public._c15('07 conferência: a tarefa ficou concluída; "lida" e "provid
   and (select count(*) = 2 from public.publicacoes where id in (910001, 910002) and lida and providencia is not null and tratada_por = :'jur')
   and (select count(distinct publicacao_id) = 2 from public.publicacao_historico where publicacao_id in (910001, 910002) and acao = 'tratada'));
 select public.djen_gravar('{"id": 910003, "data_disponibilizacao": "2026-11-15", "siglaTribunal": "TJSP", "tipoComunicacao": "Intimação", "numeroprocessocommascara": "1111111-11.2026.8.26.0100", "texto": "<p>Outra.</p>"}'::jsonb);
-select public._c15('08 cancelar a tarefa e as rotinas do sistema não são afetados',
-  public._t14($$update public.tarefas set status = 'cancelada' where id = (select tarefa_id from public.publicacoes where id = 910003)$$) = '00000');
+select public.djen_gravar('{"id": 910004, "data_disponibilizacao": "2026-11-15", "siglaTribunal": "TJSP", "tipoComunicacao": "Intimação", "tipoDocumento": "Sentença", "numeroprocessocommascara": "1111111-11.2026.8.26.0100", "texto": "<p>Julgo procedente.</p>"}'::jsonb);
+select tarefa_id as tb from public.publicacoes where id = 910003 \gset
+select public._como14(:'jur'); set role authenticated;
+select public._c15('08 a lista exata do que falta, para a tela: duas publicações, com processo, data e tipo',
+  (select jsonb_array_length(public.tarefa_publicacoes_pendentes(:'tb')) = 2 and (public.tarefa_publicacoes_pendentes(:'tb') -> 1 ->> 'tipo') = 'Sentença' and (public.tarefa_publicacoes_pendentes(:'tb') -> 0 ->> 'numero_processo') = '1111111-11.2026.8.26.0100'));
+select public._c15('09 CANCELAR a tarefa pela API, com intimação sem providência, é recusado (23514): cancelar não esconde pendência',
+  public._t14(format($$update public.tarefas set status = 'cancelada' where id = %L$$, :'tb')) = '23514');
+select public._c15('10 tratar UMA publicação não trata nem conclui a outra', public._t14($$select public.publicacao_tratar(910003, 'nada_a_fazer', 'ok')$$) = '00000');
+reset role; select public._como14(null);
+select public._c15('10b conferência: a 910004 segue sem providência, não lida, e a tarefa segue aberta; cada uma com o seu histórico',
+  (select providencia is null and not lida from public.publicacoes where id = 910004) and (select status = 'aberta' from public.tarefas where id = :'tb')
+  and (select count(*) = 1 from public.publicacao_historico where publicacao_id = 910003 and acao = 'tratada') and (select count(*) = 0 from public.publicacao_historico where publicacao_id = 910004 and acao = 'tratada'));
+select public._c15('11 publicação IGNORADA (ex.: homônimo) não trava a tarefa', public._t14($$update public.publicacoes set ignorada = true where id = 910004$$) = '00000');
+select public._como14(:'jur'); set role authenticated;
+select public._c15('11b com a outra ignorada, a tarefa conclui', public._t14(format($$update public.tarefas set status = 'concluida' where id = %L$$, :'tb')) = '00000');
+reset role; select public._como14(null);
+select public.djen_gravar('{"id": 910005, "data_disponibilizacao": "2026-11-16", "siglaTribunal": "TJSP", "tipoComunicacao": "Intimação", "numeroprocessocommascara": "1111111-11.2026.8.26.0100", "texto": "<p>Mais uma.</p>"}'::jsonb);
+create or replace function public._rotina15(p uuid) returns void language sql security definer as $$ update public.tarefas set status = 'cancelada' where id = p $$; grant execute on function public._rotina15(uuid) to authenticated;
+select public._como14(:'jur'); set role authenticated;
+select public._c15('12 rotina interna do sistema (ex.: encerramento de cliente) continua podendo cancelar; a publicação segue pendente em Publicações',
+  public._t14(format($$select public._rotina15(%L)$$, (select tarefa_id from public.publicacoes where id = 910005))) = '00000');
+reset role; select public._como14(null);
+select public._c15('12b conferência: tarefa cancelada pela rotina; a publicação 910005 continua sem providência (aparece em "A analisar")',
+  (select t.status = 'cancelada' and p.providencia is null from public.publicacoes p join public.tarefas t on t.id = p.tarefa_id where p.id = 910005));
 select case when ok then 'ok    ' else 'FALHA ' end || caso from public._r15 order by n;
 select (select count(*) filter (where ok) from public._r15) || ' de ' || (select count(*) from public._r15) || ' casos conformes (0115)';

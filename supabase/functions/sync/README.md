@@ -6,10 +6,12 @@
 |---|---|
 | `adaptador.mjs` | Módulo puro: tradução fornecedor → sistema, assinatura do webhook, cliente REST (paginação, repetição com limite), consulta, webhook, teste de conexão |
 | `index.ts` | Edge Function (Deno): rotas `/webhook`, `/puxar`, `/testar`; lê os segredos do ambiente da função |
+| `../../../docs/qa/sync/deno-funcao.test.ts` | 12 cenários com a função rodando de verdade em Deno |
+| `../../migrations/0114b_prazos_atribuicao_revisao.sql` | Quem confere (atribuição sobre a publicação) e quem revisa (cargo ou indicação da administração); fila administrativa; 22 casos |
 | `adaptador.test.mjs` | 22 testes simulados (`node --test supabase/functions/sync/adaptador.test.mjs`) |
 | `../../migrations/0114_sync_atendedireito.sql` | Banco: origem das publicações, fontes, divergências, prazos sugeridos × conferidos, histórico, chave liga/desliga |
 | `../../../docs/qa/sync/0114-matriz.sql` | 43 casos no banco (PostgreSQL 16 e 17; esquema como o da produção e como o do beta) |
-| `../../migrations/0115_publicacoes_guarda_analise.sql` | Independente do Sync: a tarefa de análise não conclui com intimação sem providência (8 casos em `0115-matriz.sql`) |
+| `../../migrations/0115_publicacoes_guarda_analise.sql` | Independente do Sync: a tarefa de análise não conclui com intimação sem providência (15 casos em `0115-matriz.sql`) |
 | `../../../docs/qa/sync/ponta-a-ponta.mjs` | 16 casos: o adaptador entregando ao banco local, com fornecedor simulado |
 
 ## Regras que o código garante
@@ -45,7 +47,8 @@ O adaptador usa nomes candidatos (ajustáveis em `integracoes.config.mapa`, sem 
 | Respostas e registros | sem detalhe de erro, sem conteúdo de processo, sem credencial; `Cache-Control: no-store` |
 | CORS | só a origem do painel |
 | Falta de configuração | responde 503 em vez de operar parcialmente |
-| **Pendente** | execução real em Deno (até aqui só verificação de sintaxe); limite de frequência por usuário em `/puxar`; revisão por segunda pessoa antes da implantação |
+| Execução em Deno | **feita em 17/11**: `docs/qa/sync/deno-funcao.test.ts`, 12 cenários, com Supabase e fornecedor simulados na própria máquina (entra na verificação automática) |
+| **Pendente** | limite de frequência por usuário em `/puxar`; execução no ambiente real de funções do Supabase (só com implantação autorizada); revisão por segunda pessoa antes da implantação |
 
 ## Para ligar de verdade (cada passo depende de autorização específica)
 1. Conta e plano contratados pelas sócias; chave criada na conta e colocada pelas sócias nos segredos da função.

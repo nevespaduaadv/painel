@@ -38,7 +38,10 @@ async function rpcComo(chave: string, bearer: string, nome: string, args: Dict =
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
 const db = { rpc: (nome: string, args: Dict = {}) => rpcComo(SERVICE, SERVICE, nome, args) };
-const cliente = () => clienteSync({ chave: env("SYNC_API_KEY") });
+// Só para o teste local em Deno: permite apontar o cliente para um fornecedor simulado NA PRÓPRIA MÁQUINA. Fora de 127.0.0.1/localhost
+// a variável é ignorada — a chave nunca é enviada a outro endereço que não o do fornecedor.
+const BASE_LOCAL = env("SYNC_TESTE_LOCAL") === "1" && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(env("SYNC_API_BASE")) ? env("SYNC_API_BASE") : undefined;
+const cliente = () => clienteSync({ chave: env("SYNC_API_KEY"), ...(BASE_LOCAL ? { base: BASE_LOCAL } : {}) });
 
 async function quem(req: Request): Promise<{ id: string; admin: boolean; juridico: boolean } | null> {
   const tk = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
