@@ -355,6 +355,21 @@ html.np-casca-v3 header.top #busca:focus-within .res{left:-1px;right:-1px;top:ca
 @keyframes np-paleta{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translate(-50%,0)}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 header.top #busca:focus-within{animation:none}}
 @media (pointer:coarse),(hover:none){html.np-casca-v3 .np-conta{width:44px;height:44px}html.np-casca-v3 #np-acao .np-btn{height:44px}}
+
+/* ---------- V6 (16/11) · um só tema escuro ----------
+   Com a casca V3.1 ligada, as variáveis da V2 (as telas que ainda não migraram) passam a apontar para os tokens --np-* nos dois temas:
+   o escuro marrom dá lugar ao grafite e a ação primária da V2 deixa o verde pela tinta, como na V3.1. Fora da casca nada muda.
+   html:root.np-casca-v3 (0,2,1) vence :root[data-theme="dark"] e :root:not([data-theme="light"]) (0,2,0). */
+html:root.np-casca-v3{
+  --bg:var(--np-bg); --surface:var(--np-surface); --surface-2:var(--np-surface-2); --line:var(--np-line);
+  --fg:var(--np-text); --muted:var(--np-text-2); --faint:var(--np-text-3);
+  --ok:var(--np-ok); --warn:var(--np-att); --crit:var(--np-crit); --info:var(--np-info);
+  --btn-primary:var(--np-ink); --btn-primary-shadow:rgba(0,0,0,0); --on-dark:var(--np-inv);
+  --gold-soft:var(--np-surface-2); --ch-grid:var(--np-line);
+  --shadow:none; --shadow-pop:var(--np-shadow);
+}
+html.np-casca-v3 .np-ag-livres{display:flex;gap:10px;align-items:baseline;margin:2px 0;padding:8px 12px;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-ag-livres-r{font:italic 400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
 /* np-ui.css — componentes V3.1 (DESIGN.md §4). Tudo escopado em html.np-casca-v3; só tokens --np-*. Injetado pelo gerador na âncora NP_UI (ausente no modo token). */
 /* ---------- toolbar (38 px; reflui em duas linhas quando falta largura) ---------- */
 html.np-casca-v3 .np-toolbar{display:flex;align-items:center;gap:14px;min-height:38px;padding:3px 0;border-bottom:1px solid var(--np-line);margin:0 0 10px;flex-wrap:nowrap;position:sticky;top:var(--np-bar-h);background:var(--np-bg);z-index:3}
@@ -798,6 +813,24 @@ html.np-casca-v3 .np-dossie-pag .note{margin-left:8px}
   html.np-casca-v3 .np-dossie .lnk{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-dossie-grupo{min-height:44px}
 }
+
+/* V5 (16/11) · modal() da V2 sob a casca V3.1 (NPUI.modalV3): mesmo invólucro do NPUI.form; o corpo legado (.form/.f/.help) ganha a anatomia dos campos da V3.1 */
+html.np-casca-v3 .np-modal-v3 .np-m-corpo{padding:14px 18px 4px;min-width:0;overflow-x:auto}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{gap:12px 16px}
+html.np-casca-v3 .np-modal-v3 .f label{font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-modal-v3 .help{font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){min-height:40px;border:1px solid var(--np-line-2,var(--np-line));border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.4 var(--np-ui);padding:8px 10px;box-shadow:none}
+html.np-casca-v3 .np-modal-v3 input[type=file]{padding:6px 8px}
+html.np-casca-v3 .np-modal-v3 textarea{min-height:96px;resize:vertical}
+html.np-casca-v3 .np-modal-v3 :is(input,select,textarea):focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-modal-v3 :is(input,select,textarea):disabled{background:var(--np-surface-2,var(--np-surface));color:var(--np-text-3)}
+html.np-casca-v3 .np-modal-v3 input[type=checkbox],html.np-casca-v3 .np-modal-v3 input[type=radio]{accent-color:var(--np-ink)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn{min-height:36px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(h3,h4){font:500 var(--np-fs-3)/1.3 var(--np-ui);color:var(--np-text);text-transform:none;letter-spacing:0}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo table{font-size:var(--np-fs-2)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{opacity:.55}
+@media (max-width:600px){html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select){min-height:44px}html.np-casca-v3 .np-modal-v3 .np-m-corpo{flex:1 1 auto;overflow:auto}html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{grid-template-columns:1fr}html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn{min-height:44px}}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{transition:none}}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -2112,6 +2145,7 @@ function renderCalib(){
 /* ---------- Formulários ---------- */
 function needDb(){if(S.db)return true;toast(S.dbStatus==="pending"?"Conectando ao banco de dados, aguarde alguns segundos…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta.");return false}
 function modal(title,body,onSave,extra){
+  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
   if(!needDb())return;
   const host=$("#modalHost");host.replaceChildren();
   const close=()=>host.replaceChildren();
@@ -2234,7 +2268,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwkskmev";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["comercial","comercial"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["leads","comercial"],["leads-importar","comercial"],["fluxos-mensagens","comercial"],["automacoes","comercial"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["atendimento","atendimento"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwkywci8";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");

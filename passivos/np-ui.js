@@ -257,5 +257,63 @@ const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, ori
   setTimeout(() => { const primeiro = campos.find(c => c && c.el && c.el.getAttribute("aria-invalid") === "true") || campos.find(c => c && c.el && !c.el.disabled); (primeiro ? primeiro.el : btnX).focus(); }, 0);
   return { fechar: restaurar, erroCampo, avisoCampo, erroGeral, el: card, valores, mostrar };
 };
-window.NPUI = { form, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+/* ---------- V5 (16/11) — modal() da V2 sob a casca V3.1 ----------
+   Os formulários que chamam modal(title, body, onSave, extra) (≈110, em todos os módulos) ganham, SÓ com a casca ligada, a experiência do
+   NPUI.form sem mudar o que gravam: cabeçalho com Fechar, role=dialog + aria-labelledby, foco inicial no primeiro campo, preso (inert em #app)
+   e devolvido à origem; Escape, fundo, X e Cancelar pedem "Descartar as alterações?" quando a pessoa alterou algum campo (só alteração feita
+   por ela: preenchimento automático não conta); envio com trava (onSave roda uma vez por clique, "Salvando…", Salvar/Cancelar/X desabilitados,
+   Enter e Escape ignorados durante o envio) e erro exibido no próprio diálogo, traduzido, sem fechar. O DOM continua compatível com a V2:
+   .modal > .card (primeiro .card do host) > h2 … corpo … .actions (extra, Cancelar, Salvar = primeiro button.btn.primary) — quem renomeia ou
+   remove o Salvar, acrescenta classe ao .card ou esvazia #modalHost (exclusões) continua funcionando; o encerramento só remove o próprio diálogo,
+   nunca um formulário aberto em seguida. */
+const modalV3 = (title, body, onSave, extra) => {
+  if (typeof needDb === "function" && !needDb()) return;
+  const host = doc.querySelector("#modalHost"); if (!host) return; host.replaceChildren();
+  const app = doc.querySelector("#app"); const origemEl = doc.activeElement;
+  const uid = "npm" + Math.random().toString(36).slice(2, 8); let enviando = false, fechado = false, sujo = false, confirmando = false, focoAntes = null;
+  const btnX = el("button", { type: "button", class: "np-ib np-f-x", "aria-label": "Fechar (Esc)" }, svgIco(I.x));
+  const geral = el("div", { class: "np-f-geral", role: "alert", tabindex: "-1", hidden: "" }); const vivo = el("div", { class: "np-vh", "aria-live": "polite" });
+  const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, "Cancelar");
+  const btnSalvar = el("button", { type: "button", class: "btn primary np-f-salvar" }, "Salvar");
+  const confirmBox = el("div", { class: "np-f-confirm", role: "alertdialog", "aria-labelledby": uid + "-cf", hidden: "" });
+  const corpo = el("div", { class: "np-m-corpo" }, body);
+  const acoes = el("div", { class: "actions np-f-acoes" }, extra || null, el("span", { class: "sp" }), btnCancelar, btnSalvar);
+  const card = el("div", { class: "card np-form np-modal-v3", role: "dialog", "aria-modal": "true", "aria-labelledby": uid + "-t" },
+    el("div", { class: "np-f-cab" }, el("div", {}, el("h2", { id: uid + "-t" }, title)), btnX), geral, vivo, corpo, confirmBox, acoes);
+  const fundo = el("div", { class: "modal np-form-fundo" }, card);
+  const marcar = (e) => { if (e.isTrusted && !enviando) sujo = true; }; corpo.addEventListener("input", marcar, true); corpo.addEventListener("change", marcar, true);
+  const outroAberto = () => [...host.querySelectorAll('[role="dialog"]')].some((d) => d !== card);
+  const restaurar = () => { if (fechado) return; fechado = true; obs.disconnect(); doc.removeEventListener("keydown", teclas, true); if (fundo.isConnected) fundo.remove();
+    if (outroAberto()) return; /* outro formulário abriu no lugar deste: ele cuida do inert e do foco */ app?.removeAttribute("inert");
+    const alvo = (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") ? origemEl : null; setTimeout(() => { try { alvo ? alvo.focus() : doc.body.focus(); } catch (_) {} }, 0); };
+  const focaveis = () => [...(confirmando ? confirmBox : card).querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((e) => !e.disabled && !e.hidden && e.offsetParent !== null && !e.closest("[hidden],[inert]"));
+  const pedirConfirmacao = () => { confirmando = true; focoAntes = card.contains(doc.activeElement) ? doc.activeElement : null; corpo.setAttribute("inert", ""); btnX.disabled = true;
+    confirmBox.replaceChildren(el("p", { id: uid + "-cf" }, FORM_MSG.descartar), el("div", { class: "np-f-confirm-acoes" },
+      el("button", { type: "button", class: "btn np-f-conf-nao", onclick: () => fecharConfirmacao() }, FORM_MSG.continuar),
+      el("button", { type: "button", class: "btn danger np-f-conf-sim", onclick: () => { fecharConfirmacao({ devolver: false }); restaurar(); } }, FORM_MSG.descartarBtn)));
+    confirmBox.hidden = false; acoes.hidden = true; setTimeout(() => confirmBox.querySelector(".np-f-conf-nao")?.focus(), 0); };
+  const fecharConfirmacao = ({ devolver = true } = {}) => { confirmando = false; confirmBox.hidden = true; confirmBox.replaceChildren(); acoes.hidden = false; corpo.removeAttribute("inert"); btnX.disabled = false;
+    const alvo = focoAntes; focoAntes = null; if (devolver) setTimeout(() => { try { (alvo && alvo.isConnected && !alvo.disabled ? alvo : (corpo.querySelector("input,select,textarea") || btnCancelar)).focus(); } catch (_) {} }, 0); };
+  const tentarFechar = () => { if (enviando) return; if (confirmando) { fecharConfirmacao(); return; } if (sujo) { pedirConfirmacao(); return; } restaurar(); };
+  const travar = (on) => { enviando = on; card.setAttribute("aria-busy", String(on)); btnCancelar.disabled = on; btnX.disabled = on;
+    const salvar = card.querySelector(".np-f-salvar"); if (!salvar) return; salvar.disabled = on; /* o módulo pode ter renomeado ("Enviar", "Importar"…) */
+    if (on) { salvar.dataset.rotulo = salvar.textContent; salvar.textContent = FORM_MSG.salvando; vivo.textContent = FORM_MSG.salvando; } else if (salvar.dataset.rotulo) { salvar.textContent = salvar.dataset.rotulo; delete salvar.dataset.rotulo; } };
+  const mostrarErro = (e) => { const msg = traduzErroBD(e); const det = (e && (e.code || e.status)) ? detalheDe(e) : ""; geral.replaceChildren(el("b", {}, msg));
+    if (det && det !== msg) geral.append(el("details", {}, el("summary", {}, "detalhes técnicos"), el("code", {}, String(det).slice(0, 400)))); geral.hidden = false; setTimeout(() => { try { geral.focus(); } catch (_) {} }, 0); };
+  const enviar = async () => { if (enviando || confirmando || fechado) return; geral.hidden = true; travar(true);
+    try { await onSave(); if (fechado) return; travar(false); restaurar(); } catch (e) { if (fechado) return; travar(false); mostrarErro(e); } };
+  btnSalvar.onclick = (e) => { e.preventDefault(); enviar(); }; btnCancelar.onclick = tentarFechar; btnX.onclick = tentarFechar;
+  fundo.addEventListener("mousedown", (e) => { if (e.target === fundo) tentarFechar(); });
+  const teclas = (e) => { if (!card.isConnected) return; if (e.key === "Escape") { if (popAtual) return; /* o popover fecha primeiro */ e.preventDefault(); e.stopPropagation(); tentarFechar(); return; }
+    if (e.key === "Tab") { const fs = focaveis(); if (!fs.length) return; const i = fs.indexOf(doc.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); fs[fs.length - 1].focus(); } else if (!e.shiftKey && (i === fs.length - 1 || i === -1)) { e.preventDefault(); fs[0].focus(); } return; }
+    if (e.key === "Enter" && enviando) { e.preventDefault(); e.stopPropagation(); } };
+  doc.addEventListener("keydown", teclas, true);
+  host.append(fundo); app?.setAttribute("inert", "");
+  // quem esvazia #modalHost (exclusões da V2, outro formulário) encerra este diálogo: inert, ouvintes e foco são desfeitos
+  const obs = new MutationObserver(() => { if (!fundo.isConnected && !fechado) restaurar(); }); obs.observe(host, { childList: true });
+  setTimeout(() => { if (fechado) return; const primeiro = corpo.querySelector("input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled])"); (primeiro || btnX).focus(); }, 0);
+  return { fechar: restaurar, el: card };
+};
+modalV3.ativo = () => doc.documentElement.classList.contains("np-casca-v3"); /* o desvio do modal() só vale com a casca V3.1 ligada */
+window.NPUI = { form, modalV3, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();
