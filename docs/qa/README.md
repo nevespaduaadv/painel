@@ -87,6 +87,9 @@ NODE_PATH=<módulos> node docs/qa/ficha-lab.cjs
 ```
 Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios do c1. Verifica cabeçalho (valor e marcas com as contas da Carteira), **uma única ação em tinta**, 8 abas numa linha (rolagem e ←/→), Dossiê V3.1 (régua das frentes pelo estado, linha do tempo, filtros e ações iguais aos da V2), "Editar dados da empresa", V2 intacta, nenhuma gravação, 375 px sem rolagem lateral, alvos ≥ 44 px e contraste nos dois temas.
 
+## Cargos funcionais (0113) contra PostgreSQL real
+`docs/qa/sql/0113-rodar.sh <pg16|pg17> <porta>` (caminhos do ambiente de laboratório): reconstrói o esquema equivalente à produção + trilha + 0111, cria pessoas fictícias no modelo antigo (`0113-preparo.sql`), aplica a 0113 duas vezes e roda `0113-matriz.sql` com sessões simuladas como o PostgREST. 34 casos: instalação sem mexer em nada existente; catálogo e filas; escalonamento por não administradora (inclusive a correção da auto-alteração de núcleo/frente); cargo ocupado; dois cargos; cliente novo com vínculo institucional; cargo vago; troca de ocupante sem duplicar; quem saiu; atividade nominal e autoria preservadas; histórico de responsáveis; revogação valendo na mesma sessão; substituto temporário; titular sem login; titular inativa; conta de teste; desligamento; ninguém recebe o que não consegue abrir; transferência individual; mudança de núcleo; distribuição da fila; contagem sem duplicações; auditoria. As matrizes da 0108 (43 casos) e da 0111 (38 casos) dão o mesmo resultado com a 0113 instalada.
+
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
 PGLAB_HOST=<socket ou host> PGLAB_PORT=<porta> PGLAB_UID=<uuid de um perfil admin do banco local> NODE_PATH=<módulos> node docs/qa/clientes-pg-lab.cjs
