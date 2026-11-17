@@ -107,3 +107,9 @@ Exige um PostgreSQL **local e descartável** com o esquema do espelho (`docs/bet
 
 ## Datas determinísticas (hoje-agenda-avisos-lab)
 O laboratório de Hoje/Agenda/Avisos usa um **relógio fixo**: quarta-feira 11/11/2026 10:00 em Brasília. As fixtures calculam "hoje ± n" por aritmética em UTC (independente do `TZ` do runner) e o navegador recebe `timezoneId: America/Sao_Paulo` + `context.clock.install()` no mesmo instante, de modo que `hojeISO()` (UTC-3) e `hojeLocal()` da aplicação coincidem com as fixtures em qualquer dia, fuso ou horário. Antes, rodando num fim de semana, prazos a "+2 dias" caíam na semana seguinte e sumiam da vista Semana; entre 00h e 03h UTC os dias divergiam. Verificado: sábado real, `TZ=UTC`, `TZ=Asia/Tokyo` → 115/115. Os demais laboratórios ainda usam o relógio real (suas asserções não dependem do dia da semana); migrá-los para o mesmo esquema é melhoria futura.
+
+## 0112b — correção isolada da autoelevação pela própria ficha (17/11)
+Gatilho em `colaboradores`: núcleo, frente, situação, vínculo de login e data de desligamento só mudam pela administradora. Fecha a falha em que o colaborador trocava a própria frente/núcleo e ganhava `edita_protecao()`/`edita_ata()`. Não depende de nenhuma outra migração pendente (vale no esquema atual da produção) e é compatível com a 0113, que redefine a mesma função e o mesmo gatilho.
+- SQL: `docs/qa/sql/0112b-matriz.sql` (`-v fase=antes` reproduz a falha em transação desfeita; `-v fase=depois` roda os 10 casos).
+- API real (PostgREST): `docs/qa/sql/0112b-api.sh <socket> <porta> <postgrest>` — 8 casos.
+- Resultado (PG17 e PG16, esquema como o da produção): 11/11 e 8/8; segunda execução sem efeito; fichas idênticas; reversão testada; com a 0113 aplicada em seguida, 56/56 e 17/17.
