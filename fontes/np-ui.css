@@ -459,3 +459,11 @@ html.np-casca-v3 .np-modal-v3 .np-m-corpo table{font-size:var(--np-fs-2)}
 html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{opacity:.55}
 @media (max-width:600px){html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select){min-height:44px}html.np-casca-v3 .np-modal-v3 .np-m-corpo{flex:1 1 auto;overflow:auto}html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{grid-template-columns:1fr}html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn{min-height:44px}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{transition:none}}
+/* ---------- V8 — Processos (lista por prazo + painel com DataJud): só o que os componentes existentes não cobriam ---------- */
+html.np-casca-v3 .np-sec p.np-nota{color:var(--np-text-2)}
+html.np-casca-v3 .np-sec .np-btn{margin-top:8px}
+html.np-casca-v3 .np-link{appearance:none;border:0;background:none;padding:2px 0;margin-left:8px;min-height:24px;font:500 var(--np-fs-1)/1.4 var(--np-ui);color:var(--np-text-2);text-decoration:underline;text-underline-offset:2px;cursor:pointer;border-radius:var(--np-r)}
+html.np-casca-v3 .np-link:hover{color:var(--np-text)}
+html.np-casca-v3 .np-link:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-it-dir .np-sem,html.np-casca-v3 .np-props .np-sem{color:var(--np-text-3)}
+@media (pointer:coarse){html.np-casca-v3 .np-link{min-height:44px;padding:10px 4px}}
