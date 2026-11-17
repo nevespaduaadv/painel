@@ -84,6 +84,11 @@ Reaproveita servidor, fixtures e `contexto()` do laboratório de integrações, 
 ## Segurança da exclusão de clientes e bens (0111)
 - **Banco (PostgreSQL 16 e 17, fora do CI):** esquema equivalente ao da produção + 0104/0107/0108(/0109/0110) + `perfis-teste-ficticios.sql` + `sql/0111-preparo.sql` + a 0111 (duas vezes, idempotente) + `sql/0111-matriz.sql` (38 casos: DELETE pela API por perfil e anônimo, dono do banco fora da função, encerrar, exclusão definitiva com e sem trabalho, instantâneo na auditoria, bens por perfil e situação, rebaixamento de proteção, exclusão autorizada).
 - **Front (no CI):** `NODE_PATH=<módulos> node docs/qa/exclusao-lab.cjs` — botões por perfil, motivo, função do banco, mensagens quando o banco recusa e nenhum "excluído" falso, nas cascas V2 e V3.1.
+## Laboratório da Ficha do cliente V3.1 (entrega visual V4)
+```
+NODE_PATH=<módulos> node docs/qa/ficha-lab.cjs
+```
+Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios do c1. Verifica cabeçalho (valor e marcas com as contas da Carteira), **uma única ação em tinta**, 8 abas numa linha (rolagem e ←/→), Dossiê V3.1 (régua das frentes pelo estado, linha do tempo, filtros e ações iguais aos da V2), "Editar dados da empresa", V2 intacta, nenhuma gravação, 375 px sem rolagem lateral, alvos ≥ 44 px e contraste nos dois temas.
 
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
