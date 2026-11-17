@@ -145,6 +145,18 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Estados**: carregando (esqueleto), erro de carga (aviso com "Tentar de novo", sem novas tentativas em laço), sem processos, sem resultado nos filtros e só leitura (sem ações de escrita nem "Atualizar no DataJud").
 - Laboratório: `docs/qa/processos-lab.cjs` (65 verificações: lista, painel, ficha, navegação, botões, estados, só leitura, V2 intacta, as 8 combinações para lista, painel e ficha, contraste, toque, teclado).
 
+### 4.10 V9 — Publicações (17/11)
+- **Uma tela só** (`passivos/publicacoes.js`, `renderPubV3`): publicações do DJEN e do AtendeDireito Sync na mesma lista, com a origem marcada (*Sync*, *DJEN + Sync*). Não existe segunda central.
+- **Lista** em grupos pela **situação**: Análise fora do prazo (régua vinho), A analisar (régua âmbar quando vence hoje), Analisadas e Ignoradas (fechados por padrão). A data da linha é a da disponibilização; ao lado, "analisar até…" ou "análise vencida há n d". Não lida = título em peso 600.
+- **Marcas** (sem pílula): *sem processo*, *prazo a conferir* (sugestão da plataforma, ainda sem conferência), *fontes divergentes*, origem, a providência registrada e *fora do prazo*.
+- **Faixa**: a analisar, fora do prazo de análise, sem processo e — só com a integração instalada — prazos a conferir. Filtros com contagem; busca, período, cliente e origem em "Mais filtros". Vista **Tempestividade** no controle segmentado (relatório do módulo atual).
+- **Fontes**: linha fixa com o DJEN (última busca, erros) e o Sync (não instalada / desligada / ligada). "Ver integração" mostra a situação e os comandos (Testar conexão, Sincronizar agora, Ligar), **desativados** até a ativação autorizada.
+- **Painel**: situação (recebida → pendente de análise → analisada → com providência), prazo de análise, processo, cliente, origem com link, e as ações de hoje (Tratar, Atribuir tarefa, Vincular, Histórico, Reabrir, Lida, Ignorar).
+- **Prazos** (seção do painel, quando há sugestão): cada hipótese mostra, separados, o **sugerido pela plataforma**, o **conferido** (data em serifa), quem conferiu e quando, se foi registrado em tarefa e a observação. *Fatal* só aparece se a pessoa marcou na conferência. Ações: Confirmar, Corrigir, Descartar; depois, Reabrir. Nada é gravado antes do clique em "Registrar conferência".
+- **Fontes divergentes**: o que difere entre as fontes e a conciliação humana ("É a mesma comunicação" / "São comunicações diferentes").
+- **Estados**: carregando, erro de carga (sem repetição em laço), vazio com "Buscar período", sem resultado nos filtros, só leitura.
+- Laboratório: `docs/qa/publicacoes-lab.cjs` (38 verificações, em dois cenários: sem a integração instalada — o beta de hoje — e com registros fictícios do Sync; as 8 combinações para lista e painel).
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |
