@@ -221,6 +221,120 @@ select public._chk('34 auditoria: toda criação, troca e encerramento de ocupa�
   and (select count(*) from public.auditoria where tabela = 'cargos') >= 9,
   (select count(*) || ' linhas de ocupações' from public.auditoria where tabela = 'cargo_ocupacoes'));
 
+-- ===== 35+. cargo OPERACIONAL (vários ocupantes, sem escolha arbitrária) e fonte única de permissões =====
+create table if not exists public._op (n serial, id uuid, quem uuid); grant all on public._op to authenticated; grant usage on sequence public._op_n_seq to authenticated;
+create or replace function public._novo_op(p_titulo text) returns uuid language sql security definer as $$
+  with x as (insert into public.tarefas (titulo, cliente_id, status, nucleo) values (p_titulo, 'cli-cargos-1', 'aberta', 'juridico') returning id)
+  insert into public._op (id) select id from x returning id $$;
+create or replace function public._salvar_op(p_distribuicao text, p_modalidade text default 'operacional') returns text language sql as $$
+  select public._tenta(format($f$select public.cargo_salvar(%L, 'operador_juridico', 'Operador Jurídico', 'juridico', 'juridico', '{clientes,juridico,superendividamento}', false, false, null, true, %L, %L)$f$,
+    public._cg('operador_juridico'), p_modalidade, p_distribuicao)) $$;
+create or replace function public._ocup(p_colab uuid) returns uuid language sql stable security definer as $$
+  select id from public.cargo_ocupacoes where cargo_id = public._cg('operador_juridico') and colaborador_id = p_colab and fim is null $$;
+grant execute on function public._novo_op(text), public._salvar_op(text, text), public._ocup(uuid) to authenticated;
+create temp table _t35 as select count(*) n from public.tarefas;
+
+select public._como(:'adm'); set role authenticated;
+select public._chk('35 cargo operacional: Bia e Fábio ocupam o Operador Jurídico ao mesmo tempo; substituto é recusado (23514); a designação concede os acessos sem acesso pessoal anterior',
+  public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000003', 'titular', 'Bia também opera (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000008', 'titular', 'Fábio passa a operar (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000002', 'substituto', 'não existe substituto aqui')$$, public._cg('operador_juridico'))) = '23514');
+select public._chk('35b conferência: dois ocupantes ativos, nenhum "ocupante único"; acessos somados; a Bia segue titular do Responsável Jurídico',
+  (select ocupantes_n = 2 and not vago and ocupante_id is null and jsonb_array_length(ocupantes) = 2 from public.v_cargos where codigo = 'operador_juridico')
+  and (select acessos = '{clientes,juridico,superendividamento}' from public.perfis where id = :'fab')
+  and (select acessos = '{clientes,juridico,superendividamento,tarefas_equipe}' from public.perfis where id = :'bia')
+  and (select titular = 'Bia Fictícia' from public.v_cargos where codigo = 'responsavel_juridico'),
+  'a Bia continua titular do Responsável Jurídico: uma pessoa em dois cargos');
+select public._chk('36 regras do cargo: operacional não responde por núcleo (23514); não vira coordenação com dois ocupantes (23514)',
+  public._tenta($$select public.cargo_salvar(null, 'op_teste', 'Operacional que responde por núcleo', 'rh', null, '{equipe}', true, false, null, true, 'operacional', 'fila')$$) = '23514'
+  and public._salvar_op('fila', 'coordenacao') = '23514');
+select public._novo_op('Operador: peça 1') \gset t1_
+select public._chk('37 dois operadores, regra "fila": a atividade enviada ao cargo NÃO escolhe ninguém — fica na fila do cargo, à vista da gestão',
+  public._tenta(format($$select public.atividade_para_cargo('tarefas', %L, %L, 'vai para o cargo (teste)')$$, :'t1__novo_op', public._cg('operador_juridico'))) = '00000');
+reset role;
+select public._chk('37b conferência: responsável é a fila do Operador Jurídico; cargo carimbado; aparece em v_distribuicao_pendente',
+  (select responsavel_id = public.cargo_fila(public._cg('operador_juridico')) and cargo_id = public._cg('operador_juridico') from public.tarefas where id = :'t1__novo_op')
+  and exists (select 1 from public.v_distribuicao_pendente where registro = :'t1__novo_op' and cargo = 'Operador Jurídico'));
+select public._como(:'adm'); set role authenticated;
+select public._chk('38 a gestão distribui da fila para um ocupante (Fábio): a atividade continua vinculada ao cargo',
+  public._tenta(format($$select public.atividade_transferir('tarefas', %L, 'c0000000-0000-0000-0000-000000000008', 'distribuída ao Fábio (teste)')$$, :'t1__novo_op')) = '00000');
+reset role;
+select public._chk('38b conferência', (select responsavel_id = :'cFab' and cargo_id = public._cg('operador_juridico') from public.tarefas where id = :'t1__novo_op'));
+select public._como(:'adm'); set role authenticated;
+select public._chk('39 regra "rodízio" (explícita, ligada pela administradora): quatro atividades alternam Bia, Fábio, Bia, Fábio, na ordem definida',
+  public._salvar_op('rodizio') = '00000'
+  and public._tenta(format($$select public.atividade_para_cargo('tarefas', public._novo_op('Operador: rodízio 1')::text, %L, 'rodízio (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.atividade_para_cargo('tarefas', public._novo_op('Operador: rodízio 2')::text, %L, 'rodízio (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.atividade_para_cargo('tarefas', public._novo_op('Operador: rodízio 3')::text, %L, 'rodízio (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.atividade_para_cargo('tarefas', public._novo_op('Operador: rodízio 4')::text, %L, 'rodízio (teste)')$$, public._cg('operador_juridico'))) = '00000');
+reset role;
+select public._chk('39b conferência do rodízio',
+  (select string_agg(case t.responsavel_id when :'cBia' then 'B' when :'cFab' then 'F' else '?' end, '' order by o.n) = 'BFBF'
+     from public._op o join public.tarefas t on t.id = o.id where t.titulo like 'Operador: rodízio%'),
+  (select string_agg(case t.responsavel_id when :'cBia' then 'Bia' when :'cFab' then 'Fábio' else '?' end, ' → ' order by o.n)
+     from public._op o join public.tarefas t on t.id = o.id where t.titulo like 'Operador: rodízio%'));
+select public._como(:'adm'); set role authenticated;
+select public._chk('40 operador sai indicando quem assume (Fábio → Bia): só a carteira dele neste cargo passa à Bia; nada é criado',
+  public._salvar_op('fila') = '00000'
+  and public._tenta(format($$select public.cargo_encerrar(%L, 'Fábio deixou a operação (teste)', 'c0000000-0000-0000-0000-000000000003')$$, public._ocup('c0000000-0000-0000-0000-000000000008'))) = '00000');
+reset role;
+select public._chk('40b conferência: as 5 atividades do cargo estão com a Bia; o Fábio perdeu os acessos do cargo; a carteira do outro cargo da Bia não mudou de dono',
+  (select count(*) = 5 and bool_and(t.responsavel_id = :'cBia') from public._op o join public.tarefas t on t.id = o.id)
+  and (select acessos = '{}' from public.perfis where id = :'fab')
+  and (select count(*) = 3 from public.responsavel_historico h join public._op o on o.id::text = h.registro where h.de = :'cFab' and h.para = :'cBia' and h.motivo like 'ocupação encerrada%'));
+select public._como(:'adm'); set role authenticated;
+select public._chk('41 operador sai sem indicar sucessor, com outro ocupante no cargo (Ana): a carteira dele vai para a FILA; depois a gestão distribui à única ocupante',
+  public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000002', 'titular', 'Ana passa a operar (teste)')$$, public._cg('operador_juridico'))) = '00000'
+  and public._tenta(format($$select public.cargo_encerrar(%L, 'Bia saiu da operação (teste)')$$, public._ocup('c0000000-0000-0000-0000-000000000003'))) = '00000');
+reset role;
+select public._chk('41b conferência: 5 na fila do cargo; a Ana (marketing + operadora) não recebeu nada sozinha',
+  (select count(*) = 5 and bool_and(t.responsavel_id = public.cargo_fila(public._cg('operador_juridico'))) from public._op o join public.tarefas t on t.id = o.id)
+  and (select acessos = '{clientes,growth,juridico,marketing,superendividamento}' from public.perfis where id = :'ana'));
+select public._como(:'adm'); set role authenticated;
+select public._chk('42 distribuir pendentes com uma única ocupante: a fila passa para a Ana', public._tenta(format($$select public.cargo_distribuir_pendentes(%L)$$, public._cg('operador_juridico'))) = '00000');
+select public._chk('43 substituição nominal (Ana → Caio): o Caio assume a carteira da Ana neste cargo; a Ana mantém o Marketing',
+  public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000004', 'titular', 'Caio assume no lugar da Ana (teste)', null, 'c0000000-0000-0000-0000-000000000002')$$, public._cg('operador_juridico'))) = '00000');
+reset role;
+select public._chk('43b conferência: 5 com o Caio; Ana só com o Marketing; nenhuma tarefa duplicada desde o caso 35 (só as 5 incluídas de propósito)',
+  (select count(*) = 5 and bool_and(t.responsavel_id = :'cCaio') from public._op o join public.tarefas t on t.id = o.id)
+  and (select acessos = '{growth,marketing}' from public.perfis where id = :'ana')
+  and (select (select count(*) from public.tarefas) = n + 5 from _t35));
+select public._chk('44 coordenação continua com um único titular: segundo titular gravado direto no banco é recusado (23505)',
+  public._tenta(format($$insert into public.cargo_ocupacoes (cargo_id, colaborador_id, tipo) values (%L, 'c0000000-0000-0000-0000-000000000002', 'titular')$$, public._cg('responsavel_juridico'))) = '23505');
+-- fonte única
+select public._chk('45 fonte única: nenhuma divergência entre os acessos gravados e os dos cargos ativos', (select count(*) = 0 from public.v_cargos_divergencias));
+select set_config('np.cargos_sync', '1', false);
+update public.colaboradores set nucleo = 'acompanhamento_pj', frente = 'estrategico' where id = :'cBia';   -- campo legado adulterado por fora da gestão
+select set_config('np.cargos_sync', '', false);
+select public._como(:'bia'); set role authenticated;
+select public._chk('46 pessoa gerida por cargo: o campo legado (núcleo/frente na ficha) NÃO concede permissão — só os cargos ativos contam', not public.edita_protecao());
+reset role;
+select set_config('np.cargos_sync', '1', false);
+update public.colaboradores set nucleo = 'juridico', frente = 'juridico' where id = :'cBia';
+select set_config('np.cargos_sync', '', false);
+select public._como(:'adm'); set role authenticated;
+select public._chk('47 nem a administradora desliga a gestão por cargo de quem ocupa cargo (23514): não há segunda fonte de acesso',
+  public._tenta($$update public.colaboradores set acesso_por_cargo = false where id = 'c0000000-0000-0000-0000-000000000003'$$) = '23514');
+reset role;
+-- autoelevação
+select public._como(:'caio'); set role authenticated;
+select public._chk('48 autoelevação: quem não é administradora não se designa, não cria cargo, não muda ordem, não encerra ocupação, não envia atividade a cargo (42501)',
+  public._tenta(format($$select public.cargo_designar(%L, 'c0000000-0000-0000-0000-000000000004', 'titular', 'eu mesmo')$$, public._cg('responsavel_acompanhamento_pj'))) = '42501'
+  and public._tenta($$select public.cargo_salvar(null, 'meu_cargo', 'Meu cargo', 'socios', null, '{financeiro,protecao}')$$) = '42501'
+  and public._tenta(format($$select public.cargo_ordem(%L, 1)$$, public._ocup('c0000000-0000-0000-0000-000000000004'))) = '42501'
+  and public._tenta(format($$select public.cargo_encerrar(%L, 'encerrando outro')$$, (select id from public.cargo_ocupacoes where fim is null and colaborador_id = 'c0000000-0000-0000-0000-000000000002' limit 1))) = '42501'
+  and public._tenta(format($$select public.atividade_para_cargo('tarefas', %L, %L, 'puxando para mim')$$, (select id from public._op limit 1), public._cg('responsavel_acordos'))) = '42501'
+  and public._tenta($$insert into public.cargo_ocupacoes (cargo_id, colaborador_id) select id, 'c0000000-0000-0000-0000-000000000004' from public.cargos where codigo = 'responsavel_financeiro'$$) = '42501'
+  and public._tenta($$update public.cargos set acessos = acessos || '{financeiro}'::text[]$$) = '42501');
+select public._tenta($$update public.perfis set papel = 'admin' where id = 'a0000000-0000-0000-0000-000000000004'$$) as t49a \gset
+select public._tenta($$update public.perfis set acessos = '{financeiro,protecao,equipe}' where id = 'a0000000-0000-0000-0000-000000000004'$$) as t49b \gset
+select public._tenta($$update public.colaboradores set acesso_por_cargo = false, nucleo = 'socios' where id = 'c0000000-0000-0000-0000-000000000004'$$) as t49c \gset
+reset role;
+select public._chk('49 autoelevação por cadastro: a pessoa não vira administradora, não amplia os próprios acessos e não troca o próprio núcleo',
+  (select papel = 'colaborador' and not ('financeiro' = any(acessos)) and not ('protecao' = any(acessos)) from public.perfis where id = :'caio')
+  and (select acesso_por_cargo and nucleo <> 'socios' from public.colaboradores where id = :'cCaio'),
+  'tentativas: papel ' || :'t49a' || ' · acessos ' || :'t49b' || ' · ficha ' || :'t49c');
+
 \echo
 select case when ok then 'ok    ' else 'FALHA ' end || caso || case when det <> '' then '  [' || det || ']' else '' end from public._res order by n;
 select 'resumo';
