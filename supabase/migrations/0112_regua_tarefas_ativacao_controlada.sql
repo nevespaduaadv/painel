@@ -1,5 +1,5 @@
 -- 0112 — Controle financeiro: instalação SEM tarefas automáticas, ativação explícita e cobranças antigas à parte.
--- PROPOSTA: não aplicada. Vai SEMPRE na mesma transação da 0105 (0105 + 0112). Idempotente.
+-- PROPOSTA: não aplicada. Vai SEMPRE na mesma transação, na ordem 0104b (trava prévia) → 0105 → 0112. Idempotente.
 -- Contexto: aplicada sozinha, a 0105 agenda regua_tarefas_auto e, na 1ª execução (dia útil, 08h20), criaria em produção
 -- uma tarefa de prioridade alta por cobrança vencida há 7+ dias sem tarefa aberta (154 em 15/11, todas para a mesma sócia).
 --

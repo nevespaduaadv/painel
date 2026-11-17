@@ -87,6 +87,14 @@ PostgreSQL 16 e 17, fora do CI: esquema equivalente ao da produção + 0104/0107
 2. **instalação** `0105 + 0112` numa transação só (`psql -1`): estruturas criadas, régua desligada, sem agendamento, nenhuma tarefa;
 3. `sql/0112-matriz.sql` (29 casos): rotina desligada cria 0 (1ª e 2ª execução), prévia, ativação só pela administradora, data de corte, limite, executor e prioridade, acumulado escolhido pelo Financeiro (idempotente), desativação, auditoria;
 4. **acidente**: reexecutar a 0105 sozinha recria o agendamento, mas a trava na inserção impede qualquer tarefa; reaplicar a 0112 repara.
+## Laboratório da Ficha do cliente V3.1 (entrega visual V4)
+```
+NODE_PATH=<módulos> node docs/qa/ficha-lab.cjs
+```
+Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios do c1. Verifica cabeçalho (valor e marcas com as contas da Carteira), **uma única ação em tinta**, 8 abas numa linha (rolagem e ←/→), Dossiê V3.1 (régua das frentes pelo estado, linha do tempo, filtros e ações iguais aos da V2), "Editar dados da empresa", V2 intacta, nenhuma gravação, 375 px sem rolagem lateral, alvos ≥ 44 px e contraste nos dois temas.
+
+### Ordem segura de execução (0104b → 0105 → 0112)
+`docs/qa/sql/0112-ordem.sh <pg16|pg17> <porta>` (caminhos do ambiente de laboratório) prova que a proteção existe **antes** de a rotina da 0105 poder agir: com a trava (`0104b`) instalada, a 0105 aplicada **sozinha** e a rotina chamada três vezes não gravam nenhuma tarefa automática (a inserção direta também é descartada; tarefa manual continua entrando). Na execução proposta — uma transação só — a reversão não deixa nada, outra sessão não enxerga o agendamento no meio da transação, a segunda execução é idempotente, a fila de mensagens e os dados dos clientes não mudam, e a matriz da 0112 dá 29/29.
 
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
