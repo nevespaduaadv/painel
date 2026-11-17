@@ -157,6 +157,14 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Estados**: carregando, erro de carga (sem repetição em laço), vazio com "Buscar período", sem resultado nos filtros, só leitura.
 - Laboratório: `docs/qa/publicacoes-lab.cjs` (41 verificações, em dois cenários: sem a integração instalada — o beta de hoje — e com registros fictícios do Sync; as 8 combinações para lista e painel).
 
+### 4.11 V10 — Financeiro (em construção; 17/11: Cobranças)
+- **Cobranças** (`passivos/financeiro.js`, `renderFinV3`): lista em grupos pelo **vencimento** — Em atraso (régua vinho), Vencem em até 7 dias (régua âmbar), A vencer, Pagas, Estornadas e canceladas —, cada grupo com o seu total. Título da linha = cliente; contexto = descrição, parcela e tipo; à direita, marcas (*sem cliente*, *régua: n msg*, *régua pausada*, *paga em*) e o **valor em serifa tabular**.
+- **Faixa**: as contas dos indicadores da V2 (recebido no mês, a vencer no mês, em atraso, em aberto), em linha própria; filtros com contagem (Em atraso, Em aberto, Pagas, Todas, Sem cliente); busca, cliente e tipo em "Mais filtros". "Nova cobrança" é a ação primária; "Sincronizar com o Asaas" em "Mais ações".
+- **Estado**: linha com a última sincronização do Asaas e a **régua por WhatsApp** (ligada/desligada). A régua só muda pela administradora, em dois passos explícitos ("Alterar" → "Ligar a régua").
+- **Painel**: situação, valor, vencimento, cliente, parcela, tipo, forma, régua, observações (com "Salvar observação") e as ações do detalhe da V2: Abrir fatura, Boleto PDF, Copiar Pix, Pausar/Reativar régua, Vincular cliente.
+- A barra de subáreas (Cobranças, Central de Cobranças, Clientes, Conta) continua a mesma. **Ainda na apresentação V2:** Central de Cobranças, Clientes (Asaas), Conta e parâmetros, Contratos e faturamento, Estoque, Inventário e as telas do Controle Financeiro (0105).
+- Laboratório: `docs/qa/cobrancas-lab.cjs` (29 verificações, 8 combinações).
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |
