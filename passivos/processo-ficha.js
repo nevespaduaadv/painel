@@ -14,6 +14,7 @@
     C.ands[pid] = a.data || []; C.tarefas[pid] = t.data || []; C.regs[pid] = r.data || []; render();
   }
   function ficha(p, { cliente = null, recarregar = () => {} } = {}) {
+    if (v3()) return fichaV3(p, { cliente, recarregar });
     const pid = p.id; if (!C.ands[pid]) { C.ands[pid] = null; carregar(pid); }
     const ands = C.ands[pid] || [], tarefas = C.tarefas[pid] || [];
     const abertas = tarefas.filter((t) => t.status === "aberta" || t.status === "em_andamento"), prazos = abertas.filter((t) => t.prazo).sort((x, y) => x.prazo.localeCompare(y.prazo)), semPrazo = abertas.filter((t) => !t.prazo);
@@ -56,6 +57,81 @@
     }
     if (aba === "publicacoes") { if (window.PP_PUB_TRAT?.secaoProcesso) window.PP_PUB_TRAT.secaoProcesso(p, box); else box.append(el("div", { class: "note" }, "Módulo de publicações não carregado.")); }
     if (aba === "pasta") { if (window.PP_PASTAS?.secaoProcesso) box.append(window.PP_PASTAS.secaoProcesso(p, () => { invalidar(pid); recarregar(); }, { semPublicacoes: true })); }
+    return box;
+  }
+  /* ==========================================================================================================================
+     V3.1 (entrega visual V8) — a MESMA ficha com os componentes do Design System. Mesmos dados (v_processos, andamentos, v_tarefas,
+     v_dossie), as mesmas cinco seções e as mesmas ações da V2. Ativa só com a casca V3.1 ligada. Nada novo é gravado.
+     As seções "Publicações" e "Pasta e relacionados" continuam vindo de PP_PUB_TRAT e PP_PASTAS (mesmo conteúdo, tokens da V3.1).
+     ========================================================================================================================== */
+  const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const SECOES = [["visao", "Prazos e tarefas"], ["registros", "Trabalho do escritório"], ["andamentos", "Andamentos"], ["publicacoes", "Publicações"], ["pasta", "Pasta e relacionados"]];
+  async function datajud(p, b, recarregar) {
+    b.disabled = true;
+    try { const { error } = await SB.rpc("datajud_atualizar", { p_processo: p.id }); if (error) throw error; toast("DataJud: consulta enviada — as movimentações aparecem em alguns minutos");
+      setTimeout(async () => { await SB.rpc("datajud_atualizar", { p_processo: null }).catch(() => {}); invalidar(p.id); recarregar(); if (typeof render === "function") render(); }, 20000); }
+    catch (err) { toast(err.message || "Não foi possível consultar"); } finally { b.disabled = false; }
+  }
+  function fichaV3(p, { cliente = null, recarregar = () => {} } = {}) {
+    const U = window.NPUI, m = U.marca; const pid = p.id; if (!C.ands[pid]) { C.ands[pid] = null; carregar(pid); }
+    const carregandoF = C.ands[pid] === null; const ands = C.ands[pid] || [], tarefas = C.tarefas[pid] || [], regs = C.regs[pid] || [];
+    const abertas = tarefas.filter((t) => t.status === "aberta" || t.status === "em_andamento"), prazos = abertas.filter((t) => t.prazo).sort((x, y) => x.prazo.localeCompare(y.prazo)), semPrazo = abertas.filter((t) => !t.prazo);
+    const ro = typeof readOnly === "function" && readOnly();
+    const faltam = p.campos_faltando || []; const incompleto = faltam.length ? m("cadastro incompleto", "att") : null; if (incompleto) incompleto.title = "Falta: " + faltam.join(", ");
+    const marcas = [m(p.status || "—", p.status === "ativo" ? "ok" : ""), p.fase ? m(p.fase) : null, p.area ? m(p.area) : null, p.polo ? m(p.polo === "ativo" ? "polo ativo" : "polo passivo") : null, p.relevante ? m("relevante", "att") : null, p.sigiloso ? m("sigiloso", "crit") : null, incompleto, p.visivel_cliente === false ? m("oculto do cliente") : null].filter(Boolean);
+    const acoes = [
+      ro ? null : U.btn("Prazo ou tarefa", { variante: "pri", icone: "mais", onclick: () => window.PP_TAREFAS?.nova({ processo_id: p.id, cliente_id: p.cliente_id || null, titulo: "", prazo_fatal: false }) }),
+      ro ? null : U.btn("+ Andamento", { onclick: () => window.PP_CARTEIRA?.openAndamentoForm(p) }),
+      ro || !p.cliente_id ? null : U.btn("Registrar", { title: "Registrar trabalho do escritório neste processo", onclick: () => window.PP_CARTEIRA?.registrar(p.cliente_id, { processo_id: p.id, frente: "juridico" }) }),
+      ro ? null : U.btn("Editar", { onclick: () => window.PP_CARTEIRA?.openProcessoForm(cliente || null, p) }),
+      !cliente && p.cliente_id ? U.btn("Abrir no cliente", { variante: "ghost", onclick: () => window.PP_CARTEIRA?.abrirProcesso(p.cliente_id, p.id) }) : null].filter(Boolean);
+    const trilha = [p.cliente_id ? el("a", { href: "#clientes/" + encodeURIComponent(p.cliente_id), onclick: (ev) => { ev.preventDefault(); S.tab = "clientes"; S.sel = p.cliente_id; S.sub = "processos"; render(); } }, p.cliente_nome || cliente?.nome || "Cliente") : "Fora da base", p.pasta_codigo ? " · Pasta " + p.pasta_codigo : ""];
+    const box = el("article", { class: "np-v3 np-pf", "aria-label": "Processo " + (p.numero_cnj || "sem número") });
+    box.append(el("header", { class: "np-pf-cab" }, el("div", { class: "np-pf-id" }, el("p", { class: "np-pf-trilha" }, ...trilha), el("h2", { class: "np-pf-num" }, p.numero_cnj || "(sem número)"),
+        (p.tipo_acao || p.parte_contraria) ? el("p", { class: "np-pf-sub" }, [p.tipo_acao, p.parte_contraria ? "× " + p.parte_contraria : null].filter(Boolean).join(" · ")) : null, el("div", { class: "np-pf-marcas" }, ...marcas)),
+      acoes.length ? el("div", { class: "np-pf-acoes" }, ...acoes) : null));
+    const pares = [["Tipo de ação", p.tipo_acao], ["Parte contrária", p.parte_contraria ? p.parte_contraria + (p.advogado_contrario ? " (adv. " + p.advogado_contrario + ")" : "") : null], ["Banco", p.banco], ["Tribunal / vara", [p.tribunal, p.vara].filter(Boolean).join(" · ") || null], ["Comarca", p.comarca ? p.comarca + (p.uf ? "/" + p.uf : "") : null],
+      ["Valor da causa", p.valor_causa ? BRLx(p.valor_causa) : null], ["Distribuição", p.data_distribuicao ? fmt(p.data_distribuicao) : null], ["Rito", p.rito], ["Assunto", p.assunto], ["Responsável", p.responsavel_nome ? U.quem(p.responsavel_nome) : el("span", { class: "np-sem" }, "— ninguém —")], ["Risco", p.grau_risco], ["Última atualização", p.updated_at ? fmt(p.updated_at) : null]].filter((x) => x[1] != null && x[1] !== "");
+    const meio = Math.ceil(pares.length / 2);
+    box.append(el("div", { class: "np-pf-dados" }, U.props(pares.slice(0, meio)), pares.length > meio ? U.props(pares.slice(meio)) : null));
+    if (p.observacoes) box.append(U.secao("Observações", el("p", { style: "white-space:pre-wrap" }, p.observacoes)));
+    const bDJ = U.btn("Atualizar no DataJud", { title: "Busca as movimentações no DataJud (CNJ). A consulta automática roda uma vez por dia.", onclick: (e) => datajud(p, e.currentTarget, recarregar) });
+    box.append(U.secao("DataJud", el("p", { class: "np-nota" }, p.datajud_erro ? [m("erro na última consulta", "att"), " ", p.datajud_erro] : p.datajud_atualizado_em ? "Movimentações atualizadas em " + new Date(p.datajud_atualizado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + "." : "Ainda sem consulta registrada para este processo."), ro || !p.numero_cnj ? null : bDJ));
+    // seções (as mesmas cinco abas da V2)
+    const aba = C.aba[pid] || "visao"; const cont = { visao: abertas.length, registros: regs.length, andamentos: ands.length, publicacoes: +p.publicacoes_pendentes || 0, pasta: +p.qtd_relacionados || 0 };
+    const seg = U.seg(SECOES.map(([k, l]) => [k, l + (cont[k] ? " · " + cont[k] : "")]), aba, (k) => { C.aba[pid] = k; render(); }, "Seções do processo");
+    box.append(el("div", { class: "np-pf-abas" }, seg));
+    const corpo = el("div", { class: "np-pf-secao", "data-secao": aba }); box.append(corpo);
+    const quando = (q) => new Date(q).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const cabSec = (titulo, ...dir) => el("div", { class: "np-pf-sec-h" }, el("h3", {}, titulo), el("div", { class: "np-pf-sec-a" }, ...dir.filter(Boolean)));
+    if (aba === "visao") {
+      const prox = prazos[0]; const d0 = prox ? dias(prox.prazo) : null;
+      corpo.append(cabSec("Prazos e tarefas", prox ? m("próximo: " + fmt(prox.prazo) + (d0 < 0 ? ` · ${-d0} d atrasado` : d0 === 0 ? " · hoje" : ` · em ${d0} d`) + (prox.prazo_fatal ? " · fatal" : ""), d0 <= 3 ? "crit" : d0 <= 7 ? "att" : "ok") : m("sem prazo em aberto")));
+      corpo.append(el("p", { class: "np-nota" }, "O prazo do processo é a tarefa com prazo mais próxima. Para registrar um prazo, crie uma tarefa."));
+      if (carregandoF) corpo.append(U.carregando(3));
+      else if (!abertas.length) corpo.append(U.vazio({ titulo: "Nenhuma tarefa aberta", texto: "Não há prazo nem tarefa em aberto para este processo.", acao: ro ? null : "Criar prazo ou tarefa", onAcao: () => window.PP_TAREFAS?.nova({ processo_id: p.id, cliente_id: p.cliente_id || null, titulo: "", prazo_fatal: false }) }));
+      else corpo.append(el("ul", { class: "np-lst", role: "list" }, [...prazos, ...semPrazo].map((t) => { const d = dias(t.prazo); const pz = t.prazo ? U.prazoTxt(t.prazo, t.hora) : null;
+        return U.linha({ id: t.id, regua: d == null ? null : d < 0 ? "late" : t.prazo_fatal && d <= 7 ? "fatal" : d <= 7 ? "att" : null, prazo: pz ? { curta: pz.curta, hora: pz.hora, exata: pz.exata, rel: t.prazo_fatal ? [el("b", {}, "fatal"), " · ", pz.rel] : pz.rel, tom: d < 0 ? "late" : t.prazo_fatal && d <= 7 ? "crit" : "" } : null,
+          titulo: t.titulo, contexto: [t.status === "em_andamento" ? "fazendo" : null, t.horas_apontadas > 0 ? (+t.horas_apontadas).toFixed(1).replace(".0", "").replace(".", ",") + " h apontadas" : null].filter(Boolean).join(" · ") || null,
+          direita: [t.prazo_fatal ? (() => { const k = m("fatal", "crit"); k.classList.add("np-so-largo"); return k; })() : null, t.responsavel_nome ? U.quem(t.responsavel_nome) : el("span", { class: "np-sem" }, "— ninguém —")], titleAbrir: "Abrir a tarefa", onOpen: () => window.PP_TAREFAS?.abrir(t.id) }); })));
+      const concl = tarefas.filter((t) => t.status === "concluida").length; if (concl) corpo.append(el("p", { class: "np-nota" }, `${concl} tarefa(s) concluída(s) neste processo — veja em “Trabalho do escritório”.`));
+    }
+    if (aba === "registros") {
+      corpo.append(cabSec("Trabalho do escritório neste processo", ro || !p.cliente_id ? null : U.btn("Registrar", { icone: "mais", onclick: () => window.PP_CARTEIRA?.registrar(p.cliente_id, { processo_id: p.id, frente: "juridico" }) })));
+      if (carregandoF) corpo.append(U.carregando(3));
+      else if (!regs.length) corpo.append(U.vazio({ titulo: "Nenhum registro ainda", texto: "Tarefas abertas, passadas e concluídas e os registros manuais deste processo aparecem aqui — e também no dossiê do cliente." }));
+      else corpo.append(U.passos(regs.map((i) => ({ estado: i.origem === "registro" ? "ok" : "", el: el("span", {}, el("b", {}, quando(i.quando)), " · " + (i.origem === "tarefa" ? "Tarefa" : i.origem === "registro" ? "Registro" : "Negociação") + (i.autor ? " · " + i.autor : "") + (+i.anexos ? " · " + i.anexos + " anexo(s)" : "")),
+        sub: [el("span", { style: "white-space:pre-wrap" }, i.texto || ""), i.tarefa_id ? el("button", { type: "button", class: "np-link", onclick: () => window.PP_TAREFAS?.abrir(i.tarefa_id) }, "Abrir tarefa") : null].filter(Boolean) }))));
+    }
+    if (aba === "andamentos") {
+      corpo.append(cabSec(`Andamentos do tribunal${carregandoF ? "" : " (" + ands.length + ")"}`, ro ? null : U.btn("Andamento", { icone: "mais", onclick: () => window.PP_CARTEIRA?.openAndamentoForm(p) })));
+      if (carregandoF) corpo.append(U.carregando(3));
+      else if (!ands.length) corpo.append(U.vazio({ titulo: "Nenhum andamento registrado", texto: "Os andamentos chegam do DataJud ou são incluídos à mão.", acao: ro ? null : "Incluir andamento", onAcao: () => window.PP_CARTEIRA?.openAndamentoForm(p) }));
+      else corpo.append(U.passos(ands.map((a) => ({ estado: "ok", el: el("span", {}, el("b", {}, fmt(a.data)), a.tipo ? " · " + a.tipo : "", " ", m(a.visivel_cliente ? "visível ao cliente" : "interno", a.visivel_cliente ? "ok" : ""), a.fonte && a.fonte !== "manual" ? [" ", m(/^datajud$/i.test(a.fonte) ? "DataJud" : a.fonte, "info")] : null),
+        sub: [el("span", { style: "white-space:pre-wrap" }, a.descricao || ""), ro ? null : el("button", { type: "button", class: "np-link", onclick: () => window.PP_CARTEIRA?.openAndamentoForm(p, a) }, "Editar")].filter(Boolean) }))));
+    }
+    if (aba === "publicacoes") { corpo.append(cabSec("Publicações deste processo")); const h = el("div", { class: "np-pf-legado" }); corpo.append(h); if (window.PP_PUB_TRAT?.secaoProcesso) window.PP_PUB_TRAT.secaoProcesso(p, h); else h.append(el("p", { class: "np-nota" }, "Módulo de publicações não carregado.")); }
+    if (aba === "pasta") { corpo.append(cabSec("Pasta e processos relacionados")); const h = el("div", { class: "np-pf-legado" }); corpo.append(h); if (window.PP_PASTAS?.secaoProcesso) h.append(window.PP_PASTAS.secaoProcesso(p, () => { invalidar(pid); recarregar(); }, { semPublicacoes: true })); else h.append(el("p", { class: "np-nota" }, "Módulo de pastas não carregado.")); }
     return box;
   }
   window.PP_PROCESSO = { ficha, invalidar };
