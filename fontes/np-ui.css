@@ -441,3 +441,21 @@ html.np-casca-v3 .np-dossie-pag .note{margin-left:8px}
   html.np-casca-v3 .np-dossie .lnk{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-dossie-grupo{min-height:44px}
 }
+
+/* V5 (16/11) · modal() da V2 sob a casca V3.1 (NPUI.modalV3): mesmo invólucro do NPUI.form; o corpo legado (.form/.f/.help) ganha a anatomia dos campos da V3.1 */
+html.np-casca-v3 .np-modal-v3 .np-m-corpo{padding:14px 18px 4px;min-width:0;overflow-x:auto}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{gap:12px 16px}
+html.np-casca-v3 .np-modal-v3 .f label{font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-modal-v3 .help{font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){min-height:40px;border:1px solid var(--np-line-2,var(--np-line));border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.4 var(--np-ui);padding:8px 10px;box-shadow:none}
+html.np-casca-v3 .np-modal-v3 input[type=file]{padding:6px 8px}
+html.np-casca-v3 .np-modal-v3 textarea{min-height:96px;resize:vertical}
+html.np-casca-v3 .np-modal-v3 :is(input,select,textarea):focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-modal-v3 :is(input,select,textarea):disabled{background:var(--np-surface-2,var(--np-surface));color:var(--np-text-3)}
+html.np-casca-v3 .np-modal-v3 input[type=checkbox],html.np-casca-v3 .np-modal-v3 input[type=radio]{accent-color:var(--np-ink)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn{min-height:36px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(h3,h4){font:500 var(--np-fs-3)/1.3 var(--np-ui);color:var(--np-text);text-transform:none;letter-spacing:0}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo table{font-size:var(--np-fs-2)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{opacity:.55}
+@media (max-width:600px){html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select){min-height:44px}html.np-casca-v3 .np-modal-v3 .np-m-corpo{flex:1 1 auto;overflow:auto}html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{grid-template-columns:1fr}html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn{min-height:44px}}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-modal-v3 .np-m-corpo[inert]{transition:none}}

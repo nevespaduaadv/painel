@@ -120,6 +120,14 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Pendências registradas** (fora desta fase): permissão da UI (`podeEditar`) mais estrita que a RLS `ata_wr` (toda a equipe); dossiê não acompanha edição/exclusão da ata (trigger só no insert); **duplo envio no `modal()` da V2** (113 formulários) — correção pontual futura com teste próprio.
 - **QA**: `docs/qa/formularios-lab.cjs` no workflow (55 verificações; ver `docs/qa/README.md`).
 
+### 4.7 V5 — modais e formulários da V2 na casca V3.1: `NPUI.modalV3` (16/11)
+- `modal(title, body, onSave, extra)` (núcleo, usado por ≈110 formulários) desvia, **só com a casca V3.1 ligada**, para `NPUI.modalV3` (`np-ui.js`); a V2 continua idêntica. O que cada formulário grava, valida e exclui não muda: o desvio cuida só da experiência.
+- Mesmo invólucro do `NPUI.form`: `.card.np-form.np-modal-v3` com cabeçalho (h2 serifado + Fechar), corpo legado dentro de `.np-m-corpo` (rótulos `--np-text`, campos 40 px, ajuda `--np-text-3`), rodapé `extra · Cancelar · Salvar` (tinta). `role=dialog aria-modal aria-labelledby`; foco inicial no primeiro campo, preso (`inert` em `#app`) e devolvido à origem.
+- Escape, fundo, X e Cancelar fecham direto quando nada mudou; quando **a pessoa** alterou um campo (evento `isTrusted`; preenchimento por código não conta) perguntam "Descartar as alterações?" (`alertdialog`, foco em "Continuar editando").
+- **Envio com trava**: `onSave` roda uma vez por envio (Salvar/Cancelar/X desabilitados, "Salvando…", `aria-busy`, Enter/Escape ignorados) — corrige o duplo envio da V2 registrado na Fase 4C, só na V3.1. Erro do `onSave` aparece no diálogo (`role=alert`, foco), traduzido por `traduzErroBD` (recusas do banco com "Nada foi gravado."; 5xx/rede como resultado desconhecido), sem fechar; nova tentativa livre.
+- **Compatibilidade**: o 1º `button.btn.primary` do host é o Salvar e o 1º `.card` é o diálogo (módulos que renomeiam/removem o Salvar ou acrescentam classe continuam funcionando; o rótulo renomeado volta após o envio); esvaziar `#modalHost` (exclusões da V2) encerra o diálogo e libera o `#app`; um formulário aberto dentro do `onSave` não é apagado pelo anterior.
+- 375 px: tela cheia, uma coluna, campos e botões 44 px, rodapé fixo. Contraste medido ≥ 4,5:1 nos dois temas. QA: `docs/qa/modais-lab.cjs` no workflow.
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |
@@ -141,7 +149,7 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 | **Feita · Desfazer** `.feito` | substitui a linha; fio verde de 6 s; Desfazer devolve | — |
 | **Paleta** | `/` e `Ctrl K`; tipos: navegar, cliente, negociação, tarefa, filtro, ação | — |
 | **Botões** | primário = tinta; secundário = folha com fio; fantasma = sem fio; 30 px (36 no toque) | salvando (giro), salvo (verde) |
-| **Formulários** | `modal()` atual, estilizado com os tokens; label visível, validação no blur, erro junto ao campo | — |
+| **Formulários** | V3.1: `NPUI.form` (formulários migrados) e `NPUI.modalV3` (todo `modal()` da V2 com a casca ligada): cabeçalho com Fechar, rótulo visível, campos 40 px (44 no toque), rodapé Cancelar · Salvar em tinta | salvando ("Salvando…", trava), erro no diálogo (traduzido, sem fechar), descarte com confirmação |
 | **Estados** | vazio: título + ação ("Nada com esses filtros · Limpar"); carregando: `aria-busy` + esmaecimento, espaço reservado; erro: o que fazer | — |
 
 ## 6. Motion Design System (regras vigentes)
