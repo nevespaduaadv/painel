@@ -14,12 +14,13 @@ async function carregar(){
 }
 const garantir=()=>{if(!P.ok&&!P.carregando)carregar();return P.ok};
 async function carregarAndamentos(pid){
-  P.andsDe=pid;const {data}=await SB.from("andamentos").select("*").eq("processo_id",pid).order("data",{ascending:false});
-  if(P.andsDe===pid){P.ands=data||[];if(S.tab==="processos")render()}
+  P.andsDe=pid;P.andsOk=null;const {data}=await SB.from("andamentos").select("*").eq("processo_id",pid).order("data",{ascending:false});
+  if(P.andsDe===pid){P.ands=data||[];P.andsOk=pid;if(S.tab==="processos")render()}
 }
 const prazoPill=p=>{if(!p.proximo_prazo)return el("span",{class:"note"},"—");const d=p.dias_para_prazo;const cls=d<0||d===0?"e3":d<=7?"e2":"g";return el("span",{class:"pill "+cls},fmtD(parseD(p.proximo_prazo)),p.prazo_fatal?" · fatal":"",d<0?` · ${-d}d atrás`:d===0?" · hoje":d<=30?` · em ${d}d`:"")};
+const COLS_EXP=[{k:"numero_cnj",t:"Processo"},{k:"pasta_codigo",t:"Pasta"},{k:"cliente_nome",t:"Cliente"},{k:"parte_contraria",t:"Parte contrária"},{k:"banco",t:"Banco"},{k:"tipo_acao",t:"Tipo de ação"},{k:"area",t:"Área"},{k:"polo",t:"Polo"},{k:"tribunal",t:"Tribunal"},{k:"comarca",t:"Comarca"},{k:"uf",t:"UF"},{k:"vara",t:"Vara"},{k:"fase",t:"Fase"},{k:"status",t:"Status"},{k:"valor_causa",t:"Valor da causa",f:v=>v==null?"":String(v).replace(".",",")},{k:"responsavel_nome",t:"Responsável"},{k:"proximo_prazo",t:"Próximo prazo",f:v=>v?v.split("-").reverse().join("/"):""},{k:"prazo_fatal",t:"Fatal",f:v=>v?"sim":""},{k:"ultimo_andamento",t:"Último andamento",f:v=>v?String(v).slice(0,10).split("-").reverse().join("/"):""},{k:"dias_sem_andamento",t:"Dias sem andamento"},{k:"tarefas_abertas",t:"Tarefas abertas"},{k:"data_distribuicao",t:"Distribuição",f:v=>v?v.split("-").reverse().join("/"):""}];
 function renderProcessos(){
-  const v=$("#view-processos");v.replaceChildren();
+  const v=$("#view-processos");v.replaceChildren();v.classList.remove("np-v3");
   if(P.sel&&window.PP_PROCESSO?.ficha){
     if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
     const p=P.lista.find(x=>x.id===P.sel);if(!p){P.sel=null;render();return}
@@ -29,8 +30,9 @@ function renderProcessos(){
     v.append(window.PP_PROCESSO.ficha(p,{recarregar:()=>{P.ok=false;garantir()}}));
     return;
   }
+  if(procV3())return renderProcessosV3(v);
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Processos"),el("div",{class:"sub"},"Todos os processos acompanhados, inclusive os de pessoas fora da base de clientes.")),
-    el("div",{class:"actions"},btnExportar("processos",()=>P.filtrados||[],[{k:"numero_cnj",t:"Processo"},{k:"pasta_codigo",t:"Pasta"},{k:"cliente_nome",t:"Cliente"},{k:"parte_contraria",t:"Parte contrária"},{k:"banco",t:"Banco"},{k:"tipo_acao",t:"Tipo de ação"},{k:"area",t:"Área"},{k:"polo",t:"Polo"},{k:"tribunal",t:"Tribunal"},{k:"comarca",t:"Comarca"},{k:"uf",t:"UF"},{k:"vara",t:"Vara"},{k:"fase",t:"Fase"},{k:"status",t:"Status"},{k:"valor_causa",t:"Valor da causa",f:v=>v==null?"":String(v).replace(".",",")},{k:"responsavel_nome",t:"Responsável"},{k:"proximo_prazo",t:"Próximo prazo",f:v=>v?v.split("-").reverse().join("/"):""},{k:"prazo_fatal",t:"Fatal",f:v=>v?"sim":""},{k:"ultimo_andamento",t:"Último andamento",f:v=>v?String(v).slice(0,10).split("-").reverse().join("/"):""},{k:"dias_sem_andamento",t:"Dias sem andamento"},{k:"tarefas_abertas",t:"Tarefas abertas"},{k:"data_distribuicao",t:"Distribuição",f:v=>v?v.split("-").reverse().join("/"):""}]),el("button",{class:"btn primary",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})},"+ Processo"))));
+    el("div",{class:"actions"},btnExportar("processos",()=>P.filtrados||[],COLS_EXP),el("button",{class:"btn primary",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})},"+ Processo"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const f=P.f;
   const ativos=P.lista.filter(p=>p.status==="ativo");
@@ -74,6 +76,123 @@ function renderProcessos(){
       ands.length?el("ul",{class:"tl"},ands.map(a=>el("li",{},el("div",{class:"d"},fmtD(parseD(a.data)),a.tipo?" · "+a.tipo:"",a.fonte&&a.fonte!=="manual"?el("span",{class:"pill c",style:"margin-left:6px"},a.fonte):null),el("div",{style:"white-space:pre-wrap"},a.descricao),
         el("div",{class:"actions",style:"justify-content:flex-start;margin-top:4px"},el("button",{class:"btn sm",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p,a)},"Editar"))))):el("div",{class:"note"},P.andsDe===p.id?"Nenhum andamento registrado.":"Carregando…")));
   }
+}
+/* ============================================================================================================================
+   V3.1 (entrega visual V8) — mesma lógica, outra apresentação. Ativa só com a casca V3.1 ligada (html.np-casca-v3).
+   Lista agrupada pelo PRÓXIMO PRAZO (v_processos.dias_para_prazo), régua na linha, marcas sem pílula e painel lateral com os
+   dados do processo, o DataJud e os andamentos. Mesmos dados, mesmos filtros, mesma exportação e as mesmas ações da V2
+   (abrir a ficha completa, editar, + andamento, + processo). Nada é gravado por esta apresentação.
+   ============================================================================================================================ */
+const procV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const V3={aberta:null,obra:null,painel:null,grupos:null};
+const GRUPOS_P=[["vencido","Prazo vencido","crit"],["semana","Próximos 7 dias","att"],["mes","Próximos 30 dias",""],["depois","Mais adiante",""],["sem","Sem prazo registrado",""]];
+const grupoP=p=>{const d=p.dias_para_prazo;return !p.proximo_prazo||d==null?"sem":d<0?"vencido":d<=7?"semana":d<=30?"mes":"depois"};
+const gruposAb=()=>{if(!V3.grupos){try{V3.grupos=JSON.parse(NPUI.pref.get("np-proc-grupos","{}"))||{}}catch(_){V3.grupos={}}}return V3.grupos};
+const pastaP=p=>{const t=window.PP_PASTAS?.pastaTxt?.(p);return t&&t!=="—"?(/^pasta/i.test(t)?t:"Pasta "+t):(p.pasta_codigo?"Pasta "+p.pasta_codigo:"")};
+const limparP=()=>{Object.assign(P.f,{q:"",cliente:"",status:"ativo",resp:"",area:"",incompleto:false,vencido:false,semProv:false})};
+function filtrarP(){
+  const f=P.f,ql=f.q.trim().toLowerCase();
+  return P.lista.filter(p=>(!f.status||p.status===f.status)&&(!f.resp||p.responsavel_id===f.resp)&&(f.area==="__sem"?!p.area:!f.area||p.area===f.area)&&(f.cliente==="__sem"?!p.cliente_id:!f.cliente||p.cliente_id===f.cliente)
+    &&(!f.incompleto||(p.campos_faltando||[]).length)&&(!f.vencido||(p.dias_para_prazo!=null&&p.dias_para_prazo<0))&&(!f.semProv||p.sem_providencia)
+    &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_codigo||(p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):"")].join(" ").toLowerCase().includes(ql)));
+}
+function linhaP(p){
+  const d=p.dias_para_prazo,ativo=p.status==="ativo";const pz=p.proximo_prazo?NPUI.prazoTxt(p.proximo_prazo):null;
+  const regua=!ativo||d==null?null:d<0?"late":p.prazo_fatal&&d<=7?"fatal":d<=7?"att":null;
+  const m=[];
+  if(p.prazo_fatal&&p.proximo_prazo&&ativo)m.push(NPUI.marca("fatal","crit"));
+  if((p.campos_faltando||[]).length){const k=NPUI.marca("incompleto","att");k.title="Falta: "+p.campos_faltando.join(", ");m.push(k)}
+  if(p.sem_providencia&&ativo){const k=NPUI.marca("sem providência","att");k.title="30 dias sem andamento nem tarefa";m.push(k)}
+  if(p.datajud_erro){const k=NPUI.marca("DataJud com erro","att");k.title=p.datajud_erro;m.push(k)}
+  if(!p.cliente_id)m.push(NPUI.marca("fora da base"));
+  if(!ativo)m.push(NPUI.marca(p.status||"—"));
+  const ctx=[p.cliente_nome||"Fora da base",(p.parte_contraria||p.banco)?"× "+(p.parte_contraria||p.banco):null,p.tipo_acao||p.area||null,[p.tribunal,p.vara].filter(Boolean).join(" ")||null,pastaP(p)||null].filter(Boolean).join(" · ");
+  return NPUI.linha({id:p.id,regua,atual:V3.aberta===p.id,riscado:p.status==="encerrado",prazo:pz?{curta:pz.curta,rel:pz.rel,exata:pz.exata,tom:ativo&&d<0?"late":""}:null,
+    titulo:p.numero_cnj||"(sem número)",contexto:ctx,direita:[...m,p.responsavel_nome?NPUI.quem(p.responsavel_nome):el("span",{class:"np-sem"},"— ninguém —")],titleAbrir:"Abrir o processo",
+    onOpen:(li)=>abrirPainelP(p,{origem:li.querySelector(".np-it-abrir")})});
+}
+function filtrosP(ativos){
+  const f=P.f,chips=[];const C=(o)=>{const c=NPUI.chip(o);chips.push(c);return c};
+  const n=(fn)=>ativos.filter(fn).length;
+  C({label:"Prazo vencido",n:n(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0),on:!!f.vencido,grupo:"attr",title:"O próximo prazo já passou",onclick:()=>{f.vencido=!f.vencido;render()}}).classList.add("crit");
+  C({label:"Cadastro incompleto",n:n(p=>(p.campos_faltando||[]).length),on:!!f.incompleto,grupo:"attr",title:"Campos obrigatórios em branco",onclick:()=>{f.incompleto=!f.incompleto;render()}});
+  C({label:"Sem providência",n:n(p=>p.sem_providencia),on:!!f.semProv,grupo:"attr",title:"30 dias sem andamento nem tarefa",onclick:()=>{f.semProv=!f.semProv;render()}});
+  C({label:"Fora da base",n:n(p=>!p.cliente_id),on:f.cliente==="__sem",grupo:"attr",title:"Processos de pessoas que não estão no cadastro de clientes",onclick:()=>{f.cliente=f.cliente==="__sem"?"":"__sem";render()}});
+  const extras=[f.q.trim(),f.resp,f.area,f.cliente&&f.cliente!=="__sem"?f.cliente:"",f.status!=="ativo"?"s":""].filter(Boolean).length;
+  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Busca, situação, cliente, responsável, área",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+    let t=null;const q=el("input",{type:"search",placeholder:"Nº CNJ, parte, banco, cliente…",value:f.q,"aria-label":"Buscar processo",oninput:ev=>{f.q=ev.target.value;clearTimeout(t);t=setTimeout(()=>{V3.manterPop=true;render()},300)}});
+    const fs=sel({ativo:"Ativos",suspenso:"Suspensos",encerrado:"Encerrados","":"Todos"},f.status);fs.onchange=()=>{f.status=fs.value;render()};
+    const fc=sel({"":"Todos os clientes","__sem":"Só fora da base",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},f.cliente);fc.onchange=()=>{f.cliente=fc.value;render()};
+    const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(P.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp);fr.onchange=()=>{f.resp=fr.value;render()};
+    const areas=[...new Set(P.lista.map(p=>p.area).filter(Boolean))].sort();const fa=sel({"":"Todas as áreas","__sem":"Sem área",...Object.fromEntries(areas.map(a=>[a,a]))},f.area||"");fa.onchange=()=>{f.area=fa.value;render()};
+    const L=(l,c)=>el("div",{},el("label",{},l),c);
+    return [el("div",{class:"np-pop-form"},L("Buscar",q),L("Situação",fs),L("Cliente",fc),L("Responsável",fr),L("Área",fa),
+      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{limparP();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-processos .np-chipf[aria-haspopup="dialog"]')})});
+  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
+  return {chips,fixos:[mais]};
+}
+function renderProcessosV3(v){
+  v.classList.add("np-v3");V3.obra=null;V3.painel=null;
+  if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
+  const ativos=P.lista.filter(p=>p.status==="ativo");
+  const nV=ativos.filter(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0).length,nI=ativos.filter(p=>(p.campos_faltando||[]).length).length,nS=ativos.filter(p=>p.sem_providencia).length;
+  const resumo=NPUI.resumo([{n:ativos.length,label:ativos.length===1?"processo ativo":"processos ativos"},{n:nV,label:"com prazo vencido",tom:nV?"crit":"zero"},{n:nI,label:nI===1?"cadastro incompleto":"cadastros incompletos",tom:nI?"att":"zero"},{n:nS,label:"sem providência",tom:nS?"att":"zero"}]);
+  const lista=filtrarP();P.filtrados=lista;
+  const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,[{label:"Exportar CSV (lista filtrada)",onclick:()=>{const ls=P.filtrados||[];if(!ls.length){toast("Nada para exportar");return}exportarCSV("processos",ls,COLS_EXP);toast(`${ls.length} linha(s) exportada(s)`)}}],{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-processos .np-ib[aria-label="Mais ações"]')}));
+  maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
+  const ro=typeof readOnly==="function"&&readOnly();
+  const fl=filtrosP(ativos);
+  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[maisAc,ro?null:NPUI.btn("Novo processo",{variante:"pri",icone:"mais",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})})]}));
+  if(V3.manterPop){V3.manterPop=false;NPUI.reancorarPop()}else NPUI.reancorarPop();
+  const obra=el("div",{class:"np-obra"});V3.obra=obra;const corpo=el("div",{class:"np-corpo"});
+  if(!lista.length){
+    const semNada=!P.lista.length;
+    corpo.append(NPUI.vazio(semNada?{titulo:"Nenhum processo cadastrado",texto:"Cadastre o primeiro processo para acompanhar prazos e andamentos.",acao:ro?null:"Novo processo",onAcao:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})}
+      :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver os demais processos.",acao:"Limpar filtros",onAcao:()=>{limparP();render()}}));
+  }else{
+    const ab=gruposAb();
+    for(const [k,l,tom] of GRUPOS_P){const its=lista.filter(p=>grupoP(p)===k);if(!its.length)continue;
+      corpo.append(NPUI.grupo({id:"proc-"+k,titulo:l,n:its.length,tom,aberto:ab[k]!=null?ab[k]!==false:true,onToggle:x=>{ab[k]=x;NPUI.pref.set("np-proc-grupos",JSON.stringify(ab))},itens:its.map(linhaP)}))}
+    corpo.append(NPUI.rodape(`${lista.length} de ${P.lista.length} processo${P.lista.length===1?"":"s"} com estes filtros`,[["late","prazo vencido"],["fatal","prazo fatal em até 7 dias"],["att","prazo em até 7 dias"]]));
+  }
+  obra.append(corpo);v.append(obra);
+  V3.painel=NPUI.painel({obra,label:"Detalhe do processo",onClose:()=>{V3.aberta=null}});
+  if(V3.aberta){const p=P.lista.find(x=>x.id===V3.aberta);if(p)abrirPainelP(p,{silencioso:true});else V3.aberta=null}
+}
+async function datajudP(p,b){
+  b.disabled=true;
+  try{const {error}=await SB.rpc("datajud_atualizar",{p_processo:p.id});if(error)throw error;toast("DataJud: consulta enviada — as movimentações aparecem em alguns minutos");
+    setTimeout(async()=>{await SB.rpc("datajud_atualizar",{p_processo:null}).catch(()=>{});P.ok=false;carregar();if(V3.aberta===p.id)carregarAndamentos(p.id);window.PP_PROCESSO_FICHA?.recarregar?.(p.id)},20000)}
+  catch(err){toast(err.message||"Não foi possível consultar")}finally{b.disabled=false}
+}
+function abrirPainelP(p,{origem}={}){
+  V3.aberta=p.id;if(P.andsDe!==p.id){P.ands=[];carregarAndamentos(p.id)}
+  const pz=p.proximo_prazo?NPUI.prazoTxt(p.proximo_prazo):null;const d=p.dias_para_prazo;const ro=typeof readOnly==="function"&&readOnly();
+  const sit=[NPUI.marca(p.status||"—",p.status==="ativo"?"ok":""),p.fase?el("span",{},p.fase):null,p.polo?el("span",{class:"np-sem"},p.polo==="ativo"?"polo ativo":"polo passivo"):null].filter(Boolean);
+  const props=NPUI.props([
+    ["Situação",el("span",{style:"display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap"},...sit)],
+    ["Próximo prazo",pz?[pz.exata," ",pz.rel?el("span",{class:"np-marca "+(d<0?"crit":d<=7?"att":"")},pz.rel):null,p.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null]:"sem prazo registrado","serif"],
+    ["Cliente",p.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(p.cliente_id),onclick:e=>{e.preventDefault();S.tab="clientes";S.sel=p.cliente_id;S.sub="processos";render()}},p.cliente_nome||"Cliente"):"Fora da base"],
+    ["Parte contrária",p.parte_contraria||p.banco||null],["Tipo de ação",[p.area,p.tipo_acao].filter(Boolean).join(" · ")||null],
+    ["Tribunal / vara",[p.tribunal,p.vara].filter(Boolean).join(" · ")||null],["Comarca",p.comarca?p.comarca+(p.uf?"/"+p.uf:""):null],
+    ["Valor da causa",p.valor_causa?BRL(+p.valor_causa):null],
+    ["Responsável",p.responsavel_nome?NPUI.quem(p.responsavel_nome):el("span",{class:"np-sem"},"— ninguém —")],
+    ["Pasta",pastaP(p)||null],
+    (p.campos_faltando||[]).length?["Cadastro",NPUI.marca("falta: "+p.campos_faltando.join(", "),"att")]:null,
+    p.sem_providencia?["Providência",NPUI.marca("30 dias sem andamento nem tarefa","att")]:null,
+  ].filter(x=>x&&x[1]!=null));
+  const bDJ=NPUI.btn("Atualizar no DataJud",{title:"Busca as movimentações no DataJud (CNJ). A consulta automática roda uma vez por dia.",onclick:e=>datajudP(p,e.currentTarget)});
+  const dj=NPUI.secao("DataJud",el("p",{class:"np-nota"},p.datajud_erro?[NPUI.marca("erro na última consulta","att")," ",p.datajud_erro]:p.datajud_atualizado_em?"Movimentações atualizadas em "+new Date(p.datajud_atualizado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+".":"Ainda sem consulta registrada para este processo."),ro||!p.numero_cnj?null:bDJ);
+  const carregouA=P.andsDe===p.id&&P.andsOk===p.id;const ands=P.andsDe===p.id?P.ands:[];const MAXA=8;
+  const andEl=!carregouA?NPUI.carregando(3):ands.length?NPUI.passos(ands.slice(0,MAXA).map(a=>({estado:"ok",el:el("span",{},el("b",{},fmtD(parseD(a.data))),a.tipo?" · "+a.tipo:"",a.fonte&&a.fonte!=="manual"?[" ",NPUI.marca(/^datajud$/i.test(a.fonte)?"DataJud":a.fonte,"info")]:null),
+      sub:[el("span",{style:"white-space:pre-wrap"},a.descricao||""),ro?null:el("button",{type:"button",class:"np-link",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p,a)},"Editar")].filter(Boolean)})))
+    :el("p",{class:"np-nota"},"Nenhum andamento registrado.");
+  const secA=NPUI.secao(`Andamentos${carregouA?" ("+ands.length+")":""}`,andEl,carregouA&&ands.length>MAXA?el("p",{class:"np-nota"},`Mais ${ands.length-MAXA} na ficha completa.`):null);
+  const pe=[NPUI.btn("Abrir ficha completa",{variante:"pri",title:"Prazos, tarefas, pasta, publicações e todos os andamentos",onclick:()=>window.PP_PROCESSOS.abrir(p.id)}),
+    ro?null:NPUI.btn("Editar",{onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,p)}),ro?null:NPUI.btn("+ Andamento",{variante:"ghost",onclick:()=>window.PP_CARTEIRA?.openAndamentoForm(p)})].filter(Boolean);
+  if(!V3.painel)return;
+  V3.painel.abrir({trilha:[el("span",{},p.cliente_nome||"Fora da base"),pastaP(p)?el("span",{class:"sep"}):null,pastaP(p)?el("span",{},pastaP(p)):null].filter(Boolean),titulo:p.numero_cnj||"(sem número)",
+    corpo:[props,p.observacoes?NPUI.secao("Observações",el("p",{style:"white-space:pre-wrap"},p.observacoes)):null,dj,secA].filter(Boolean),pe,origem,id:p.id});
 }
 let rt=null;
 function tempoReal(){const ch=SB.channel("processos-lista");for(const t of ["processos","andamentos"])ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{clearTimeout(rt);rt=setTimeout(()=>{P.ok=false;if(P.sel)carregarAndamentos(P.sel);if(S.tab==="processos")garantir()},500)});ch.subscribe()}
