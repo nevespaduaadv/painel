@@ -3,7 +3,8 @@
 -- O nome do arquivo ordena esta trava antes da 0105. Com ela instalada, a rotina regua_tarefas_auto() da 0105 não
 -- consegue gravar nenhuma tarefa "Criada automaticamente pela régua" enquanto regua_tarefas_config.ativa = false
 -- (padrão), nem se a 0105 for executada sozinha e a rotina for chamada à mão ou pelo agendamento.
--- Nada aqui depende da 0105: tarefas.cobranca_id existe desde a 0098 e pode_financeiro() desde a 0055.
+-- Nada aqui depende da 0105 (pode_financeiro() existe desde a 0055). PRÉ-REQUISITO DO TRIO: a 0098 (tarefas.cobranca_id,
+-- cobranca_criar_tarefa) — a 0105 falha sem ela, e a transação inteira é desfeita (visto no beta em 17/11/2026).
 -- O mesmo bloco se repete, idêntico, no início da 0112 (que continua autossuficiente).
 
 create table if not exists public.regua_tarefas_config (
@@ -24,7 +25,7 @@ revoke all on public.regua_tarefas_config from anon;
 -- trava 3: com a régua desligada, nenhuma tarefa "Criada automaticamente pela régua" entra (descarta a linha, sem erro)
 create or replace function public.tarefas_regua_trava_tg() returns trigger language plpgsql set search_path = public as $$
 begin
-  if new.cobranca_id is not null and coalesce(new.descricao, '') like 'Criada automaticamente pela régua%'
+  if (to_jsonb(new) ->> 'cobranca_id') is not null and coalesce(new.descricao, '') like 'Criada automaticamente pela régua%' -- to_jsonb: não quebra a inclusão de tarefas num banco sem tarefas.cobranca_id (0098)
      and not coalesce((select ativa from public.regua_tarefas_config where id), false) then
     return null;
   end if;

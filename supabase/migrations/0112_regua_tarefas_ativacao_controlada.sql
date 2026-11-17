@@ -30,7 +30,7 @@ revoke all on public.regua_tarefas_config from anon;
 -- trava 3: com a régua desligada, nenhuma tarefa "Criada automaticamente pela régua" entra (descarta a linha, sem erro)
 create or replace function public.tarefas_regua_trava_tg() returns trigger language plpgsql set search_path = public as $$
 begin
-  if new.cobranca_id is not null and coalesce(new.descricao, '') like 'Criada automaticamente pela régua%'
+  if (to_jsonb(new) ->> 'cobranca_id') is not null and coalesce(new.descricao, '') like 'Criada automaticamente pela régua%' -- to_jsonb: não quebra a inclusão de tarefas num banco sem tarefas.cobranca_id (0098)
      and not coalesce((select ativa from public.regua_tarefas_config where id), false) then
     return null;
   end if;
