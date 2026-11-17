@@ -89,6 +89,17 @@ Mesma carteira fictícia do integracoes-lab, com contratos e dossiê fictícios 
 
 ## Cargos funcionais (0113) contra PostgreSQL real
 `docs/qa/sql/0113-rodar.sh <pg16|pg17> <porta>` (caminhos do ambiente de laboratório): reconstrói o esquema equivalente à produção + trilha + 0111, cria pessoas fictícias no modelo antigo (`0113-preparo.sql`), aplica a 0113 duas vezes e roda `0113-matriz.sql` com sessões simuladas como o PostgREST. 34 casos: instalação sem mexer em nada existente; catálogo e filas; escalonamento por não administradora (inclusive a correção da auto-alteração de núcleo/frente); cargo ocupado; dois cargos; cliente novo com vínculo institucional; cargo vago; troca de ocupante sem duplicar; quem saiu; atividade nominal e autoria preservadas; histórico de responsáveis; revogação valendo na mesma sessão; substituto temporário; titular sem login; titular inativa; conta de teste; desligamento; ninguém recebe o que não consegue abrir; transferência individual; mudança de núcleo; distribuição da fila; contagem sem duplicações; auditoria. As matrizes da 0108 (43 casos) e da 0111 (38 casos) dão o mesmo resultado com a 0113 instalada.
+## Laboratório dos modais e formulários V3.1 (entrega visual V5)
+```
+NODE_PATH=<módulos> node docs/qa/modais-lab.cjs
+```
+Exercita o `modal()` **real** (o mesmo que os módulos chamam) com a casca V3.1 ligada e desligada. Verifica: `role=dialog`, `aria-modal`, `aria-labelledby` = título, `#app` inerte, foco inicial no primeiro campo, Tab/Shift+Tab presos, Escape/fundo/X/Cancelar fechando direto sem alteração e perguntando "Descartar as alterações?" quando a pessoa alterou algo (preenchimento por código não conta), "Continuar editando" devolvendo o foco; envio com trava (clique duplo + Enter + Escape durante o envio ⇒ `onSave` uma vez, "Salvando…", `aria-busy`); erro no próprio diálogo, sem fechar (42501 traduzido com detalhe técnico, `Error` do módulo, 503 como resultado desconhecido), nova tentativa livre e rótulo renomeado pelo módulo restaurado; compatibilidade (Salvar removido, classe no `.card`, `#modalHost` esvaziado por exclusões da V2, formulário aberto dentro do `onSave`); "Novo cliente" real com banco lento ⇒ 1 POST; V2 sem mudança; 375 px em tela cheia (campos e alvos ≥ 44 px, sem rolagem lateral) e contraste em 375/1024 px nos dois temas.
+
+## Laboratório do tema único e da Agenda (entrega visual V6)
+```
+NODE_PATH=<módulos> node docs/qa/tema-lab.cjs
+```
+Com a casca V3.1, confere que as 13 variáveis da V2 (fundo, folha, fio, texto, semânticas, primária, texto sobre a primária) resolvem para os tokens `--np-*` no claro e no escuro; que Processos, Publicações, Base de acordos e Equipe (telas ainda da V2) pintam fundo e folhas com o papel/grafite da V3.1, com contraste ≥ 4,5:1 nos textos medidos e sem rolagem lateral em 375 px; que, sem a casca, os valores legados continuam idênticos; e que a Agenda (semana) junta os dias livres numa linha compacta ("Livre · seg 9 · ter 10"), mantendo "Nada marcado" no modo Dia.
 
 ## Laboratório de clientes contra PostgreSQL real (correção 15/11 — fora do CI)
 ```
