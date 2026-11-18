@@ -37,7 +37,7 @@ async function abrir(b, o = {}) {
     if (p.startsWith('/rest/v1/v_cargos_divergencias')) return o.sem0113 ? json(rota, { code: '42P01', message: 'relation "public.v_cargos_divergencias" does not exist' }, 404) : json(rota, o.div ? [{ colaborador_id: 'col-n', nome: 'Nina Teste', acessos_gravados: ['clientes', 'financeiro'], acessos_dos_cargos: ['clientes', 'juridico'] }] : []);
     if (p.startsWith('/rest/v1/v_distribuicao_pendente')) return json(rota, o.semFila ? [] : PEND);
     if (p.startsWith('/rest/v1/responsavel_historico')) return json(rota, HRESP);
-    if (p.startsWith('/rest/v1/tarefas')) return json(rota, [{ id: 't-1', prazo_fatal: false, prazo_hora: null }, { id: 't-2', prazo_fatal: true, prazo_hora: null }, { id: 't-9', prazo_fatal: true, prazo_hora: null }]);
+    if (p.startsWith('/rest/v1/tarefas')) { if (!/select=id%2Cprazo_fatal%2Chora(&|$)/.test(u.search)) return json(rota, { code: '42703', message: 'column does not exist' }, 400); return json(rota, [{ id: 't-1', prazo_fatal: false, hora: null }, { id: 't-2', prazo_fatal: true, hora: null }, { id: 't-9', prazo_fatal: true, hora: null }]); }
     if (p.startsWith('/rest/v1/v_cargos')) return o.sem0113 ? json(rota, { code: 'PGRST205', message: "Could not find the table 'public.v_cargos' in the schema cache" }, 404) : json(rota, CARGOS);
     if (p.startsWith('/rest/v1/cargo_ocupacoes')) return json(rota, (u.searchParams.get('cargo_id') || '') === 'eq.g2' ? HIST : []);
     if (p.startsWith('/rest/v1/v_colaboradores')) return json(rota, PES);
