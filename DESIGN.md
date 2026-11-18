@@ -157,6 +157,7 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Estados**: carregando, erro de carga (sem repetição em laço), vazio com "Buscar período", sem resultado nos filtros, só leitura.
 - Laboratório: `docs/qa/publicacoes-lab.cjs` (41 verificações, em dois cenários: sem a integração instalada — o beta de hoje — e com registros fictícios do Sync; as 8 combinações para lista e painel).
 
+<<<<<<< HEAD
 ### 4.11 V10 — Financeiro (em construção; 17/11: Cobranças, Clientes, Conta e parâmetros)
 - **Cobranças** (`passivos/financeiro.js`, `renderFinV3`): lista em grupos pelo **vencimento** — Em atraso (régua vinho), Vencem em até 7 dias (régua âmbar), A vencer, Pagas, Estornadas e canceladas —, cada grupo com o seu total. Título da linha = cliente; contexto = descrição, parcela e tipo; à direita, marcas (*sem cliente*, *régua: n msg*, *régua pausada*, *paga em*) e o **valor em serifa tabular**.
 - **Faixa**: as contas dos indicadores da V2 (recebido no mês, a vencer no mês, em atraso, em aberto), em linha própria; filtros com contagem (Em atraso, Em aberto, Pagas, Todas, Sem cliente); busca, cliente e tipo em "Mais filtros". "Nova cobrança" é a ação primária; "Sincronizar com o Asaas" em "Mais ações".
@@ -168,6 +169,9 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Ainda na apresentação V2:** Central de Cobranças, Contratos e faturamento, Estoque, Inventário e as quatro telas do Controle Financeiro (0105).
 - **Central de Cobranças** (`centralV3`): barra de áreas do Financeiro, faixa (lembretes de hoje enviados, vencidas a contatar e o valor dessa fila, sem resposta, negociações), controle segmentado com as 8 vistas. **Só "Ações de hoje" está em V3.1**: grupos Lembrete D-5, D-2 e D-0 (caixa de marcar = lembrete enviado; registra, não envia mensagem), Vencidas — contatar hoje (a mais atrasada primeiro), Sem resposta e Negociações (fechados). Painel: valor, vencimento e atraso, etapa da régua, ação prevista, último contato, negociação, tarefas. Ações: Registrar contato (formulário no painel, com validação de medida, desfecho, valor e data), Criar tarefa, Mover na régua, Histórico do cliente, Marcar como paga (dois cliques) e Reabrir para a fila. As outras sete vistas (Disparos, Régua, Negociados, Histórico, Registros, Resumo, Dashboard) abrem dentro da moldura nova, **ainda na apresentação anterior**.
 - Laboratório: `docs/qa/cobrancas-lab.cjs` (as três telas; 8 combinações para cada uma) e `docs/qa/central-lab.cjs` (Central — Ações de hoje; 23 verificações).
+=======
+- **Ajustes funcionais de 17/11 (noite):** (1) no painel da tarefa, a seção "n publicações sem providência" lista as publicações ligadas à tarefa que ainda faltam tratar (consulta `tarefa_publicacoes_pendentes`, da 0115); cada item abre a publicação. Quando o banco recusa concluir ou cancelar, a mensagem dele aparece e a lista é recarregada. (2) Os comandos Confirmar, Corrigir, Descartar e Reabrir do prazo só aparecem para quem tem atribuição sobre aquela publicação (consulta `pode_conferir_prazo(publicação)`, da 0114b); sem atribuição, a tela explica. Aprovar revisão e Devolver só aparecem para quem revisa e não conferiu. O banco confere tudo de novo.
+>>>>>>> visual/v9-publicacoes
 
 ### 4.12 V11 — Equipe e gestão (em construção; 17/11: Cargos funcionais, segunda parte)
 - **Princípio:** pessoas ocupam cargos; cargos têm permissões e responsabilidades; cada ação guarda o autor individual.

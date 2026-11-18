@@ -218,7 +218,9 @@ function concluirComNota(t){
 const comentarConclusao=concluirComNota;
 /* ---------- Tela da tarefa: o que fazer, para quem passar, o que já aconteceu ---------- */
 async function mudarStatus(t,status,nota,files){
-  const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);if(error)throw new Error("Não foi possível atualizar");
+  const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);
+  /* 0115: tarefa de análise com publicação sem providência — o banco recusa e diz quais faltam */
+  if(error){if(error.code==="23514"&&/publica/i.test(error.message||"")){window.PP_TAREFAS?._pendPub?.(t.id);throw new Error(error.message)}throw new Error("Não foi possível atualizar")}
   if(nota||files?.length)await comentar(t.id,nota||"(anexo)",files);
 }
 function passarPara(t,recarregar){
@@ -664,6 +666,12 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
       el:x.id===t.id?el("span",{},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null):el("button",{type:"button",class:"lnk",onclick:()=>abrirTarefaCompleta(x.id)},ETAPA_N3[x.etapa_codigo]||x.etapa_codigo||x.titulo,x.prazo_fatal?" · fatal":""),
       sub:(x.prazo?px.exata+" · "+px.rel:"sem prazo")+(x.responsavel_nome?" · "+NPUI.curto(x.responsavel_nome):"")+(x.status==="concluida"?" · feita":x.status==="cancelada"?" · cancelada":"")}})))});
   const desc=NPUI.secao("Descrição",t.descricao?el("p",{style:"white-space:pre-wrap"},t.descricao):el("p",{style:"color:var(--np-text-3)"},"Sem descrição."));
+  /* 0115: publicações ligadas a esta tarefa que ainda não têm providência — lista clicável; sem a 0115 a consulta falha e nada aparece */
+  const pend=el("section",{class:"np-sec np-tar-pend",hidden:""});
+  const carregarPend=()=>SB.rpc("tarefa_publicacoes_pendentes",{p_tarefa:t.id}).then(({data,error})=>{if(error||!Array.isArray(data)||!data.length){pend.hidden=true;pend.replaceChildren();return}
+    pend.hidden=false;pend.replaceChildren(el("h3",{},data.length===1?"1 publicação sem providência":data.length+" publicações sem providência"),el("p",{class:"np-nota"},aberta?"A tarefa só pode ser concluída ou cancelada depois de registrada a providência de cada uma. Ler não conta como tratar.":"Estas publicações continuam sem providência."),
+      el("ul",{class:"np-tar-pend-l"},data.map(x=>el("li",{},el("button",{type:"button",class:"lnk",title:"Abrir a publicação para tratar",onclick:()=>{V3.painel?.fechar?.(false);window.PP_PUBLICACOES?.abrirId?.(x.publicacao_id)}},[x.numero_processo||"sem número",x.data?NPUI.prazoTxt(String(x.data).slice(0,10)).curta:null,x.tipo||null].filter(Boolean).join(" · "))," ",NPUI.marca(x.lida?"lida, sem providência":"não lida",x.lida?"att":"crit")))))},()=>{});
+  carregarPend();window.PP_TAREFAS._pendPub=id=>{if(id===t.id)carregarPend().then(()=>{if(!pend.hidden)pend.scrollIntoView({block:"nearest"})})};
   /* Fase 4B · B3: tarefa do núcleo Acompanhamento PJ com cliente → bloco cruzado só leitura + "Abrir acompanhamento" (contrato PP_ACOMP; null sem permissão). O vínculo é só cliente+núcleo: nada é inferido sobre negociações. */
   const acomp=t.nucleo==="acompanhamento_pj"&&t.cliente_id&&window.PP_ACOMP?.bloco?window.PP_ACOMP.bloco(t.cliente_id):null;
   /* andamento: registro obrigatório para concluir (regra da controladoria) — mesma lógica da V2 */
@@ -718,7 +726,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   ].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
   const pe=[btnConcluir,btnFeito,el("span",{class:"sp"}),aviso,mais,nota];
   const trilha=[el("span",{},t.cliente_nome||"Sem cliente"),el("span",{class:"sep"}),el("span",{},NUCLEOS[t.nucleo]||"—")];
-  V3.painel.abrir({id:t.id,trilha,titulo:t.titulo,corpo:[props,cadeia,acomp,desc,trab,andamento],pe,origem:silencioso?null:origem,foco:focoAndamento?()=>com.focus():null});
+  V3.painel.abrir({id:t.id,trilha,titulo:t.titulo,corpo:[props,pend,cadeia,acomp,desc,trab,andamento],pe,origem:silencioso?null:origem,foco:focoAndamento?()=>com.focus():null});
   historico(t.id,hist);
 }
 document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;border:1px solid var(--np-ctrl);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.45 var(--np-ui);padding:8px 10px;resize:vertical}html.np-casca-v3 .np-ib.on{color:var(--np-ink);background:var(--np-sel)}`));
