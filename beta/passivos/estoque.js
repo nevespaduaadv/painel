@@ -22,12 +22,20 @@ async function movimentar(p,tipo){
   const qtd=inp("number","",{min:"0",step:"0.5",placeholder:"0"}),obs=inp("text","",{placeholder:tipo==="entrada"?"Ex.: compra no Atacadão, NF 1234":"Ex.: retirada para a copa"});
   const body=el("div",{class:"form"},el("div",{class:"f full note"},`${p.nome} · saldo atual ${n(p.saldo_atual)} ${p.unidade}${p.estoque_minimo?` · mínimo ${n(p.estoque_minimo)}`:""}`),
     field("em-q",tipo==="entrada"?"Quantidade que entrou":tipo==="retirada"?"Quantidade retirada":"Novo saldo (ajuste de contagem)",qtd),field("em-o","Observação",obs));
+  // V3.1: antes de gravar, a pessoa vê o saldo que vai ficar e que o registro sai em seu nome; a retirada maior que o saldo é recusada já na tela (mesma regra do banco)
+  const v3m=document.documentElement.classList.contains("np-casca-v3"),prevEl=el("div",{class:"f full np-est-prev",role:"status","aria-live":"polite"});
+  const calc=()=>{const q=+qtd.value;if(!(q>0)&&tipo!=="ajuste"||qtd.value===""){prevEl.className="f full np-est-prev";prevEl.textContent=`Saldo atual: ${n(p.saldo_atual)} ${p.unidade}. Informe a quantidade para ver como fica.`;return}const novo=tipo==="entrada"?+p.saldo_atual+q:tipo==="retirada"?+p.saldo_atual-q:q;
+    if(novo<0){prevEl.className="f full np-est-prev erro";prevEl.textContent=`A retirada (${n(q)}) é maior que o saldo registrado (${n(p.saldo_atual)} ${p.unidade}). Confira a quantidade.`;return}
+    prevEl.className="f full np-est-prev"+(p.estoque_minimo&&novo<=p.estoque_minimo?" att":"");prevEl.textContent=`O saldo passa de ${n(p.saldo_atual)} para ${n(novo)} ${p.unidade}`+(p.estoque_minimo&&novo<=p.estoque_minimo&&tipo==="retirada"?`, no mínimo ou abaixo dele (${n(p.estoque_minimo)}): o sistema abre a tarefa de reposição.`:".")};
+  if(v3m){qtd.addEventListener("input",calc);calc();body.append(prevEl,el("div",{class:"f full note"},`Fica registrado no histórico do produto em nome de ${PP.perfil?.nome||"quem está logado"}, com data e hora. O saldo só muda por este registro.`))}
   modal(tipo==="entrada"?"Entrada: "+p.nome:tipo==="retirada"?"Retirada: "+p.nome:"Ajuste de saldo: "+p.nome,body,async()=>{
     const q=+qtd.value;if(!(q>=0)||(tipo!=="ajuste"&&!(q>0)))throw new Error("Informe a quantidade");
+    if(v3m&&tipo==="retirada"&&q>+p.saldo_atual)throw new Error(`Retirada maior que o saldo (${n(p.saldo_atual)} ${p.unidade})`);
     const {data,error}=await SB.rpc("estoque_movimentar",{p_produto:p.id,p_tipo:tipo,p_quantidade:q,p_observacao:obs.value.trim()||null});
     if(error)throw new Error(error.message.replace(/^.*?:\s*/,""));
     toast(`Saldo de ${p.nome}: ${n(data.saldo)} ${p.unidade}`);recarregar();
   });
+  if(v3m){const b=$("#modalHost button.btn.primary");if(b)b.textContent=tipo==="entrada"?"Registrar entrada":tipo==="retirada"?"Registrar retirada":"Ajustar saldo"}
   setTimeout(()=>qtd.focus(),50);
 }
 function openProduto(p={}){

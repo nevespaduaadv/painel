@@ -501,7 +501,6 @@
       // o envio exige a aprovação no descritivo do dia (mesmas funções do banco: regua_preparar, regua_aprovar, regua_cancelar).
       const TOM_S = { aguardando_aprovacao: "att", em_andamento: "info", concluida: "ok", falhou: "crit", cancelada: "", sem_clientes: "", solicitado: "" };
       const dow = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][parseISO(HOJE).getDay()], ativas = C.etapas.filter((e) => e.ativa), admin = PP.perfil?.papel === "admin";
-      corpo.append(el("p", { class: "np-nota np-cc-escopo" }, `${fmtD(HOJE)}, ${dow}. Cada etapa gera uma prévia de quem recebe e de quem fica de fora pelas regras. O envio só acontece depois da aprovação, pelo ChatGuru, em horário comercial. Às sextas, D-5, D-2 e D-0 incluem os vencimentos do fim de semana; às segundas, D+1 inclui o que venceu de sexta a domingo.`));
       const abrirEt = (et, origem) => {
         Z3.aberta = "et:" + et.codigo; if (!Z3.painel) return; const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
         const podeGerar = !!et.mensagem && (!hoje || !["em_andamento", "concluida", "aguardando_aprovacao"].includes(hoje.status));
@@ -524,12 +523,18 @@
       };
       const linhaEt = (et) => { const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
         return NPUI.linha({ id: "et:" + et.codigo, regua: hoje?.status === "aguardando_aprovacao" ? "att" : null, atual: Z3.aberta === "et:" + et.codigo, prazo: { curta: et.codigo, rel: "", exata: et.descricao || et.codigo }, titulo: et.titulo,
-          contexto: [et.descricao, prev.length ? `prévia de hoje: ${prev.length} cobrança(s)` + (fora ? `, ${fora} fora pelas regras` : "") : "nenhuma cobrança hoje", et.mensagem ? null : "mensagem não cadastrada"].filter(Boolean).join(" · "),
-          direita: [et.personalizada ? NPUI.marca("personalizada", "") : null, et.automatica ? NPUI.marca("prévia automática 8h55", "info") : null, hoje ? NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || "") : NPUI.marca("não gerada hoje", "")], titleAbrir: "Abrir a etapa", onOpen: (li) => abrirEt(et, li.querySelector(".np-it-abrir")) }); };
-      corpo.append(el("div", { class: "np-cc-fl" }, NPUI.btn(C.nova ? "Fechar a nova cadência" : "Nova cadência", { onclick: () => { C.nova = !C.nova; renderCentral(); } })));
+          contexto: [prev.length ? (prev.length - fora ? `hoje: ${prev.length - fora} cliente(s) receberia(m)` : "hoje: ninguém receberia") + (fora ? ` · ${fora} fora pelas regras` : "") : "nenhuma cobrança nesta etapa hoje", et.mensagem ? null : "sem mensagem cadastrada: não gera prévia"].filter(Boolean).join(" · "),
+          direita: [et.personalizada ? NPUI.marca("personalizada", "") : null, et.automatica ? NPUI.marca("prévia automática 8h55", "info") : null, hoje ? NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || "") : null], titleAbrir: "Abrir a etapa", onOpen: (li) => abrirEt(et, li.querySelector(".np-it-abrir")) }); };
+      // O que exige intervenção vem primeiro e em grupo próprio; a explicação longa fica recolhida.
+      const stHoje = (et) => C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo)?.status, pend = ativas.filter((et) => ["aguardando_aprovacao", "falhou"].includes(stHoje(et))), semMsg = ativas.filter((et) => !et.mensagem), autoOn = ativas.filter((et) => et.automatica);
+      corpo.append(el("div", { class: "np-cc-sit" }, NPUI.resumo([{ n: pend.length, label: pend.length === 1 ? "prévia aguardando a sua decisão" : "prévias aguardando a sua decisão", tom: pend.length ? "att" : "zero" }, semMsg.length ? { n: semMsg.length, label: semMsg.length === 1 ? "etapa sem mensagem cadastrada" : "etapas sem mensagem cadastrada" } : null, { n: autoOn.length, label: autoOn.length ? "com prévia automática ligada (" + autoOn.map((e) => e.codigo).join(", ") + ")" : "com prévia automática ligada", tom: autoOn.length ? "" : "zero" }]),
+        NPUI.btn(C.nova ? "Fechar a nova cadência" : "Nova cadência", { onclick: () => { C.nova = !C.nova; renderCentral(); } })));
+      corpo.append(el("p", { class: "np-nota np-cc-regra" }, "Nenhuma mensagem sai desta tela sem aprovação: gerar a prévia só monta a lista de quem receberia."), el("details", { class: "np-rm-def" }, el("summary", {}, "Como a régua funciona"), el("p", { class: "np-nota" }, `Hoje é ${fmtD(HOJE)}, ${dow}. Cada etapa gera uma prévia de quem recebe e de quem fica de fora pelas regras. O envio só acontece depois da aprovação, pelo ChatGuru, em horário comercial. Às sextas, D-5, D-2 e D-0 incluem os vencimentos do fim de semana; às segundas, D+1 inclui o que venceu de sexta a domingo. A prévia automática das 8h55 apenas prepara a lista; a aprovação continua manual.`)));
       if (C.nova) corpo.append(el("div", { class: "np-cc-nova" }, formNovaCadencia()));
       if (!ativas.length) corpo.append(NPUI.vazio({ titulo: "Nenhuma etapa ativa na régua", texto: "Crie uma cadência para definir quando e o que enviar." }));
-      else corpo.append(NPUI.grupo({ id: "cd-et", titulo: "Etapas da régua", n: ativas.length, itens: ativas.map(linhaEt) }));
+      else { const resto = ativas.filter((et) => !pend.includes(et));
+        if (pend.length) corpo.append(NPUI.grupo({ id: "cd-pend", titulo: "Aguardando a sua decisão", n: pend.length, tom: "att", itens: pend.map(linhaEt) }));
+        if (resto.length) corpo.append(NPUI.grupo({ id: "cd-et", titulo: pend.length ? "Demais etapas" : "Etapas da régua", n: resto.length, itens: resto.map(linhaEt) })); }
       const linhaD = (d) => { const et = C.etapas.find((e) => e.codigo === d.etapa); return NPUI.linha({ id: "dp:" + d.id, prazo: NPUI.prazoTxt(d.data), titulo: d.etapa + (et ? " · " + et.titulo : ""),
         contexto: [d.origem === "agendada" ? "prévia automática" : d.origem === "migracao" ? "Central antiga" : "gerada pelo botão", d.motivo].filter(Boolean).join(" · "),
         direita: [NPUI.marca((DISP_ST[d.status] || [d.status])[0].toLowerCase(), TOM_S[d.status] || ""), el("span", { class: "np-valor" }, `${(d.enviados || []).length} enviada(s) · ${(d.nao_enviados || []).length} fora`)], titleAbrir: "Ver o descritivo do dia", onOpen: () => abrirDetalhe(d.etapa, d.data) }); };
@@ -546,13 +551,23 @@
       const doMes = rows.filter((r) => r.c.venc_ef.slice(0, 7) === cur), vencMes = doMes.filter((r) => !r.c.paga && r.c.venc_ef < HOJE), aVencer = doMes.filter((r) => !r.c.paga && r.c.venc_ef >= HOJE), pagasMes = doMes.filter((r) => r.c.paga), carryL = rows.filter(isCarry);
       const abertoV = soma(vencMes), base = abertoV + soma(pagasMes), pct = base > 0 ? abertoV / base * 100 : 0, recV = rec.reduce((a, l) => a + (+l.valor || 0), 0);
       const ind = (n, rot, nota, tom) => el("div", { class: "np-rm-i" }, el("b", { class: tom || "" }, n), el("span", { class: "rot" }, rot), nota ? el("span", { class: "nota" }, nota) : null);
-      corpo.append(NPUI.secao(`${fmtMes(cur)} · cobranças com vencimento no mês`, el("div", { class: "np-rm-ind" },
-        ind(R$(soma(pagasMes)), "recebido no mês", `${pagasMes.length} cobrança(s) quitada(s)`, "ok"),
-        ind(R$(abertoV), "vencido e não pago", `${vencMes.length} parcela(s) do mês`, vencMes.length ? "crit" : ""),
-        ind(R$(soma(aVencer)), "a vencer até o fim do mês", `${aVencer.length} parcela(s)`),
-        ind(pct.toFixed(1).replace(".", ",") + "%", "da carteira do mês em aberto", `sobre recebido + vencido até hoje (${R$(base)})`),
-        ind(R$(recV), "recuperado no mês", `${rec.length} registro(s) com desfecho Recuperado`),
-        ind(R$(soma(carryL)), "negociado em meses anteriores, ainda sem pagamento", `${carryL.length} parcela(s); não entra no vencido do mês`, carryL.length ? "att" : ""))));
+      // Hierarquia (rodada de 18/11, 21h): primeiro o que decide — quanto do mês já venceu sem pagamento —, depois o que já entrou e o que falta vencer.
+      // A recuperação tem base diferente (registros de contato, pela data do registro) e por isso fica em seção própria, menor, com a ressalva.
+      corpo.append(NPUI.secao(`Cobranças com vencimento em ${fmtMes(cur).toLowerCase()}`, el("div", { class: "np-rm-ind" },
+        ind(R$(abertoV), "vencido e não pago", `${vencMes.length} parcela(s) com vencimento até ontem`, vencMes.length ? "crit" : ""),
+        ind(R$(soma(pagasMes)), "já pago", `${pagasMes.length} cobrança(s) do mês com baixa confirmada pelo Asaas`, "ok"),
+        ind(R$(soma(aVencer)), "a vencer até o fim do mês", `${aVencer.length} parcela(s), de hoje em diante`)),
+        el("p", { class: "np-nota np-rm-frase" }, base > 0 ? `Do que já venceu neste mês (${R$(base)}), ${pct.toFixed(1).replace(".", ",")}% está em aberto.` : "Nenhuma cobrança do mês venceu ainda.")));
+      corpo.append(NPUI.secao(`Recuperação · contatos registrados em ${fmtMes(cur).toLowerCase()}`, el("div", { class: "np-rm-ind np-rm-sec" },
+        ind(R$(recV), "recuperado", `${rec.length} registro(s) de contato com desfecho Recuperado`),
+        ind(R$(soma(carryL)), "negociado em meses anteriores, ainda sem pagamento", `${carryL.length} parcela(s); não entra no vencido do mês`, carryL.length ? "att" : "")),
+        el("details", { class: "np-rm-def" }, el("summary", {}, "Como cada número é calculado"), NPUI.props([
+          ["Vencido e não pago", "Soma das cobranças com vencimento neste mês, anterior a hoje, sem pagamento confirmado."],
+          ["Já pago", "Soma das cobranças com vencimento neste mês já quitadas no Asaas. Conta pelo mês do vencimento, não pela data em que o dinheiro entrou."],
+          ["A vencer", "Soma das cobranças deste mês com vencimento de hoje em diante, ainda não pagas."],
+          ["% em aberto", "Vencido e não pago dividido por (já pago + vencido e não pago)."],
+          ["Recuperado", "Soma do valor das cobranças cujo contato foi registrado neste mês com o desfecho Recuperado. Conta pela data do registro, feito pela equipe; pode incluir parcelas vencidas em meses anteriores. Por isso não se soma nem se compara com \"já pago\"."],
+          ["Negociado de meses anteriores", "Parcelas de outros meses com nova data combinada e ainda sem pagamento. Ficam fora do vencido deste mês."]]))));
       // comparação com o mês anterior: duas frases dizem o mesmo que os dois gráficos de barras antigos, com a variação
       const prevAb = all.filter((r) => r.c.venc_ef.slice(0, 7) === prev && !r.c.paga), prevV = soma(prevAb), uniq = (arr) => new Set(arr.map((r) => r.c.chave_cliente)).size;
       const varia = (o, n, f) => { const d = n - o; if (d === 0) return NPUI.marca("igual", ""); const p = o > 0 ? Math.abs(d / o * 100).toFixed(1).replace(".", ",") + "%" : null; return NPUI.marca(`${d < 0 ? "↓" : "↑"} ${p ? p + " · " : ""}${d < 0 ? "−" : "+"}${f(Math.abs(d))}`, d < 0 ? "ok" : "crit"); };
