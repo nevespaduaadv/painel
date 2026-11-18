@@ -430,7 +430,8 @@
     v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: pre.length ? `${feitos}/${pre.length}` : 0, label: "lembretes de hoje enviados", tom: pre.length && feitos < pre.length ? "att" : "zero" }, { n: fila.length, label: fila.length === 1 ? "vencida a contatar hoje" : "vencidas a contatar hoje", tom: fila.length ? "crit" : "zero" }, { n: R$(soma(fila)), label: "nessa fila" }, { n: mon.length, label: "sem resposta" }, { n: neg.length, label: neg.length === 1 ? "negociação" : "negociações" }]),
       direita: [q, NPUI.btn("Atualizar", { onclick: invalidar })] }), abas());
     v.append(el("p", { class: "np-nota np-cc-escopo" }, `${fmtMes(cur)}` + (carry ? ` + ${carry} parcela(s) negociada(s) de meses anteriores sem pagamento` : "") + (prox ? ` + ${prox} parcela(s) do próximo mês já na régua` : "") + `. Base: cobranças do Asaas. Hoje é ${fmtD(HOJE)}.`));
-    if (C.aba !== "hoje") {
+    const V3ABAS = ["hoje", "negociados", "cadencia"]; // vistas já na linguagem V3.1; as demais ainda abrem na apresentação anterior
+    if (!V3ABAS.includes(C.aba)) {
       const monthLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur), scoped = new Set(rows.map((r) => r.c.id)), viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
       const host = el("div", { class: "np-legado" }); v.append(host);
       if (C.aba === "disparos") renderDisparos(host, all); else if (C.aba === "regua") renderRegua(host, rows); else if (C.aba === "negociados") renderNegociados(host, all); else if (C.aba === "historico") renderHistorico(host, all); else if (C.aba === "cadencia") renderLog(host, viewLog); else if (C.aba === "resumo") renderResumo(host, rows, monthLog); else renderDashboard(host, rows, all, monthLog);
@@ -473,6 +474,34 @@
       Z3.painel.abrir({ trilha: [el("span", {}, "Cobrança"), el("span", { class: "sep" }), el("span", {}, r.info.stage && r.info.stage !== "—" ? r.info.stage : r.info.situacao)], titulo: c.cliente_nome, id: String(c.id), origem, corpo: [props, Z3.form ? formV3(r) : null].filter(Boolean), pe });
     }
     const grupos = [];
+    if (C.aba === "negociados") {
+      // Negociados: três situações que mudam sozinhas (pagou no Asaas = cumprida; passou da data = não cumpriu). Agrupar pela situação dispensa filtro.
+      const neg0 = all.filter((r) => r.c.vencimento_negociado || r.c.valor_negociado || r.c.negociada).filter(fb).map((r) => ({ r, sit: r.c.paga ? "cumprida" : r.c.venc_ef < HOJE ? "descumprida" : "a_vencer", n: C.hist.find((h) => h.cobranca_id === r.c.id && h.desfecho === "NEGOCIOU") })).sort((a, b) => (a.r.c.venc_ef || "").localeCompare(b.r.c.venc_ef || ""));
+      const vAc = (x) => +x.r.c.valor_negociado || +x.r.c.valor || 0, tot = (l) => R$(l.reduce((a, x) => a + vAc(x), 0));
+      const linhaN = (x) => { const { r, sit, n } = x; return NPUI.linha({ id: String(r.c.id), regua: sit === "descumprida" ? "late" : null, atual: Z3.aberta === r.c.id, riscado: sit === "cumprida", prazo: { ...NPUI.prazoTxt(r.c.venc_ef), tom: sit === "descumprida" ? "late" : "" }, titulo: r.c.cliente_nome,
+        contexto: [ctx(r), r.c.vencimento_negociado && r.c.vencimento ? "vencia em " + fmtD(r.c.vencimento) : null, n ? "negociado em " + fmtD(n.data) + (n.por ? " por " + n.por : "") : null, n?.retorno || n?.observacao || null].filter(Boolean).join(" · "),
+        direita: [sit === "descumprida" ? NPUI.marca("não cumpriu", "crit") : sit === "cumprida" ? NPUI.marca("pagou", "ok") : null, r.c.valor_negociado && +r.c.valor_negociado !== +r.c.valor ? NPUI.marca("de " + R$(r.c.valor), "") : null, el("span", { class: "np-valor" }, R$(vAc(x)))], titleAbrir: "Abrir a cobrança", onOpen: (li) => abrir(r, li.querySelector(".np-it-abrir")) }); };
+      const des = neg0.filter((x) => x.sit === "descumprida"), agu = neg0.filter((x) => x.sit === "a_vencer"), cum = neg0.filter((x) => x.sit === "cumprida");
+      if (des.length) grupos.push(NPUI.grupo({ id: "cn-des", titulo: "Não cumpriu — voltou à fila de cobrança · " + tot(des), n: des.length, tom: "crit", itens: des.map(linhaN) }));
+      if (agu.length) grupos.push(NPUI.grupo({ id: "cn-agu", titulo: "Aguardando a data combinada · " + tot(agu), n: agu.length, itens: agu.map(linhaN) }));
+      if (cum.length) grupos.push(NPUI.grupo({ id: "cn-cum", titulo: "Pagou · " + tot(cum), n: cum.length, aberto: false, itens: cum.map(linhaN) }));
+      if (!grupos.length) corpo.append(NPUI.vazio(C.busca ? { titulo: "Nenhuma negociação com esse nome", texto: "Confira a busca.", acao: "Limpar a busca", onAcao: () => { C.busca = ""; renderCentral(); } } : { titulo: "Nenhuma negociação registrada", texto: "Uma cobrança entra aqui quando o contato é registrado com o desfecho \"Negociou\"." }));
+      else corpo.append(...grupos, NPUI.rodape(`${neg0.length} negociação(ões) · ${des.length} não cumprida(s) · ${agu.length} aguardando · ${cum.length} paga(s)`, [["late", "passou da data combinada sem pagar"]]), el("p", { class: "np-nota np-cc-regra" }, "A situação muda sozinha: paga no Asaas vira \"pagou\"; passou da data combinada sem pagar vira \"não cumpriu\" e a cobrança volta à fila de hoje."));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
+      if (Z3.aberta) { const r = all.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
+      return; }
+    if (C.aba === "cadencia") {
+      // Registros de contato: o diário do mês, do mais recente para o mais antigo, com filtro por desfecho
+      const scoped = new Set(rows.map((r) => r.c.id)), viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
+      const base = viewLog.filter((l) => busca(l.cliente_nome)), lista = base.filter((l) => C.logF === "todas" || l.desfecho === C.logF).sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+      const chipD = (k, label) => NPUI.chip({ label, n: k === "todas" ? base.length : base.filter((l) => l.desfecho === k).length, on: C.logF === k, grupo: "attr", onclick: () => { C.logF = C.logF === k && k !== "todas" ? "todas" : k; renderCentral(); } });
+      corpo.append(el("div", { class: "np-filtros np-cc-fl", role: "group", "aria-label": "Filtrar por desfecho" }, chipD("todas", "Todos"), ...Object.entries(DESF).map(([k, [t]]) => chipD(k, t))));
+      const linhaL = (l) => { const r = all.find((x) => x.c.id === l.cobranca_id); return NPUI.linha({ id: "log:" + (l.id || l.data + l.cobranca_id), prazo: NPUI.prazoTxt(l.data), titulo: l.cliente_nome || "Cliente não identificado",
+        contexto: [l.proxima_acao, l.observacao, "por " + (l.registrado_por_nome || (l.origem === "migracao" ? "Central antiga" : "não identificado"))].filter(Boolean).join(" · "),
+        direita: [NPUI.marca(DESF[l.desfecho][0].toLowerCase(), TOM_D[l.desfecho]), el("span", { class: "np-valor" }, R$(l.valor))], titleAbrir: r ? "Ver o histórico do cliente" : "Registro sem cobrança em aberto", onOpen: () => { if (r) { C.aba = "historico"; C.histCli = r.c.chave_cliente; renderCentral(); } } }); };
+      if (!lista.length) corpo.append(NPUI.vazio(C.busca || C.logF !== "todas" ? { titulo: "Nenhum registro com esse filtro", texto: "Confira a busca e o desfecho escolhido.", acao: "Limpar filtros", onAcao: () => { C.busca = ""; C.logF = "todas"; renderCentral(); } } : { titulo: "Nenhum contato registrado neste mês", texto: "Os contatos registrados em \"Ações de hoje\" aparecem aqui." }));
+      else corpo.append(NPUI.grupo({ id: "cl-reg", titulo: "Contatos registrados", n: lista.length, itens: lista.slice(0, 500).map(linhaL) }), NPUI.rodape(lista.length > 500 ? `500 de ${lista.length} registros (os mais recentes)` : `${lista.length} registro(s)`, []));
+      obra.append(corpo); v.append(obra); return; }
     for (const [k, rot] of [["D-5", "Lembrete D-5 · relatório mensal"], ["D-2", "Lembrete D-2 · aviso de vencimento"], ["D-0", "Lembrete D-0 · vence hoje"]]) { const its = pre.filter((r) => r.info.stage === k && fb(r)); if (its.length) grupos.push(NPUI.grupo({ id: "cc-" + k, titulo: rot, n: `${its.filter((r) => r.c.check_hoje).length}/${its.length}`, itens: its.map(linhaPre) })); }
     const filaF = fila.filter(fb), monF = mon.filter(fb), negF = neg.filter(fb);
     if (filaF.length) grupos.push(NPUI.grupo({ id: "cc-fila", titulo: "Vencidas — contatar hoje", n: filaF.length, tom: "crit", itens: filaF.map((r) => linhaV(r, "late")) }));
