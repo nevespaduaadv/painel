@@ -11,15 +11,17 @@
 -- Regras:
 --   * só a administradora classifica, reverte o lote ou devolve uma publicação à análise; fundamento obrigatório;
 --   * entra no lote só o que está pendente (sem providência, não ignorada, ainda sem classificação) e é ANTERIOR à data de corte;
---   * por padrão, publicação que já tem tarefa de análise neste sistema NÃO entra (ela já está sob controle aqui);
---     a administradora pode incluí-las de propósito — nesse caso elas deixam de travar a conclusão da tarefa (0115);
+--   * publicação que já tem tarefa de análise neste sistema só entra se a administradora incluir de propósito. Nesse caso ela
+--     fica marcada como PENDENTE DE CONCILIAÇÃO com o ADVBox, a tarefa não é concluída nem cancelada, e a proteção da 0115
+--     continua valendo: a tarefa segue travada até a providência individual ser registrada (decisão das sócias, 18/11);
 --   * cada lote guarda quantidade, data de corte, fundamento, quem e quando; cada publicação guarda o lote e ganha uma linha
 --     no próprio histórico; a reversão desfaz exatamente o lote e também fica registrada;
 --   * não cria tarefa, não altera tarefa, não cria agendamento, não faz chamada externa.
--- Depende da 0115 (redefine as duas funções de pendência para desconsiderar a publicação acompanhada externamente).
+-- Não altera a 0115.
 alter table public.publicacoes add column if not exists acompanhamento_externo text check (acompanhamento_externo in ('advbox'));
 alter table public.publicacoes add column if not exists acompanhamento_externo_lote uuid;
 alter table public.publicacoes add column if not exists acompanhamento_externo_em timestamptz;
+alter table public.publicacoes add column if not exists acompanhamento_externo_conciliar boolean not null default false;  -- tem tarefa aberta aqui: falta confirmar o acompanhamento no ADVBox
 create index if not exists publicacoes_acomp_ext_idx on public.publicacoes (acompanhamento_externo_lote) where acompanhamento_externo is not null;
 
 create table if not exists public.publicacao_lotes_externos (
@@ -62,7 +64,7 @@ begin
   if p_corte is null then raise exception 'Informe a data de corte.' using errcode = '22023'; end if;
   if length(btrim(coalesce(p_fundamento, ''))) < 10 then raise exception 'Informe o fundamento da classificação (pelo menos 10 caracteres).' using errcode = '22023'; end if;
   select pf.nome into v_nome from public.perfis pf where pf.id = auth.uid();
-  update public.publicacoes p set acompanhamento_externo = 'advbox', acompanhamento_externo_lote = v, acompanhamento_externo_em = now()
+  update public.publicacoes p set acompanhamento_externo = 'advbox', acompanhamento_externo_lote = v, acompanhamento_externo_em = now(), acompanhamento_externo_conciliar = (p.tarefa_id is not null)
    where p.providencia is null and not coalesce(p.ignorada, false) and p.acompanhamento_externo is null
      and p.data_disponibilizacao::date < p_corte and (p.tarefa_id is null or p_incluir_com_tarefa);
   get diagnostics n = row_count;
@@ -86,7 +88,7 @@ begin
   select pf.nome into v_nome from public.perfis pf where pf.id = auth.uid();
   insert into public.publicacao_historico (publicacao_id, acao, detalhe, por, por_nome)
     select id, 'acompanhamento_externo_revertido', jsonb_build_object('lote', p_lote, 'motivo', btrim(p_motivo)), auth.uid(), v_nome from public.publicacoes where acompanhamento_externo_lote = p_lote and acompanhamento_externo is not null;
-  update public.publicacoes set acompanhamento_externo = null, acompanhamento_externo_em = null where acompanhamento_externo_lote = p_lote and acompanhamento_externo is not null;
+  update public.publicacoes set acompanhamento_externo = null, acompanhamento_externo_em = null, acompanhamento_externo_conciliar = false where acompanhamento_externo_lote = p_lote and acompanhamento_externo is not null;
   get diagnostics n = row_count;
   update public.publicacao_lotes_externos set revertido_em = now(), revertido_por = auth.uid(), revertido_motivo = btrim(p_motivo), revertidas = n where id = p_lote;
   insert into public.auditoria (usuario, tabela, registro, acao, antes, depois) values (auth.uid(), 'publicacao_lotes_externos', p_lote::text, 'REVERSAO_DE_LOTE', null, jsonb_build_object('revertidas', n, 'motivo', btrim(p_motivo)));
@@ -99,7 +101,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not (public.sou_admin() or (public.sou_equipe() and public.tem_acesso('juridico'))) then raise exception 'Sem permissão para devolver a publicação à análise.' using errcode = '42501'; end if;
   if length(btrim(coalesce(p_motivo, ''))) < 5 then raise exception 'Informe o motivo.' using errcode = '22023'; end if;
-  update public.publicacoes set acompanhamento_externo = null, acompanhamento_externo_em = null where id = p_id and acompanhamento_externo is not null;
+  update public.publicacoes set acompanhamento_externo = null, acompanhamento_externo_em = null, acompanhamento_externo_conciliar = false where id = p_id and acompanhamento_externo is not null;
   if not found then raise exception 'Publicação não encontrada ou não está em acompanhamento externo.' using errcode = 'P0002'; end if;
   insert into public.publicacao_historico (publicacao_id, acao, detalhe, por, por_nome) values (p_id, 'acompanhamento_externo_devolvida', jsonb_build_object('motivo', btrim(p_motivo)), auth.uid(), (select nome from public.perfis where id = auth.uid()));
 end $$;
@@ -109,7 +111,7 @@ grant execute on function public.publicacoes_externo_previa(date, boolean), publ
 -- a pessoa não altera a classificação direto pela API (só pelas funções acima)
 create or replace function public.publicacoes_acomp_externo_guarda_tg() returns trigger language plpgsql set search_path = public as $$
 begin
-  if (new.acompanhamento_externo is distinct from old.acompanhamento_externo or new.acompanhamento_externo_lote is distinct from old.acompanhamento_externo_lote or new.acompanhamento_externo_em is distinct from old.acompanhamento_externo_em)
+  if (new.acompanhamento_externo is distinct from old.acompanhamento_externo or new.acompanhamento_externo_lote is distinct from old.acompanhamento_externo_lote or new.acompanhamento_externo_em is distinct from old.acompanhamento_externo_em or new.acompanhamento_externo_conciliar is distinct from old.acompanhamento_externo_conciliar)
      and current_user in ('authenticated', 'anon') then
     raise exception 'A classificação de acompanhamento externo só muda pelas funções próprias.' using errcode = '42501';
   end if;
@@ -118,18 +120,20 @@ end $$;
 drop trigger if exists publicacoes_acomp_externo_guarda on public.publicacoes;
 create trigger publicacoes_acomp_externo_guarda before update on public.publicacoes for each row execute function public.publicacoes_acomp_externo_guarda_tg();
 
--- 0115: publicação acompanhada externamente não trava a tarefa de análise (só importa se a administradora incluiu as que têm tarefa)
-create or replace function public.tarefa_publicacoes_pendentes(p_tarefa uuid) returns jsonb language sql stable security definer set search_path = public as $$
-  select coalesce(jsonb_agg(jsonb_build_object('publicacao_id', p.id, 'numero_processo', p.numero_processo, 'data', p.data_disponibilizacao, 'tipo', coalesce(p.tipo_documento, p.tipo_comunicacao), 'lida', p.lida) order by p.data_disponibilizacao, p.id), '[]'::jsonb)
-    from public.publicacoes p where p.tarefa_id = p_tarefa and p.providencia is null and not coalesce(p.ignorada, false) and p.acompanhamento_externo is null and public.sou_equipe() $$;
-create or replace function public.tarefa_pendencias_analise(p_tarefa uuid, out n integer, out quais text, out detalhe text) language sql stable security definer set search_path = public as $$
-  select count(*)::integer,
-         case when public.sou_equipe() or auth.uid() is null then string_agg(coalesce(p.numero_processo, 'sem número') || ' · ' || to_char(p.data_disponibilizacao, 'DD/MM') || coalesce(' · ' || coalesce(p.tipo_documento, p.tipo_comunicacao), ''), '; ' order by p.data_disponibilizacao, p.id) end,
-         case when public.sou_equipe() or auth.uid() is null then coalesce(jsonb_agg(jsonb_build_object('publicacao_id', p.id, 'numero_processo', p.numero_processo, 'data', p.data_disponibilizacao, 'tipo', coalesce(p.tipo_documento, p.tipo_comunicacao)) order by p.data_disponibilizacao, p.id), '[]'::jsonb)::text end
-    from public.publicacoes p where p.tarefa_id = p_tarefa and p.providencia is null and not coalesce(p.ignorada, false) and p.acompanhamento_externo is null $$;
+-- conciliação individual das que têm tarefa: a administradora ou o Jurídico registra que conferiu no ADVBox (não é providência jurídica)
+create or replace function public.publicacao_externo_conciliada(p_id bigint, p_nota text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.sou_admin() or (public.sou_equipe() and public.tem_acesso('juridico'))) then raise exception 'Sem permissão para registrar a conciliação.' using errcode = '42501'; end if;
+  if length(btrim(coalesce(p_nota, ''))) < 5 then raise exception 'Descreva o que foi conferido no ADVBox.' using errcode = '22023'; end if;
+  update public.publicacoes set acompanhamento_externo_conciliar = false where id = p_id and acompanhamento_externo is not null and acompanhamento_externo_conciliar;
+  if not found then raise exception 'Publicação não encontrada ou sem conciliação pendente.' using errcode = 'P0002'; end if;
+  insert into public.publicacao_historico (publicacao_id, acao, detalhe, por, por_nome) values (p_id, 'acompanhamento_externo_conciliada', jsonb_build_object('nota', btrim(p_nota)), auth.uid(), (select pf.nome from public.perfis pf where pf.id = auth.uid()));
+end $$;
+revoke all on function public.publicacao_externo_conciliada(bigint, text) from public, anon; grant execute on function public.publicacao_externo_conciliada(bigint, text) to authenticated;
 
-select 'ok 0116' as resultado, (select count(*) from public.publicacoes where acompanhamento_externo is not null) as classificadas, (select count(*) from public.publicacao_lotes_externos) as lotes;
+select 'ok 0116' as resultado, (select count(*) from public.publicacoes where acompanhamento_externo is not null) as classificadas, (select count(*) from public.publicacao_lotes_externos) as lotes, (select count(*) from public.publicacoes where acompanhamento_externo_conciliar) as pendentes_de_conciliacao;
 
 -- Reversão: drop trigger publicacoes_acomp_externo_guarda on public.publicacoes; drop function public.publicacoes_acomp_externo_guarda_tg(), public.publicacoes_externo_previa(date, boolean),
---   public.publicacoes_externo_classificar(date, text, boolean, integer), public.publicacoes_externo_reverter(uuid, text), public.publicacao_externo_devolver(bigint, text);
---   reexecutar as duas funções da 0115; drop table public.publicacao_lotes_externos; alter table public.publicacoes drop column acompanhamento_externo, drop column acompanhamento_externo_lote, drop column acompanhamento_externo_em;
+--   public.publicacoes_externo_classificar(date, text, boolean, integer), public.publicacoes_externo_reverter(uuid, text), public.publicacao_externo_devolver(bigint, text), public.publicacao_externo_conciliada(bigint, text);
+--   drop table public.publicacao_lotes_externos; alter table public.publicacoes drop column acompanhamento_externo, drop column acompanhamento_externo_lote, drop column acompanhamento_externo_em, drop column acompanhamento_externo_conciliar;
