@@ -278,7 +278,9 @@ function renderPainelV3(){
   const resumo=itensRes.length?NPUI.resumo(itensRes):el("div",{class:"np-resumo np-resumo-calmo",role:"status","aria-live":"polite"},D.escopo==="equipe"?"Nada pendente na equipe":"Nada pendente para você");
   // quem vê a equipe e está em "Minhas": o que a equipe tem de crítico aparece numa linha, com o caminho para ver
   const podeEquipe=!!(esc.tudo||esc.nucleos);const daEquipe=z=>esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id);
-  const eqP=podeEquipe&&D.escopo==="minhas"?D.prazos.filter(daEquipe):[];const eqFat=eqP.filter(z=>z.prazo_fatal&&["atrasada","hoje","d7"].includes(z.faixa)).length-fatais.length,eqAtr=eqP.filter(z=>z.faixa==="atrasada").length-atrasadas.length;
+  const eqP=podeEquipe&&D.escopo==="minhas"?D.prazos.filter(daEquipe):[];// só o que está POR VIR (hoje e 7 dias): prazo vencido da equipe não entra nesta linha — ele aparece, com contexto, em "Equipe" e em Tarefas.
+  // Um total de atrasos de todo o escritório na abertura da Home lê-se como alarme pessoal, e hoje inclui registros em conciliação com o ADVBox.
+  const naoMeu=z=>!(meu&&z.responsavel_id===meu.id);const eqFat=eqP.filter(z=>naoMeu(z)&&z.prazo_fatal&&["hoje","d7"].includes(z.faixa)).length,eqHoje=eqP.filter(z=>naoMeu(z)&&z.faixa==="hoje").length;
   const irEquipe=()=>{D.escopo="equipe";try{localStorage.setItem("pp-painel-escopo","equipe")}catch(_){}render()};
   const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
   if(esc.tudo||esc.nucleos){C({label:"Minhas",on:D.escopo==="minhas",grupo:"escopo",onclick:()=>{D.escopo="minhas";try{localStorage.setItem("pp-painel-escopo","minhas")}catch(_){}render()}});C({label:esc.tudo?"Equipe":"Jurídico",on:D.escopo==="equipe",grupo:"escopo",onclick:()=>{D.escopo="equipe";try{localStorage.setItem("pp-painel-escopo","equipe")}catch(_){}render()}})}
@@ -291,7 +293,7 @@ function renderPainelV3(){
   const obra=el("div",{class:"np-obra"});H3.obra=obra;const corpo=el("div",{class:"np-corpo"});
   // saudação + data (serifa) — substitui o cabeçalho da V2
   const nomeEq=esc.tudo?"equipe":"Jurídico";
-  const linhaEq=eqFat>0||eqAtr>0?el("p",{class:"np-hoje-eq"},esc.tudo?"Na equipe: ":"No Jurídico: ",[eqFat>0?[el("b",{class:"crit"},String(eqFat)),eqFat===1?" fatal em 7 dias":" fatais em 7 dias"]:null,eqFat>0&&eqAtr>0?" · ":null,eqAtr>0?[el("b",{class:"crit"},String(eqAtr)),eqAtr===1?" atrasada":" atrasadas"]:null].flat().filter(Boolean)," ",el("button",{type:"button",class:"lnk",onclick:irEquipe},esc.tudo?"Ver a equipe":"Ver o Jurídico")):null;
+  const linhaEq=eqFat>0||eqHoje>0?el("p",{class:"np-hoje-eq"},esc.tudo?"Na equipe: ":"No Jurídico: ",[eqHoje>0?[el("b",{},String(eqHoje)),eqHoje===1?" prazo vence hoje":" prazos vencem hoje"]:null,eqFat>0&&eqHoje>0?" · ":null,eqFat>0?[el("b",{},String(eqFat)),eqFat===1?" fatal nos próximos 7 dias":" fatais nos próximos 7 dias"]:null].flat().filter(Boolean)," ",el("button",{type:"button",class:"lnk",onclick:irEquipe},esc.tudo?"Ver a equipe":"Ver o Jurídico")):null;
   corpo.append(el("div",{class:"np-hoje-h"},el("h1",{},`${sauda}${nome?", "+nome:""}`),el("span",{class:"np-hoje-d"},dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),linhaEq));
   // cronômetro rodando (Agora) — mesma leitura e as mesmas ações da V2
   if(!AG.ok)carregarAgora(meu);
