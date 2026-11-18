@@ -174,6 +174,7 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Ainda na apresentação V2:** Central de Cobranças, Contratos e faturamento, Estoque, Inventário e as quatro telas do Controle Financeiro (0105).
 - **Central de Cobranças** (`centralV3`): barra de áreas do Financeiro, faixa (lembretes de hoje enviados, vencidas a contatar e o valor dessa fila, sem resposta, negociações), controle segmentado com as 8 vistas. **Só "Ações de hoje" está em V3.1**: grupos Lembrete D-5, D-2 e D-0 (caixa de marcar = lembrete enviado; registra, não envia mensagem), Vencidas — contatar hoje (a mais atrasada primeiro), Sem resposta e Negociações (fechados). Painel: valor, vencimento e atraso, etapa da régua, ação prevista, último contato, negociação, tarefas. Ações: Registrar contato (formulário no painel, com validação de medida, desfecho, valor e data), Criar tarefa, Mover na régua, Histórico do cliente, Marcar como paga (dois cliques) e Reabrir para a fila. As outras sete vistas (Disparos, Régua, Negociados, Histórico, Registros, Resumo, Dashboard) abrem dentro da moldura nova, **ainda na apresentação anterior**.
 - Laboratório: `docs/qa/cobrancas-lab.cjs` (as três telas; 8 combinações para cada uma) e `docs/qa/central-lab.cjs` (Central — Ações de hoje; 23 verificações).
+<<<<<<< HEAD
 
 ### 4.12 V11 — Equipe e gestão (em construção; 17/11: Cargos funcionais, segunda parte)
 - **Princípio:** pessoas ocupam cargos; cargos têm permissões e responsabilidades; cada ação guarda o autor individual.
@@ -187,6 +188,8 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Sem a 0113** a tela explica e não oferece ação. **A tela não está homologada com a 0113 real**: só laboratório com respostas simuladas.
 - **Falta:** homologação com a 0113; a vista Pessoas em V3.1, Horas, Ponto, Requisições e Ferramentas; ocupação temporária com data de término (o banco não tem esse campo).
 - Laboratório: `docs/qa/cargos-lab.cjs` (26 verificações, 8 combinações).
+=======
+>>>>>>> visual/v10-financeiro
 
 ## 5. Componentes
 
