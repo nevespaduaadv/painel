@@ -1,6 +1,6 @@
 # Conector AtendeDireito Sync
 
-**Situação: código no repositório, integração DESLIGADA, função NÃO implantada, nenhuma chamada real feita.**
+**Situação (17/11/2026): migração 0114 aplicada no BETA (integração desligada; publicações, tarefas e agendamentos preservados); NÃO aplicada na produção. Função NÃO implantada. Nenhuma chamada real ao fornecedor. 0114b e 0115 não aplicadas em nenhum ambiente.**
 
 | Arquivo | O que é |
 |---|---|
