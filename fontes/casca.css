@@ -19,6 +19,17 @@ html.np-casca-v3 :is(#np-side,#np-fly,#np-dica,#np-trilha) [hidden],html.np-casc
 /* ---------- lateral ---------- */
 html.np-casca-v3 #np-side{background:var(--np-side);color:var(--np-text);position:sticky;top:var(--np-topo,0px);height:calc(100vh - var(--np-topo,0px));display:flex;flex-direction:column;border-right:1px solid var(--np-line);min-width:0;overflow:hidden;z-index:10;transition:width calc(var(--np-d4)*var(--np-slow)) var(--np-e-spring)}
 html.np-casca-v3 .np-ws{display:flex;align-items:center;gap:9px;padding:14px 12px 10px;min-height:52px}
+/* recolher/expandir mora no cabeçalho da lateral (DESIGN.md §4 e prévia de 11/11): seta, não o menu de três traços; no celular o mesmo botão volta à barra como menu */
+html.np-casca-v3 .np-ws .np-rot{flex:1;min-width:0}
+html.np-casca-v3 #btnSb .np-ico-rec{display:none}
+html.np-casca-v3 .np-ws #btnSb{appearance:none;border:0;background:transparent;color:var(--np-text-3);width:28px;height:28px;padding:0;border-radius:var(--np-r);display:grid;place-items:center;cursor:pointer;flex:none}
+html.np-casca-v3 .np-ws #btnSb:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .np-ws #btnSb:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-ws #btnSb>svg:not(.np-ico-rec){display:none}
+html.np-casca-v3 .np-ws #btnSb .np-ico-rec{display:block;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform var(--np-d2) var(--np-e-move)}
+html.np-casca-v3 .np-rail .np-ws{flex-direction:column;gap:6px}
+html.np-casca-v3 .np-rail .np-ws #btnSb .np-ico-rec{transform:rotate(180deg)}
+@media (pointer:coarse),(hover:none){html.np-casca-v3 .np-ws #btnSb{width:44px;height:44px}}
 html.np-casca-v3 .np-ws .np-mono{width:26px;height:26px;border-radius:6px;background:var(--np-ink);color:var(--np-inv);display:grid;place-items:center;font-family:var(--np-display);font-size:13.5px;flex:none}
 html.np-casca-v3 .np-ws b{font-weight:600;font-size:13.5px;white-space:nowrap;display:block}
 html.np-casca-v3 .np-ws small{display:block;font-size:12px;color:var(--np-text-3);white-space:nowrap;line-height:1.1}
@@ -28,7 +39,7 @@ html.np-casca-v3 .np-busca-btn{display:flex;align-items:center;gap:9px;height:34
 html.np-casca-v3 .np-busca-btn:hover{border-color:var(--np-line-2);color:var(--np-text)}
 html.np-casca-v3 .np-busca-btn kbd{margin-left:auto;font:12px var(--np-ui);color:var(--np-text-3);border:1px solid var(--np-line-2);border-radius:4px;padding:0 5px}
 html.np-casca-v3 .np-ico{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
-html.np-casca-v3 #np-tree{flex:1;overflow:auto;padding:2px 8px 8px;scrollbar-width:thin;scrollbar-color:var(--np-line-2) transparent;mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%);-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%)}
+html.np-casca-v3 #np-tree{flex:1;overflow:auto;padding:2px 8px 8px;scrollbar-width:none;mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%);-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 14px),transparent 100%)}
 /* itens: reaproveita .tab gerado por itemNav() (button com svg + span [+ .cnt]) */
 html.np-casca-v3 #np-tree .tab{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px 0 10px;border-radius:var(--np-r);border:0;background:transparent;color:var(--np-text-2);font-size:14px;font-weight:400;white-space:nowrap;position:relative;width:100%;text-align:left;cursor:pointer;text-decoration:none;transition:background calc(var(--np-d1)*var(--np-slow)),color calc(var(--np-d1)*var(--np-slow))}
 html.np-casca-v3 #np-tree .tab:hover{background:var(--np-hover);color:var(--np-text)}
@@ -120,6 +131,10 @@ html.np-casca-v3 .top .switch{font-size:13px;color:var(--np-text-2)}
 html.np-casca-v3 .top .switch input{accent-color:var(--np-ink)}
 html.np-casca-v3 .top .userbox{font-size:13px;color:var(--np-text-2)}
 html.np-casca-v3 .top .userbox{flex:none}
+/* chat e notificações: mesmos botões só-ícone da barra (DESIGN.md §5 Botões, fantasma), não o círculo com borda da V2 */
+html.np-casca-v3 .top .ntf-btn{width:32px;height:32px;border:0;border-radius:var(--np-r);background:transparent;color:var(--np-text-2)}
+html.np-casca-v3 .top .ntf-btn:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .top .ntf-btn:focus-visible{outline:none;box-shadow:var(--np-focus)}
 html.np-casca-v3 .top .userbox .btn{height:30px;padding:0 10px;border-radius:var(--np-r);border:1px solid var(--np-line-2);background:var(--np-surface);color:var(--np-text);font-size:13px;font-weight:500}
 html.np-casca-v3 .top .userbox .btn:hover{background:var(--np-surface-2)}
 html.np-casca-v3 .top .userbox #userName{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -164,7 +179,7 @@ html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus
   html.np-casca-v3 .np-rail #np-tree .tab,html.np-casca-v3 .np-rail #np-tree .np-g>.np-gh,html.np-casca-v3 .np-rail .np-busca-btn{width:44px;height:44px;min-height:44px}
   html.np-casca-v3 .np-rail .np-eu .tab{min-width:44px;min-height:44px;justify-content:center}
   html.np-casca-v3 .np-eu .np-links a{min-height:44px;display:flex;align-items:center}
-  html.np-casca-v3 .top .ic,html.np-casca-v3 .top .ham{width:44px;height:44px}
+  html.np-casca-v3 .top .ic,html.np-casca-v3 .top .ham,html.np-casca-v3 .top .ntf-btn{width:44px;height:44px}
   html.np-casca-v3 .top .userbox .btn{min-height:44px}
   html.np-casca-v3 .top .switch{min-height:44px;display:inline-flex;align-items:center}
   html.np-casca-v3 .busca input{height:44px}
@@ -226,3 +241,5 @@ html:root.np-casca-v3{
 html.np-casca-v3 .np-ag-livres{display:flex;gap:10px;align-items:baseline;margin:2px 0;padding:8px 12px;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text-3)}
 html.np-casca-v3 .np-ag-livres-r{font:italic 400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
 
+
+html.np-casca-v3 #np-tree::-webkit-scrollbar{display:none}

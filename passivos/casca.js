@@ -56,7 +56,7 @@
     perfil: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   };
   const temIcone = (i) => { const k = i.icone || i.tab; return !!(typeof ICONES === "object" && ICONES && ICONES[k]); };
-  const I_GRUPO = { juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>' };
+  const I_GRUPO = { clientes: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>' };
   const ws = el("div", { class: "np-ws" }, el("div", { class: "np-mono", "aria-hidden": "true" }, "NP"), el("div", { class: "np-rot" }, el("b", {}, "Neves Pádua"), el("small", {}, "Advocacia")));
   const buscaBtn = el("button", { class: "np-busca-btn edit-only", type: "button", onclick: () => { const i = $("#buscaGlobal"); if (i) { fecharGaveta(); i.focus(); } } }, ico(LUPA), el("span", {}, "Buscar"), el("kbd", {}, "/"));
   // Semântica: <nav> com listas de botões (não é tablist — os grupos expansíveis não são abas); o destino atual leva
@@ -99,6 +99,14 @@
     app.classList.toggle("np-trilho"); fecharFly();
     try { localStorage.setItem(K("np-trilho"), app.classList.contains("np-trilho") ? "1" : "0"); } catch (_) {}
   };
+  if (btnSb) {
+    const casaBarra = btnSb.nextSibling, paiBarra = btnSb.parentNode;
+    btnSb.append(ico('<path d="m15 6-6 6 6 6"/>', "np-ico np-ico-rec"));
+    const morar = () => { const cel = matchMedia("(max-width:900px)").matches;
+      if (cel && btnSb.parentNode !== paiBarra) paiBarra.insertBefore(btnSb, casaBarra); else if (!cel && btnSb.parentNode !== ws) ws.append(btnSb);
+      btnSb.title = cel ? "Menu" : "Recolher ou expandir o menu"; };
+    morar(); matchMedia("(max-width:900px)").addEventListener("change", morar);
+  }
   const fecharGaveta = () => app.classList.remove("sb-aberta", "np-expandida");
   const emTrilho = () => !matchMedia("(max-width:900px)").matches && (app.classList.contains("np-trilho") || (matchMedia("(max-width:1179px)").matches && !app.classList.contains("np-expandida")));
   // .np-rail é o estado visual derivado (o CSS do trilho pende dele); recalculado a cada mudança de classe/largura
@@ -108,8 +116,11 @@
   sincRail();
 
   /* ---------- modelo da árvore a partir do NAV real ---------- */
-  const FIXOS = ["painel", "tarefas", "agenda", "avisos", "clientes", "acompanhamento"]; // "acompanhamento" (Fase 3) é filho visual de Clientes
-  const FILHOS = { acompanhamento: "clientes" };
+  // DESIGN.md §4: fixos sem grupo = Hoje, Tarefas e prazos, Agenda, Avisos; Clientes é GRUPO (Carteira, Acompanhamento PJ).
+  // Na visão do cliente (somente leitura) "Clientes" continua item único ("Minha área"), como sempre foi.
+  const soLeitura = () => { try { return readOnly(); } catch (_) { return false; } };
+  const FIXOS_BASE = ["painel", "tarefas", "agenda", "avisos"];
+  const FILHOS = {};
   const HUBS = (window.PP_HUBS && window.PP_HUBS.HUBS) || {};
   // Falha fechada: a casca nunca libera visualmente um destino por conta própria. Só mostra o que PP.temAcesso
   // (regra da aplicação, definida pelo gerador) responde `true`; ausência ou erro da função esconde o item.
@@ -120,11 +131,14 @@
       // abas de hub sem acesso não entram no modelo (não existem na árvore, no flyout nem na árvore de acessibilidade)
       return { id: chave, label, icone, cls: it.cls || "", hubTab: it.tab, itens: h.tabs.filter(([t]) => it.tabs.includes(t) && acesso(t)).map(([t, l]) => ({ tab: t, label: l, cls: "" })) }; };
     const deGrupos = (ids) => grupos.filter(g => ids.includes(g.grupo)).flatMap(g => g.itens.map(i => ({ ...i, cls: ((g.cls || "") + " " + (i.cls || "")).trim() })));
-    const gs = [hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
+    const ro = soLeitura(); const FIXOS = ro ? [...FIXOS_BASE, "clientes", "acompanhamento"] : FIXOS_BASE;
+    const cart = byTab("clientes"), acomp = byTab("acompanhamento");
+    const gCli = ro || !cart ? null : { id: "clientes", label: "Clientes", icone: "clientes", cls: "", itens: [{ ...cart, label: "Carteira" }, acomp].filter(Boolean) };
+    const gs = [gCli, hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
       { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
       { id: "ferramentas", label: "Ferramentas", icone: "ferramentas", cls: "", itens: deGrupos(["juridico-ferr", "comercial", "marketing"]) }].filter(g => g && g.itens.length);
     // itens do NAV que não entraram em fixos, hubs ou grupos conhecidos: grupo "Outros" (nunca se perde destino)
-    const cobertos = new Set([...FIXOS, "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
+    const cobertos = new Set([...FIXOS, "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
     const soltos = itens.filter(i => i.tab && !i.tabs && !cobertos.has(i.tab)).concat(grupos.filter(g => !["equipe", "gestao", "juridico-ferr", "comercial", "marketing"].includes(g.grupo)).flatMap(g => g.itens.filter(i => !cobertos.has(i.tab))));
     if (soltos.length) gs.push({ id: "outros", label: "Outros", icone: "ferramentas", cls: "", itens: soltos });
@@ -144,7 +158,7 @@
     tree.replaceChildren(lista(m.fixos.map(i => { const b = item(i, "np-top"); if (FILHOS[i.tab]) b.classList.add("np-filho"); return b; })), el("div", { class: "np-sec" }));
     for (const g of m.grupos) {
       const temAtivo = g.itens.some(ativo) || (g.hubTab && ativo({ tab: g.hubTab, tabs: g.itens.map(i => i.tab) }));
-      const aberto = abertos[g.id] !== undefined ? !!abertos[g.id] : (g.id === "juridico" || temAtivo);
+      const aberto = abertos[g.id] !== undefined ? !!abertos[g.id] : (g.id === "juridico" || g.id === "clientes" || temAtivo);
       const head = el("button", { class: "np-gh", type: "button", "aria-expanded": String(aberto || temAtivo), "aria-controls": "np-g-" + g.id, "data-g": g.id, onclick: (e) => aoClicarGrupo(e, g) }, ico(CHEV, "np-ico np-chev"), ico(I_GRUPO[g.icone] || I_GRUPO.ferramentas), el("span", {}, g.label));
       const corpo = el("div", { class: "np-corpo", id: "np-g-" + g.id }, lista(g.itens.map(i => item(i))));
       // estado aberto/fechado fica em data-aberto (CSS); aria-expanded só no botão, onde é válido
@@ -171,7 +185,8 @@
     requestAnimationFrame(() => { for (const grp of tree.querySelectorAll(".np-g")) { const algum = [...grp.querySelectorAll(".tab")].some(visivel); grp.dataset.vazio = algum ? "0" : "1"; } });
     // trilha e título da barra
     const gAtivo = m.grupos.find(g => g.itens.some(ativo) || (g.hubTab && ativoDe({ tab: g.hubTab, tabs: g.itens.map(i => i.tab) })));
-    trilha.textContent = gAtivo ? gAtivo.label : ""; trilha.hidden = !gAtivo;
+    const fixoAtivo = !gAtivo && m.fixos.some(ativo); // itens fixos da árvore pertencem a "Meu dia" (DESIGN.md §4: trilha "Grupo / Módulo" em toda tela)
+    trilha.textContent = gAtivo ? gAtivo.label : fixoAtivo ? "Meu dia" : ""; trilha.hidden = !(gAtivo || fixoAtivo);
     if (brand) { const i = m.fixos.concat(m.grupos.flatMap(g => g.itens)).find(ativo); if (i && !readOnly()) brand.textContent = i.label; }
     if (flyG) atualizarFly();
   }
