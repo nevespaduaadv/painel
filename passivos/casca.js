@@ -171,7 +171,8 @@
     requestAnimationFrame(() => { for (const grp of tree.querySelectorAll(".np-g")) { const algum = [...grp.querySelectorAll(".tab")].some(visivel); grp.dataset.vazio = algum ? "0" : "1"; } });
     // trilha e título da barra
     const gAtivo = m.grupos.find(g => g.itens.some(ativo) || (g.hubTab && ativoDe({ tab: g.hubTab, tabs: g.itens.map(i => i.tab) })));
-    trilha.textContent = gAtivo ? gAtivo.label : ""; trilha.hidden = !gAtivo;
+    const fixoAtivo = !gAtivo && m.fixos.some(ativo); // itens fixos da árvore pertencem a "Meu dia" (DESIGN.md §4: trilha "Grupo / Módulo" em toda tela)
+    trilha.textContent = gAtivo ? gAtivo.label : fixoAtivo ? "Meu dia" : ""; trilha.hidden = !(gAtivo || fixoAtivo);
     if (brand) { const i = m.fixos.concat(m.grupos.flatMap(g => g.itens)).find(ativo); if (i && !readOnly()) brand.textContent = i.label; }
     if (flyG) atualizarFly();
   }

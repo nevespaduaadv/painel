@@ -120,6 +120,10 @@ html.np-casca-v3 .top .switch{font-size:13px;color:var(--np-text-2)}
 html.np-casca-v3 .top .switch input{accent-color:var(--np-ink)}
 html.np-casca-v3 .top .userbox{font-size:13px;color:var(--np-text-2)}
 html.np-casca-v3 .top .userbox{flex:none}
+/* chat e notificações: mesmos botões só-ícone da barra (DESIGN.md §5 Botões, fantasma), não o círculo com borda da V2 */
+html.np-casca-v3 .top .ntf-btn{width:32px;height:32px;border:0;border-radius:var(--np-r);background:transparent;color:var(--np-text-2)}
+html.np-casca-v3 .top .ntf-btn:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .top .ntf-btn:focus-visible{outline:none;box-shadow:var(--np-focus)}
 html.np-casca-v3 .top .userbox .btn{height:30px;padding:0 10px;border-radius:var(--np-r);border:1px solid var(--np-line-2);background:var(--np-surface);color:var(--np-text);font-size:13px;font-weight:500}
 html.np-casca-v3 .top .userbox .btn:hover{background:var(--np-surface-2)}
 html.np-casca-v3 .top .userbox #userName{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -164,7 +168,7 @@ html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus
   html.np-casca-v3 .np-rail #np-tree .tab,html.np-casca-v3 .np-rail #np-tree .np-g>.np-gh,html.np-casca-v3 .np-rail .np-busca-btn{width:44px;height:44px;min-height:44px}
   html.np-casca-v3 .np-rail .np-eu .tab{min-width:44px;min-height:44px;justify-content:center}
   html.np-casca-v3 .np-eu .np-links a{min-height:44px;display:flex;align-items:center}
-  html.np-casca-v3 .top .ic,html.np-casca-v3 .top .ham{width:44px;height:44px}
+  html.np-casca-v3 .top .ic,html.np-casca-v3 .top .ham,html.np-casca-v3 .top .ntf-btn{width:44px;height:44px}
   html.np-casca-v3 .top .userbox .btn{min-height:44px}
   html.np-casca-v3 .top .switch{min-height:44px;display:inline-flex;align-items:center}
   html.np-casca-v3 .busca input{height:44px}
