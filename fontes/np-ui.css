@@ -647,4 +647,27 @@ html.np-casca-v3 .np-btn.np-est-b{min-width:32px;padding:0 8px;justify-content:c
 html.np-casca-v3 #view-estoque .np-it-prazo .r{display:inline;margin-left:4px;font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2)}
 @media (max-width:900px){html.np-casca-v3 .np-btn.np-est-b{min-width:44px;min-height:44px}}
 html.np-casca-v3 .np-est-pm{display:inline-flex;gap:8px;flex:0 0 auto}
-@media (max-width:900px){html.np-casca-v3 #view-estoque .np-it-dir{flex-wrap:wrap;justify-content:flex-start;white-space:normal}html.np-casca-v3 #view-estoque .np-est-pm{flex-basis:100%}}
+/* Rodada de refinamento (18/11, 21h): hierarquia do Resumo do mês e de Disparos */
+html.np-casca-v3 .np-rm-ind.np-rm-sec .np-rm-i b{font-size:var(--np-fs-5)}
+html.np-casca-v3 .np-rm-ind .np-rm-i:first-child b{font-size:calc(var(--np-fs-7) * 1.25)}
+html.np-casca-v3 .np-rm-ind.np-rm-sec .np-rm-i:first-child b{font-size:var(--np-fs-5)}
+html.np-casca-v3 p.np-rm-frase{margin:14px 0 0}
+html.np-casca-v3 details.np-rm-def{margin:12px 0 0;border-top:1px solid var(--np-line);padding-top:8px}
+html.np-casca-v3 details.np-rm-def>summary{cursor:pointer;font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text-2);padding:6px 0;min-height:32px}
+html.np-casca-v3 details.np-rm-def>summary:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 details.np-rm-def[open]>summary{color:var(--np-text)}
+html.np-casca-v3 details.np-rm-def .np-props dd{font:400 var(--np-fs-2)/1.5 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-cc-sit{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin:0 0 6px}
+@media (pointer:coarse),(max-width:900px){html.np-casca-v3 details.np-rm-def>summary{min-height:44px;display:flex;align-items:center}}
+/* Estoque — registro de movimentação: o saldo que vai ficar, antes de gravar */
+html.np-casca-v3 .np-est-prev{font:500 var(--np-fs-3)/1.45 var(--np-ui);color:var(--np-text);padding:10px 12px;border:1px solid var(--np-line);border-radius:8px;background:var(--np-surface-2)}
+html.np-casca-v3 .np-est-prev.att{border-color:var(--np-att)}
+html.np-casca-v3 .np-est-prev.erro{border-color:var(--np-crit);color:var(--np-crit)}
+/* Estoque no celular: saldo e nome à esquerda, situação e − + à direita, numa faixa só por produto */
+@media (max-width:900px){
+  html.np-casca-v3 #view-estoque .np-it{grid-template-columns:0 minmax(0,1fr) auto;grid-template-areas:"chk prazo dir" "chk texto dir";column-gap:8px}
+  html.np-casca-v3 #view-estoque .np-it-dir{flex-direction:column;align-items:flex-end;gap:4px;white-space:normal;text-align:right;align-self:center}
+  html.np-casca-v3 #view-estoque .np-it-dir .np-marca{max-width:150px}
+}
+@media (max-width:600px){html.np-casca-v3 #view-estoque .np-toolbar .np-busca-inline{flex:1 1 auto}html.np-casca-v3 #view-estoque .np-toolbar{row-gap:8px;padding-bottom:10px}html.np-casca-v3 #view-estoque .np-fin-sub{margin-bottom:8px}}
+html.np-casca-v3 details.np-ft-mais{margin-top:18px}
