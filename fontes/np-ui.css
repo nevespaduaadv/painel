@@ -562,6 +562,7 @@ html.np-casca-v3 .np-cc-nova .card{border:0;box-shadow:none;padding:0;margin:0;b
 /* Central · Resumo do mês: leitura editorial — números em serifa sobre o papel, sem cartões; fios separam as seções */
 html.np-casca-v3 #view-financeiro .np-corpo>.np-sec{margin:0 0 22px}html.np-casca-v3 #view-financeiro .np-corpo>*+.np-sec{margin-top:26px}html.np-casca-v3 .np-rm-duas .np-sec{margin-bottom:4px}html.np-casca-v3 #view-financeiro .np-corpo>.np-sec:has(.np-resumo){margin-bottom:8px}
 html.np-casca-v3 .np-rm-ind{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 28px;padding-top:6px}
+@media (min-width:1100px){html.np-casca-v3 .np-rm-ind{grid-template-columns:repeat(3,minmax(0,1fr))}} /* seis indicadores em 3 × 2: evita a linha com um item órfão em telas largas */
 html.np-casca-v3 .np-rm-i{display:flex;flex-direction:column;gap:2px;min-width:0}
 html.np-casca-v3 .np-rm-i b{font:500 var(--np-fs-7)/1.15 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text)}
 html.np-casca-v3 .np-rm-i b.crit{color:var(--np-crit)}html.np-casca-v3 .np-rm-i b.att{color:var(--np-att)}html.np-casca-v3 .np-rm-i b.ok{color:var(--np-ok)}
@@ -639,3 +640,11 @@ html.np-casca-v3 .np-props dd.np-crit{color:var(--np-crit)}
 html.np-casca-v3 .np-ft-conf{flex:1 1 100%}
 html.np-casca-v3 .np-ft-bts{display:flex;flex-wrap:wrap;gap:8px}
 @media (max-width:600px){html.np-casca-v3 .np-ft-lst>li{flex-wrap:wrap}html.np-casca-v3 .np-ft-lst .a{flex-basis:100%}}
+/* V10 — Estoque em V3.1: − e + na própria linha (retirada e entrada são o uso diário) */
+html.np-casca-v3 #view-estoque .np-toolbar{flex-wrap:wrap;row-gap:10px}
+html.np-casca-v3 #view-estoque .np-toolbar>.np-resumo{flex:1 0 100%}
+html.np-casca-v3 .np-btn.np-est-b{min-width:32px;padding:0 8px;justify-content:center;font:500 var(--np-fs-4)/1 var(--np-ui)}
+html.np-casca-v3 #view-estoque .np-it-prazo .r{display:inline;margin-left:4px;font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2)}
+@media (max-width:900px){html.np-casca-v3 .np-btn.np-est-b{min-width:44px;min-height:44px}}
+html.np-casca-v3 .np-est-pm{display:inline-flex;gap:8px;flex:0 0 auto}
+@media (max-width:900px){html.np-casca-v3 #view-estoque .np-it-dir{flex-wrap:wrap;justify-content:flex-start;white-space:normal}html.np-casca-v3 #view-estoque .np-est-pm{flex-basis:100%}}
