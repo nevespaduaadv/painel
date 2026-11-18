@@ -25,6 +25,13 @@ jobs:
           if echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q '"fase-0"'; then echo "fase=0" >> "$GITHUB_OUTPUT"; else echo "fase=3" >> "$GITHUB_OUTPUT"; fi
       - name: verificar-geracao
         run: node fontes/verificar-geracao.mjs --base origin/${{ github.base_ref }} --fase ${{ steps.fase.outputs.fase }}
+      - name: Conector Sync — testes simulados do adaptador (sem chamada real)
+        run: node --test supabase/functions/sync/adaptador.test.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Conector Sync — função de servidor executada em Deno, com Supabase e fornecedor simulados na própria máquina
+        run: deno test --allow-net=127.0.0.1 --allow-run --allow-env --allow-read docs/qa/sync/deno-funcao.test.ts
       - name: Laboratório da casca (navegação real, dados fictícios, sem rede)
         run: |
           npm i -g --no-fund --no-audit playwright@1.49.1 pngjs@7.0.0
