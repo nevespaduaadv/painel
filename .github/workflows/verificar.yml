@@ -60,6 +60,8 @@ jobs:
         run: NODE_PATH="$(npm root -g)" node docs/qa/central-lab.cjs "$RUNNER_TEMP/casca-lab/central"
       - name: Laboratório de Contratos e faturamento (V10)
         run: NODE_PATH="$(npm root -g)" node docs/qa/faturamento-lab.cjs "$RUNNER_TEMP/casca-lab/faturamento"
+      - name: Laboratório do Estoque (V10)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/estoque-lab.cjs "$RUNNER_TEMP/casca-lab/estoque"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4

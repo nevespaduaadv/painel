@@ -614,3 +614,11 @@ html.np-casca-v3 .np-props dd.np-crit{color:var(--np-crit)}
 html.np-casca-v3 .np-ft-conf{flex:1 1 100%}
 html.np-casca-v3 .np-ft-bts{display:flex;flex-wrap:wrap;gap:8px}
 @media (max-width:600px){html.np-casca-v3 .np-ft-lst>li{flex-wrap:wrap}html.np-casca-v3 .np-ft-lst .a{flex-basis:100%}}
+/* V10 — Estoque em V3.1: − e + na própria linha (retirada e entrada são o uso diário) */
+html.np-casca-v3 #view-estoque .np-toolbar{flex-wrap:wrap;row-gap:10px}
+html.np-casca-v3 #view-estoque .np-toolbar>.np-resumo{flex:1 0 100%}
+html.np-casca-v3 .np-btn.np-est-b{min-width:32px;padding:0 8px;justify-content:center;font:500 var(--np-fs-4)/1 var(--np-ui)}
+html.np-casca-v3 #view-estoque .np-it-prazo .r{display:inline;margin-left:4px;font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2)}
+@media (max-width:900px){html.np-casca-v3 .np-btn.np-est-b{min-width:44px;min-height:44px}}
+html.np-casca-v3 .np-est-pm{display:inline-flex;gap:8px;flex:0 0 auto}
+@media (max-width:900px){html.np-casca-v3 #view-estoque .np-it-dir{flex-wrap:wrap;justify-content:flex-start;white-space:normal}html.np-casca-v3 #view-estoque .np-est-pm{flex-basis:100%}}
