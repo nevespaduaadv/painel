@@ -168,15 +168,18 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Ainda na apresentação V2:** Central de Cobranças, Contratos e faturamento, Estoque, Inventário e as quatro telas do Controle Financeiro (0105).
 - Laboratório: `docs/qa/cobrancas-lab.cjs` (as três telas; 8 combinações para cada uma).
 
-### 4.12 V11 — Equipe e gestão (em construção; 17/11: Cargos funcionais, primeira parte)
+### 4.12 V11 — Equipe e gestão (em construção; 17/11: Cargos funcionais, segunda parte)
 - **Princípio:** pessoas ocupam cargos; cargos têm permissões e responsabilidades; cada ação guarda o autor individual.
 - **Vistas** (`passivos/equipe.js`): controle segmentado Pessoas | Cargos. Pessoas ainda é a tela atual (apresentação V2).
-- **Cargos** (`renderCargosV3`, depende da migração 0113): lista em grupos — Vagos (régua vinho), Com pendência, Ocupados, Inativos —; linha com núcleo, modalidade (coordenação ou operacional por fila/rodízio), número de áreas de acesso, ocupantes e as marcas *vago*, *n na fila*, *pendência*. Faixa: cargos ativos, pessoas em cargos, cargos vagos, itens na fila sem pessoa e divergências de acesso.
-- **Painel**: situação, núcleo e frente, modalidade, acessos do cargo, responsabilidades, ocupantes (titular, substituto, afastamento, pendência, tarefas do cargo) e histórico de ocupações com o motivo.
-- **Ações** (só a administradora; conferidas no banco): Designar pessoa (titular ou substituto, com motivo; em coordenação, quem é substituído) e Encerrar ocupação (motivo e destino da carteira aberta — por padrão, a fila do cargo).
-- **Sem a 0113** a tela explica e não oferece ação.
-- **Falta:** criar e editar cargo, ordem do rodízio, afastamentos, redistribuição da fila, a vista Pessoas em V3.1, Horas, Ponto, Requisições e Ferramentas.
-- Laboratório: `docs/qa/cargos-lab.cjs` (8 combinações).
+- **Nomenclatura:** "titular" e "substituto" só em cargo de **coordenação**. Em cargo **operacional**, todas as pessoas são "ocupantes". "Cargo principal da pessoa" marca a ocupação principal; as demais são adicionais. Afastamento em curso e afastamento programado aparecem com as datas.
+- **Cargos** (`renderCargosV3`, depende da migração 0113): lista em grupos — Vagos, Com pendência, Ocupados, Inativos —; linha com núcleo, modalidade (coordenação, com ou sem substituto; operacional com o número de ocupantes e fila ou rodízio), áreas de acesso, ocupantes e as marcas *vago*, *n na fila*, *n com prazo fatal na fila*, *pendência*, *afastamento em curso*. Régua carmim quando há prazo fatal na fila.
+- **Prazo fatal sem pessoa:** aviso no topo da tela com o cargo (e "cargo vago", se for o caso), clicável. Cargo vago não esconde atividade.
+- **Fila de distribuição** (`abrirFila`): "n na fila" é clicável, na linha e no painel. Lista o que está com a fila do cargo, prazo fatal primeiro: atividade, cliente, prazo, urgência e responsável anterior (do histórico de responsáveis). "Distribuir" abre a confirmação com a pessoa (só ocupantes elegíveis: com login, sem pendência, fora de afastamento) e o motivo; grava por `atividade_transferir`, que registra a auditoria. "Distribuir tudo ao ocupante efetivo" só existe quando o cargo tem um ocupante efetivo, e pede confirmação marcada.
+- **Painel do cargo**: situação, núcleo e frente, modalidade, acessos, responsabilidades, ocupantes e histórico de ocupações com o motivo.
+- **Ações** (só a administradora; todas pelas funções do banco, sem SQL): Novo cargo e Editar cargo (`cargo_salvar`: nome, código, núcleo, frente, modalidade, distribuição, acessos, responde por núcleo ou frente, responsabilidades, ativo), Designar pessoa (`cargo_designar`: titular ou substituto em coordenação, ocupante em operacional, cargo principal, quem é substituído, motivo), Encerrar ocupação (`cargo_encerrar`: motivo e destino da carteira), Registrar ou alterar afastamento (`cargo_afastar`), Ordem no rodízio (`cargo_ordem`).
+- **Sem a 0113** a tela explica e não oferece ação. **A tela não está homologada com a 0113 real**: só laboratório com respostas simuladas.
+- **Falta:** homologação com a 0113; a vista Pessoas em V3.1, Horas, Ponto, Requisições e Ferramentas; ocupação temporária com data de término (o banco não tem esse campo).
+- Laboratório: `docs/qa/cargos-lab.cjs` (26 verificações, 8 combinações).
 
 ## 5. Componentes
 

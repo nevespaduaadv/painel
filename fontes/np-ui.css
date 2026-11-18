@@ -552,4 +552,14 @@ html.np-casca-v3 .np-cargo-oc>li{padding:12px 0;border-top:1px solid var(--np-li
 html.np-casca-v3 .np-cargo-oc .q{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
 html.np-casca-v3 .np-cargo-oc .d{font:400 var(--np-fs-2)/1.5 var(--np-ui);color:var(--np-text-2)}
 html.np-casca-v3 .np-cargo-oc .ac{display:flex;gap:8px}
+html.np-casca-v3 button.np-fila-b{background:none;border:0;padding:6px 2px;margin:-6px 0;cursor:pointer;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;border-radius:4px}
+html.np-casca-v3 button.np-fila-b:hover{text-decoration-thickness:2px}
+html.np-casca-v3 button.np-fila-b:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-cargo-oc .ac{flex-wrap:wrap}
+html.np-casca-v3 .np-fila>li.fatal{border-left:3px solid var(--np-crit);padding-left:10px}
+html.np-casca-v3 .np-fila>li.late{border-left:3px solid var(--np-late,var(--np-crit));padding-left:10px}
+html.np-casca-v3 .np-fila-alerta{color:var(--np-crit)}
+html.np-casca-v3 .np-cargo-ac{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 16px}
+html.np-casca-v3 .np-f-leg{display:block;font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text-2);margin-bottom:4px}
+@media (max-width:900px){html.np-casca-v3 button.np-fila-b{min-height:44px;margin:0;padding:0 4px}}
 @media (max-width:600px){html.np-casca-v3 .np-cargo-oc .ac .np-btn{min-height:44px}}
