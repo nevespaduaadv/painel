@@ -400,12 +400,80 @@
   // ---------- integração com a aba Financeiro ----------
   const S0 = S;
   function barraSub() {
-    return el("div", { class: "tabs", style: "margin-bottom:10px" }, [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
+    const SUBS = [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]];
+    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS, S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
+    return el("div", { class: "tabs", style: "margin-bottom:10px" }, SUBS.map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
   }
   try { S0.finSub = localStorage.getItem("pp-fin-sub") || "asaas"; } catch (_) { S0.finSub = "asaas"; }
   { const _r = render; render = function () { _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } vf.prepend(barraSub()); }; }
+  // ---------- V10 · Clientes (Asaas) e Conta/Parâmetros em V3.1 — mesmos dados e mesmas ações da V2 ----------
+  const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const W3 = { aberta: null, painel: null, f: "" };
+  function clientesV3(v) {
+    v.classList.add("np-v3"); v.replaceChildren(); W3.painel = null;
+    if (C.asaasErro) { v.append(NPUI.faixaErro({ texto: "Não foi possível carregar os clientes do Asaas.", onAcao: () => { C.asaasErro = null; C.asaasCli = null; render(); } })); return; }
+    if (!C.asaasCli) { v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: "…", label: "carregando" }]) }), NPUI.carregando(7));
+      if (!C.asaasCarregando) { C.asaasCarregando = true; Promise.all([SB.from("asaas_contatos").select("*").order("nome"), SB.from("v_central_cobrancas").select("chave_cliente,asaas_cliente_id,cliente_id,valor,venc_ef,paga,status")]).then(([a, b]) => { C.asaasCarregando = false; if (a.error) { C.asaasErro = a.error; } else C.asaasCli = { lista: a.data || [], cobs: b.data || [] }; render(); }).catch((e) => { C.asaasCarregando = false; C.asaasErro = e; render(); }); }
+      return; }
+    const hoje = hojeISO(), soma = (l) => l.reduce((a, x) => a + (+x.valor || 0), 0);
+    const todas = C.asaasCli.lista.map((c) => { const cobs = C.asaasCli.cobs.filter((x) => x.asaas_cliente_id === c.asaas_id); const ab = cobs.filter((x) => !x.paga), venc = ab.filter((x) => x.venc_ef < hoje); return { c, ab, venc, pagas: cobs.filter((x) => x.paga).length }; });
+    const f = (C.asaasQ || "").toLowerCase();
+    const linhas = todas.filter(({ c, venc }) => (!f || [c.nome, c.cpf_cnpj, c.telefone, c.email].some((x) => String(x || "").toLowerCase().includes(f))) && (W3.f !== "sem" || !c.cliente_id) && (W3.f !== "venc" || venc.length));
+    const nSem = todas.filter((l) => !l.c.cliente_id).length, nVenc = todas.filter((l) => l.venc.length).length;
+    const resumo = NPUI.resumo([{ n: todas.length, label: todas.length === 1 ? "cliente no Asaas" : "clientes no Asaas" }, { n: nSem, label: "sem ficha vinculada", tom: nSem ? "att" : "zero" }, { n: nVenc, label: "com cobrança vencida", tom: nVenc ? "crit" : "zero" }, { n: R$(soma(todas.flatMap((l) => l.ab))), label: "em aberto" }]);
+    const chip = (k, label, n, title) => NPUI.chip({ label, n, on: W3.f === k, grupo: "attr", title, onclick: () => { W3.f = W3.f === k ? "" : k; render(); } });
+    let t = null; const q = el("input", { type: "search", class: "np-busca-inline", placeholder: "Nome, CPF/CNPJ, telefone…", value: C.asaasQ || "", "aria-label": "Buscar cliente no Asaas", oninput: (ev) => { C.asaasQ = ev.target.value; clearTimeout(t); t = setTimeout(() => { render(); const n = $("#view-financeiro .np-busca-inline"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 300); } });
+    v.append(NPUI.toolbar({ resumo, filtros: [chip("venc", "Com cobrança vencida", nVenc), chip("sem", "Sem ficha", nSem, "Cobrados só pelo Asaas, sem ficha vinculada no sistema")], direita: [q, NPUI.btn("Atualizar", { title: "Recarrega a lista (a sincronização com o Asaas é diária)", onclick: () => { C.asaasCli = null; render(); } })] }));
+    const obra = el("div", { class: "np-obra" }), corpo = el("div", { class: "np-corpo" });
+    const linha = (l) => { const { c, ab, venc } = l; const cli = (S.clientes || []).find((x) => x.id === c.cliente_id); const m = [];
+      if (!c.cliente_id) m.push(NPUI.marca("sem ficha", "att")); if (venc.length) m.push(NPUI.marca(venc.length === 1 ? "1 vencida" : venc.length + " vencidas", "crit"));
+      return NPUI.linha({ id: String(c.asaas_id), regua: venc.length ? "late" : null, atual: W3.aberta === c.asaas_id, titulo: c.nome || c.asaas_id, contexto: [c.cpf_cnpj, c.telefone, c.email, cli ? "ficha: " + cli.nome : null].filter(Boolean).join(" · "),
+        direita: [...m, el("span", { class: "np-valor" }, ab.length ? R$(soma(ab)) : "—")], titleAbrir: "Abrir o cliente", onOpen: (li) => abrir(l, li.querySelector(".np-it-abrir")) }); };
+    const abrir = (l, origem) => { const { c, ab, venc, pagas } = l; W3.aberta = c.asaas_id; if (!W3.painel) return; const cli = (S.clientes || []).find((x) => x.id === c.cliente_id);
+      W3.painel.abrir({ trilha: [el("span", {}, "Cliente no Asaas")], titulo: c.nome || c.asaas_id, id: String(c.asaas_id), origem,
+        corpo: [NPUI.props([["Ficha no sistema", c.cliente_id ? el("a", { href: "#clientes/" + encodeURIComponent(c.cliente_id), onclick: (e) => { e.preventDefault(); S.tab = "clientes"; S.sel = c.cliente_id; S.sub = "financeiro"; render(); } }, cli?.nome || c.cliente_id) : NPUI.marca("sem vínculo", "att")],
+          ["CPF/CNPJ", c.cpf_cnpj || null], ["Telefone", c.telefone || null], ["E-mail", c.email || null], ["Em aberto", ab.length ? `${ab.length} · ${R$(soma(ab))}` : "nenhuma", "serif"], ["Vencidas", venc.length ? [String(venc.length), " ", NPUI.marca(R$(soma(venc)), "crit")] : "nenhuma"], ["Pagas", String(pagas)], ["Asaas", c.asaas_id]].filter((x) => x[1] != null))],
+        pe: [el("a", { class: "np-btn", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas"), NPUI.btn("Histórico de cobrança", { variante: "ghost", onclick: () => { C.aba = "historico"; C.histCli = c.asaas_id; S0.finSub = "central"; render(); } })] }); };
+    if (!linhas.length) corpo.append(NPUI.vazio(!todas.length ? { titulo: "Nenhum cliente do Asaas", texto: "A lista vem da sincronização diária com o Asaas." } : { titulo: "Nada com esses filtros", texto: "Tire um filtro ou limpe a busca.", acao: "Limpar", onAcao: () => { W3.f = ""; C.asaasQ = ""; render(); } }));
+    else { const LIM = 500, mostra = linhas.slice(0, LIM);
+      for (const [k, l, tom, fn] of [["venc", "Com cobrança vencida", "crit", (x) => x.venc.length], ["ab", "Com cobrança em aberto", "", (x) => !x.venc.length && x.ab.length], ["sem", "Sem cobrança em aberto", "", (x) => !x.ab.length]]) { const its = mostra.filter(fn); if (its.length) corpo.append(NPUI.grupo({ id: "asc-" + k, titulo: l, n: its.length, tom, aberto: k !== "sem", itens: its.map(linha) })); }
+      corpo.append(NPUI.rodape(`${mostra.length} ${mostra.length === 1 ? "cliente" : "clientes"} na lista` + (linhas.length > LIM ? ` · mostrando ${LIM} de ${linhas.length}` : "") + (todas.length - linhas.length ? ` · ${todas.length - linhas.length} fora dos filtros` : ""), [["late", "tem cobrança vencida"]])); }
+    obra.append(corpo); v.append(obra); W3.painel = NPUI.painel({ obra, label: "Detalhe do cliente no Asaas", onClose: () => { W3.aberta = null; } });
+    if (W3.aberta) { const l = linhas.find((x) => x.c.asaas_id === W3.aberta); if (l) abrir(l); else W3.aberta = null; }
+  }
+  function contaV3(v) {
+    v.classList.add("np-v3"); v.replaceChildren();
+    const r = C.conta, ct = r?.conta || {}, sd = r?.saldo || {}, tx = r?.taxas || {}, es = r?.estatisticas_mes || {};
+    v.append(NPUI.toolbar({ resumo: NPUI.resumo([r?.ok ? { n: sd.balance != null ? R$(sd.balance) : "—", label: "saldo disponível no Asaas" } : { n: r ? "—" : "…", label: r ? "conta não consultada" : "consultando o Asaas" }, r?.ok && es.value != null ? { n: R$(es.value), label: `no mês (${es.quantity ?? 0} cobranças)` } : null]), direita: [NPUI.btn("Consultar agora", { title: "Consulta a conta, o saldo e as taxas no Asaas", onclick: () => { C.conta = null; render(); } })] }));
+    const folha = el("div", { class: "np-fin-conta" }); v.append(folha);
+    // parâmetros (do escritório) — mesma gravação da V2
+    const sp = NPUI.secao("Parâmetros gerais de recebimento", NPUI.carregando(4)); sp.classList.add("np-fin-cartao"); folha.append(sp);
+    (async () => {
+      if (!C.cfgRec) { const { data, error } = await SB.from("escritorio").select("dados").eq("id", "financeiro").maybeSingle(); if (error) { sp.replaceChildren(el("h3", {}, "Parâmetros gerais de recebimento"), NPUI.faixaErro({ texto: "Não foi possível carregar os parâmetros.", onAcao: () => render() })); return; } C.cfgRec = data?.dados || {}; }
+      const dados = C.cfgRec, cfg = { multa_pct: 2, juros_mes_pct: 1, desconto_pct: 0, desconto_dias: 0, forma_padrao: "UNDEFINED", dia_vencimento_padrao: 10, notificacoes_asaas: true, ...(dados.recebimento || {}) };
+      const multa = inp("number", cfg.multa_pct, { step: "0.01", min: 0, max: 10 }), juros = inp("number", cfg.juros_mes_pct, { step: "0.01", min: 0, max: 10 }), desc = inp("number", cfg.desconto_pct, { step: "0.01", min: 0, max: 100 }), descD = inp("number", cfg.desconto_dias, { min: 0, max: 30 }), forma = sel({ UNDEFINED: "Cliente escolhe (boleto, Pix ou cartão)", BOLETO: "Boleto", PIX: "Pix", CREDIT_CARD: "Cartão de crédito" }, cfg.forma_padrao), dia = inp("number", cfg.dia_vencimento_padrao, { min: 1, max: 28 });
+      const notif = el("input", { type: "checkbox", id: "pr-notif" }); notif.checked = !!cfg.notificacoes_asaas; const ro = typeof readOnly === "function" && readOnly() || PP.perfil?.papel !== "admin" && !(PP.perfil?.acessos || []).includes("financeiro");
+      const salvar = NPUI.btn("Salvar parâmetros", { variante: "pri", cls: "np-pri-local", onclick: async () => { const novo = { ...dados, recebimento: { multa_pct: +multa.value || 0, juros_mes_pct: +juros.value || 0, desconto_pct: +desc.value || 0, desconto_dias: +descD.value || 0, forma_padrao: forma.value, dia_vencimento_padrao: +dia.value || 10, notificacoes_asaas: notif.checked } }; const { error } = await SB.from("escritorio").upsert({ id: "financeiro", dados: novo }); if (error) { toast(error.message); return; } C.cfgRec = novo; toast("Parâmetros salvos — valem para as próximas cobranças criadas pelo sistema"); } });
+      sp.replaceChildren(el("h3", {}, "Parâmetros gerais de recebimento"), el("p", { class: "np-nota" }, "Usados quando o sistema cria uma cobrança. As cobranças que já existem no Asaas não mudam."),
+        el("div", { class: "form np-fin-form" }, field("pr-multa", "Multa por atraso (%)", multa, "Aplicada uma vez após o vencimento. Limite legal: 2%."), field("pr-juros", "Juros de mora (% ao mês)", juros, "Limite legal: 1% ao mês."), field("pr-desc", "Desconto por antecipação (%)", desc, "0 = sem desconto."), field("pr-descd", "Desconto válido até (dias antes do vencimento)", descD), field("pr-forma", "Forma de pagamento padrão", forma), field("pr-dia", "Dia de vencimento padrão", dia, "Sugerido ao criar cobranças novas."),
+          el("div", { class: "f full" }, el("label", { for: "pr-notif", class: "np-fin-check" }, notif, "Deixar o Asaas enviar as notificações dele (e-mail e SMS) além da régua do escritório"))), ro ? null : el("div", {}, salvar));
+    })();
+    // conta (ao vivo) — mesma consulta da V2
+    const sc = NPUI.secao("Conta no Asaas", NPUI.carregando(5)); sc.classList.add("np-fin-cartao"); folha.append(sc);
+    if (!C.conta) { if (!C.contaCarregando) { C.contaCarregando = true; window.PP_FIN.edge({ acao: "asaas_conta" }).then((x) => { C.conta = x; }).catch((e) => { C.conta = { ok: false, erro: e.message }; }).finally(() => { C.contaCarregando = false; render(); }); } return; }
+    if (!r.ok) { sc.replaceChildren(el("h3", {}, "Conta no Asaas"), NPUI.faixaErro({ texto: "Não foi possível consultar a conta no Asaas" + (r.erro ? ": " + r.erro : "."), acao: "Consultar de novo", onAcao: () => { C.conta = null; render(); } })); return; }
+    const pct = (o) => o == null ? "—" : (o.percentage != null ? `${o.percentage}%` : "") + (o.fixedValue != null ? ` + ${R$(o.fixedValue)}` : "") + (o.value != null && o.percentage == null && o.fixedValue == null ? R$(o.value) : "");
+    sc.replaceChildren(el("h3", {}, "Conta no Asaas ", NPUI.marca(r.ambiente || "", r.ambiente === "produção" ? "ok" : "att")),
+      NPUI.props([["Titular", ct.name || null], ["CPF/CNPJ", ct.cpfCnpj || null], ["E-mail", ct.email || null], ["Saldo disponível", sd.balance != null ? R$(sd.balance) : null, "serif"]].filter((x) => x[1] != null)),
+      el("h3", {}, "Taxas vigentes"), NPUI.props([["Boleto", tx.payment?.bankSlip ? R$(tx.payment.bankSlip.defaultValue ?? tx.payment.bankSlip.value) : "—"], ["Pix", tx.payment?.pix ? pct(tx.payment.pix) : "—"], ["Cartão (à vista)", tx.payment?.creditCard?.operationValue != null ? `${tx.payment.creditCard.oneInstallmentPercentage ?? ""}% + ${R$(tx.payment.creditCard.operationValue)}` : "—"],
+        ["Transferência", tx.transfer ? R$(tx.transfer.monthlyTransfersWithoutFee != null ? 0 : tx.transfer.value) + (tx.transfer.monthlyTransfersWithoutFee != null ? ` (${tx.transfer.monthlyTransfersWithoutFee} grátis por mês)` : "") : "—"],
+        ["Notificações", tx.notification ? [tx.notification.emailNotification != null ? "e-mail " + R$(tx.notification.emailNotification) : null, tx.notification.smsNotification != null ? "SMS " + R$(tx.notification.smsNotification) : null, tx.notification.whatsAppNotification != null ? "WhatsApp " + R$(tx.notification.whatsAppNotification) : null].filter(Boolean).join(" · ") || "—" : "—"]]),
+      el("h3", {}, "Mês atual (vencimentos até hoje)"), NPUI.props([["Cobranças", es.quantity != null ? String(es.quantity) : "—"], ["Valor total", es.value != null ? R$(es.value) : "—"], ["Valor líquido", es.netValue != null ? R$(es.netValue) : "—"]]),
+      el("details", { class: "np-fin-bruto" }, el("summary", {}, "Dados completos retornados pelo Asaas"), el("pre", {}, JSON.stringify({ conta: ct, saldo: sd, taxas: tx, estatisticas: es }, null, 2))));
+  }
   // ----- CLIENTES DO ASAAS -----
   async function renderClientesAsaas(v) {
+    if (v3()) return clientesV3(v);
     v.replaceChildren(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Clientes no Asaas"), el("div", { class: "sub" }, "Todos os clientes cadastrados no Asaas (sincronização diária), o vínculo com a ficha no sistema e a posição de cobrança de cada um.")), el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { C.asaasCli = null; render(); } }, "Atualizar"))));
     if (!C.asaasCli) { v.append(el("div", { class: "note" }, "Carregando…")); const [a, b] = await Promise.all([SB.from("asaas_contatos").select("*").order("nome"), SB.from("v_central_cobrancas").select("chave_cliente,asaas_cliente_id,cliente_id,valor,venc_ef,paga,status")]); if (a.error) { v.append(el("div", { class: "note" }, a.error.message)); return; } C.asaasCli = { lista: a.data || [], cobs: b.data || [] }; render(); return; }
     const q = inp("search", C.asaasQ, { placeholder: "Buscar por nome, CPF/CNPJ, telefone…", style: "min-width:260px" }); q.oninput = () => { C.asaasQ = q.value; render(); const n = $("#view-financeiro input[type=search]"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
@@ -420,6 +488,7 @@
   }
   // ----- CONTA ASAAS · PARÂMETROS GERAIS DE RECEBIMENTO -----
   async function renderConta(v) {
+    if (v3()) return contaV3(v);
     v.replaceChildren(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Conta Asaas e parâmetros de recebimento"), el("div", { class: "sub" }, "Dados da conta, saldo e taxas consultados ao vivo no Asaas; e os parâmetros padrão (multa, juros, desconto, forma, vencimento) usados quando o sistema cria uma cobrança.")), el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { C.conta = null; render(); } }, "Consultar agora"))));
     const host = el("div", { class: "kpis", style: "grid-template-columns:repeat(2,minmax(0,1fr))" }); v.append(host);
     // parâmetros (nossos)
