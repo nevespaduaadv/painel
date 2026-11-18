@@ -645,3 +645,10 @@ html.np-casca-v3 .np-est-prev.erro{border-color:var(--np-crit);color:var(--np-cr
 }
 @media (max-width:600px){html.np-casca-v3 #view-estoque .np-toolbar .np-busca-inline{flex:1 1 auto}html.np-casca-v3 #view-estoque .np-toolbar{row-gap:8px;padding-bottom:10px}html.np-casca-v3 #view-estoque .np-fin-sub{margin-bottom:8px}}
 html.np-casca-v3 details.np-ft-mais{margin-top:18px}
+/* V10 — Inventário em V3.1 */
+html.np-casca-v3 #view-inventario .np-toolbar{flex-wrap:wrap;row-gap:10px}
+html.np-casca-v3 #view-inventario .np-toolbar>.np-resumo{flex:1 0 100%}
+html.np-casca-v3 .np-inv-fs{display:flex;flex-wrap:wrap;gap:8px 12px;margin:0 0 12px}
+html.np-casca-v3 .np-inv-f{flex:0 1 200px}
+html.np-casca-v3 #view-inventario .np-it-prazo .d{font-size:var(--np-fs-3)}
+@media (max-width:600px){html.np-casca-v3 .np-inv-f{flex:1 1 100%}}
