@@ -168,6 +168,16 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Ainda na apresentação V2:** Central de Cobranças, Contratos e faturamento, Estoque, Inventário e as quatro telas do Controle Financeiro (0105).
 - Laboratório: `docs/qa/cobrancas-lab.cjs` (as três telas; 8 combinações para cada uma).
 
+### 4.12 V11 — Equipe e gestão (em construção; 17/11: Cargos funcionais, primeira parte)
+- **Princípio:** pessoas ocupam cargos; cargos têm permissões e responsabilidades; cada ação guarda o autor individual.
+- **Vistas** (`passivos/equipe.js`): controle segmentado Pessoas | Cargos. Pessoas ainda é a tela atual (apresentação V2).
+- **Cargos** (`renderCargosV3`, depende da migração 0113): lista em grupos — Vagos (régua vinho), Com pendência, Ocupados, Inativos —; linha com núcleo, modalidade (coordenação ou operacional por fila/rodízio), número de áreas de acesso, ocupantes e as marcas *vago*, *n na fila*, *pendência*. Faixa: cargos ativos, pessoas em cargos, cargos vagos, itens na fila sem pessoa e divergências de acesso.
+- **Painel**: situação, núcleo e frente, modalidade, acessos do cargo, responsabilidades, ocupantes (titular, substituto, afastamento, pendência, tarefas do cargo) e histórico de ocupações com o motivo.
+- **Ações** (só a administradora; conferidas no banco): Designar pessoa (titular ou substituto, com motivo; em coordenação, quem é substituído) e Encerrar ocupação (motivo e destino da carteira aberta — por padrão, a fila do cargo).
+- **Sem a 0113** a tela explica e não oferece ação.
+- **Falta:** criar e editar cargo, ordem do rodízio, afastamentos, redistribuição da fila, a vista Pessoas em V3.1, Horas, Ponto, Requisições e Ferramentas.
+- Laboratório: `docs/qa/cargos-lab.cjs` (8 combinações).
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |
