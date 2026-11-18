@@ -185,11 +185,20 @@ html.np-casca-v3 .np-cardq .np-ib{width:26px;height:26px}
   html.np-casca-v3 .np-resumo{flex-wrap:wrap;row-gap:2px;overflow:visible;white-space:normal}
   html.np-casca-v3 .np-tb-dir{flex-wrap:wrap;gap:8px}
   html.np-casca-v3 .np-tb-dir .np-seg{margin-right:auto}
+  /* celular: três linhas com função clara — (1) resumo + ação primária só-ícone à direita; (2) período e navegação; (3) filtros.
+     A faixa passa a distribuir os filhos da área direita diretamente (display:contents) para poder ordená-los. */
+  html.np-casca-v3 .np-toolbar{flex-wrap:wrap;column-gap:8px;row-gap:6px;align-items:center}
+  html.np-casca-v3 .np-toolbar>.np-resumo{order:1;width:auto;flex:1 1 calc(100% - 60px);min-width:0}
+  html.np-casca-v3 .np-tb-dir{display:contents}
+  html.np-casca-v3 .np-tb-dir>*{order:3}
+  html.np-casca-v3 .np-tb-dir>.np-btn.pri{order:2;width:36px;padding:0;gap:0;font-size:0;justify-content:center;flex:none;margin-left:auto}
+  html.np-casca-v3 .np-tb-dir>.np-btn.pri svg{width:16px;height:16px}
+  html.np-casca-v3 .np-toolbar>.np-filtros-w{order:4}
   html.np-casca-v3 .np-props{grid-template-columns:1fr}html.np-casca-v3 .np-props dt{margin-top:4px}
 }
 @media (pointer:coarse),(hover:none){
   html.np-casca-v3 .np-chipf,html.np-casca-v3 .np-seg button,html.np-casca-v3 .np-btn,html.np-casca-v3 .np-ib,html.np-casca-v3 .np-grp-h,html.np-casca-v3 .np-pop-i{min-height:44px}
-  html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
+  html.np-casca-v3 .np-ib,html.np-casca-v3 .np-cardq .np-ib{width:44px;height:44px}@media (max-width:600px){html.np-casca-v3 .np-tb-dir>.np-btn.pri{width:44px}}html.np-casca-v3 .np-it{min-height:52px}html.np-casca-v3 .np-check{width:22px;height:22px}
   html.np-casca-v3 .np-props dd a,html.np-casca-v3 .np-passos a{display:inline-flex;align-items:center;min-height:44px}
   html.np-casca-v3 .np-it-chk{min-width:44px;min-height:44px;margin-left:-11px}
   html.np-casca-v3 .np-seg button{min-width:44px} /* rótulos curtos ("Dia") ainda são alvos de 44 px no toque */
