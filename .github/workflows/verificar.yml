@@ -46,6 +46,8 @@ jobs:
         run: NODE_PATH="$(npm root -g)" node docs/qa/formularios-lab.cjs "$RUNNER_TEMP/casca-lab/formularios"
       - name: Laboratório da Ficha do cliente V3.1 (entrega V4)
         run: NODE_PATH="$(npm root -g)" node docs/qa/ficha-lab.cjs "$RUNNER_TEMP/casca-lab/ficha"
+      - name: Laboratório · Processos V3.1 (V8)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/processos-lab.cjs "$RUNNER_TEMP/casca-lab/processos"
       - name: Laboratório dos modais e formulários V3.1 (entrega V5)
         run: NODE_PATH="$(npm root -g)" node docs/qa/modais-lab.cjs "$RUNNER_TEMP/casca-lab/modais"
       - name: Laboratório do tema único e da Agenda (entrega V6)
