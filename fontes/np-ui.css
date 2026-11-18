@@ -607,6 +607,7 @@ html.np-casca-v3 .np-fin-check input{width:18px;height:18px;flex:none;margin:0}
 html.np-casca-v3 .np-fin-bruto summary{cursor:pointer;font:400 var(--np-fs-1)/1.5 var(--np-ui);color:var(--np-text-2);min-height:24px}
 html.np-casca-v3 .np-fin-bruto pre{white-space:pre-wrap;overflow:auto;max-height:300px;font-size:11px;color:var(--np-text-2);margin:8px 0 0}
 @media (max-width:600px){html.np-casca-v3 .np-fin-cartao{padding:16px 14px}html.np-casca-v3 .np-fin-sub .np-seg button{min-height:44px}html.np-casca-v3 .np-busca-inline{height:44px;min-width:0;flex:1 1 100%}html.np-casca-v3 .np-fin-bruto summary{min-height:44px;display:flex;align-items:center}}
+<<<<<<< HEAD
 /* ---------- V11 (início) · Cargos funcionais (17/11) ---------- */
 html.np-casca-v3 .np-cargo-oc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 html.np-casca-v3 .np-cargo-oc>li{padding:12px 0;border-top:1px solid var(--np-line);display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -624,3 +625,20 @@ html.np-casca-v3 .np-cargo-ac{display:grid;grid-template-columns:repeat(auto-fil
 html.np-casca-v3 .np-f-leg{display:block;font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text-2);margin-bottom:4px}
 @media (max-width:900px){html.np-casca-v3 button.np-fila-b{min-height:44px;margin:0;padding:0 4px}}
 @media (max-width:600px){html.np-casca-v3 .np-cargo-oc .ac .np-btn{min-height:44px}}
+=======
+/* V10 — Contratos e faturamento em V3.1: listas de parcelas, aditivos e lançamentos dentro do painel; confirmação em dois passos no pé */
+html.np-casca-v3 #view-faturamento .np-toolbar{flex-wrap:wrap;row-gap:10px}
+html.np-casca-v3 #view-faturamento .np-toolbar>.np-resumo{flex:1 0 100%}
+html.np-casca-v3 .np-ft-lst{list-style:none;margin:0;padding:0}
+html.np-casca-v3 .np-ft-lst>li{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.45 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-ft-lst>li:last-child{border-bottom:0}
+html.np-casca-v3 .np-ft-lst .a{flex:1 1 auto;min-width:0;text-align:left;overflow-wrap:anywhere}
+html.np-casca-v3 .np-ft-lst .b{flex:0 0 auto;display:inline-flex;gap:8px;align-items:baseline}
+html.np-casca-v3 .np-ft-lst .np-valor{min-width:0}
+html.np-casca-v3 p.np-ft-tx{margin:0 0 6px;font:400 var(--np-fs-3)/1.55 var(--np-ui);color:var(--np-text);overflow-wrap:anywhere}
+html.np-casca-v3 .np-props dd.np-serif{font:500 var(--np-fs-4)/1.2 var(--np-display);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-props dd.np-crit{color:var(--np-crit)}
+html.np-casca-v3 .np-ft-conf{flex:1 1 100%}
+html.np-casca-v3 .np-ft-bts{display:flex;flex-wrap:wrap;gap:8px}
+@media (max-width:600px){html.np-casca-v3 .np-ft-lst>li{flex-wrap:wrap}html.np-casca-v3 .np-ft-lst .a{flex-basis:100%}}
+>>>>>>> visual/v10-financeiro
