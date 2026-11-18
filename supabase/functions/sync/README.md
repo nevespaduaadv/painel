@@ -2,6 +2,8 @@
 
 **Situação (17/11/2026): migração 0114 aplicada no BETA (integração desligada; publicações, tarefas e agendamentos preservados); NÃO aplicada na produção. Função NÃO implantada. Nenhuma chamada real ao fornecedor. 0114b e 0115 não aplicadas em nenhum ambiente.**
 
+**0115 e 0114b: aplicadas no BETA em 17/11/2026, por volta das 22h15 e 22h25, separadamente, com os arquivos deste repositório no commit `dfbaea0` (SHA-256 `1455d232…c032af` e `33a0bd1b…ad54f4`). NÃO aplicadas na produção. Os arquivos aplicados não devem ser alterados; o cabeçalho da 0115 ainda diz "não aplicada" porque é o arquivo exato que foi executado.**
+
 | Arquivo | O que é |
 |---|---|
 | `adaptador.mjs` | Módulo puro: tradução fornecedor → sistema, assinatura do webhook, cliente REST (paginação, repetição com limite), consulta, webhook, teste de conexão |
