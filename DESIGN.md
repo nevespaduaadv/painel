@@ -157,6 +157,8 @@ Biblioteca `NPUI` (módulo `core`, só apresentação, sem Supabase, sem estado 
 - **Estados**: carregando, erro de carga (sem repetição em laço), vazio com "Buscar período", sem resultado nos filtros, só leitura.
 - Laboratório: `docs/qa/publicacoes-lab.cjs` (41 verificações, em dois cenários: sem a integração instalada — o beta de hoje — e com registros fictícios do Sync; as 8 combinações para lista e painel).
 
+- **Ajustes funcionais de 17/11 (noite):** (1) no painel da tarefa, a seção "n publicações sem providência" lista as publicações ligadas à tarefa que ainda faltam tratar (consulta `tarefa_publicacoes_pendentes`, da 0115); cada item abre a publicação. Quando o banco recusa concluir ou cancelar, a mensagem dele aparece e a lista é recarregada. (2) Os comandos Confirmar, Corrigir, Descartar e Reabrir do prazo só aparecem para quem tem atribuição sobre aquela publicação (consulta `pode_conferir_prazo(publicação)`, da 0114b); sem atribuição, a tela explica. Aprovar revisão e Devolver só aparecem para quem revisa e não conferiu. O banco confere tudo de novo.
+
 ## 5. Componentes
 
 | Componente | Anatomia | Estados |

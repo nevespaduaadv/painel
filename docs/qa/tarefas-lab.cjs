@@ -235,7 +235,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     if (escritas.slice(antes).some(e => /PATCH \/rest\/v1\/tarefas\S* .*em_andamento/.test(e))) ok('mover para Fazendo → PATCH tarefas{status:em_andamento} (mesma regra do drop da V2)'); else falha('mover: ' + JSON.stringify(escritas.slice(antes)));
     // mover para "Feitas" não grava: abre o painel para concluir com nota (V2: abre a tela da tarefa)
     const antesF = escritas.length; await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(200); await pg.click('#np-pop [role="menuitem"]:has-text("Feitas")'); await pg.waitForTimeout(500);
-    const mf = await pg.evaluate(() => ({ painel: !document.querySelector('.np-painel').hidden, foco: document.activeElement.tagName })); if (!escritas.slice(antesF).length && mf.painel && mf.foco === 'TEXTAREA') ok('mover para Feitas → sem escrita; abre o painel com foco no andamento (equivalente ao openTarefa+foco da V2)'); else falha('mover feitas: ' + JSON.stringify({ mf, w: escritas.slice(antesF) }));
+    const mf = await pg.evaluate(() => ({ painel: !document.querySelector('.np-painel').hidden, foco: document.activeElement.tagName })); if (!escritas.slice(antesF).filter(e => !/rpc\/tarefa_publicacoes_pendentes/.test(e)).length && mf.painel && mf.foco === 'TEXTAREA') ok('mover para Feitas → sem escrita; abre o painel com foco no andamento (equivalente ao openTarefa+foco da V2)'); else falha('mover feitas: ' + JSON.stringify({ mf, w: escritas.slice(antesF) }));
     await pg.screenshot({ path: path.join(OUT, 'v3-light-1440-quadro.png') });
     await ctx.close();
     // V2: arrastar de "A fazer" para "Fazendo" produz exatamente a mesma escrita

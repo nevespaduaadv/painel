@@ -505,6 +505,10 @@ html.np-casca-v3 .np-pub-fontes .np-link{margin-left:4px}
 html.np-casca-v3 .np-pub-integ{min-width:min(360px,80vw)}
 html.np-casca-v3 .np-pub-integ h4{margin:0;font:600 var(--np-fs-3)/1.2 var(--np-ui);color:var(--np-text)}
 html.np-casca-v3 .np-pub-integ-ac{display:flex;flex-wrap:wrap;gap:8px}
+html.np-casca-v3 .np-tar-pend-l{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+html.np-casca-v3 .np-tar-pend-l li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+html.np-casca-v3 .np-tar-pend>h3{color:var(--np-crit)}
+@media (max-width:900px){html.np-casca-v3 .np-tar-pend-l .lnk{min-height:44px;text-align:left}}
 html.np-casca-v3 .np-pub-integ p.np-nota{margin:0;font:400 var(--np-fs-1)/1.5 var(--np-ui);color:var(--np-text-2)}
 html.np-casca-v3 .np-pub-pz,html.np-casca-v3 .np-pub-dv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 html.np-casca-v3 .np-pub-pz>li,html.np-casca-v3 .np-pub-dv>li{padding:12px 0;border-top:1px solid var(--np-line);display:flex;flex-direction:column;gap:8px;min-width:0}
