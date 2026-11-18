@@ -546,3 +546,10 @@ html.np-casca-v3 .np-fin-check input{width:18px;height:18px;flex:none;margin:0}
 html.np-casca-v3 .np-fin-bruto summary{cursor:pointer;font:400 var(--np-fs-1)/1.5 var(--np-ui);color:var(--np-text-2);min-height:24px}
 html.np-casca-v3 .np-fin-bruto pre{white-space:pre-wrap;overflow:auto;max-height:300px;font-size:11px;color:var(--np-text-2);margin:8px 0 0}
 @media (max-width:600px){html.np-casca-v3 .np-fin-cartao{padding:16px 14px}html.np-casca-v3 .np-fin-sub .np-seg button{min-height:44px}html.np-casca-v3 .np-busca-inline{height:44px;min-width:0;flex:1 1 100%}html.np-casca-v3 .np-fin-bruto summary{min-height:44px;display:flex;align-items:center}}
+/* ---------- V11 (início) · Cargos funcionais (17/11) ---------- */
+html.np-casca-v3 .np-cargo-oc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+html.np-casca-v3 .np-cargo-oc>li{padding:12px 0;border-top:1px solid var(--np-line);display:flex;flex-direction:column;gap:6px;min-width:0}
+html.np-casca-v3 .np-cargo-oc .q{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+html.np-casca-v3 .np-cargo-oc .d{font:400 var(--np-fs-2)/1.5 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-cargo-oc .ac{display:flex;gap:8px}
+@media (max-width:600px){html.np-casca-v3 .np-cargo-oc .ac .np-btn{min-height:44px}}
