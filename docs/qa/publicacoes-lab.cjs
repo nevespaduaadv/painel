@@ -38,7 +38,7 @@ const PRAZOS = [
 const REL = [{ mes: '2026-11', tratada_por_nome: 'Ana Teste', publicacoes: 5, tratadas: 1, tempestivas: 1, pendentes_vencidas: 1, gerou_prazo: 1, nada_a_fazer: 0, duplicidade: 0, encaminhadas: 0, media_dias_para_tratar: 1 }];
 const V = '#view-publicacoes';
 async function abrir(b, o = {}) {
-  const r = await contexto(b, { hash: '#publicacoes', ...o });
+  const r = await contexto(b, { hash: '#publicacoes', ...o, escrita: (m, p, c) => (o.escrita && o.escrita(m, p, c)) || (/rpc\/pode_conferir_prazo/.test(p) ? { status: 200, body: !o.semAtribuicao } : null) });
   const json = (rota, corpo, status = 200) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(corpo) });
   let falhar = o.erro || 0; const lista = o.vazio ? [] : o.sync ? [...PUB_SYNC, ...PUB] : PUB;
   await r.ctx.route(/supabase\.co\/rest\/v1\/(v_publicacoes|integracoes|publicacao_fontes|publicacao_prazos|publicacao_historico)/, (rota) => {
@@ -119,7 +119,7 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     const antes = escritas.length; await pg.click('button.np-f-salvar'); await pg.waitForTimeout(800);
     const ch = escritas.slice(antes).filter(x => /rpc\/publicacao_prazo_conferir/.test(x));
     if (ch.length === 1 && /"p_prazo":11/.test(ch[0]) && /"p_decisao":"confirmar"/.test(ch[0]) && /"p_fatal":false/.test(ch[0])) ok('Confirmar → uma chamada de conferência (prazo 11, decisão "confirmar", fatal só se marcado); nada antes do clique'); else falha('conferir: ' + JSON.stringify(escritas.slice(antes)));
-    if (escritas.slice(0, antes).every(x => /rpc\/prazo_revisor/.test(x))) ok('nenhuma gravação até a pessoa registrar a conferência'); else falha('escritas antes: ' + JSON.stringify(escritas.slice(0, 3)));
+    if (escritas.slice(0, antes).every(x => /rpc\/(prazo_revisor|pode_conferir_prazo)/.test(x))) ok('nenhuma gravação até a pessoa registrar a conferência'); else falha('escritas antes: ' + JSON.stringify(escritas.slice(0, 3)));
     await pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 }); await pg.waitForTimeout(400);
     await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
     if (p && p.prazos.length === 1 && /corrigido/.test(p.prazos[0].t) && /fatal/.test(p.prazos[0].t) && /Conferido por\s*Ana Teste/.test(p.prazos[0].dl) && /Registrado\s*na tarefa/.test(p.prazos[0].dl) && /Feriado local/.test(p.prazos[0].dl) && /aguardando revisão/.test(p.prazos[0].t) && /Revisão\s*pendente · prazo fatal/.test(p.prazos[0].dl) && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Reabrir'])) ok('prazo conferido: sugerido × conferido lado a lado, "fatal" marcado pela pessoa, quem e quando, tarefa, observação; "aguardando revisão" visível; quem não é revisor só tem Reabrir'); else falha('painel 105: ' + JSON.stringify(p && p.prazos));
@@ -132,6 +132,11 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(600); p = await painel(pg);
     if (p && !p.todosBotoes.some(x => /Tratar|Atribuir|Confirmar|Vincular|Marcar/.test(x))) ok('só leitura: painel sem ações'); else falha('só leitura: ' + JSON.stringify(p && p.todosBotoes));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
+    await ctx.close(); }
+  { const { ctx, pg, escritas } = await abrir(b, { sync: true, semAtribuicao: true });
+    await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(1200); const p = await painel(pg);
+    const nota = await pg.evaluate((V) => [...document.querySelectorAll(V + ' .np-pub-pz p.np-nota')].map(x => x.textContent).join(' '), V);
+    if (p && p.prazos.length === 2 && p.prazos.every(z => !z.ac.length) && /cabe a quem responde por este processo/.test(nota) && escritas.some(x => /rpc\/pode_conferir_prazo/.test(x) && /"p_publicacao":-1/.test(x)) && !escritas.some(x => /publicacao_prazo_conferir/.test(x))) ok('pessoa do Jurídico SEM atribuição sobre a publicação: vê os prazos, não vê Confirmar, Corrigir nem Descartar, e a tela explica por quê (a consulta é feita ao banco por publicação)'); else falha('sem atribuição: ' + JSON.stringify([p && p.prazos, nota, escritas.slice(0, 4)]));
     await ctx.close(); }
   { const { ctx, pg, escritas } = await abrir(b, { sync: true, escrita: (m, p) => /rpc\/prazo_revisor/.test(p) ? { status: 200, body: true } : null });
     await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); const p = await painel(pg);
