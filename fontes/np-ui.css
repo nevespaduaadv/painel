@@ -541,6 +541,11 @@ html.np-casca-v3 .np-cc-abas{margin-top:2px}
 html.np-casca-v3 p.np-cc-escopo,html.np-casca-v3 p.np-cc-regra{margin:0 0 12px;font:400 var(--np-fs-2)/1.5 var(--np-ui);color:var(--np-text-2)}
 html.np-casca-v3 p.np-cc-regra{margin:14px 0 0}
 html.np-casca-v3 .np-cc-fl{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 8px}
+html.np-casca-v3 .np-cc-cli{align-items:center;gap:10px}html.np-casca-v3 .np-cc-cli label{font:500 var(--np-fs-2)/1 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-cc-cli select{font:400 var(--np-fs-3)/1.2 var(--np-ui);color:var(--np-text);background:var(--np-surface);border:1px solid var(--np-line-2);border-radius:var(--np-r);height:32px;padding:0 10px;min-width:min(420px,100%);max-width:100%}
+html.np-casca-v3 .np-cc-cli select:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-cc-msg{white-space:pre-wrap}
+@media (pointer:coarse),(hover:none){html.np-casca-v3 .np-cc-cli select{height:44px}}
 html.np-casca-v3 .np-cc-form{display:flex;flex-direction:column;gap:12px}
 html.np-casca-v3 .np-cc-f{display:flex;flex-direction:column;gap:4px;min-width:0}
 html.np-casca-v3 .np-cc-f>label,html.np-casca-v3 .np-cc-f>.rot{font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text-2)}
