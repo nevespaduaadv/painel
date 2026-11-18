@@ -197,9 +197,123 @@
   }
   { const _r = window.PP_MOD?.resumo; if (window.PP_MOD) window.PP_MOD.resumo = (c, host, ind) => { _r && _r(c, host, ind); if (typeof readOnly === "function" && readOnly()) return; if (!(typeof equipe === "function" && equipe())) return; if (S.sub === "dossie" || S.sub === "cliente" || S.sub === "acompanhamento") return; /* acompanhamento: Honorários ficam na aba Financeiro (17/11) */ host.append(cardHonorarios(c)); }; }
 
+  // ---------- V3.1 (V10, 18/11): mesma tela, mesmos dados e funções; lista + painel contextual no lugar das tabelas ----------
+  const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const Z = { aberta: null, painel: null, confirma: null, cancelar: null, f3: "abertas" };
+  const TOM_SF = { em_analise: "att", autorizada: "", faturada: "ok", nao_autorizada: "crit", cancelada: "" }, TOM_CH = { minuta: "", enviado: "att", assinado: "ok", ativo: "ok", encerrado: "", cancelado: "crit" }, TOM_COM = { prevista: "", liberada: "att", paga: "ok", cancelada: "" };
+  const dCurta = (s) => s ? { curta: new Date(String(s).slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", ""), rel: "", exata: fmt(s) } : null;
+  const hon = (c) => [c.entrada ? "entrada " + R$(c.entrada) : null, c.parcelas ? `${c.parcelas}× ${R$(c.valor_parcela)}` : null, c.mensalidade ? R$(c.mensalidade) + "/mês" : null, c.exito_pct != null ? "êxito " + c.exito_pct + "%" : null].filter(Boolean).join(" · ");
+  const lst = (itens) => el("ul", { class: "np-ft-lst" }, itens);
+  function fatV3(v) {
+    v.classList.add("np-v3"); v.replaceChildren(); Z.painel = null;
+    const fin = podeFin(), re = () => render();
+    if (!F.ok) { v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: "…", label: "carregando" }]) }), NPUI.carregando(6)); carregar(); return; }
+    const ea = F.sf.filter((s) => s.status === "em_analise"), au = F.sf.filter((s) => s.status === "autorizada"), mesA = new Date().toISOString().slice(0, 7), fatMes = F.sf.filter((s) => s.status === "faturada" && (s.faturada_em || "").slice(0, 7) === mesA), soma = (l, k = "valor_total") => l.reduce((x, s) => x + (+s[k] || 0), 0);
+    let t = null; const q = el("input", { type: "search", class: "np-busca-inline", placeholder: F.aba === "com" ? "Buscar colaborador…" : "Buscar cliente ou código…", value: F.q || "", "aria-label": "Buscar em Contratos e faturamento", oninput: (ev) => { F.q = ev.target.value; clearTimeout(t); t = setTimeout(() => { re(); const n = $("#view-faturamento .np-busca-inline"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 300); } });
+    v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: ea.length, label: (ea.length === 1 ? "solicitação em análise" : "solicitações em análise") + (ea.length ? " · " + R$(soma(ea)) : ""), tom: ea.length ? "att" : "zero" }, { n: au.length, label: (au.length === 1 ? "autorizada a faturar" : "autorizadas a faturar") + (au.length ? " · " + R$(soma(au)) : ""), tom: au.length ? "" : "zero" }, { n: R$(soma(fatMes)), label: "faturado no mês" }, { n: R$(F.com.filter((c) => c.status === "prevista").reduce((x, c) => x + +c.valor, 0)), label: "em comissões previstas" }]),
+      direita: [q, NPUI.btn("Novo contrato", { onclick: () => formContrato({}) }), NPUI.btn("Solicitar faturamento", { variante: "pri", onclick: () => formSF({}) })] }));
+    v.append(el("div", { class: "np-fin-sub np-cc-abas" }, NPUI.seg([["sf", "Solicitações"], ["ch", "Contratos de honorários"], ["com", "Comissões"]], F.aba, (k) => { F.aba = k; F.q = ""; Z.aberta = null; Z.confirma = null; Z.cancelar = null; re(); }, "Área de Contratos e faturamento")));
+    const obra = el("div", { class: "np-obra" }), corpo = el("div", { class: "np-corpo" }), ql = (F.q || "").trim().toLowerCase(), m = meu();
+    const fecha = () => { Z.aberta = null; Z.confirma = null; Z.cancelar = null; };
+    const acao = async (fn, okMsg) => { try { const r = await fn(); if (r?.error) throw new Error(r.error.message); toast(typeof okMsg === "function" ? okMsg(r) : okMsg); Z.confirma = null; Z.cancelar = null; inval(); carregar(); } catch (e) { toast(e.message || "Não foi possível concluir."); } };
+
+    if (F.aba === "sf") {
+      const passa = (s, k) => k === "todas" ? true : k === "minhas" ? (s.solicitante_id === m?.id || s.created_by === PP.perfil?.id) : k === "abertas" ? ["em_analise", "autorizada"].includes(s.status) : s.status === k;
+      const base = F.sf.filter((s) => !ql || [s.codigo, s.cliente_nome, s.descricao, s.contrato_codigo].join(" ").toLowerCase().includes(ql));
+      const ch = (k, label) => NPUI.chip({ label, n: base.filter((s) => passa(s, k)).length, on: Z.f3 === k, grupo: "attr", onclick: () => { Z.f3 = k; re(); } });
+      v.append(el("div", { class: "np-cc-fl", role: "group", "aria-label": "Situação da solicitação" }, ch("abertas", "Em aberto"), ch("faturada", "Faturadas"), ch("nao_autorizada", "Não autorizadas"), ch("cancelada", "Canceladas"), ch("minhas", "Minhas"), ch("todas", "Todas")));
+      const lista = base.filter((s) => passa(s, Z.f3));
+      const abrir = (s, origem) => {
+        Z.aberta = "sf:" + s.id;
+        if (!F.parcelas[s.id]) { F.parcelas[s.id] = { ok: false, lista: [] }; SB.from("sf_parcelas").select("*, cobranca:cobrancas(status,valor_pago,pago_em,link_fatura)").eq("sf_id", s.id).order("n").then(({ data }) => { F.parcelas[s.id] = { ok: true, lista: data || [] }; if (Z.aberta === "sf:" + s.id && S.tab === "faturamento") re(); }); }
+        const p = F.parcelas[s.id], coms = F.com.filter((c) => c.sf_id === s.id);
+        const props = NPUI.props([["Situação", NPUI.marca(ST_SF[s.status]?.[0] || s.status, TOM_SF[s.status])], ["Valor", R$(s.valor_total) + (s.qtd_parcelas > 1 ? ` em ${s.qtd_parcelas} parcelas` : ""), "np-serif"], ["1º vencimento", fmt(s.vencimento_inicial)], ["Tipo", TIPO_SF[s.tipo] || s.tipo], ["Forma", FORMA[s.forma] || s.forma || "—"], ["Nota fiscal", s.emitir_nf ? "emitir" : "não emitir"], ["Contrato", s.contrato_codigo || "—"], ["Pasta / processo", [s.pasta_codigo ? "Pasta " + s.pasta_codigo : null, s.numero_cnj].filter(Boolean).join(" · ") || "—"], ["Solicitante", (s.solicitante_nome || "—") + " · " + fmtDH(s.created_at)], ["Decisão", s.autorizada_por_nome ? s.autorizada_por_nome + " · " + fmtDH(s.autorizada_em) : "ainda sem decisão"], s.status === "faturada" ? ["Recebido", `${s.parcelas_pagas} de ${s.qtd_parcelas} parcela(s) · ${R$(s.valor_pago)}`] : null, s.motivo ? ["Motivo", s.motivo, "np-crit"] : null]);
+        const secP = NPUI.secao("Parcelas", !p.ok ? el("p", { class: "np-nota" }, "Carregando…") : !p.lista.length ? el("p", { class: "np-nota" }, "As parcelas são geradas na autorização.") : lst(p.lista.map((x) => el("li", {}, el("span", { class: "a" }, `${x.n}ª · vence em ${fmt(x.vencimento)}`), el("span", { class: "b" }, x.cobranca ? [NPUI.marca(x.cobranca.status + (x.cobranca.pago_em ? " em " + fmt(x.cobranca.pago_em) : ""), x.cobranca.status === "paga" ? "ok" : x.cobranca.status === "atrasada" ? "crit" : ""), x.cobranca.link_fatura ? el("a", { href: x.cobranca.link_fatura, target: "_blank", rel: "noopener", class: "lnk" }, "abrir a fatura") : null] : NPUI.marca("não faturada", "")), el("span", { class: "np-valor" }, R$(x.valor))))));
+        const secC = NPUI.secao("Comissões", coms.length ? lst(coms.map((c) => el("li", {}, el("span", { class: "a" }, `${c.colaborador_nome} · ${c.papel} · ${c.pct}% de ${R$(c.base)}`), el("span", { class: "b" }, NPUI.marca((ST_COM[c.status]?.[0] || c.status).toLowerCase(), TOM_COM[c.status])), el("span", { class: "np-valor" }, R$(c.valor))))) : el("p", { class: "np-nota" }, (s.rateio || []).length ? (s.rateio || []).map((r) => (F.colab.find((c) => c.id === r.colaborador_id)?.nome || "?") + " " + r.pct + "%").join(" · ") + " (previstas na autorização)" : "Sem rateio de comissão."));
+        const pe = [], dono = s.created_by === PP.perfil?.id;
+        if (Z.cancelar === s.id) {
+          const mot = el("input", { type: "text", id: "ft3-mot", placeholder: "Por que está sendo cancelada" });
+          pe.push(el("div", { class: "np-cc-form np-ft-conf" }, el("div", { class: "np-cc-f" }, el("label", { for: "ft3-mot" }, "Motivo do cancelamento"), mot), el("div", { class: "np-ft-bts" }, NPUI.btn("Confirmar o cancelamento", { variante: "pri", cls: "np-pri-local", onclick: () => acao(() => SB.rpc("sf_cancelar", { p_id: s.id, p_motivo: mot.value.trim() || null }), "Solicitação cancelada.") }), NPUI.btn("Voltar", { variante: "ghost", onclick: () => { Z.cancelar = null; re(); } }))));
+        } else {
+          if (fin && s.status === "em_analise") pe.push(NPUI.btn("Autorizar", { variante: "pri", cls: "np-pri-local", onclick: () => decidir(s, true) }), NPUI.btn("Não autorizar", { onclick: () => decidir(s, false) }));
+          if (fin && s.status === "autorizada") pe.push(Z.confirma === s.id ? NPUI.btn(`Confirmar: gerar ${s.qtd_parcelas} cobrança(s)`, { variante: "pri", cls: "np-pri-local", onclick: () => acao(() => SB.rpc("sf_faturar", { p_id: s.id }), (r) => `${r.data} cobrança(s) criada(s). A emissão no Asaas é feita em Cobranças.`) }) : NPUI.btn("Faturar", { variante: "pri", cls: "np-pri-local", title: "Gera as cobranças no painel; a emissão do boleto ou Pix no Asaas é feita depois, em Cobranças", onclick: () => { Z.confirma = s.id; re(); } }));
+          if ((fin && ["em_analise", "autorizada"].includes(s.status)) || (!fin && dono && s.status === "em_analise")) pe.push(NPUI.btn("Cancelar a solicitação", { variante: "ghost", onclick: () => { Z.cancelar = s.id; Z.confirma = null; re(); } }));
+        }
+        Z.painel.abrir({ trilha: [el("span", {}, "Solicitação"), el("span", { class: "sep" }), el("span", {}, s.codigo)], titulo: s.cliente_nome, id: "sf:" + s.id, origem, corpo: [props, NPUI.secao("Descrição", el("p", { class: "np-ft-tx" }, s.descricao || "—"), s.observacoes ? el("p", { class: "np-nota" }, s.observacoes) : null), secP, secC], pe });
+      };
+      const linhaS = (s) => NPUI.linha({ id: "sf:" + s.id, regua: s.status === "em_analise" ? "att" : null, atual: Z.aberta === "sf:" + s.id, riscado: s.status === "cancelada", prazo: dCurta(s.vencimento_inicial), titulo: s.cliente_nome,
+        contexto: [s.codigo, TIPO_SF[s.tipo] || s.tipo, s.descricao, s.solicitante_nome ? "pedida por " + s.solicitante_nome : null, s.status === "faturada" ? `${s.parcelas_pagas}/${s.qtd_parcelas} pagas` : null].filter(Boolean).join(" · "),
+        direita: [s.qtd_parcelas > 1 ? NPUI.marca(s.qtd_parcelas + "×", "") : null, el("span", { class: "np-valor" }, R$(s.valor_total))], titleAbrir: "Abrir a solicitação", onOpen: (li) => abrir(s, li.querySelector(".np-it-abrir")) });
+      const ordem = [["em_analise", "Em análise", "att"], ["autorizada", "Autorizadas, a faturar", ""], ["faturada", "Faturadas", ""], ["nao_autorizada", "Não autorizadas", ""], ["cancelada", "Canceladas", ""]];
+      const grupos = ordem.map(([k, tit, tom]) => ({ k, tit, tom, l: lista.filter((s) => s.status === k) })).filter((g) => g.l.length);
+      for (const g of grupos) corpo.append(NPUI.grupo({ id: "ft-sf-" + g.k, titulo: `${g.tit} · ${R$(soma(g.l))}`, n: g.l.length, tom: g.tom, aberto: grupos.length === 1 || ["em_analise", "autorizada"].includes(g.k), itens: g.l.map(linhaS) }));
+      if (!grupos.length) corpo.append(NPUI.vazio(ql ? { titulo: "Nenhuma solicitação com essa busca", texto: "Confira o nome ou o código.", acao: "Limpar a busca", onAcao: () => { F.q = ""; re(); } } : Z.f3 === "abertas" ? { titulo: "Nenhuma solicitação em aberto", texto: "Quem presta o serviço pede o faturamento; o financeiro autoriza e fatura.", acao: "Solicitar faturamento", onAcao: () => formSF({}) } : { titulo: "Nenhuma solicitação nesta situação", texto: "Escolha outra situação nos filtros.", acao: "Ver todas", onAcao: () => { Z.f3 = "todas"; re(); } }));
+      if (grupos.length) corpo.append(NPUI.rodape("A data à esquerda é o primeiro vencimento."));
+      obra.append(corpo); v.append(obra); Z.painel = NPUI.painel({ obra, label: "Solicitação de faturamento", onClose: fecha });
+      const a = Z.aberta && lista.find((s) => "sf:" + s.id === Z.aberta); if (a) abrir(a, null); else if (Z.aberta) fecha();
+      return;
+    }
+
+    if (F.aba === "ch") {
+      const GR = { ativos: ["ativo", "assinado"], minuta: ["minuta", "enviado"], encerrados: ["encerrado", "cancelado"], todos: Object.keys(ST_CH) };
+      const base = F.ch.filter((c) => !ql || [c.codigo, c.cliente_nome, c.pasta_codigo, c.descricao_servico].join(" ").toLowerCase().includes(ql));
+      const chp = (k, label) => NPUI.chip({ label, n: base.filter((c) => GR[k].includes(c.status)).length, on: F.fCh === k, grupo: "attr", onclick: () => { F.fCh = k; re(); } });
+      v.append(el("div", { class: "np-cc-fl", role: "group", "aria-label": "Situação do contrato" }, chp("ativos", "Ativos e assinados"), chp("minuta", "Minuta e enviados"), chp("encerrados", "Encerrados e cancelados"), chp("todos", "Todos")));
+      const lista = base.filter((c) => GR[F.fCh].includes(c.status)), tot = soma(lista), mens = soma(lista, "mensalidade");
+      if (lista.length) v.append(el("p", { class: "np-nota np-cc-escopo" }, `${lista.length} contrato(s) · valor total contratado ${R$(tot)}` + (mens ? ` · mensalidades ${R$(mens)} por mês` : "") + "."));
+      const abrir = (c, origem) => {
+        Z.aberta = "ch:" + c.id; F.abrirCh = c.id;
+        if (!F.aditivos[c.id]) { F.aditivos[c.id] = { ok: false, lista: [] }; SB.from("contratos_honorarios_aditivos").select("*").eq("contrato_id", c.id).order("data").then(({ data }) => { F.aditivos[c.id] = { ok: true, lista: data || [] }; if (Z.aberta === "ch:" + c.id && S.tab === "faturamento") re(); }); }
+        const ad = F.aditivos[c.id], sfs = F.sf.filter((s) => s.contrato_id === c.id);
+        const props = NPUI.props([["Situação", NPUI.marca(ST_CH[c.status]?.[0] || c.status, TOM_CH[c.status])], ["Tipo", TIPO_CH[c.tipo] || c.tipo], ["Valor total", R$(c.valor_total), "np-serif"], ["Entrada", R$(c.entrada)], ["Parcelas", c.parcelas ? `${c.parcelas} × ${R$(c.valor_parcela)}${c.vencimento_dia ? " · dia " + c.vencimento_dia : ""}` : "—"], ["Mensalidade", R$(c.mensalidade)], ["Êxito", c.exito_pct != null ? c.exito_pct + "%" : "—"], ["Faturado", R$(c.faturado)], ["Recebido", R$(c.recebido)], ["Horas contratadas", c.horas_contratadas_mes != null ? c.horas_contratadas_mes + " por mês" : "—"], ["Tabela de hora", c.tabela_hora_nome || "padrão"], ["Vigência", (c.vigencia_inicio ? fmt(c.vigencia_inicio) : "—") + " até " + (c.indeterminado ? "prazo indeterminado" : fmt(c.vigencia_fim))], ["Pasta", c.pasta_codigo ? "Pasta " + c.pasta_codigo : "—"], ["Responsável", c.responsavel_nome || "—"], ["Closer", c.closer_nome || "—"], ["Assinado em", fmt(c.assinado_em)], ["Documento", c.contrato_url ? el("a", { href: c.contrato_url, target: "_blank", rel: "noopener", class: "lnk" }, "abrir o contrato") : "—"]]);
+        const secA = NPUI.secao(`Aditivos${ad.ok ? " · " + ad.lista.length : ""}`, !ad.ok ? el("p", { class: "np-nota" }, "Carregando…") : !ad.lista.length ? el("p", { class: "np-nota" }, "Nenhum aditivo.") : lst(ad.lista.map((a) => el("li", {}, el("span", { class: "a" }, fmt(a.data) + " · " + a.descricao + (a.nova_vigencia_fim ? " · vigência até " + fmt(a.nova_vigencia_fim) : "")), el("span", { class: "b" }, a.url ? el("a", { href: a.url, target: "_blank", rel: "noopener", class: "lnk" }, "documento") : null), a.valor_delta != null ? el("span", { class: "np-valor" }, (a.valor_delta >= 0 ? "+" : "") + R$(a.valor_delta)) : null))));
+        const secS = NPUI.secao(`Solicitações de faturamento · ${sfs.length}`, sfs.length ? lst(sfs.map((s) => el("li", {}, el("button", { type: "button", class: "lnk a", onclick: () => { F.aba = "sf"; Z.f3 = "todas"; F.q = ""; Z.aberta = "sf:" + s.id; re(); } }, `${s.codigo} · ${TIPO_SF[s.tipo] || s.tipo} · ${fmt(s.vencimento_inicial)}`), el("span", { class: "b" }, NPUI.marca((ST_SF[s.status]?.[0] || s.status).toLowerCase(), TOM_SF[s.status])), el("span", { class: "np-valor" }, R$(s.valor_total))))) : el("p", { class: "np-nota" }, "Nenhuma solicitação neste contrato."));
+        Z.painel.abrir({ trilha: [el("span", {}, "Contrato"), el("span", { class: "sep" }), el("span", {}, c.codigo)], titulo: c.cliente_nome, id: "ch:" + c.id, origem, corpo: [props, c.descricao_servico ? NPUI.secao("Serviço contratado", el("p", { class: "np-ft-tx" }, c.descricao_servico)) : null, secA, secS].filter(Boolean),
+          pe: [NPUI.btn("Solicitar faturamento", { variante: "pri", cls: "np-pri-local", onclick: () => formSF({ cliente_id: c.cliente_id, contrato_id: c.id, pasta_numero: c.pasta_numero }) }), NPUI.btn("Editar", { onclick: () => formContrato(c) }), NPUI.btn("Novo aditivo", { onclick: () => modalAditivo(c) })] });
+      };
+      const linhaC = (c) => NPUI.linha({ id: "ch:" + c.id, atual: Z.aberta === "ch:" + c.id, riscado: c.status === "cancelado", prazo: c.indeterminado ? { curta: "indet.", rel: "", exata: "Vigência por prazo indeterminado" } : (dCurta(c.vigencia_fim) ? { ...dCurta(c.vigencia_fim), exata: "Vigência até " + fmt(c.vigencia_fim) } : null), titulo: c.cliente_nome,
+        contexto: [c.codigo, TIPO_CH[c.tipo] || c.tipo, hon(c), c.pasta_codigo ? "Pasta " + c.pasta_codigo : null, c.responsavel_nome].filter(Boolean).join(" · "),
+        direita: [c.faturado ? NPUI.marca(`faturado ${R$(c.faturado)} · recebido ${R$(c.recebido)}`, "") : null, el("span", { class: "np-valor" }, R$(c.valor_total))], titleAbrir: "Abrir o contrato", onOpen: (li) => abrir(c, li.querySelector(".np-it-abrir")) });
+      const grupos = Object.keys(ST_CH).map((k) => ({ k, l: lista.filter((c) => c.status === k) })).filter((g) => g.l.length);
+      for (const g of grupos) corpo.append(NPUI.grupo({ id: "ft-ch-" + g.k, titulo: ST_CH[g.k][0], n: g.l.length, aberto: true, itens: g.l.map(linhaC) }));
+      if (!grupos.length) corpo.append(NPUI.vazio(ql ? { titulo: "Nenhum contrato com essa busca", texto: "Confira o nome ou o código.", acao: "Limpar a busca", onAcao: () => { F.q = ""; re(); } } : !F.ch.length ? { titulo: "Nenhum contrato de honorários cadastrado", texto: "O contrato reúne entrada, parcelas, mensalidade, êxito e vigência de cada cliente.", acao: "Novo contrato", onAcao: () => formContrato({}) } : { titulo: "Nenhum contrato nesta situação", texto: "Escolha outra situação nos filtros.", acao: "Ver todos", onAcao: () => { F.fCh = "todos"; re(); } }));
+      if (lista.length) corpo.append(NPUI.rodape("A data à esquerda é o fim da vigência."));
+      obra.append(corpo); v.append(obra); Z.painel = NPUI.painel({ obra, label: "Contrato de honorários", onClose: () => { fecha(); F.abrirCh = null; } });
+      if (F.abrirCh && !Z.aberta) Z.aberta = "ch:" + F.abrirCh;
+      const a = Z.aberta && F.ch.find((c) => "ch:" + c.id === Z.aberta); if (a) abrir(a, null); else if (Z.aberta) fecha();
+      return;
+    }
+
+    // comissões: uma linha por colaborador e mês; os lançamentos ficam no painel
+    const porMes = new Map();
+    for (const c of F.com) { if (c.status === "cancelada") continue; if (ql && !(c.colaborador_nome || "").toLowerCase().includes(ql)) continue; const k = (c.mes || "").slice(0, 7) + "|" + c.colaborador_id; const g = porMes.get(k) || { k, mes: (c.mes || "").slice(0, 7), nome: c.colaborador_nome, prevista: 0, liberada: 0, paga: 0, itens: [] }; g[c.status] += +c.valor; g.itens.push(c); porMes.set(k, g); }
+    const rows = [...porMes.values()].sort((a, b) => b.mes.localeCompare(a.mes) || (a.nome || "").localeCompare(b.nome || "")), meses = [...new Set(rows.map((g) => g.mes))];
+    const nomeMes = (ym) => { const [a, mm] = ym.split("-"); const n = new Date(+a, +mm - 1, 15).toLocaleDateString("pt-BR", { month: "long" }); return ym ? n.charAt(0).toUpperCase() + n.slice(1) + " de " + a : "Sem mês"; };
+    v.append(el("p", { class: "np-nota np-cc-escopo" }, (fin ? "Comissões por colaborador e mês. " : "Suas comissões. ") + "Prevista: a solicitação foi autorizada. Liberada: a cobrança correspondente foi paga pelo cliente. Paga: o escritório pagou a comissão."));
+    const abrirG = (g, origem) => {
+      Z.aberta = "com:" + g.k;
+      const props = NPUI.props([["Prevista", R$(g.prevista)], ["Liberada", R$(g.liberada), "np-serif"], ["Paga", R$(g.paga)]]);
+      const sec = NPUI.secao(`Lançamentos · ${g.itens.length}`, lst(g.itens.map((c) => el("li", {}, el("span", { class: "a" }, `${c.sf_codigo || "sem solicitação"} · ${c.cliente_nome || "—"} · ${c.papel} · ${c.pct}% de ${R$(c.base)}`), el("span", { class: "b" }, NPUI.marca((ST_COM[c.status]?.[0] || c.status).toLowerCase() + (c.paga_em || c.pago_em ? " em " + fmt(c.paga_em || c.pago_em) : ""), TOM_COM[c.status])), el("span", { class: "np-valor" }, R$(c.valor))))));
+      const pe = [];
+      if (fin && g.liberada) {
+        if (Z.confirma === g.k) { const d = el("input", { type: "date", id: "ft3-dt", value: new Date().toISOString().slice(0, 10) }); const ids = g.itens.filter((c) => c.status === "liberada").map((c) => c.id);
+          pe.push(el("div", { class: "np-cc-form np-ft-conf" }, el("div", { class: "np-cc-f" }, el("label", { for: "ft3-dt" }, "Data do pagamento da comissão"), d), el("div", { class: "np-ft-bts" }, NPUI.btn(`Confirmar: ${R$(g.liberada)} pagos a ${g.nome}`, { variante: "pri", cls: "np-pri-local", onclick: () => { if (!d.value) return toast("Informe a data do pagamento."); acao(() => SB.from("comissoes").update({ status: "paga", paga_em: d.value }).in("id", ids), "Comissões marcadas como pagas."); } }), NPUI.btn("Voltar", { variante: "ghost", onclick: () => { Z.confirma = null; re(); } })))); }
+        else pe.push(NPUI.btn("Marcar as liberadas como pagas", { onclick: () => { Z.confirma = g.k; re(); } }));
+      }
+      Z.painel.abrir({ trilha: [el("span", {}, "Comissões"), el("span", { class: "sep" }), el("span", {}, nomeMes(g.mes))], titulo: g.nome || "Colaborador", id: "com:" + g.k, origem, corpo: [props, sec], pe });
+    };
+    const linhaG = (g) => NPUI.linha({ id: "com:" + g.k, regua: fin && g.liberada ? "att" : null, atual: Z.aberta === "com:" + g.k, prazo: null, titulo: g.nome || "Colaborador", contexto: [`prevista ${R$(g.prevista)}`, `paga ${R$(g.paga)}`, `${g.itens.length} lançamento(s)`].join(" · "),
+      direita: [g.liberada ? NPUI.marca("liberada, a pagar", "att") : null, el("span", { class: "np-valor" }, R$(g.liberada))], titleAbrir: "Abrir os lançamentos", onOpen: (li) => abrirG(g, li.querySelector(".np-it-abrir")) });
+    meses.forEach((ym, i) => { const l = rows.filter((g) => g.mes === ym); corpo.append(NPUI.grupo({ id: "ft-com-" + ym, titulo: `${nomeMes(ym)} · liberado ${R$(l.reduce((x, g) => x + g.liberada, 0))}`, n: l.length, aberto: i < 2, itens: l.map(linhaG) })); });
+    if (!rows.length) corpo.append(NPUI.vazio(ql ? { titulo: "Nenhuma comissão com essa busca", texto: "Confira o nome.", acao: "Limpar a busca", onAcao: () => { F.q = ""; re(); } } : { titulo: "Nenhuma comissão registrada", texto: "A comissão é prevista quando uma solicitação de faturamento com rateio é autorizada." }));
+    else corpo.append(NPUI.rodape("O valor à direita é o liberado: já recebido do cliente e ainda não pago ao colaborador."));
+    obra.append(corpo); v.append(obra); Z.painel = NPUI.painel({ obra, label: "Comissões do colaborador", onClose: fecha });
+    const a = Z.aberta && rows.find((g) => "com:" + g.k === Z.aberta); if (a) abrirG(a, null); else if (Z.aberta) fecha();
+  }
+
   // ---------- render ----------
   function renderFat() {
-    const v = $("#view-faturamento"); if (!v) return; v.replaceChildren();
+    const v = $("#view-faturamento"); if (!v) return; if (v3()) return fatV3(v); v.classList.remove("np-v3"); v.replaceChildren();
     v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Financeiro"), el("h1", {}, "Contratos e faturamento"), el("div", { class: "sub" }, "Contratos de honorários, solicitações de faturamento (quem presta o serviço pede, o financeiro autoriza e fatura) e comissões.")),
       el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => formContrato({}) }, "+ Contrato"), el("button", { class: "btn primary", onclick: () => formSF({}) }, "+ Solicitar faturamento"))));
     const b = (k, l, n) => el("button", { class: "btn sm" + (F.aba === k ? " primary" : ""), onclick: () => { F.aba = k; F.q = ""; render(); } }, l, n ? el("span", { class: "cnt", style: "margin-left:6px" }, String(n)) : null);
