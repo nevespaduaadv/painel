@@ -275,16 +275,18 @@
     acoes.append(el("button", { class: "btn", onclick: close }, "Fechar"));
     host.append(el("div", { class: "modal", onclick: (e) => { if (e.target.classList.contains("modal")) close(); } }, el("div", { class: "card", role: "dialog", style: "max-width:900px;width:min(900px,96vw)" }, el("h2", {}, `${etapa} · ${et?.titulo || "Etapa"} — descritivo do dia`), body, acoes)));
   }
-  function exportMensagens() {
+  function exportMensagens(comoV3) {
     const meses = [...new Set([mesAtual(), ...C.disparos.map((d) => (d.data || "").slice(0, 7))])].filter(Boolean).sort().reverse();
     const s = sel(Object.fromEntries(meses.map((m) => [m, fmtMes(m)])), mesAtual()); const inc = el("input", { type: "checkbox" });
-    return el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, el("span", { class: "note" }, "Exportar mensagens por cliente:"), s, el("label", { class: "note" }, inc, " incluir quem ficou de fora e falhas"), el("button", { class: "btn sm", onclick: () => {
+    const exportar = () => {
       const linhas = [];
       for (const d of C.disparos.filter((d) => (d.data || "").slice(0, 7) === s.value)) { const et = C.etapas.find((e) => e.codigo === d.etapa); for (const x of d.enviados || []) linhas.push([x.cliente, fmtD(d.data), x.hora || "", d.etapa, et?.titulo || "", x.parcela || "", x.vencimento || "", "Enviada", "", d.origem, (x.mensagem || "").replace(/\n/g, " ")]); if (inc.checked) for (const x of d.nao_enviados || []) linhas.push([x.cliente, fmtD(d.data), "", d.etapa, et?.titulo || "", x.parcela || "", x.vencimento || "", x.falha ? "Falhou" : "Não enviada (regra)", x.motivo || "", d.origem, ""]); }
       if (!linhas.length) { toast("Nenhuma mensagem registrada no mês"); return; }
       linhas.sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
       baixarCSV(linhas, ["Cliente", "Data", "Hora", "Etapa", "Nome da etapa", "Parcela", "Vencimento", "Situação", "Motivo", "Origem", "Mensagem"], `mensagens_regua_${s.value}.csv`);
-    } }, "Exportar (.csv)"));
+    };
+    if (comoV3) { s.id = "cc3-exp-mes"; inc.id = "cc3-exp-inc"; return el("div", { class: "np-rm-exp np-cc-cli" }, el("label", { for: "cc3-exp-mes" }, "Mês"), s, el("label", { class: "np-cc-chk", for: "cc3-exp-inc" }, inc, " incluir quem ficou de fora e as falhas"), NPUI.btn("Exportar mensagens (.csv)", { onclick: exportar })); }
+    return el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, el("span", { class: "note" }, "Exportar mensagens por cliente:"), s, el("label", { class: "note" }, inc, " incluir quem ficou de fora e falhas"), el("button", { class: "btn sm", onclick: exportar }, "Exportar (.csv)"));
   }
 
   // ----- RÉGUA -----
@@ -414,7 +416,7 @@
   // ---------- V10 · Central de Cobranças em V3.1 — moldura e "Ações de hoje". Mesmos dados e as mesmas funções do banco da V2.
   //            As outras sete vistas continuam na apresentação anterior, dentro da moldura nova. Nada aqui liga régua nem envia mensagem. ----------
   const Z3 = { aberta: null, painel: null, form: false, confirma: null };
-  const ABAS_C = [["hoje", "Ações de hoje"], ["disparos", "Disparos da régua"], ["regua", "Régua"], ["negociados", "Negociados"], ["historico", "Histórico por cliente"], ["cadencia", "Registros de contato"], ["resumo", "Resumo"], ["dashboard", "Dashboard"]];
+  const ABAS_C = [["hoje", "Ações de hoje"], ["disparos", "Disparos da régua"], ["regua", "Régua"], ["negociados", "Negociados"], ["historico", "Histórico por cliente"], ["cadencia", "Registros de contato"], ["resumo", "Resumo do mês"]]; // "Resumo" e "Dashboard" viraram uma visão só (18/11): mesmos cálculos, sem repetição
   const TOM_D = { RECUPERADO: "ok", NAO_RESPONDE: "crit", VERIFICAR_AMANHA: "", NEGOCIOU: "info", SEM_ACORDO: "crit" };
   function centralV3(v) {
     v.classList.add("np-v3"); v.replaceChildren(barraSub()); Z3.painel = null;
@@ -430,7 +432,8 @@
     v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: pre.length ? `${feitos}/${pre.length}` : 0, label: "lembretes de hoje enviados", tom: pre.length && feitos < pre.length ? "att" : "zero" }, { n: fila.length, label: fila.length === 1 ? "vencida a contatar hoje" : "vencidas a contatar hoje", tom: fila.length ? "crit" : "zero" }, { n: R$(soma(fila)), label: "nessa fila" }, { n: mon.length, label: "sem resposta" }, { n: neg.length, label: neg.length === 1 ? "negociação" : "negociações" }]),
       direita: [q, NPUI.btn("Atualizar", { onclick: invalidar })] }), abas());
     v.append(el("p", { class: "np-nota np-cc-escopo" }, `${fmtMes(cur)}` + (carry ? ` + ${carry} parcela(s) negociada(s) de meses anteriores sem pagamento` : "") + (prox ? ` + ${prox} parcela(s) do próximo mês já na régua` : "") + `. Base: cobranças do Asaas. Hoje é ${fmtD(HOJE)}.`));
-    const V3ABAS = ["hoje", "regua", "negociados", "historico", "cadencia"]; // vistas já na linguagem V3.1; as demais ainda abrem na apresentação anterior
+    if (C.aba === "dashboard") C.aba = "resumo"; // atalho antigo
+    const V3ABAS = ["hoje", "disparos", "regua", "negociados", "historico", "cadencia", "resumo"]; // vistas já na linguagem V3.1; as demais ainda abrem na apresentação anterior
     if (!V3ABAS.includes(C.aba)) {
       const monthLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur), scoped = new Set(rows.map((r) => r.c.id)), viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
       const host = el("div", { class: "np-legado" }); v.append(host);
@@ -492,6 +495,99 @@
       else corpo.append(...grupos, NPUI.rodape(`${neg0.length} negociação(ões) · ${des.length} não cumprida(s) · ${agu.length} aguardando · ${cum.length} paga(s)`, [["late", "passou da data combinada sem pagar"]]), el("p", { class: "np-nota np-cc-regra" }, "A situação muda sozinha: paga no Asaas vira \"pagou\"; passou da data combinada sem pagar vira \"não cumpriu\" e a cobrança volta à fila de hoje."));
       obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
       if (Z3.aberta) { const r = all.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
+      return; }
+    if (C.aba === "disparos") {
+      // Disparos da régua: as etapas, a prévia de hoje e o histórico. NADA é enviado desta lista: gerar a prévia só monta a relação de quem receberia;
+      // o envio exige a aprovação no descritivo do dia (mesmas funções do banco: regua_preparar, regua_aprovar, regua_cancelar).
+      const TOM_S = { aguardando_aprovacao: "att", em_andamento: "info", concluida: "ok", falhou: "crit", cancelada: "", sem_clientes: "", solicitado: "" };
+      const dow = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][parseISO(HOJE).getDay()], ativas = C.etapas.filter((e) => e.ativa), admin = PP.perfil?.papel === "admin";
+      corpo.append(el("p", { class: "np-nota np-cc-escopo" }, `${fmtD(HOJE)}, ${dow}. Cada etapa gera uma prévia de quem recebe e de quem fica de fora pelas regras. O envio só acontece depois da aprovação, pelo ChatGuru, em horário comercial. Às sextas, D-5, D-2 e D-0 incluem os vencimentos do fim de semana; às segundas, D+1 inclui o que venceu de sexta a domingo.`));
+      const abrirEt = (et, origem) => {
+        Z3.aberta = "et:" + et.codigo; if (!Z3.painel) return; const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
+        const podeGerar = !!et.mensagem && (!hoje || !["em_andamento", "concluida", "aguardando_aprovacao"].includes(hoje.status));
+        const props = NPUI.props([["Quando", et.descricao || null], ["Hoje", hoje ? [NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || ""), ` · ${(hoje.enviados || []).length} enviada(s) · ${(hoje.nao_enviados || []).length} fora ou com falha` + (hoje.status === "aguardando_aprovacao" ? ` · ${(hoje.aptos || []).length} apto(s)` : "")] : "ainda não gerada hoje"],
+          ["Prévia de hoje", prev.length ? `${prev.length} cobrança(s)` + (fora ? ` · ${fora} devem ficar de fora pelas regras` : "") + " — " + prev.slice(0, 5).map((r) => r.c.cliente_nome).join(", ") + (prev.length > 5 ? ` e mais ${prev.length - 5}` : "") : "nenhuma cobrança nesta etapa hoje"],
+          ["Prévia automática", et.automatica ? "ligada: dias úteis, 8h55 (não envia sem aprovação)" : "desligada: só pelo botão"]].filter((x) => x[1] != null));
+        let corpoMsg;
+        if (C.edit === et.codigo) { const ta = el("textarea", { rows: "9", id: "cc3-msg" }, et.mensagem || ""); const erro = el("p", { class: "np-cc-erro", role: "alert", hidden: "" });
+          corpoMsg = NPUI.secao("Mensagem da etapa", el("div", { class: "np-cc-form" }, el("div", { class: "np-cc-f" }, el("label", { for: "cc3-msg" }, "Texto enviado ao cliente"), ta, el("span", { class: "aj" }, "Campos: {parcela} {link} {vencimento} {valor} {quando}. *texto* fica em negrito no WhatsApp.")), erro,
+            el("div", { class: "np-cc-ac" }, NPUI.btn("Salvar mensagem", { variante: "pri", cls: "np-pri-local", onclick: async () => { const { error } = await SB.from("regua_etapas").update({ mensagem: ta.value.replace(/\r\n/g, "\n").trim() || null, atualizado_em: new Date().toISOString(), atualizado_por: PP.perfil?.id }).eq("codigo", et.codigo); if (error) { erro.textContent = error.message; erro.hidden = false; return; } toast("Mensagem salva"); C.edit = null; invalidar(); } }), NPUI.btn("Cancelar", { variante: "ghost", onclick: () => { C.edit = null; abrirEt(et); } }))));
+        } else corpoMsg = NPUI.secao("Mensagem da etapa", et.mensagem ? el("p", { class: "np-cc-msg" }, et.mensagem) : el("p", { class: "np-cc-aviso" }, "Mensagem ainda não cadastrada. A prévia fica liberada depois que ela for salva."));
+        const pe = [];
+        if (hoje?.status === "aguardando_aprovacao") pe.push(NPUI.btn(`Revisar e aprovar (${(hoje.aptos || []).length})`, { variante: "pri", cls: "np-pri-local", onclick: () => abrirDetalhe(et.codigo, HOJE) }));
+        else { const b = NPUI.btn("Gerar a prévia de hoje", { variante: "pri", cls: "np-pri-local", onclick: async () => { if (!confirm(`Gerar a prévia da etapa ${et.codigo} para hoje? Nada é enviado antes da sua aprovação.`)) return; const { data, error } = await SB.rpc("regua_preparar", { p_etapa: et.codigo, p_data: HOJE }); if (error) { toast(error.message); return; } toast(data.status === "sem_clientes" ? "Nenhuma cobrança se encaixa hoje." : `${(data.aptos || []).length} cliente(s) aguardando sua aprovação.`); await carregar(); if (data.status !== "sem_clientes") abrirDetalhe(et.codigo, HOJE); } }); if (!podeGerar) { b.disabled = true; b.title = !et.mensagem ? "Cadastre a mensagem primeiro" : "A etapa já foi gerada hoje"; } pe.push(b); }
+        if (C.edit !== et.codigo) pe.push(NPUI.btn(et.mensagem ? "Editar mensagem" : "Cadastrar mensagem", { variante: "ghost", onclick: () => { C.edit = et.codigo; abrirEt(et); } }));
+        pe.push(NPUI.btn("Ver o descritivo do dia", { variante: "ghost", onclick: () => abrirDetalhe(et.codigo, HOJE) }));
+        if (admin) pe.push(NPUI.btn(et.automatica ? "Desligar a prévia automática" : "Ligar a prévia automática (8h55)", { variante: "ghost", onclick: async () => { const novo = !et.automatica; if (!confirm(novo ? `Ligar a prévia automática da etapa ${et.codigo} nos dias úteis, às 8h55? A prévia continua exigindo aprovação para enviar.` : `Desligar a prévia automática da etapa ${et.codigo}?`)) return; const { error } = await SB.from("regua_etapas").update({ automatica: novo }).eq("codigo", et.codigo); if (error) { toast(error.message); return; } toast(novo ? "Prévia automática nos dias úteis (8h55)" : "Só manual"); invalidar(); } }));
+        if (et.personalizada) pe.push(NPUI.btn("Remover a cadência", { variante: "ghost", onclick: async () => { if (!confirm(`Remover a cadência ${et.codigo}? O histórico de disparos continua guardado.`)) return; const { error } = await SB.from("regua_etapas").delete().eq("codigo", et.codigo); if (error) { toast(error.message); return; } toast("Cadência removida"); Z3.aberta = null; invalidar(); } }));
+        Z3.painel.abrir({ trilha: [el("span", {}, "Etapa da régua"), el("span", { class: "sep" }), el("span", {}, et.codigo)], titulo: et.titulo, id: "et:" + et.codigo, origem, corpo: [props, corpoMsg], pe });
+      };
+      const linhaEt = (et) => { const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
+        return NPUI.linha({ id: "et:" + et.codigo, regua: hoje?.status === "aguardando_aprovacao" ? "att" : null, atual: Z3.aberta === "et:" + et.codigo, prazo: { curta: et.codigo, rel: "", exata: et.descricao || et.codigo }, titulo: et.titulo,
+          contexto: [et.descricao, prev.length ? `prévia de hoje: ${prev.length} cobrança(s)` + (fora ? `, ${fora} fora pelas regras` : "") : "nenhuma cobrança hoje", et.mensagem ? null : "mensagem não cadastrada"].filter(Boolean).join(" · "),
+          direita: [et.personalizada ? NPUI.marca("personalizada", "") : null, et.automatica ? NPUI.marca("prévia automática 8h55", "info") : null, hoje ? NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || "") : NPUI.marca("não gerada hoje", "")], titleAbrir: "Abrir a etapa", onOpen: (li) => abrirEt(et, li.querySelector(".np-it-abrir")) }); };
+      corpo.append(el("div", { class: "np-cc-fl" }, NPUI.btn(C.nova ? "Fechar a nova cadência" : "Nova cadência", { onclick: () => { C.nova = !C.nova; renderCentral(); } })));
+      if (C.nova) corpo.append(el("div", { class: "np-cc-nova" }, formNovaCadencia()));
+      if (!ativas.length) corpo.append(NPUI.vazio({ titulo: "Nenhuma etapa ativa na régua", texto: "Crie uma cadência para definir quando e o que enviar." }));
+      else corpo.append(NPUI.grupo({ id: "cd-et", titulo: "Etapas da régua", n: ativas.length, itens: ativas.map(linhaEt) }));
+      const linhaD = (d) => { const et = C.etapas.find((e) => e.codigo === d.etapa); return NPUI.linha({ id: "dp:" + d.id, prazo: NPUI.prazoTxt(d.data), titulo: d.etapa + (et ? " · " + et.titulo : ""),
+        contexto: [d.origem === "agendada" ? "prévia automática" : d.origem === "migracao" ? "Central antiga" : "gerada pelo botão", d.motivo].filter(Boolean).join(" · "),
+        direita: [NPUI.marca((DISP_ST[d.status] || [d.status])[0].toLowerCase(), TOM_S[d.status] || ""), el("span", { class: "np-valor" }, `${(d.enviados || []).length} enviada(s) · ${(d.nao_enviados || []).length} fora`)], titleAbrir: "Ver o descritivo do dia", onOpen: () => abrirDetalhe(d.etapa, d.data) }); };
+      if (C.disparos.length) corpo.append(NPUI.grupo({ id: "cd-hist", titulo: "Histórico de disparos", n: C.disparos.length, aberto: true, itens: C.disparos.slice(0, 60).map(linhaD) }), NPUI.rodape(C.disparos.length > 60 ? `60 de ${C.disparos.length} disparos (os mais recentes)` : `${C.disparos.length} disparo(s)`, [["att", "aguardando aprovação"]]));
+      else corpo.append(el("p", { class: "np-nota np-cc-regra" }, "Nenhum disparo registrado ainda."));
+      corpo.append(NPUI.secao("Exportar mensagens por cliente", exportMensagens(true)));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Etapa da régua", onClose: () => { Z3.aberta = null; C.edit = null; } });
+      if (typeof Z3.aberta === "string" && Z3.aberta.startsWith("et:")) { const et = ativas.find((e) => "et:" + e.codigo === Z3.aberta); if (et) abrirEt(et); else Z3.aberta = null; }
+      return; }
+    if (C.aba === "resumo") {
+      // Resumo do mês: os mesmos cálculos do Resumo e do Dashboard antigos, numa leitura só — indicadores, comparação, recuperação, quem exige atenção, exportação.
+      // Cada número diz o período e o conceito; recebido, vencido, a vencer, negociado e recuperado NUNCA entram no mesmo total.
+      const prev = mesAnterior(), monthLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur), rec = monthLog.filter((l) => l.desfecho === "RECUPERADO");
+      const doMes = rows.filter((r) => r.c.venc_ef.slice(0, 7) === cur), vencMes = doMes.filter((r) => !r.c.paga && r.c.venc_ef < HOJE), aVencer = doMes.filter((r) => !r.c.paga && r.c.venc_ef >= HOJE), pagasMes = doMes.filter((r) => r.c.paga), carryL = rows.filter(isCarry);
+      const abertoV = soma(vencMes), base = abertoV + soma(pagasMes), pct = base > 0 ? abertoV / base * 100 : 0, recV = rec.reduce((a, l) => a + (+l.valor || 0), 0);
+      const ind = (n, rot, nota, tom) => el("div", { class: "np-rm-i" }, el("b", { class: tom || "" }, n), el("span", { class: "rot" }, rot), nota ? el("span", { class: "nota" }, nota) : null);
+      corpo.append(NPUI.secao(`${fmtMes(cur)} · cobranças com vencimento no mês`, el("div", { class: "np-rm-ind" },
+        ind(R$(soma(pagasMes)), "recebido no mês", `${pagasMes.length} cobrança(s) quitada(s)`, "ok"),
+        ind(R$(abertoV), "vencido e não pago", `${vencMes.length} parcela(s) do mês`, vencMes.length ? "crit" : ""),
+        ind(R$(soma(aVencer)), "a vencer até o fim do mês", `${aVencer.length} parcela(s)`),
+        ind(pct.toFixed(1).replace(".", ",") + "%", "da carteira do mês em aberto", `sobre recebido + vencido até hoje (${R$(base)})`),
+        ind(R$(recV), "recuperado no mês", `${rec.length} registro(s) com desfecho Recuperado`),
+        ind(R$(soma(carryL)), "negociado em meses anteriores, ainda sem pagamento", `${carryL.length} parcela(s); não entra no vencido do mês`, carryL.length ? "att" : ""))));
+      // comparação com o mês anterior: duas frases dizem o mesmo que os dois gráficos de barras antigos, com a variação
+      const prevAb = all.filter((r) => r.c.venc_ef.slice(0, 7) === prev && !r.c.paga), prevV = soma(prevAb), uniq = (arr) => new Set(arr.map((r) => r.c.chave_cliente)).size;
+      const varia = (o, n, f) => { const d = n - o; if (d === 0) return NPUI.marca("igual", ""); const p = o > 0 ? Math.abs(d / o * 100).toFixed(1).replace(".", ",") + "%" : null; return NPUI.marca(`${d < 0 ? "↓" : "↑"} ${p ? p + " · " : ""}${d < 0 ? "−" : "+"}${f(Math.abs(d))}`, d < 0 ? "ok" : "crit"); };
+      const cmp = (rot, a, b, f) => el("p", { class: "np-rm-cmp" }, el("span", { class: "rot" }, rot), el("span", {}, nomeMes(prev).toLowerCase() + " "), el("b", {}, f(a)), el("span", { class: "seta", "aria-hidden": "true" }, "→"), el("span", {}, nomeMes(cur).toLowerCase() + ", até " + fmtDM(HOJE) + " "), el("b", {}, f(b)), varia(a, b, f));
+      corpo.append(NPUI.secao(`Comparação com ${nomeMes(prev).toLowerCase()}`, cmp("Vencido e não pago", prevV, abertoV, R$), cmp("Clientes inadimplentes", uniq(prevAb), uniq(vencMes), (x) => String(Math.round(x))),
+        el("p", { class: "np-nota" }, `Parcelas vencidas e não pagas de cada mês, pelo vencimento. ${fmtMes(prev)} é calculado ao vivo a partir das cobranças do Asaas; o mês atual ainda está em curso. Na virada do mês, esta visão passa sozinha para o mês novo.`)));
+      // recuperação: desfechos dos contatos do mês e posição das cobranças em aberto na régua
+      const cont = Object.fromEntries(Object.keys(DESF).map((d) => [d, monthLog.filter((l) => l.desfecho === d).length])), maxD = Math.max(1, ...Object.values(cont));
+      const etapasR = C.etapas.filter((e) => e.ativa).sort((a, b) => b.dias - a.dias), conhe = new Set([...etapasR.map((e) => e.codigo), "—", "fora"]), outrasR = [...new Set(ab.map((r) => r.info.stage).filter((k) => !conhe.has(k)))].sort();
+      const posicao = [...etapasR.map((e) => [e.codigo, etapaLabel(e)]), ...outrasR.map((k) => [k, ab.find((r) => r.info.stage === k).info.etapa || k]), ["—", "Sem ação hoje"], ["fora", "Retiradas da régua"]].map(([k, l]) => [l, ab.filter((r) => r.info.stage === k)]).filter((x) => x[1].length);
+      corpo.append(el("div", { class: "np-rm-duas" },
+        NPUI.secao(`Desfechos dos contatos · ${monthLog.length} registro(s) no mês`, el("ul", { class: "np-rm-tab" }, Object.entries(DESF).map(([d, [t]]) => el("li", {}, el("span", { class: "rot" }, t), el("span", { class: "barra", "aria-hidden": "true" }, el("i", { style: `width:${Math.round(cont[d] / maxD * 100)}%` })), el("b", {}, String(cont[d])))))),
+        NPUI.secao("Posição na régua hoje · cobranças em aberto", el("ul", { class: "np-rm-tab np-rm-pos" }, posicao.map(([l, it]) => el("li", {}, el("span", { class: "rot" }, l), el("span", { class: "qt" }, String(it.length)), el("b", {}, R$(soma(it))))), el("li", { class: "tot" }, el("span", { class: "rot" }, "Total em aberto (vencidas + a vencer)"), el("span", { class: "qt" }, String(ab.length)), el("b", {}, R$(soma(ab))))))));
+      // quem exige atenção: clientes com parcela vencida e não paga, ou negociação de mês anterior sem pagamento (mesmo critério da lista antiga)
+      const alvo = rows.filter((r) => !r.c.paga && (isCarry(r) || r.c.venc_ef < HOJE)), byCli = {};
+      for (const r of alvo) { const g = byCli[r.c.chave_cliente] = byCli[r.c.chave_cliente] || { nome: r.c.cliente_nome, parcelas: [], valor: 0, carry: false }; g.parcelas.push(r); g.valor += +r.c.valor || 0; if (isCarry(r)) g.carry = true; }
+      const cliA = Object.values(byCli).map((g) => { g.parcelas.sort((a, b) => a.info.F - b.info.F); g.ref = g.parcelas[0]; g.atraso = g.ref.info.F < 0 ? -g.ref.info.F : null; g.status = g.ref.cad.status; g.last = g.parcelas.map((r) => r.cad.last).filter(Boolean).sort((a, b) => b.data.localeCompare(a.data))[0] || null; return g; });
+      const TOM_C = { FILA_HOJE: "crit", MONITORANDO: "att", NEGOCIOU: "info", CONTATADA_HOJE: "ok" }, passaC = (g, k) => k === "todas" || (k === "CARRY" ? g.carry : g.status === k);
+      const baseC = cliA.filter((g) => busca(g.nome)), listaC = baseC.filter((g) => passaC(g, C.listaF)).sort((a, b) => b.valor - a.valor);
+      const chC = (k, label) => NPUI.chip({ label, n: baseC.filter((g) => passaC(g, k)).length, on: C.listaF === k, grupo: "attr", onclick: () => { C.listaF = C.listaF === k && k !== "todas" ? "todas" : k; renderCentral(); } });
+      const linhaC = (g) => NPUI.linha({ id: String(g.ref.c.id), regua: g.atraso != null ? "late" : null, atual: Z3.aberta === g.ref.c.id, prazo: { ...NPUI.prazoTxt(g.ref.c.venc_ef), tom: g.atraso != null ? "late" : "" }, titulo: g.nome,
+        contexto: [g.parcelas.length === 1 ? "1 parcela" : g.parcelas.length + " parcelas", g.ref.info.etapa, g.last ? "último contato " + fmtD(g.last.data) + (g.last.observacao ? " · " + g.last.observacao : "") : "nunca contatado"].filter(Boolean).join(" · "),
+        direita: [NPUI.marca((CAD[g.status] || [g.status])[0].toLowerCase(), TOM_C[g.status] || ""), g.carry ? NPUI.marca("negociação de mês anterior", "att") : null, el("span", { class: "np-valor" }, R$(g.valor))], titleAbrir: "Abrir a cobrança mais antiga deste cliente", onOpen: (li) => abrir(g.ref, li.querySelector(".np-it-abrir")) });
+      const nrC = cliA.filter((g) => g.status === "MONITORANDO");
+      corpo.append(NPUI.secao("Clientes que exigem atenção", NPUI.resumo([{ n: cliA.length, label: cliA.length === 1 ? "cliente inadimplente" : "clientes inadimplentes", tom: cliA.length ? "crit" : "zero" }, { n: R$(cliA.reduce((a, g) => a + g.valor, 0)), label: `em aberto, em ${alvo.length} parcela(s)` }, { n: nrC.length, label: "não respondem", tom: nrC.length ? "att" : "zero" }, { n: cliA.filter((g) => g.carry).length, label: "com negociação de mês anterior" }]),
+        el("div", { class: "np-filtros np-cc-fl", role: "group", "aria-label": "Filtrar clientes por situação" }, chC("todas", "Todos"), chC("FILA_HOJE", "Na fila"), chC("MONITORANDO", "Não responde"), chC("NEGOCIOU", "Negociou"), chC("CONTATADA_HOJE", "Contatado hoje"), chC("CARRY", "Meses anteriores"))));
+      if (!listaC.length) corpo.append(NPUI.vazio(C.busca || C.listaF !== "todas" ? { titulo: "Nenhum cliente com esse filtro", texto: "Confira a busca e a situação escolhida.", acao: "Limpar filtros", onAcao: () => { C.busca = ""; C.listaF = "todas"; renderCentral(); } } : { titulo: "Nenhum cliente inadimplente", texto: "Não há parcela vencida sem pagamento nem negociação anterior pendente." }));
+      else corpo.append(NPUI.grupo({ id: "rm-cli", titulo: "Do maior valor em aberto para o menor", n: listaC.length, itens: listaC.map(linhaC) }), el("p", { class: "np-nota np-cc-regra" }, "Entra quem tem parcela vencida e não paga, ou negociação de mês anterior ainda sem pagamento. Sai sozinho quando o Asaas confirma o pagamento."));
+      // exportação: os mesmos dois arquivos de antes
+      const fc = inp("text", "", { placeholder: "Nome do cliente (opcional)" }); fc.id = "cc3-exp"; fc.className = "np-busca-inline";
+      const expCob = () => { const f = fc.value.trim().toLowerCase(); baixarCSV(C.rows.filter((c) => !f || (c.cliente_nome || "").toLowerCase().includes(f)).map((c) => { const i = stageInfo(c); return [c.cliente_nome, numBR(c.valor), c.descricao || "", c.venc_ef.slice(0, 7), fmtD(c.venc_ef), i.situacao, i.etapa, c.paga ? "Sim" : "Não"]; }), ["Cliente", "Valor", "Descrição", "Mês", "Vencimento", "Situação", "Estágio", "Paga"], "cobrancas.csv"); };
+      const expHist = () => { const f = fc.value.trim().toLowerCase(); baixarCSV(C.log.filter((l) => !f || (l.cliente_nome || "").toLowerCase().includes(f)).map((l) => [fmtD(l.data), l.cliente_nome || "", numBR(l.valor), DESF[l.desfecho][0], l.proxima_acao || "", l.observacao || "", l.registrado_por_nome || ""]), ["Data", "Cliente", "Valor", "Desfecho", "Próxima ação", "Observação", "Registrado por"], "historico_cadencia.csv"); };
+      corpo.append(NPUI.secao("Exportar", el("p", { class: "np-nota" }, "Arquivos .csv com a base carregada (cobranças em aberto de qualquer mês e pagas desde o mês anterior) ou com o histórico de contatos."), el("div", { class: "np-rm-exp" }, el("label", { for: "cc3-exp", class: "np-sr" }, "Filtrar a exportação por cliente"), fc, NPUI.btn("Exportar cobranças (.csv)", { onclick: expCob }), NPUI.btn("Exportar histórico de contatos (.csv)", { onclick: expHist }))));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
+      if (Z3.aberta) { const r = rows.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
       return; }
     if (C.aba === "regua") {
       // Régua: onde está cada cobrança em aberto, etapa por etapa (da mais atrasada para a mais nova). As pagas ficam num grupo fechado.
