@@ -40,6 +40,7 @@ const filaDe=g=>K.pend.filter(x=>x.cargo_id===g.id||(x.cargo_id==null&&x.cargo==
 const orfas=()=>K.pend.filter(x=>!x.na_fila).slice().sort((a,b)=>(b.fatal-a.fatal)||String(a.prazo||"9999").localeCompare(String(b.prazo||"9999")));
 const fataisDe=g=>filaDe(g).filter(x=>x.fatal).length;
 const elegiveis=g=>(g.ocupantes||[]).filter(o=>!o.pendencia&&!afastadoHoje(o));
+const NUC_L={...NUCLEOS,financeiro:"Financeiro"};
 const AREAS_L={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento",superendividamento:"Superendividamento",tarefas_equipe:"Tarefas da equipe",protecao:"Proteção patrimonial"};
 const dataBR=iso=>iso?new Date(iso).toLocaleDateString("pt-BR"):"—";
 async function carregarCargos(){
@@ -52,7 +53,7 @@ async function carregarCargos(){
     const f=await SB.from("v_distribuicao_pendente").select("tabela,registro,descricao,cliente_id,prazo,prioridade,cargo_id,cargo,created_at");
     let pend=(f.data||[]).map(x=>({...x,na_fila:!!(x.cargo_id||x.cargo),fatal:false}));
     const ids=pend.filter(x=>x.tabela==="tarefas").map(x=>x.registro).slice(0,300);
-    if(ids.length){const t=await SB.from("tarefas").select("id,prazo_fatal,prazo_hora").in("id",ids);const m=new Map((t.data||[]).map(x=>[String(x.id),x]));pend=pend.map(x=>({...x,fatal:!!m.get(x.registro)?.prazo_fatal,hora:m.get(x.registro)?.prazo_hora||null}))}
+    if(ids.length){const t=await SB.from("tarefas").select("id,prazo_fatal,hora").in("id",ids);const m=new Map((t.data||[]).map(x=>[String(x.id),x]));pend=pend.map(x=>({...x,fatal:!!m.get(x.registro)?.prazo_fatal,hora:m.get(x.registro)?.hora||null}))}
     K.pend=pend;K.instalada=true;K.cargos=a.data||[];K.div=d.data||[];K.ok=true;K.erro=null;if(!E.ok&&!E.carregando)carregar();
   }catch(e){console.warn("cargos",e);K.erro=e}
   finally{K.carregando=false;render()}
@@ -68,7 +69,7 @@ function linhaK(g){
   if(oc.some(o=>o.pendencia))m.push(NPUI.marca("pendência","att"));
   const quem=oc.filter(o=>o.tipo==="titular").slice(0,3).map(o=>NPUI.quem(o.nome));
   if(oc.some(afastadoHoje))m.push(NPUI.marca("afastamento em curso","att"));
-  const ctx=[NUCLEOS[g.nucleo]||g.nucleo||"sem núcleo",g.modalidade==="operacional"?"operacional · "+(oc.length===1?"1 ocupante":oc.length+" ocupantes")+" · "+(g.distribuicao==="rodizio"?"rodízio":"fila"):"coordenação"+(oc.some(o=>o.tipo==="substituto")?" · com substituto":""),`${(g.acessos||[]).length} ${(g.acessos||[]).length===1?"área":"áreas"} de acesso`,+g.tarefas_abertas?`${g.tarefas_abertas} tarefa(s) aberta(s)`:null].filter(Boolean).join(" · ");
+  const ctx=[NUC_L[g.nucleo]||g.nucleo||"sem núcleo",g.modalidade==="operacional"?"operacional · "+(oc.length===1?"1 ocupante":oc.length+" ocupantes")+" · "+(g.distribuicao==="rodizio"?"rodízio":"fila"):"coordenação"+(oc.some(o=>o.tipo==="substituto")?" · com substituto":""),`${(g.acessos||[]).length} ${(g.acessos||[]).length===1?"área":"áreas"} de acesso`,+g.tarefas_abertas?`${g.tarefas_abertas} tarefa(s) aberta(s)`:null].filter(Boolean).join(" · ");
   return NPUI.linha({id:g.id,regua:nFat?"fatal":g.ativo&&g.vago?"late":+g.na_fila?"att":null,atual:K.aberta===g.id,riscado:!g.ativo,titulo:g.nome,contexto:ctx,direita:[...m,...quem,oc.filter(o=>o.tipo==="titular").length>3?el("span",{class:"np-sem"},"+"+(oc.filter(o=>o.tipo==="titular").length-3)):null,!oc.length&&g.ativo?el("span",{class:"np-sem"},"— ninguém —"):null],titleAbrir:"Abrir o cargo",onOpen:li=>abrirCargo(g,{origem:li.querySelector(".np-it-abrir")})});
 }
 function renderCargosV3(v){
@@ -97,13 +98,13 @@ function abrirCargo(g,{origem}={}){
   K.aberta=g.id;K.fila=null;if(!K.painel)return;const adm=admin()&&!(typeof readOnly==="function"&&readOnly()),oc=g.ocupantes||[];
   if(!K.hist[g.id]){K.hist[g.id]=null;carregarHist(g)}
   const props=NPUI.props([["Situação",[NPUI.marca(!g.ativo?"inativo":g.vago?"vago":"ocupado",!g.ativo?"":g.vago?"crit":"ok"),+g.na_fila?[" ",el("button",{type:"button",class:"np-marca att np-fila-b",title:"Abrir a fila do cargo",onclick:()=>abrirFila(g)},`${g.na_fila} na fila do cargo`)]:null,fataisDe(g)?[" ",NPUI.marca(`${fataisDe(g)} com prazo fatal`,"crit")]:null]],
-    ["Núcleo / frente",[NUCLEOS[g.nucleo]||g.nucleo,g.frente].filter(Boolean).join(" · ")||null],
+    ["Núcleo / frente",[NUC_L[g.nucleo]||g.nucleo,g.frente].filter(Boolean).join(" · ")||null],
     ["Modalidade",g.modalidade==="operacional"?"Operacional — um ou vários ocupantes ao mesmo tempo; distribuição por "+(g.distribuicao==="rodizio"?"rodízio (o próximo da ordem recebe)":"fila (ninguém recebe automaticamente)"):"Coordenação — um titular e, se houver, um substituto"],
     ["Responde por",[g.responsavel_nucleo?"o núcleo":null,g.responsavel_frente?"a frente":null].filter(Boolean).join(" e ")||null],
     ["Acessos do cargo",(g.acessos||[]).length?(g.acessos||[]).map(a=>AREAS_L[a]||a).join(", "):"nenhum"],
     ["Responsabilidades",g.responsabilidades||null],["Em aberto",`${g.tarefas_abertas||0} tarefa(s) · ${g.monitoramentos||0} monitoramento(s)`]].filter(x=>x[1]!=null));
   const lista=oc.length?el("ul",{class:"np-cargo-oc"},oc.map(o=>el("li",{},el("div",{class:"q"},NPUI.quem(o.nome)," ",NPUI.marca(rotOc(g,o),""),o.pendencia?[" ",Object.assign(NPUI.marca("pendência","att"),{title:o.pendencia})]:null,o.afastado_de?[" ",NPUI.marca((afastadoHoje(o)?"afastado(a) desde ":"afastamento programado: ")+dataBR(o.afastado_de+"T12:00:00")+(o.afastado_ate?" a "+dataBR(o.afastado_ate+"T12:00:00"):" (sem data de volta)"),"att")]:null),
-      el("div",{class:"d"},"desde "+dataBR(o.inicio)+(+o.tarefas_abertas?` · ${o.tarefas_abertas} tarefa(s) do cargo`:"")+(g.modalidade==="operacional"&&g.distribuicao==="rodizio"?` · ${(+o.ordem||0)+1}º no rodízio`:"")),adm?el("div",{class:"ac"},NPUI.btn("Encerrar ocupação",{variante:"ghost",onclick:()=>encerrarOcupacao(g,o)}),NPUI.btn(o.afastado_de?"Alterar afastamento":"Registrar afastamento",{variante:"ghost",onclick:()=>afastar(g,o)}),g.modalidade==="operacional"&&g.distribuicao==="rodizio"&&oc.length>1?NPUI.btn("Ordem no rodízio",{variante:"ghost",onclick:()=>ordemRodizio(g,o)}):null):null)))
+      el("div",{class:"d"},"desde "+dataBR(o.inicio)+(+o.tarefas_abertas?` · ${o.tarefas_abertas} tarefa(s) do cargo`:"")+(g.modalidade==="operacional"&&g.distribuicao==="rodizio"?` · ${oc.indexOf(o)+1}º no rodízio`:"")),adm?el("div",{class:"ac"},NPUI.btn("Encerrar ocupação",{variante:"ghost",onclick:()=>encerrarOcupacao(g,o)}),NPUI.btn(o.afastado_de?"Alterar afastamento":"Registrar afastamento",{variante:"ghost",onclick:()=>afastar(g,o)}),g.modalidade==="operacional"&&g.distribuicao==="rodizio"&&oc.length>1?NPUI.btn("Ordem no rodízio",{variante:"ghost",onclick:()=>ordemRodizio(g,o)}):null):null)))
     :el("p",{class:"np-nota"},g.modalidade==="operacional"?"Ninguém ocupa este cargo. O que chega vai para a fila do cargo, visível à gestão, sem ser atribuído a alguém.":"Ninguém ocupa este cargo.");
   const h=K.hist[g.id];
   const hist=NPUI.secao("Histórico de ocupações",h==null?NPUI.carregando(2):h.length?NPUI.passos(h.map(x=>({estado:"ok",el:el("span",{},el("b",{},(E.lista.find(c=>c.id===x.colaborador_id)||{}).nome||"pessoa")," · "+(g.modalidade==="operacional"?"ocupante":x.tipo==="substituto"?"substituto":"titular")+" · "+dataBR(x.inicio)+" a "+dataBR(x.fim)),sub:x.motivo_fim?["Motivo do encerramento: "+x.motivo_fim]:null}))):el("p",{class:"np-nota"},"Nenhuma ocupação encerrada."));
@@ -147,9 +148,11 @@ function afastar(g,o){
   botaoModal("Salvar afastamento");
 }
 function ordemRodizio(g,o){
-  const oc=g.ocupantes||[],pos=sel(Object.fromEntries(oc.map((_,i)=>[String(i),`${i+1}º`])),String(Math.min(+o.ordem||0,oc.length-1)));
+  const oc=g.ocupantes||[],atual=oc.indexOf(o),pos=sel(Object.fromEntries(oc.map((_,i)=>[String(i),`${i+1}º`])),String(Math.max(atual,0)));
   const body=el("div",{class:"form"},el("div",{class:"f full note"},`No rodízio, cada atividade nova do cargo ${g.nome} vai para a próxima pessoa da ordem. Ordem atual: `+oc.map((x,i)=>`${i+1}º ${x.nome}`).join(", ")+"."),field("cr-pos",`Posição de ${o.nome}`,pos));
-  modal("Ordem no rodízio",body,async()=>{const {error}=await SB.rpc("cargo_ordem",{p_ocupacao:o.ocupacao_id,p_ordem:+pos.value});if(error)throw new Error(error.message||"Não foi possível salvar");toast("Ordem atualizada");recarregarCargos()});
+  modal("Ordem no rodízio",body,async()=>{const nova=oc.filter(x=>x!==o);nova.splice(+pos.value,0,o);
+    for(let i=0;i<nova.length;i++){if((+nova[i].ordem||0)===i+1)continue;const {error}=await SB.rpc("cargo_ordem",{p_ocupacao:nova[i].ocupacao_id,p_ordem:i+1});if(error)throw new Error(error.message||"Não foi possível salvar")}
+    toast("Ordem atualizada");recarregarCargos()});
   botaoModal("Salvar ordem");
 }
 function editarCargo(g){
