@@ -37,6 +37,7 @@ const afastadoHoje=o=>!!o.afastado_de&&hojeISO()>=o.afastado_de&&(!o.afastado_at
 const rotOc=(g,o)=>(g.modalidade==="operacional"?"ocupante":o.tipo==="substituto"?"substituto":"titular")+(o.principal?" · cargo principal da pessoa":"");
 const MODAL_L={coordenacao:"Coordenação — um titular e, se houver, um substituto",operacional:"Operacional — um ou vários ocupantes ao mesmo tempo"};
 const filaDe=g=>K.pend.filter(x=>x.cargo_id===g.id||(x.cargo_id==null&&x.cargo===g.nome&&x.na_fila));
+const orfas=()=>K.pend.filter(x=>!x.na_fila).slice().sort((a,b)=>(b.fatal-a.fatal)||String(a.prazo||"9999").localeCompare(String(b.prazo||"9999")));
 const fataisDe=g=>filaDe(g).filter(x=>x.fatal).length;
 const elegiveis=g=>(g.ocupantes||[]).filter(o=>!o.pendencia&&!afastadoHoje(o));
 const AREAS_L={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento",superendividamento:"Superendividamento",tarefas_equipe:"Tarefas da equipe",protecao:"Proteção patrimonial"};
@@ -49,7 +50,7 @@ async function carregarCargos(){
     const d=await SB.from("v_cargos_divergencias").select("*");
     /* fila de distribuição: o que está com a fila de um cargo, sem pessoa. Prazo fatal vem da própria tarefa. */
     const f=await SB.from("v_distribuicao_pendente").select("tabela,registro,descricao,cliente_id,prazo,prioridade,cargo_id,cargo,created_at");
-    let pend=(f.data||[]).filter(x=>x.cargo_id||x.cargo).map(x=>({...x,na_fila:true,fatal:false}));
+    let pend=(f.data||[]).map(x=>({...x,na_fila:!!(x.cargo_id||x.cargo),fatal:false}));
     const ids=pend.filter(x=>x.tabela==="tarefas").map(x=>x.registro).slice(0,300);
     if(ids.length){const t=await SB.from("tarefas").select("id,prazo_fatal,prazo_hora").in("id",ids);const m=new Map((t.data||[]).map(x=>[String(x.id),x]));pend=pend.map(x=>({...x,fatal:!!m.get(x.registro)?.prazo_fatal,hora:m.get(x.registro)?.prazo_hora||null}))}
     K.pend=pend;K.instalada=true;K.cargos=a.data||[];K.div=d.data||[];K.ok=true;K.erro=null;if(!E.ok&&!E.carregando)carregar();
@@ -76,7 +77,7 @@ function renderCargosV3(v){
   if(!K.ok){if(!K.carregando)carregarCargos();v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(6));return}
   if(!K.instalada){v.append(NPUI.vazio({titulo:"Cargos funcionais ainda não instalados neste ambiente",texto:"A gestão por cargos depende da migração 0113, que ainda não foi aplicada aqui. Até lá, os acessos continuam sendo definidos por pessoa, em Pessoas."}));return}
   const at=K.cargos.filter(g=>g.ativo),nV=at.filter(g=>g.vago).length,nF=at.reduce((a,g)=>a+(+g.na_fila||0),0),nP=new Set(at.flatMap(g=>(g.ocupantes||[]).map(o=>o.colaborador_id))).size;
-  v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:at.length,label:at.length===1?"cargo ativo":"cargos ativos"},{n:nP,label:nP===1?"pessoa em cargo":"pessoas em cargos"},{n:nV,label:nV===1?"cargo vago":"cargos vagos",tom:nV?"crit":"zero"},{n:nF,label:"na fila, sem pessoa",tom:nF?"att":"zero"},K.div.length?{n:K.div.length,label:"acesso divergente do cargo",tom:"crit"}:null]),
+  v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:at.length,label:at.length===1?"cargo ativo":"cargos ativos"},{n:nP,label:nP===1?"pessoa em cargo":"pessoas em cargos"},{n:nV,label:nV===1?"cargo vago":"cargos vagos",tom:nV?"crit":"zero"},{n:nF,label:"na fila, sem pessoa",tom:nF?"att":"zero"},orfas().length?{n:orfas().length,label:"sem responsável e sem cargo",tom:orfas().some(x=>x.fatal)?"crit":"att"}:null,K.div.length?{n:K.div.length,label:"acesso divergente do cargo",tom:"crit"}:null]),
     direita:[NPUI.btn("Atualizar",{onclick:recarregarCargos}),admin()&&!(typeof readOnly==="function"&&readOnly())?NPUI.btn("Novo cargo",{variante:"pri",onclick:()=>editarCargo(null)}):null].filter(Boolean)}));
   const obra=el("div",{class:"np-obra"}),corpo=el("div",{class:"np-corpo"});
   if(K.div.length)corpo.append(el("div",{class:"np-erro",role:"alert"},el("i",{},`${K.div.length} pessoa(s) com acessos gravados diferentes dos acessos dos cargos que ocupam: `+K.div.map(d=>d.nome).join(", ")+".")));
@@ -84,6 +85,8 @@ function renderCargosV3(v){
   if(comFatal.length)corpo.append(el("div",{class:"np-erro np-fila-fatal",role:"alert"},el("span",{},el("i",{},`${comFatal.reduce((a,x)=>a+x[1],0)} atividade(s) com prazo fatal aguardam distribuição, sem pessoa atribuída: `),...comFatal.flatMap(([g,n],i)=>[i?", ":"",el("button",{type:"button",class:"lnk",onclick:()=>abrirFila(g)},`${g.nome} (${n})`+(g.vago?" — cargo vago":""))]),".")));
   if(!K.cargos.length)corpo.append(NPUI.vazio({titulo:"Nenhum cargo cadastrado",texto:"Crie o primeiro cargo para começar a distribuir responsabilidades por função.",acao:admin()?"Novo cargo":null,onAcao:()=>editarCargo(null)}));
   else{for(const [k,l,tom] of [["vago","Vagos","crit"],["pend","Com pendência","att"],["ok","Ocupados",""],["inativo","Inativos",""]]){const its=K.cargos.filter(g=>grupoK(g)===k);if(its.length)corpo.append(NPUI.grupo({id:"cargo-"+k,titulo:l,n:its.length,tom,aberto:k!=="inativo",itens:its.map(linhaK)}))}
+    const of=orfas();
+    if(of.length)corpo.append(NPUI.grupo({id:"cargo-orfas",titulo:"Atividades sem responsável e sem cargo",n:of.length,tom:of.some(x=>x.fatal)?"crit":"att",aberto:of.some(x=>x.fatal),itens:of.slice(0,200).map(x=>NPUI.linha({id:"orf-"+x.registro,regua:x.fatal?"fatal":null,prazo:x.prazo?NPUI.prazoTxt(String(x.prazo).slice(0,10),x.hora):null,titulo:x.descricao||"Atividade",contexto:[x.tabela==="monitoramentos"?"Monitoramento":"Tarefa",nomeCliK(x.cliente_id)].join(" · "),direita:[x.fatal?NPUI.marca("prazo fatal","crit"):null,NPUI.marca("sem responsável","att")],titleAbrir:x.tabela==="tarefas"?"Abrir a tarefa":"Atividade sem responsável",onOpen:()=>{if(x.tabela==="tarefas")window.PP_TAREFAS?.abrir?.(x.registro)}}))}));
     corpo.append(NPUI.rodape(`${K.cargos.length} ${K.cargos.length===1?"cargo":"cargos"}`,[["fatal","prazo fatal na fila"],["late","cargo vago"],["att","há itens na fila do cargo"]]))}
   obra.append(corpo);v.append(obra);
   K.painel=NPUI.painel({obra,label:"Detalhe do cargo",onClose:()=>{K.aberta=null;K.fila=null}});

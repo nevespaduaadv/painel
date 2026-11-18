@@ -23,7 +23,7 @@ async function carregar(){
 }
 /* Integração AtendeDireito Sync (migração 0114). Onde a migração não existe, a leitura falha e a tela segue só com o DJEN. */
 async function carregarSync(){
-  const y=U.sync;y.fontes=new Map();y.prazos=new Map();
+  const y=U.sync;y.fontes=new Map();y.prazos=new Map();y.podeConf=new Map();
   try{
     const i=await SB.from("integracoes").select("ativo,estado,atualizado_em").eq("id","sync").maybeSingle();
     if(i.error||!i.data){y.instalada=false;y.ativo=false;y.estado={};return}
@@ -275,6 +275,9 @@ function abrirPainelPub(p,{origem}={}){
   ].filter(x=>x&&x[1]!=null));
   /* prazos: sugerido pela plataforma × conferido pelo advogado × registrado (tarefa) */
   const pzs=prazosDe(p);
+  /* quem confere: só quem tem atribuição sobre esta publicação (0114b). O banco confere de novo. Sem a 0114b, vale o acesso ao Jurídico. */
+  const yc=U.sync;yc.podeConf=yc.podeConf||new Map();let podeConf=yc.podeConf.get(p.id);
+  if(pzs.length&&jur&&podeConf===undefined){yc.podeConf.set(p.id,null);SB.rpc("pode_conferir_prazo",{p_publicacao:p.id}).then(({data,error})=>{yc.podeConf.set(p.id,error?true:data===true);if(V3.aberta===p.id)abrirPainelPub(p)},()=>{yc.podeConf.set(p.id,true);if(V3.aberta===p.id)abrirPainelPub(p)})}
   const secPz=pzs.length?NPUI.secao("Prazos",el("p",{class:"np-nota"},"A data sugerida vem da plataforma e não é prazo do escritório. Vale a data conferida por alguém do Jurídico."),
     el("ul",{class:"np-pub-pz"},pzs.map(z=>{const conf=z.estado==="confirmado"||z.estado==="corrigido";
       return el("li",{class:"e-"+z.estado},el("div",{class:"t"},el("b",{},z.rotulo||"Prazo")," ",z.estado==="sugerido"?NPUI.marca("a conferir","att"):z.estado==="descartado"?NPUI.marca("descartado"):NPUI.marca(z.estado==="corrigido"?"corrigido":"confirmado","ok"),conf&&z.fatal?[" ",NPUI.marca("fatal","crit")]:null,z.revisao_pendente?[" ",NPUI.marca("aguardando revisão","att")]:null),
@@ -283,7 +286,8 @@ function abrirPainelPub(p,{origem}={}){
           conf?[el("dt",{},"Registrado"),el("dd",{},z.tarefa_id?el("button",{type:"button",class:"np-link",onclick:()=>window.PP_TAREFAS?.abrir(z.tarefa_id)},"na tarefa"):"sem tarefa")]:null,
           z.observacao?[el("dt",{},"Observação"),el("dd",{},z.observacao)]:null,
           z.revisao_pendente?[el("dt",{},"Revisão"),el("dd",{},"pendente · "+(z.revisao_motivo||"situação crítica"))]:z.revisado_em?[el("dt",{},"Revisado por"),el("dd",{},(z.revisado_por_nome||"—")+" em "+dhBR(z.revisado_em))]:null),
-        jur?el("div",{class:"ac"},z.estado==="sugerido"?[NPUI.btn("Confirmar",{onclick:()=>conferirPrazo(p,z,"confirmar")}),NPUI.btn("Corrigir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"corrigir")}),NPUI.btn("Descartar",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"descartar")})]:[...(z.revisao_pendente&&U.sync.revisor&&z.conferido_por!==PP.perfil?.id?[NPUI.btn("Aprovar revisão",{onclick:()=>revisarPrazo(z,"aprovar")}),NPUI.btn("Devolver",{variante:"ghost",onclick:()=>revisarPrazo(z,"devolver")})]:[]),NPUI.btn("Reabrir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"reabrir")})]):null)}))):null;
+        jur&&podeConf===false&&z.estado==="sugerido"?el("p",{class:"np-nota"},"A conferência cabe a quem responde por este processo ou pela carteira de publicações."):null,
+        jur&&(podeConf===true||(z.revisao_pendente&&U.sync.revisor&&z.conferido_por!==PP.perfil?.id))?el("div",{class:"ac"},z.estado==="sugerido"?[NPUI.btn("Confirmar",{onclick:()=>conferirPrazo(p,z,"confirmar")}),NPUI.btn("Corrigir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"corrigir")}),NPUI.btn("Descartar",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"descartar")})]:[...(z.revisao_pendente&&U.sync.revisor&&z.conferido_por!==PP.perfil?.id?[NPUI.btn("Aprovar revisão",{onclick:()=>revisarPrazo(z,"aprovar")}),NPUI.btn("Devolver",{variante:"ghost",onclick:()=>revisarPrazo(z,"devolver")})]:[]),podeConf===true?NPUI.btn("Reabrir",{variante:"ghost",onclick:()=>conferirPrazo(p,z,"reabrir")}):null].filter(Boolean)):null)}))):null;
   const dvs=divergDe(p);
   const secDv=dvs.length?NPUI.secao("Fontes divergentes",el("ul",{class:"np-pub-dv"},dvs.map(f=>el("li",{},el("div",{},el("b",{},ROT[f.fonte]||f.fonte)," · recebida em "+dhBR(f.primeira_vez)),
     el("ul",{},(f.divergencias||[]).map(x=>el("li",{},x.campo==="possivel_duplicata"?"Pode ser a mesma comunicação da publicação "+x.nosso+" (mesmo processo e mesmo dia, texto diferente).":[el("b",{},x.campo),": aqui “",String(x.nosso??"—").slice(0,160),"” · na fonte “",String(x.fonte??"—").slice(0,160),"”"]))),
@@ -300,6 +304,6 @@ function abrirPainelPub(p,{origem}={}){
 /* ---------- Integração ---------- */
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};return r}}
 {const _r=render;render=function(){_r();const vp=$("#view-publicacoes");if(!vp)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="publicacoes")S.tab="clientes";vp.hidden=S.tab!=="publicacoes";if(S.tab==="publicacoes")renderPublicacoes()}}
-window.PP_PUBLICACOES={sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
+window.PP_PUBLICACOES={abrirId:id=>{V3.aberta=id;if(S.tab!=="publicacoes"){S.tab="publicacoes";try{location.hash="#publicacoes"}catch(_){}}render()},sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("publicacoes");ch.on("postgres_changes",{event:"*",schema:"public",table:"publicacoes"},()=>{U.ok=false;if(S.tab==="publicacoes")garantir()});ch.subscribe()}});
 })();
