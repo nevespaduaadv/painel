@@ -678,3 +678,37 @@ html.np-casca-v3 .np-inv-fs{display:flex;flex-wrap:wrap;gap:8px 12px;margin:0 0 
 html.np-casca-v3 .np-inv-f{flex:0 1 200px}
 html.np-casca-v3 #view-inventario .np-it-prazo .d{font-size:var(--np-fs-3)}
 @media (max-width:600px){html.np-casca-v3 .np-inv-f{flex:1 1 100%}}
+/* V10 — Controle Financeiro (19/11): quatro páginas da especificação do setor na linguagem da V3.1 */
+html.np-casca-v3 :is(#view-fin-visao,#view-fin-regua,#view-fin-retornos,#view-fin-recuperacao) .np-toolbar{flex-wrap:wrap;row-gap:10px}
+html.np-casca-v3 :is(#view-fin-visao,#view-fin-regua,#view-fin-retornos,#view-fin-recuperacao) .np-toolbar>.np-resumo{flex:1 0 100%}
+html.np-casca-v3 :is(#view-fin-visao,#view-fin-regua,#view-fin-retornos,#view-fin-recuperacao) .np-corpo>.np-sec{margin:0 0 22px}
+html.np-casca-v3 .np-fc-mes select{min-width:170px}
+html.np-casca-v3 p.np-fc-sinc{margin:2px 0 14px}html.np-casca-v3 p.np-fc-sinc.erro{color:var(--np-crit)}
+html.np-casca-v3 button.np-fc-i{appearance:none;background:none;border:0;padding:6px 8px;margin:-6px -8px;border-radius:8px;text-align:left;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:2px;min-width:0}
+html.np-casca-v3 button.np-fc-i:hover{background:var(--np-surface-2)}html.np-casca-v3 button.np-fc-i:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 button.np-fc-i[aria-pressed="true"]{background:var(--np-surface-2);box-shadow:inset 0 -2px 0 var(--np-text)}
+html.np-casca-v3 .np-fc-ind3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:1100px){html.np-casca-v3 .np-fc-ind{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:600px){html.np-casca-v3 .np-fc-ind3{grid-template-columns:1fr}}
+html.np-casca-v3 .np-fc-et{list-style:none;margin:0;padding:0}
+html.np-casca-v3 .np-fc-et>li{border-bottom:1px solid var(--np-line)}html.np-casca-v3 .np-fc-et>li:last-child{border-bottom:0}
+html.np-casca-v3 .np-fc-et button{appearance:none;background:none;border:0;width:100%;display:grid;grid-template-columns:92px minmax(0,1.2fr) minmax(60px,1fr) 28px auto;gap:10px;align-items:center;padding:9px 4px;min-height:40px;cursor:pointer;font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text);text-align:left;border-radius:6px}
+html.np-casca-v3 .np-fc-et button:hover,html.np-casca-v3 .np-fc-et button.on{background:var(--np-surface-2)}html.np-casca-v3 .np-fc-et button:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-fc-et .e{font:500 var(--np-fs-3)/1.2 var(--np-display)}html.np-casca-v3 .np-fc-et .nm{color:var(--np-text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.np-casca-v3 .np-fc-et .t{height:4px;background:var(--np-line);border-radius:2px;overflow:hidden}html.np-casca-v3 .np-fc-et .f{display:block;height:100%;background:var(--np-text);border-radius:2px}
+html.np-casca-v3 .np-fc-et .q{text-align:right;font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-fc-acoes{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 18px}
+html.np-casca-v3 .np-fc-seg{margin:14px 0 6px}
+html.np-casca-v3 .np-fc-bar{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;background:var(--np-line)}
+html.np-casca-v3 .np-fc-bar .p{display:block;min-width:4px}html.np-casca-v3 .np-fc-bar .p.dim{opacity:.3}
+html.np-casca-v3 :is(.np-fc-bar .p,.np-fc-lg .c).ok{background:var(--np-ok)}html.np-casca-v3 :is(.np-fc-bar .p,.np-fc-lg .c).att{background:var(--np-att)}html.np-casca-v3 :is(.np-fc-bar .p,.np-fc-lg .c).crit{background:var(--np-crit)}
+html.np-casca-v3 .np-fc-leg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;margin-top:10px}
+html.np-casca-v3 .np-fc-lg{appearance:none;background:none;border:0;border-radius:8px;padding:8px;margin:0 -8px;text-align:left;cursor:pointer;display:grid;grid-template-columns:10px minmax(0,1fr);gap:1px 8px;align-items:baseline;font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text);min-height:44px}
+html.np-casca-v3 .np-fc-lg:hover,html.np-casca-v3 .np-fc-lg.on{background:var(--np-surface-2)}html.np-casca-v3 .np-fc-lg.on{box-shadow:inset 0 -2px 0 var(--np-text)}html.np-casca-v3 .np-fc-lg:focus-visible{outline:none;box-shadow:var(--np-focus)}html.np-casca-v3 .np-fc-lg.dim{opacity:.6}
+html.np-casca-v3 .np-fc-lg .c{width:8px;height:8px;border-radius:50%;background:var(--np-text-3);align-self:center}html.np-casca-v3 .np-fc-lg .c.ok,html.np-casca-v3 .np-fc-lg.ok .c{background:var(--np-ok)}html.np-casca-v3 .np-fc-lg.att .c{background:var(--np-att)}html.np-casca-v3 .np-fc-lg.crit .c{background:var(--np-crit)}
+html.np-casca-v3 .np-fc-lg .l{font-weight:500}html.np-casca-v3 .np-fc-lg b{grid-column:2;font:500 var(--np-fs-4)/1.2 var(--np-display);font-variant-numeric:tabular-nums}html.np-casca-v3 .np-fc-lg .q{grid-column:2;color:var(--np-text-2);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-fc-h4{margin:20px 0 4px;font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-fc-selh{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin:26px 0 8px;padding-top:16px;border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-fc-selh h3{margin:0;font:500 var(--np-fs-5)/1.25 var(--np-display);color:var(--np-text)}
+@media (max-width:700px){html.np-casca-v3 .np-fc-et button{grid-template-columns:78px minmax(0,1fr) 24px auto}html.np-casca-v3 .np-fc-et .t{display:none}}
+@media (pointer:coarse),(max-width:900px){html.np-casca-v3 .np-fc-et button{min-height:44px}}
