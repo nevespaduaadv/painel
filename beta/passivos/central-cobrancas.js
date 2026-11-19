@@ -404,13 +404,13 @@
   // ---------- integração com a aba Financeiro ----------
   const S0 = S;
   function barraSub() {
-    const SUBS = [["asaas", "Cobranças (Asaas)"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]];
-    // 19/11: a Central de Cobranças foi retirada da navegação, nas duas cascas, por decisão das sócias — o Controle Financeiro a substitui. A integração com o Asaas continua (cobranças, clientes, conta).
-    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS, S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
+    const SUBS = [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]];
+    // V3.1 (19/11): a Central de Cobranças foi retirada da navegação por decisão das sócias — o Controle Financeiro a substitui. A integração com o Asaas continua (cobranças, clientes, conta).
+    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS.filter(([k]) => k !== "central"), S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
     return el("div", { class: "tabs", style: "margin-bottom:10px" }, SUBS.map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
   }
   try { S0.finSub = localStorage.getItem("pp-fin-sub") || "asaas"; } catch (_) { S0.finSub = "asaas"; }
-  const semCentral = () => true; // 19/11: vale também na casca antiga
+  const semCentral = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
   if (semCentral() && S0.finSub === "central") S0.finSub = "asaas";
   { const _r = render; render = function () { if (semCentral() && S0.finSub === "central") { S0.finSub = "asaas"; try { localStorage.setItem("pp-fin-sub", "asaas"); } catch (_) {} } _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } if (!(S0.finSub === "central" && v3())) vf.prepend(barraSub()); }; }
   // ---------- V10 · Clientes (Asaas) e Conta/Parâmetros em V3.1 — mesmos dados e mesmas ações da V2 ----------
@@ -748,7 +748,7 @@
     v.append(el("div", { class: "filters", style: "margin:10px 0" }, q));
     v.append(el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Cliente (Asaas)", "CPF/CNPJ", "Telefone", "Ficha no sistema", "Em aberto", "Vencidas", "Pagas", ""].map((h) => el("th", {}, h)))),
       el("tbody", {}, linhas.length ? linhas.slice(0, 500).map(({ c, ab, venc, pagas }) => { const cli = (S.clientes || []).find((x) => x.id === c.cliente_id); return el("tr", {}, el("td", {}, el("b", {}, c.nome || c.asaas_id), el("div", { class: "note" }, c.email || "")), el("td", { class: "note" }, c.cpf_cnpj || "—"), el("td", { class: "note" }, c.telefone || "—"), el("td", {}, c.cliente_id ? el("a", { href: "#", onclick: (e) => { e.preventDefault(); S.tab = "clientes"; S.sel = c.cliente_id; S.sub = "financeiro"; render(); } }, cli?.nome || c.cliente_id) : pill("sem vínculo", "e3")), el("td", { class: "num" }, ab.length ? `${ab.length} · ${R$(ab.reduce((a, x) => a + (+x.valor || 0), 0))}` : "—"), el("td", { class: "num" }, venc.length ? pill(String(venc.length), "e3") : "—"), el("td", { class: "num" }, String(pagas)),
-        el("td", {}, el("div", { style: "display:flex;gap:4px;justify-content:flex-end" }, el("a", { class: "btn sm", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas")))); }) : el("tr", {}, el("td", { colspan: "8", class: "note" }, "Nenhum cliente."))))));
+        el("td", {}, el("div", { style: "display:flex;gap:4px;justify-content:flex-end" }, el("a", { class: "btn sm", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas"), el("button", { class: "btn sm", onclick: () => { C.aba = "historico"; C.histCli = c.asaas_id; S0.finSub = "central"; render(); } }, "Histórico")))); }) : el("tr", {}, el("td", { colspan: "8", class: "note" }, "Nenhum cliente."))))));
   }
   // ----- CONTA ASAAS · PARÂMETROS GERAIS DE RECEBIMENTO -----
   async function renderConta(v) {
