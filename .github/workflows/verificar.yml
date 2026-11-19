@@ -9,7 +9,7 @@ permissions:
 jobs:
   verificar:
     runs-on: ubuntu-latest
-    timeout-minutes: 35 # dez laboratórios somam ~21 min no runner (15/11: ~19 min com nove); folga para o runner lento
+    timeout-minutes: 45 # dez laboratórios somam ~21 min no runner (15/11: ~19 min com nove); folga para o runner lento
     env:
       TZ: America/Sao_Paulo # os laboratórios geram datas "hoje ± n" na hora local e os módulos usam UTC-3: sem isto, entre 00h e 03h UTC os dias não batem
     steps:
@@ -46,10 +46,24 @@ jobs:
         run: NODE_PATH="$(npm root -g)" node docs/qa/formularios-lab.cjs "$RUNNER_TEMP/casca-lab/formularios"
       - name: Laboratório da Ficha do cliente V3.1 (entrega V4)
         run: NODE_PATH="$(npm root -g)" node docs/qa/ficha-lab.cjs "$RUNNER_TEMP/casca-lab/ficha"
+      - name: Laboratório · Processos V3.1 (V8)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/processos-lab.cjs "$RUNNER_TEMP/casca-lab/processos"
       - name: Laboratório dos modais e formulários V3.1 (entrega V5)
         run: NODE_PATH="$(npm root -g)" node docs/qa/modais-lab.cjs "$RUNNER_TEMP/casca-lab/modais"
       - name: Laboratório do tema único e da Agenda (entrega V6)
         run: NODE_PATH="$(npm root -g)" node docs/qa/tema-lab.cjs "$RUNNER_TEMP/casca-lab/tema"
+      - name: Laboratório das Publicações (V9, com as marcas da integração Sync; dados fictícios, sem rede)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/publicacoes-lab.cjs "$RUNNER_TEMP/casca-lab/publicacoes"
+      - name: Laboratório das Cobranças (V10, 1ª tela; dados fictícios, sem rede)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/cobrancas-lab.cjs "$RUNNER_TEMP/casca-lab/cobrancas"
+      - name: Laboratório de Contratos e faturamento (V10)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/faturamento-lab.cjs "$RUNNER_TEMP/casca-lab/faturamento"
+      - name: Laboratório do Estoque (V10)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/estoque-lab.cjs "$RUNNER_TEMP/casca-lab/estoque"
+      - name: Laboratório do Inventário (V10)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/inventario-lab.cjs "$RUNNER_TEMP/casca-lab/inventario"
+      - name: Laboratório do Controle Financeiro (V10)
+        run: NODE_PATH="$(npm root -g)" node docs/qa/controle-financeiro-lab.cjs "$RUNNER_TEMP/casca-lab/controle-financeiro"
       - name: Guardar relatório e capturas do laboratório
         if: always()
         uses: actions/upload-artifact@v4

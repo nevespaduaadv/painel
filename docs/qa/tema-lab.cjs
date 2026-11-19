@@ -14,7 +14,7 @@ const { servir, contexto, medirContraste } = M.exports;
 const { chromium } = require('playwright');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const PARES = [['--bg', '--np-bg'], ['--surface', '--np-surface'], ['--surface-2', '--np-surface-2'], ['--line', '--np-line'], ['--fg', '--np-text'], ['--muted', '--np-text-2'], ['--faint', '--np-text-3'], ['--ok', '--np-ok'], ['--warn', '--np-att'], ['--crit', '--np-crit'], ['--info', '--np-info'], ['--btn-primary', '--np-ink'], ['--on-dark', '--np-inv']];
-const TELAS = [['processos', 'processos'], ['publicacoes', 'publicacoes'], ['historico', 'historico'], ['equipe', 'equipe']];
+const TELAS = [['historico', 'historico'], ['equipe', 'equipe']]; // telas ainda com a apresentação da V2 dentro da casca; Processos saiu daqui na V8 (processos-lab) e Publicações na V9 (publicacoes-lab)
 const vars = (pg, nomes) => pg.evaluate((n) => { const cs = getComputedStyle(document.documentElement); const o = {}; for (const k of n) o[k] = cs.getPropertyValue(k).trim().toLowerCase(); return o; }, nomes);
 const cor = (pg, v) => pg.evaluate((v) => { const i = document.createElement('i'); i.style.color = `var(${v})`; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; }, v);
 
@@ -34,7 +34,7 @@ const cor = (pg, v) => pg.evaluate((v) => { const i = document.createElement('i'
       if (r.fundo === r.np && cardsOk) ok(`${tema} ${nome}: fundo e folhas no grafite/papel da V3.1 (${r.cards.length} folhas)`); else falha(`${tema} ${nome}: ` + JSON.stringify(r));
       const V = '#view-' + hash; const m = await medirContraste(pg, [{ sel: V + ' h1', nome: 'título' }, { sel: V + ' .card h3', nome: 'seção' }, { sel: V + ' td', nome: 'célula' }, { sel: V + ' th', nome: 'cabeçalho' }, { sel: V + ' .note', nome: 'nota' }, { sel: V + ' .sub', nome: 'linha fina' }, { sel: V + ' .btn', nome: 'botão' }, { sel: V + ' .btn.primary', nome: 'primário' }]);
       if (!m.ruins.length && m.medidos.length) ok(`${tema} ${nome}: contraste mínimo ${m.medidos.length ? m.minimo.toFixed(2) : '—'}:1 em ${m.medidos.length} pares`); else falha(`${tema} ${nome} contraste: ` + JSON.stringify(m.ruins.slice(0, 6)));
-      if (tema === 'dark' || nome === 'processos') await pg.screenshot({ path: path.join(OUT, `v6-${nome}-1440-${tema}.png`) });
+      if (tema === 'dark') await pg.screenshot({ path: path.join(OUT, `v6-${nome}-1440-${tema}.png`) });
     }
     if (!erros.length) ok(`${tema}: sem erros de página`); else falha(`${tema} erros: ` + JSON.stringify(erros.slice(0, 3)));
     await ctx.close();

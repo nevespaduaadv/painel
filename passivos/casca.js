@@ -56,7 +56,7 @@
     perfil: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   };
   const temIcone = (i) => { const k = i.icone || i.tab; return !!(typeof ICONES === "object" && ICONES && ICONES[k]); };
-  const I_GRUPO = { juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>' };
+  const I_GRUPO = { juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>', administrativo: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>' };
   const ws = el("div", { class: "np-ws" }, el("div", { class: "np-mono", "aria-hidden": "true" }, "NP"), el("div", { class: "np-rot" }, el("b", {}, "Neves Pádua"), el("small", {}, "Advocacia")));
   const buscaBtn = el("button", { class: "np-busca-btn edit-only", type: "button", onclick: () => { const i = $("#buscaGlobal"); if (i) { fecharGaveta(); i.focus(); } } }, ico(LUPA), el("span", {}, "Buscar"), el("kbd", {}, "/"));
   // Semântica: <nav> com listas de botões (não é tablist — os grupos expansíveis não são abas); o destino atual leva
@@ -123,6 +123,14 @@
     const gs = [hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
       { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
       { id: "ferramentas", label: "Ferramentas", icone: "ferramentas", cls: "", itens: deGrupos(["juridico-ferr", "comercial", "marketing"]) }].filter(g => g && g.itens.length);
+    // Financeiro (19/11, 12h — decisão das sócias): só as quatro páginas da especificação do setor. Estoque e Inventário passam para o grupo
+    // Administrativo, com a mesma regra de acesso de antes. As telas do Asaas e Contratos e faturamento saem da navegação da casca nova
+    // (a integração com o Asaas continua; na casca antiga nada muda). Nenhuma permissão foi alterada.
+    { const i = gs.findIndex(g => g.id === "financeiro"), fin = gs[i], podeFin = PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("financeiro");
+      if (fin) { const novas = podeFin ? [["fin-visao", "Visão geral"], ["fin-regua", "Régua de cobrança"], ["fin-retornos", "Cobranças e retornos"], ["fin-recuperacao", "Recuperação"]].filter(([t]) => document.getElementById("view-" + t) && acesso(t)).map(([t, l]) => ({ tab: t, label: l, cls: "" })) : [];
+        const adm = fin.itens.filter(it => it.tab === "estoque" || it.tab === "inventario");
+        fin.itens = novas; const grupos = [fin.itens.length ? fin : null, adm.length ? { id: "administrativo", label: "Administrativo", icone: "administrativo", cls: "", itens: adm } : null].filter(Boolean);
+        gs.splice(i, 1, ...grupos); } }
     // itens do NAV que não entraram em fixos, hubs ou grupos conhecidos: grupo "Outros" (nunca se perde destino)
     const cobertos = new Set([...FIXOS, "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
