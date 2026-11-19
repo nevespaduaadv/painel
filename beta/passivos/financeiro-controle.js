@@ -48,6 +48,7 @@ const kpi=(l,v,h,onclick)=>el("div",{class:"card kpi"+(onclick?" clicavel":""),o
 const pill=(t,cls)=>el("span",{class:"pill "+(cls||"")},t);
 
 /* ---------- ações ---------- */
+
 function registrarMensagem(r){
   const et=sel(Object.fromEntries(ETAPAS.map(e=>[e,e+" · "+NOME_ETAPA[e]])),ETAPAS.includes(r.etapa)?r.etapa:"D+1"),data=inp("date",hojeISO()),meio=sel({whatsapp:"WhatsApp",telefone:"Telefone",email:"E-mail",outro:"Outro"},"whatsapp"),obs=el("textarea",{rows:2,placeholder:"Opcional"});
   modal("Registrar mensagem — "+r.cliente_nome,el("div",{class:"form"},field("rm-et","Etapa",et),field("rm-data","Data",data),field("rm-meio","Meio",meio),el("div",{class:"f full"},el("label",{},"Observação"),obs)),async()=>{
@@ -96,6 +97,144 @@ const etiquetaTarefa=r=>{const ts=r.tarefas||[];if(!ts.length)return null;const 
   return el("button",{class:"pill "+(ab?(atras?"e3":"b"):"g"),style:"cursor:pointer;border:0",title:t.titulo,onclick:e=>{e.stopPropagation();window.PP_TAREFAS?.abrir(t.id)}},ab?(atras?"Tarefa atrasada · ":"Tarefa em aberto · ")+(t.responsavel||"—"):"Tarefa concluída")};
 
 /* ---------- 1) Visão geral ---------- */
+/* ---------- V3.1 (19/11): as quatro páginas da especificação do setor financeiro (versão 2, 10/11), refeitas na linguagem da V3.1.
+   Onde a especificação e o DESIGN.md divergem, vale o DESIGN.md: lista + painel no lugar de cartões e quadro, estado em palavra,
+   números em serifa, uma ação principal. Mesmos dados e as mesmas funções do banco (0105); nada é enviado por esta tela. ---------- */
+const v3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const Z={aberta:null,painel:null,fBol:"",grp:"estado"};
+const ORD=n=>n+"ª";
+const relVenc=r=>r.dias_para>0?`em ${r.dias_para} dia${r.dias_para===1?"":"s"}`:r.dias_para===0?"hoje":`há ${r.dias_atraso} dia${r.dias_atraso===1?"":"s"}`;
+const tarefaMarca=r=>{const ts=r.tarefas||[];if(!ts.length)return null;const ab=ts.filter(t=>t.status==="aberta"||t.status==="em_andamento"),h=hojeISO();if(!ab.length)return NPUI.marca("tarefa concluída","ok");const at=ab.some(t=>t.prazo&&t.prazo<h);return NPUI.marca((at?"tarefa atrasada":"tarefa em aberto")+(ab[0].responsavel?" · "+String(ab[0].responsavel).split(" ")[0]:""),at?"crit":"info")};
+const sincTxt=()=>K.sinc?(K.sinc.ok?"Asaas atualizado em "+fmtDT(K.sinc.inicio):"Não foi possível atualizar com o Asaas. Dados de "+fmtDT(K.sinc.inicio)+"."):"Asaas ainda sem sincronização";
+function finV3(v,tab){
+  v.classList.add("np-v3");Z.painel=null;const re=()=>render();
+  const mesSel=el("select",{id:"fc3-mes","aria-label":"Mês de referência",onchange:e=>{K.mes=e.target.value;K.sel=null;invalidar()}},...[-2,-1,0,1].map(n=>{const m=mesAdd(hojeISO().slice(0,7),n);return el("option",{value:m,selected:m===K.mes?"":null},mesLabel(m))}));
+  const atualizar=NPUI.btn("Atualizar agora",{title:"Busca no Asaas os pagamentos e as mudanças de situação",onclick:async()=>{try{toast("Atualizando com o Asaas…");await window.PP_FIN.edge({acao:"asaas_sincronizar"});window.PP_FIN.invalidar?.();invalidar()}catch(e){toast(e.message)}}});
+  const barra=(itens,extra)=>NPUI.toolbar({resumo:NPUI.resumo(itens.filter(Boolean)),direita:[...(extra||[]),el("div",{class:"np-cc-f np-fc-mes"},mesSel),atualizar]});
+  const sinc=()=>el("p",{class:"np-nota np-fc-sinc"+(K.sinc&&!K.sinc.ok?" erro":""),role:K.sinc&&!K.sinc.ok?"alert":null},sincTxt());
+  if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(6));return}
+  const rs=regua(),hoje=hojeISO(),excl=new Set(K.regua.filter(r=>r.excluida).map(r=>r.cliente_id));
+  const obra=el("div",{class:"np-obra"}),corpo=el("div",{class:"np-corpo"}),fecha=()=>{Z.aberta=null};
+  const ql=(K.q||"").trim().toLowerCase(),busca=()=>{let t=null;return el("input",{type:"search",class:"np-busca-inline",placeholder:"Buscar cliente…",value:K.q||"","aria-label":"Buscar cliente",oninput:ev=>{K.q=ev.target.value;clearTimeout(t);t=setTimeout(()=>{re();const x=$("#view-"+tab+" .np-busca-inline");if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},300)}})};
+  const chip=(label,n,on,fn,title)=>NPUI.chip({label,n,on,grupo:"attr",title,onclick:fn});
+  // painel do cliente na régua: o mesmo nas duas listas
+  const abrir=(r,origem)=>{
+    Z.aberta=r.id;const ts=r.tarefas||[],naEtapa=ETAPAS.includes(r.etapa),boleto=r.etapa==="D-2"||r.etapa==="D-0";
+    const props=NPUI.props([["Valor",R$(r.valor),"np-serif"],["Vencimento",fmtD(r.venc_ef)+" · "+relVenc(r),r.dias_atraso>0?"np-crit":""],["Etapa",r.etapa==="REMARCADO"?"Remarcado":naEtapa?r.etapa+" · "+NOME_ETAPA[r.etapa]:(NOME_ETAPA[r.etapa]||r.etapa)],
+      naEtapa?["Mensagem da etapa",NPUI.marca(r.mensagem_enviada?"enviada":"pendente",r.mensagem_enviada?"ok":"att")]:null,
+      boleto?["Boleto",NPUI.marca(r.boleto_enviado?"enviado":"não enviado",r.boleto_enviado?"ok":r.etapa==="D-0"?"crit":"att")]:null,
+      r.dias_atraso>0||r.cobranca_msg_em?["Mensagem de cobrança",r.cobranca_msg_em?"enviada em "+fmtD(r.cobranca_msg_em):"não enviada"]:null,
+      r.remarcado_para?["Remarcou para",fmtD(r.remarcado_para)+(r.remarcacoes>1?" · "+ORD(r.remarcacoes)+" remarcação":"")+(r.remarcado_para.slice(0,7)>K.mes?" · mês seguinte":""),r.venceu_de_novo?"np-crit":""]:null,
+      r.venceu_de_novo?["Situação","venceu de novo: a nova data passou sem pagamento","np-crit"]:null,
+      r.dias_atraso>0||r.etapa==="REMARCADO"?["Próximo passo",proximoPasso(r)]:null,
+      r.inadimplente_anterior?["Atenção","cliente com parcela vencida de mês anterior: fica fora do envio em massa"]:null,
+      r.sem_contato?["Contato","sem telefone encontrado no Chatguru: corrigir o contato","np-crit"]:null]);
+    const secT=ts.length?NPUI.secao(`Tarefas · ${ts.length}`,el("ul",{class:"np-ft-lst"},ts.map(t=>el("li",{},el("button",{type:"button",class:"lnk a",onclick:()=>window.PP_TAREFAS?.abrir?.(t.id)},t.titulo||"Tarefa"),el("span",{class:"b"},NPUI.marca((t.status==="concluida"?"concluída":t.status==="cancelada"?"cancelada":t.prazo&&t.prazo<hoje?"atrasada":"em aberto")+(t.responsavel?" · "+String(t.responsavel).split(" ")[0]:""),t.status==="concluida"?"ok":t.prazo&&t.prazo<hoje?"crit":"info")))))):null;
+    const hist=el("div",{class:"np-fc-hist"},el("p",{class:"np-nota"},"Carregando…"));
+    SB.from("cobranca_contatos").select("data,desfecho,retorno,nova_data,observacao").eq("cobranca_id",r.id).order("created_at",{ascending:false}).limit(8).then(({data})=>{if(Z.aberta!==r.id)return;hist.replaceChildren((data||[]).length?el("ul",{class:"np-ft-lst"},(data||[]).map(h=>el("li",{},el("span",{class:"a"},fmtD(h.data)+" · "+(h.retorno==="REMARCOU"?"remarcou pagamento":h.retorno==="SEM_RETORNO"?"sem retorno":(h.retorno||h.desfecho||"registro").toLowerCase())+(h.observacao?" · "+h.observacao:"")),h.nova_data?el("span",{class:"b"},NPUI.marca("nova data "+fmtD(h.nova_data),"att")):null))):el("p",{class:"np-nota"},"Nenhum retorno registrado."))});
+    const pe=[!r.mensagem_enviada&&naEtapa||(r.dias_atraso>0&&!r.cobranca_msg_em)?NPUI.btn("Registrar mensagem",{variante:"pri",cls:"np-pri-local",onclick:()=>registrarMensagem(r)}):NPUI.btn("Registrar retorno",{variante:"pri",cls:"np-pri-local",onclick:()=>registrarRetorno(r)}),
+      !r.mensagem_enviada&&naEtapa||(r.dias_atraso>0&&!r.cobranca_msg_em)?NPUI.btn("Registrar retorno",{onclick:()=>registrarRetorno(r)}):NPUI.btn("Registrar mensagem",{onclick:()=>registrarMensagem(r)}),
+      boleto?NPUI.btn(r.boleto_enviado?"Desfazer boleto enviado":"Marcar boleto como enviado",{onclick:()=>marcarBoleto(r,!!r.boleto_enviado)}):null,
+      NPUI.btn("Criar tarefa",{onclick:()=>criarTarefa([r],ETAPAS.includes(r.etapa)?r.etapa:"D+7")}),
+      r.link_fatura?el("a",{class:"np-btn",href:r.link_fatura,target:"_blank",rel:"noopener"},"Ver fatura"):null,
+      r.cliente_id?NPUI.btn("Histórico do cliente",{variante:"ghost",onclick:()=>{S.sel=r.cliente_id;S.tab="clientes";S.sub="negocial";render()}}):null,
+      NPUI.btn("Excluir da régua",{variante:"ghost",title:"Decidido para execução ou retirado do Asaas; pede o motivo",onclick:()=>excluirCliente(r)})].filter(Boolean);
+    Z.painel.abrir({trilha:[el("span",{},"Cobrança"),el("span",{class:"sep"}),el("span",{},r.parcela_txt||"parcela")],titulo:r.cliente_nome,id:String(r.id),origem,corpo:[props,secT,NPUI.secao("Retornos registrados",hist)].filter(Boolean),pe});
+  };
+  const marcas=r=>[r.venceu_de_novo?NPUI.marca("venceu de novo","crit"):null,r.remarcado_para&&!r.venceu_de_novo?NPUI.marca((r.remarcacoes>1?ORD(r.remarcacoes)+" remarcação · ":"remarcou · ")+fmtD(r.remarcado_para),"att"):null,
+    ETAPAS.includes(r.etapa)&&!r.mensagem_enviada?NPUI.marca("mensagem pendente","att"):null,(r.etapa==="D-2"||r.etapa==="D-0")&&!r.boleto_enviado?NPUI.marca("boleto não enviado",r.etapa==="D-0"?"crit":"att"):null,r.sem_contato?NPUI.marca("sem telefone","crit"):null,tarefaMarca(r)];
+  const linha=(r,o={})=>NPUI.linha({id:String(r.id),regua:r.venceu_de_novo||r.dias_atraso>0?"late":r.dias_para===0?"att":null,atual:Z.aberta===r.id,prazo:o.nova?{curta:fmtD(r.remarcado_para),rel:"nova data",exata:"Nova data combinada: "+fmtD(r.remarcado_para)}:{curta:fmtD(r.venc_ef),rel:relVenc(r),exata:vencTxt(r),tom:r.dias_atraso>0?"late":""},titulo:r.cliente_nome,
+    contexto:[r.parcela_txt,o.ctx?o.ctx(r):null,ETAPAS.includes(r.etapa)&&r.mensagem_enviada?"mensagem enviada":null,(r.etapa==="D-2"||r.etapa==="D-0")&&r.boleto_enviado?"boleto enviado":null].filter(Boolean).join(" · "),
+    direita:[...marcas(r),el("span",{class:"np-valor"},R$(r.valor))].filter(Boolean),titleAbrir:"Abrir a cobrança",onOpen:li=>abrir(r,li.querySelector(".np-it-abrir"))});
+  const fim=(label,lista)=>{obra.append(corpo);v.append(obra);Z.painel=NPUI.painel({obra,label,onClose:fecha});const a=Z.aberta&&lista.find(r=>r.id===Z.aberta);if(a)abrir(a,null);else if(Z.aberta)fecha()};
+
+  if(tab==="fin-visao"){
+    const mc=K.mesCob.filter(c=>!excl.has(c.cliente_id)),previsto=soma(mc,c=>c.valor),recebido=soma(mc.filter(c=>c.status==="paga"),c=>c.valor_pago||c.valor),aguard=mc.filter(c=>c.status==="pendente"),venc=mc.filter(c=>c.status==="atrasada");
+    const recup=K.rec.filter(r=>r.situacao!=="aberto"),remDest=K.rem.filter(r=>r.mes_destino===K.mes),nCli=l=>new Set(l.map(c=>c.cliente_id)).size;
+    v.append(barra([{n:nCli(venc),label:nCli(venc)===1?"cliente com parcela vencida":"clientes com parcela vencida",tom:venc.length?"crit":"zero"},{n:rs.filter(r=>ETAPAS.includes(r.etapa)&&!r.mensagem_enviada).length,label:"sem a mensagem da etapa",tom:"att"},{n:rs.filter(r=>r.etapa==="REMARCADO").length,label:"remarcados"}]),sinc());
+    const ind=(val,rot,nota,tom,fn)=>el("button",{type:"button",class:"np-rm-i np-fc-i",onclick:fn,title:"Abrir a página correspondente"},el("b",{class:tom||""},val),el("span",{class:"rot"},rot),nota?el("span",{class:"nota"},nota):null);
+    corpo.append(NPUI.secao(`${mesLabel(K.mes).replace(/^./,c=>c.toUpperCase())} · cobranças do mês no Asaas`,el("div",{class:"np-rm-ind np-fc-ind"},
+      ind(R$(previsto),"faturamento previsto",`${mc.length} cobrança(s), sem os clientes excluídos da régua`,"",()=>ir("fin-regua")),
+      ind(R$(recebido),"recebido",pct(recebido,previsto)+" do previsto","ok",()=>{S.finSub="asaas";ir("financeiro")}),
+      ind(R$(soma(aguard,c=>c.valor)),"aguardando pagamento",`${nCli(aguard)} cliente(s), a vencer`,"",()=>ir("fin-regua")),
+      ind(R$(soma(venc,c=>c.valor)),"vencido",`${nCli(venc)} cliente(s); inclui quem remarcou e ainda não pagou`,venc.length?"crit":"",()=>{K.fRet="todos";ir("fin-retornos")}),
+      ind(R$(soma(recup,r=>r.valor_pago||r.valor)),"recuperado após cobrança",`${recup.length} cobrança(s) pagas depois da mensagem de cobrança`,"",()=>ir("fin-recuperacao")),
+      ind(R$(soma(remDest,r=>r.valor)),"remanescente do mês anterior",`recebido ${R$(soma(remDest.filter(r=>r.situacao==="pago"),r=>r.valor_pago||r.valor))} · a receber ${R$(soma(remDest.filter(r=>r.situacao!=="pago"),r=>r.valor))}`,"",()=>ir("fin-recuperacao")))));
+    const porEtapa=[...ETAPAS,"REMARCADO"].map(e=>[e,rs.filter(r=>r.etapa===e)]),max=Math.max(1,...porEtapa.map(([,x])=>x.length));
+    const pend=[];const semBoleto=rs.filter(r=>(r.etapa==="D-2"||r.etapa==="D-0")&&!r.boleto_enviado);if(semBoleto.length)pend.push([`${semBoleto.length} boleto(s) não enviado(s) de clientes no D-2 ou no D-0`,"crit",()=>{Z.fBol="nao";ir("fin-regua")}]);
+    const semMsg=rs.filter(r=>ETAPAS.includes(r.etapa)&&!r.mensagem_enviada);if(semMsg.length)pend.push([`${semMsg.length} cliente(s) entraram em uma etapa e ainda não receberam a mensagem`,"att",()=>{K.fMsg=true;ir("fin-regua")}]);
+    const remHoje=rs.filter(r=>r.remarcado_para===hoje);if(remHoje.length)pend.push([`${remHoje.length} remarcação(ões) com nova data hoje`,"att",()=>{K.fRet="REMARCOU";ir("fin-retornos")}]);
+    const d7=new Date(hoje+"T12:00:00");d7.setDate(d7.getDate()+7);const remSem=remDest.filter(r=>r.situacao==="aguardando"&&r.nova_data<=d7.toISOString().slice(0,10));if(remSem.length)pend.push([`${remSem.length} remanescente(s) vence(m) nesta semana`,"",()=>ir("fin-recuperacao")]);
+    const tAtras=rs.filter(r=>(r.tarefas||[]).some(t=>(t.status==="aberta"||t.status==="em_andamento")&&t.prazo&&t.prazo<hoje));if(tAtras.length)pend.push([`${tAtras.length} tarefa(s) da régua com prazo vencido`,"crit",()=>{K.fTarefa=true;ir("fin-regua")}]);
+    corpo.append(el("div",{class:"np-rm-duas"},
+      NPUI.secao("Pendências de hoje",pend.length?el("ul",{class:"np-ft-lst np-fc-pend"},pend.map(([t,tom,f])=>el("li",{},el("button",{type:"button",class:"lnk a",onclick:f},t),tom?el("span",{class:"b"},NPUI.marca(tom==="crit"?"resolver hoje":"conferir",tom)):null))):el("p",{class:"np-nota"},"Nenhuma pendência hoje.")),
+      NPUI.secao("Clientes por etapa da régua",el("ul",{class:"np-fc-et"},porEtapa.map(([e,x])=>el("li",{},el("button",{type:"button",onclick:()=>{K.destaque=e;ir("fin-regua")},title:`Abrir a régua em ${e==="REMARCADO"?"Remarcados":e}`},el("span",{class:"e"},e==="REMARCADO"?"Remarcados":e),el("span",{class:"nm"},e==="REMARCADO"?"nova data combinada":NOME_ETAPA[e]),el("span",{class:"t","aria-hidden":"true"},el("span",{class:"f",style:`width:${Math.round(x.length/max*100)}%`})),el("span",{class:"q"},String(x.length)),el("span",{class:"np-valor"},R$(soma(x,r=>r.valor))))))))));
+    obra.append(corpo);v.append(obra);return;
+  }
+
+  if(tab==="fin-regua"){
+    const base=rs.filter(r=>!ql||(r.cliente_nome||"").toLowerCase().includes(ql)),nMsg=base.filter(r=>ETAPAS.includes(r.etapa)&&!r.mensagem_enviada).length,bolNao=base.filter(r=>(r.etapa==="D-2"||r.etapa==="D-0")&&!r.boleto_enviado),nTar=base.filter(r=>r.tarefas_abertas).length;
+    v.append(barra([{n:base.length,label:base.length===1?"cliente na régua":"clientes na régua"},{n:nMsg,label:"com mensagem pendente",tom:nMsg?"att":"zero"},{n:bolNao.length,label:bolNao.length===1?"boleto não enviado":"boletos não enviados",tom:bolNao.length?(bolNao.some(r=>r.etapa==="D-0")?"crit":"att"):"zero"},{n:base.filter(r=>r.etapa==="REMARCADO").length,label:"remarcados"}],[busca()]),sinc());
+    v.append(el("div",{class:"np-cc-fl",role:"group","aria-label":"Filtros da régua"},chip("Só com mensagem pendente",nMsg,!!K.fMsg,()=>{K.fMsg=!K.fMsg;re()}),chip("Só vencidos",base.filter(r=>r.dias_atraso>0).length,!!K.fVenc,()=>{K.fVenc=!K.fVenc;re()}),chip("Só com tarefa aberta",nTar,!!K.fTarefa,()=>{K.fTarefa=!K.fTarefa;re()}),
+      chip("Boleto não enviado",bolNao.length,Z.fBol==="nao",()=>{Z.fBol=Z.fBol==="nao"?"":"nao";re()},"Clientes no D-2 ou no D-0 sem o boleto enviado"),chip("Não encontrados no Chatguru",base.filter(r=>r.sem_contato).length,Z.fBol==="sem",()=>{Z.fBol=Z.fBol==="sem"?"":"sem";re()},"Sem telefone para o envio")));
+    const lista=base.filter(r=>(!K.fMsg||(ETAPAS.includes(r.etapa)&&!r.mensagem_enviada))&&(!K.fVenc||r.dias_atraso>0)&&(!K.fTarefa||r.tarefas_abertas)&&(Z.fBol!=="nao"||((r.etapa==="D-2"||r.etapa==="D-0")&&!r.boleto_enviado))&&(Z.fBol!=="sem"||r.sem_contato));
+    let algum=false;
+    for(const e of [...ETAPAS,"REMARCADO"]){const x=lista.filter(r=>r.etapa===e),rem=e==="REMARCADO";if(!x.length)continue;algum=true;const todos=K.verTodos[e]||x.length<=8,mostra=todos?x:x.slice(0,8);
+      corpo.append(NPUI.grupo({id:"fc-"+e,titulo:(rem?"Remarcados":e+" · "+NOME_ETAPA[e])+" · "+R$(soma(x,r=>r.valor)),n:x.length,tom:rem?"":e.startsWith("D+")?"crit":"",aberto:true,itens:mostra.map(r=>linha(r,{nova:rem}))}));
+      const acoes=[!todos?NPUI.btn(`Ver todos (${x.length})`,{variante:"ghost",onclick:()=>{K.verTodos[e]=true;re()}}):null,!rem?NPUI.btn("Criar tarefa para esta etapa",{title:"Uma tarefa por cliente da etapa",onclick:()=>criarTarefa(x,e)}):null].filter(Boolean);
+      if(acoes.length)corpo.append(el("div",{class:"np-fc-acoes"},acoes))}
+    if(!algum)corpo.append(NPUI.vazio(rs.length?{titulo:"Nenhum cliente com esses filtros",texto:"Confira a busca e os filtros da régua.",acao:"Limpar filtros",onAcao:()=>{K.q="";K.fMsg=K.fVenc=K.fTarefa=false;Z.fBol="";re()}}:{titulo:"Nenhum cliente na régua hoje",texto:"O cliente entra sozinho, pela data: cinco dias antes do vencimento, e sai quando o Asaas confirma o pagamento."}));
+    else corpo.append(NPUI.rodape("O cliente muda de etapa sozinho, pela data do vencimento. Em Remarcados, a data à esquerda é a nova data combinada."));
+    fim("Cobrança na régua",lista);K.destaque=null;return;
+  }
+
+  if(tab==="fin-retornos"){
+    const venc=rs.filter(r=>r.dias_atraso>0||r.etapa==="REMARCADO"),comMsg=venc.filter(r=>r.cobranca_msg_em),semMsg=venc.filter(r=>!r.cobranca_msg_em),rem=venc.filter(r=>r.remarcado_para),nMes=rem.filter(r=>r.remarcado_para.slice(0,7)<=K.mes).length;
+    const est=r=>r.venceu_de_novo?"redo":r.remarcado_para?"REMARCOU":!r.cobranca_msg_em?"semmsg":"semret";
+    const exportar=NPUI.btn("Exportar (.csv)",{title:"Baixa a lista atual, com os filtros aplicados",onclick:()=>{if(!lista.length)return toast("Nada para exportar");exportarCSV("cobrancas-retornos",lista,[{k:"cliente_nome",t:"Cliente"},{k:"valor",t:"Valor vencido"},{k:"dias_atraso",t:"Dias de atraso"},{k:"etapa",t:"Etapa"},{k:"cobranca_msg_em",t:"Mensagem de cobrança",f:x=>x?"Enviada em "+fmtD(x):"Não enviada"},{k:"remarcado_para",t:"Retorno",f:(x,l)=>x?"Remarcou pagamento":l.cobranca_msg_em?"Sem retorno":""},{k:"remarcado_para",t:"Nova data",f:x=>x?fmtD(x):""}]);toast(`${lista.length} linha(s) exportada(s)`)}});
+    v.append(barra([{n:new Set(venc.map(r=>r.chave_cliente)).size,label:"clientes vencidos · "+R$(soma(venc,r=>r.valor)),tom:venc.length?"crit":"zero"},{n:semMsg.length,label:"sem mensagem de cobrança",tom:semMsg.length?"att":"zero"},{n:Math.max(0,comMsg.length-rem.length),label:"sem retorno"},{n:rem.length,label:`remarcações · ${nMes} no mês, ${rem.length-nMes} para o mês seguinte`}],[busca(),exportar]),sinc());
+    const base=venc.filter(r=>!ql||(r.cliente_nome||"").toLowerCase().includes(ql)),F=[["todos","Todos"],["semmsg","Mensagem não enviada"],["semret","Sem retorno"],["REMARCOU","Remarcou pagamento"],["redo","Venceu de novo"]];
+    v.append(el("div",{class:"np-cc-fl",role:"group","aria-label":"Situação do retorno"},F.map(([k,l])=>NPUI.chip({label:l,n:base.filter(r=>k==="todos"||est(r)===k).length,on:K.fRet===k,grupo:"attr",onclick:()=>{K.fRet=k;re()}}))));
+    const lista=base.filter(r=>K.fRet==="todos"||est(r)===K.fRet);
+    const G=[["redo","Venceu de novo: novo contato","crit"],["semmsg","Mensagem de cobrança não enviada","att"],["semret","Mensagem enviada, sem retorno",""],["REMARCOU","Remarcaram o pagamento",""]];
+    for(const [k,tit,tom] of G){const x=lista.filter(r=>est(r)===k);if(x.length)corpo.append(NPUI.grupo({id:"fr-"+k,titulo:tit+" · "+R$(soma(x,r=>r.valor)),n:x.length,tom,aberto:true,itens:x.map(r=>linha(r,{nova:k==="REMARCOU",ctx:r=>[ETAPAS.includes(r.etapa)?r.etapa:null,r.cobranca_msg_em?"cobrança enviada em "+fmtD(r.cobranca_msg_em):null,"próximo passo: "+proximoPasso(r).toLowerCase()].filter(Boolean).join(" · ")}))}))}
+    if(!lista.length)corpo.append(NPUI.vazio(venc.length?{titulo:"Nenhum cliente nesta situação",texto:"Escolha outra situação nos filtros.",acao:"Ver todos",onAcao:()=>{K.fRet="todos";K.q="";re()}}:{titulo:"Nenhum cliente vencido",texto:"Quando uma parcela vence sem pagamento, o cliente aparece aqui para o registro da mensagem de cobrança e do retorno."}));
+    else corpo.append(NPUI.rodape("Quem remarcou continua contando como vencido até o Asaas confirmar o pagamento. \"Pago\" não é marcado à mão."));
+    fim("Cobrança vencida",lista);return;
+  }
+
+  // ----- Recuperação -----
+  const rec=K.rec,cobrado=soma(rec,r=>r.valor),sRec=rec.filter(r=>r.situacao==="recuperado"),sPar=rec.filter(r=>r.situacao==="parcial"),sAb=rec.filter(r=>r.situacao==="aberto"),recup=soma(sRec,r=>r.valor_pago||r.valor),parcial=soma(sPar,r=>r.valor_pago||0),aberto=Math.max(cobrado-recup-parcial,0);
+  const rem=K.rem.filter(r=>r.mes_destino===K.mes),remP=rem.filter(r=>r.situacao==="pago"),remA=rem.filter(r=>r.situacao==="aguardando"),remV=rem.filter(r=>r.situacao==="venceu_de_novo"),remT=soma(rem,r=>r.valor);
+  v.append(barra([{n:R$(recup+parcial),label:"recuperado de "+R$(cobrado)+" cobrados",tom:""},{n:pct(recup+parcial,cobrado),label:"taxa de recuperação"},{n:R$(soma([...remA,...remV],r=>r.valor)),label:"de remanescentes ainda a receber",tom:remV.length?"crit":""}]),sinc());
+  const setSel=k=>{K.sel=K.sel===k?null:k;re()};
+  const seg=(grupo,partes,total)=>{const sel=K.sel&&K.sel.startsWith(grupo+":")?K.sel.slice(2):null,vis=partes.filter(p=>p.valor>0||p.n>0);
+    const tecla=ev=>{if(ev.key!=="ArrowRight"&&ev.key!=="ArrowLeft")return;const bs=[...ev.currentTarget.parentElement.querySelectorAll("button")],i=bs.indexOf(ev.currentTarget),n=bs[(i+(ev.key==="ArrowRight"?1:bs.length-1))%bs.length];if(n){ev.preventDefault();n.focus()}};
+    return el("div",{class:"np-fc-seg"},el("div",{class:"np-fc-bar","aria-hidden":"true"},vis.map(p=>el("span",{class:"p "+p.tom+(sel&&sel!==p.k?" dim":""),style:`flex:${Math.max(p.valor,total*0.02)} 1 0`}))),
+      el("div",{class:"np-fc-leg",role:"group","aria-label":"Partes do gráfico; setas trocam de parte, Enter abre a lista"},partes.map(p=>el("button",{type:"button",class:"np-fc-lg "+p.tom+(sel===p.k?" on":"")+(sel&&sel!==p.k?" dim":""),"aria-pressed":sel===p.k?"true":"false",onclick:()=>setSel(grupo+":"+p.k),onkeydown:tecla},el("span",{class:"c","aria-hidden":"true"}),el("span",{class:"l"},p.label),el("b",{},R$(p.valor)),el("span",{class:"q"},(total?Math.round(p.valor/total*100)+"% · ":"")+p.n+(p.n===1?" cliente":" clientes"))))))};
+  const ind=(val,rot,nota,k)=>el("button",{type:"button",class:"np-rm-i np-fc-i","aria-pressed":K.sel===k?"true":"false",onclick:()=>setSel(k)},el("b",{},val),el("span",{class:"rot"},rot),nota?el("span",{class:"nota"},nota):null);
+  const porEt=["D+1","D+3","D+7","REMARCACAO"].map(e=>({k:"et:"+e,e,x:rec.filter(r=>r.pago_etapa===e&&r.situacao!=="aberto")})),maxEt=Math.max(1,...porEt.map(p=>soma(p.x,r=>r.valor_pago||r.valor)));
+  const selA=K.sel?.startsWith("A:")?K.sel.slice(2):null;
+  corpo.append(el("div",{class:"np-rm-duas"},
+    NPUI.secao("Valores recuperados",el("div",{class:"np-rm-ind np-fc-ind3"},ind(R$(cobrado),"cobrado",`${rec.length} cobrança(s) vencidas com mensagem de cobrança`,"A:todos"),ind(R$(recup+parcial),"recuperado","pago no Asaas depois da mensagem","A:recuperado"),el("div",{class:"np-rm-i"},el("b",{},pct(recup+parcial,cobrado)),el("span",{class:"rot"},"taxa de recuperação"),el("span",{class:"nota"},"recuperado ÷ cobrado"))),
+      rec.length?seg("A",[{k:"recuperado",label:"Recuperado",valor:recup,n:sRec.length,tom:"ok"},{k:"parcial",label:"Recuperado em parte",valor:parcial,n:sPar.length,tom:"att"},{k:"aberto",label:"Ainda em aberto",valor:aberto,n:sAb.length,tom:"crit"}],cobrado):el("p",{class:"np-nota"},"Nenhuma cobrança vencida com mensagem neste mês."),
+      el("h4",{class:"np-fc-h4"},"Recuperado por etapa em que o cliente pagou"),el("ul",{class:"np-fc-et"},porEt.map(p=>{const val=soma(p.x,r=>r.valor_pago||r.valor);return el("li",{},el("button",{type:"button","aria-pressed":selA===p.k?"true":"false",class:selA===p.k?"on":"",onclick:()=>setSel("A:"+p.k)},el("span",{class:"e"},p.e==="REMARCACAO"?"Após remarcação":p.e),el("span",{class:"nm"},p.e==="REMARCACAO"?"pagou na nova data":NOME_ETAPA[p.e]),el("span",{class:"t","aria-hidden":"true"},el("span",{class:"f",style:`width:${Math.round(val/maxEt*100)}%`})),el("span",{class:"q"},String(p.x.length)),el("span",{class:"np-valor"},R$(val))))}))),
+    NPUI.secao("Remanescentes do mês anterior",el("div",{class:"np-rm-ind np-fc-ind3"},ind(R$(remT),"remarcado para este mês",`de ${mesLabel(mesAdd(K.mes,-1)).split(" de ")[0]} para ${mesLabel(K.mes).split(" de ")[0]} · ${rem.length} cliente(s)`,"B:todos"),ind(R$(soma(remP,r=>r.valor_pago||r.valor)),"já recebido",`${remP.length} cliente(s)`,"B:pago"),ind(R$(soma([...remA,...remV],r=>r.valor)),"ainda a receber",`${remA.length} aguardando · ${remV.length} venceu de novo`,"B:areceber")),
+      rem.length?seg("B",[{k:"pago",label:"Pago",valor:soma(remP,r=>r.valor),n:remP.length,tom:"ok"},{k:"aguardando",label:"Aguardando",valor:soma(remA,r=>r.valor),n:remA.length,tom:"att"},{k:"venceu_de_novo",label:"Venceu de novo",valor:soma(remV,r=>r.valor),n:remV.length,tom:"crit"}],remT):el("p",{class:"np-nota"},"Nenhum remanescente do mês anterior."),
+      el("p",{class:"np-nota np-rm-frase"},"Remanescente é só o que o cliente remarcou do mês anterior para este; não soma inadimplência com valores a vencer."))));
+  if(K.sel){const [g,...kk]=K.sel.split(":"),k=kk.join(":");let lst=[],tit="";const SIT={recuperado:["recuperado","ok"],parcial:["recuperado em parte","att"],aberto:["ainda em aberto","crit"],pago:["pago","ok"],aguardando:["aguardando","att"],venceu_de_novo:["venceu de novo","crit"]};
+    if(g==="A"){lst=k==="todos"?rec:k.startsWith("et:")?rec.filter(r=>r.pago_etapa===k.slice(3)&&r.situacao!=="aberto"):rec.filter(r=>r.situacao===k);tit=k==="todos"?"Cobrado":k.startsWith("et:")?(k.slice(3)==="REMARCACAO"?"Recuperado após remarcação":"Recuperado no "+k.slice(3)):({recuperado:"Recuperado",parcial:"Recuperado em parte",aberto:"Ainda em aberto"})[k]}
+    else{lst=k==="todos"?rem:k==="areceber"?[...remA,...remV]:rem.filter(r=>r.situacao===k);tit=({todos:"Remarcado para este mês",pago:"Remanescentes pagos",aguardando:"Remanescentes aguardando",venceu_de_novo:"Remanescentes que venceram de novo",areceber:"Remanescentes ainda a receber"})[k]}
+    const val=g==="A"&&k!=="todos"&&k!=="aberto"?soma(lst,r=>r.valor_pago||r.valor):soma(lst,r=>r.valor);
+    const cols=g==="A"?[{k:"cliente_nome",t:"Cliente"},{k:"valor",t:"Valor cobrado"},{k:"cobranca_msg_em",t:"Cobrado em"},{k:"pago_etapa",t:"Etapa em que pagou"},{k:"pago_em",t:"Pago em"},{k:"valor_pago",t:"Valor recuperado"},{k:"situacao",t:"Situação"}]:[{k:"cliente_nome",t:"Cliente"},{k:"mes_origem",t:"Mês de origem"},{k:"valor",t:"Valor"},{k:"vencimento_original",t:"Vencimento original"},{k:"nova_data",t:"Nova data"},{k:"situacao",t:"Situação"}];
+    const li=r=>g==="A"?NPUI.linha({id:"rc:"+(r.id||r.cobranca_id||r.cliente_nome),prazo:{curta:r.pago_em?fmtD(r.pago_em):"—",rel:r.pago_em?"pago em":"sem pagamento",exata:r.pago_em?"Pago em "+fmtD(r.pago_em):"Sem pagamento"},titulo:r.cliente_nome,contexto:[`cobrado ${R$(r.valor)}`,r.cobranca_msg_em?"mensagem em "+fmtD(r.cobranca_msg_em):null,r.pago_etapa?"pagou "+(r.pago_etapa==="REMARCACAO"?"após remarcação":"no "+r.pago_etapa):null].filter(Boolean).join(" · "),direita:[NPUI.marca(...(SIT[r.situacao]||[r.situacao,""])),el("span",{class:"np-valor"},R$(r.situacao==="aberto"?r.valor:(r.valor_pago||r.valor)))],titleAbrir:"Cobrança"})
+      :NPUI.linha({id:"rm:"+(r.id||r.cobranca_id||r.cliente_nome),regua:r.situacao==="venceu_de_novo"?"late":null,prazo:{curta:fmtD(r.nova_data),rel:"nova data",exata:"Nova data: "+fmtD(r.nova_data)},titulo:r.cliente_nome,contexto:[r.mes_origem?"de "+mesLabel(String(r.mes_origem).slice(0,7)).split(" de ")[0]:null,r.vencimento_original?"vencimento original "+fmtD(r.vencimento_original):null,r.situacao==="venceu_de_novo"?"voltou para a régua no D+1":null].filter(Boolean).join(" · "),direita:[NPUI.marca(...(SIT[r.situacao]||[r.situacao,""])),el("span",{class:"np-valor"},R$(r.valor))],titleAbrir:"Remanescente"});
+    corpo.append(el("div",{class:"np-fc-selh",id:"fc3-sel"},el("h3",{},`${tit} · ${lst.length} ${lst.length===1?"cliente":"clientes"} · ${R$(val)}`),el("div",{class:"np-ft-bts"},NPUI.btn("Exportar (.csv)",{onclick:()=>{if(!lst.length)return toast("Nada para exportar");exportarCSV("recuperacao-"+K.sel.replace(/[^a-z0-9]+/gi,"-").toLowerCase(),lst,cols);toast(`${lst.length} linha(s) exportada(s)`)}}),NPUI.btn("Limpar seleção",{variante:"ghost",onclick:()=>{K.sel=null;re()}}))),
+      lst.length?NPUI.grupo({id:"fc-sel",titulo:"Clientes que compõem este número",n:lst.length,aberto:true,itens:lst.map(li)}):NPUI.vazio({titulo:"Nenhum cliente nesta parte",texto:"Escolha outra parte do gráfico."}))}
+  else corpo.append(el("p",{class:"np-nota np-rm-frase"},"Clique em um número ou em uma parte do gráfico para ver os clientes que o compõem."));
+  obra.append(corpo);v.append(obra);
+}
+
 function renderVisao(v){
   v.append(head("Visão geral","Resumo do mês e pendências do dia."),subnav("fin-visao"));if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const rs=regua();const mesCob=K.mesCob;const excl=new Set(K.regua.filter(r=>r.excluida).map(r=>r.cliente_id));
@@ -204,7 +343,7 @@ function renderRecuperacao(v){
 }
 
 /* ---------- integração com o shell ---------- */
-{const _r=render;render=function(){_r();for(const t of TABS){const v=$("#view-"+t);if(!v)continue;if(!podeFin()&&S.tab===t)S.tab="clientes";v.hidden=S.tab!==t;if(S.tab===t){v.replaceChildren();if(K.erro&&/v_regua_cobranca|v_fin_/.test(K.erro))v.append(el("div",{class:"card",style:"padding:10px 14px;border-left:3px solid var(--warn);margin-bottom:10px"},"Rode a migração 0105 para ativar o controle financeiro."));({"fin-visao":renderVisao,"fin-regua":renderRegua,"fin-retornos":renderRetornos,"fin-recuperacao":renderRecuperacao})[t](v)}}}}
+{const _r=render;render=function(){_r();for(const t of TABS){const v=$("#view-"+t);if(!v)continue;if(!podeFin()&&S.tab===t)S.tab="clientes";v.hidden=S.tab!==t;if(S.tab===t){v.replaceChildren();if(K.erro&&/v_regua_cobranca|v_fin_/.test(K.erro))v.append(el("div",{class:"card",style:"padding:10px 14px;border-left:3px solid var(--warn);margin-bottom:10px"},"Rode a migração 0105 para ativar o controle financeiro."));if(v3())finV3(v,t);else{v.classList.remove("np-v3");({"fin-visao":renderVisao,"fin-regua":renderRegua,"fin-retornos":renderRetornos,"fin-recuperacao":renderRecuperacao})[t](v)}}}}}
 const css=document.createElement("style");css.textContent=`
 .kpi.clicavel{cursor:pointer}.kpi.clicavel:hover{border-color:var(--gold)}
 .fc-bars{display:flex;flex-direction:column;gap:6px;margin-top:8px}.fc-bar{display:grid;grid-template-columns:90px 1fr 36px;gap:10px;align-items:center;background:none;border:0;padding:4px 0;text-align:left;font:inherit;color:inherit;cursor:pointer}.fc-bar:hover .fc-bar-f{background:var(--ch-b)}

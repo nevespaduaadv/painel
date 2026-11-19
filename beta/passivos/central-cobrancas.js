@@ -405,11 +405,14 @@
   const S0 = S;
   function barraSub() {
     const SUBS = [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]];
-    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS, S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
+    // V3.1 (19/11): a Central de Cobranças foi retirada da navegação por decisão das sócias — o Controle Financeiro a substitui. A integração com o Asaas continua (cobranças, clientes, conta).
+    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS.filter(([k]) => k !== "central"), S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
     return el("div", { class: "tabs", style: "margin-bottom:10px" }, SUBS.map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
   }
   try { S0.finSub = localStorage.getItem("pp-fin-sub") || "asaas"; } catch (_) { S0.finSub = "asaas"; }
-  { const _r = render; render = function () { _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } if (!(S0.finSub === "central" && v3())) vf.prepend(barraSub()); }; }
+  const semCentral = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  if (semCentral() && S0.finSub === "central") S0.finSub = "asaas";
+  { const _r = render; render = function () { if (semCentral() && S0.finSub === "central") { S0.finSub = "asaas"; try { localStorage.setItem("pp-fin-sub", "asaas"); } catch (_) {} } _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } if (!(S0.finSub === "central" && v3())) vf.prepend(barraSub()); }; }
   // ---------- V10 · Clientes (Asaas) e Conta/Parâmetros em V3.1 — mesmos dados e mesmas ações da V2 ----------
   const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
   const W3 = { aberta: null, painel: null, f: "" };
@@ -694,7 +697,7 @@
       W3.painel.abrir({ trilha: [el("span", {}, "Cliente no Asaas")], titulo: c.nome || c.asaas_id, id: String(c.asaas_id), origem,
         corpo: [NPUI.props([["Ficha no sistema", c.cliente_id ? el("a", { href: "#clientes/" + encodeURIComponent(c.cliente_id), onclick: (e) => { e.preventDefault(); S.tab = "clientes"; S.sel = c.cliente_id; S.sub = "financeiro"; render(); } }, cli?.nome || c.cliente_id) : NPUI.marca("sem vínculo", "att")],
           ["CPF/CNPJ", c.cpf_cnpj || null], ["Telefone", c.telefone || null], ["E-mail", c.email || null], ["Em aberto", ab.length ? `${ab.length} · ${R$(soma(ab))}` : "nenhuma", "serif"], ["Vencidas", venc.length ? [String(venc.length), " ", NPUI.marca(R$(soma(venc)), "crit")] : "nenhuma"], ["Pagas", String(pagas)], ["Asaas", c.asaas_id]].filter((x) => x[1] != null))],
-        pe: [el("a", { class: "np-btn", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas"), NPUI.btn("Histórico de cobrança", { variante: "ghost", onclick: () => { C.aba = "historico"; C.histCli = c.asaas_id; S0.finSub = "central"; render(); } })] }); };
+        pe: [el("a", { class: "np-btn", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas")] }); };
     if (!linhas.length) corpo.append(NPUI.vazio(!todas.length ? { titulo: "Nenhum cliente do Asaas", texto: "A lista vem da sincronização diária com o Asaas." } : { titulo: "Nada com esses filtros", texto: "Tire um filtro ou limpe a busca.", acao: "Limpar", onAcao: () => { W3.f = ""; C.asaasQ = ""; render(); } }));
     else { const LIM = 500, mostra = linhas.slice(0, LIM);
       for (const [k, l, tom, fn] of [["venc", "Com cobrança vencida", "crit", (x) => x.venc.length], ["ab", "Com cobrança em aberto", "", (x) => !x.venc.length && x.ab.length], ["sem", "Sem cobrança em aberto", "", (x) => !x.ab.length]]) { const its = mostra.filter(fn); if (its.length) corpo.append(NPUI.grupo({ id: "asc-" + k, titulo: l, n: its.length, tom, aberto: k !== "sem", itens: its.map(linha) })); }
