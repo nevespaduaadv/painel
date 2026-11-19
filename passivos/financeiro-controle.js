@@ -155,7 +155,7 @@ function finV3(v,tab){
     const ind=(val,rot,nota,tom,fn)=>el("button",{type:"button",class:"np-rm-i np-fc-i",onclick:fn,title:"Abrir a página correspondente"},el("b",{class:tom||""},val),el("span",{class:"rot"},rot),nota?el("span",{class:"nota"},nota):null);
     corpo.append(NPUI.secao(`${mesLabel(K.mes).replace(/^./,c=>c.toUpperCase())} · cobranças do mês no Asaas`,el("div",{class:"np-rm-ind np-fc-ind"},
       ind(R$(previsto),"faturamento previsto",`${mc.length} cobrança(s), sem os clientes excluídos da régua`,"",()=>ir("fin-regua")),
-      ind(R$(recebido),"recebido",pct(recebido,previsto)+" do previsto","ok",()=>ir("fin-recuperacao")),
+      ind(R$(recebido),"recebido",pct(recebido,previsto)+" do previsto","ok",()=>{S.finSub="asaas";ir("financeiro")}),
       ind(R$(soma(aguard,c=>c.valor)),"aguardando pagamento",`${nCli(aguard)} cliente(s), a vencer`,"",()=>ir("fin-regua")),
       ind(R$(soma(venc,c=>c.valor)),"vencido",`${nCli(venc)} cliente(s); inclui quem remarcou e ainda não pagou`,venc.length?"crit":"",()=>{K.fRet="todos";ir("fin-retornos")}),
       ind(R$(soma(recup,r=>r.valor_pago||r.valor)),"recuperado após cobrança",`${recup.length} cobrança(s) pagas depois da mensagem de cobrança`,"",()=>ir("fin-recuperacao")),
@@ -181,7 +181,7 @@ function finV3(v,tab){
     let algum=false;
     for(const e of [...ETAPAS,"REMARCADO"]){const x=lista.filter(r=>r.etapa===e),rem=e==="REMARCADO";if(!x.length)continue;algum=true;const todos=K.verTodos[e]||x.length<=8,mostra=todos?x:x.slice(0,8);
       corpo.append(NPUI.grupo({id:"fc-"+e,titulo:(rem?"Remarcados":e+" · "+NOME_ETAPA[e])+" · "+R$(soma(x,r=>r.valor)),n:x.length,tom:rem?"":e.startsWith("D+")?"crit":"",aberto:true,itens:mostra.map(r=>linha(r,{nova:rem}))}));
-      const acoes=[!todos?NPUI.btn(`Ver todos (${x.length})`,{variante:"ghost",onclick:()=>{K.verTodos[e]=true;re()}}):null,!rem?NPUI.btn("Criar tarefa para esta etapa",{title:"Uma tarefa por cliente da etapa",onclick:()=>criarTarefa(x,e)}):null,!rem&&x.some(r=>!r.mensagem_enviada)?NPUI.btn("Enviar mensagem para os pendentes",{title:"Abre os envios da régua nesta etapa; nada sai sem aprovação",onclick:()=>{S.finSub="central";try{localStorage.setItem("pp-fin-sub","central")}catch(_){}ir("financeiro")}}):null].filter(Boolean);
+      const acoes=[!todos?NPUI.btn(`Ver todos (${x.length})`,{variante:"ghost",onclick:()=>{K.verTodos[e]=true;re()}}):null,!rem?NPUI.btn("Criar tarefa para esta etapa",{title:"Uma tarefa por cliente da etapa",onclick:()=>criarTarefa(x,e)}):null].filter(Boolean);
       if(acoes.length)corpo.append(el("div",{class:"np-fc-acoes"},acoes))}
     if(!algum)corpo.append(NPUI.vazio(rs.length?{titulo:"Nenhum cliente com esses filtros",texto:"Confira a busca e os filtros da régua.",acao:"Limpar filtros",onAcao:()=>{K.q="";K.fMsg=K.fVenc=K.fTarefa=false;Z.fBol="";re()}}:{titulo:"Nenhum cliente na régua hoje",texto:"O cliente entra sozinho, pela data: cinco dias antes do vencimento, e sai quando o Asaas confirma o pagamento."}));
     else corpo.append(NPUI.rodape("O cliente muda de etapa sozinho, pela data do vencimento. Em Remarcados, a data à esquerda é a nova data combinada."));
