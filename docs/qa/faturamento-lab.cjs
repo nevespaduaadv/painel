@@ -1,8 +1,9 @@
-/* Laboratório da V10 — Financeiro → Contratos e faturamento em V3.1 (solicitações, contratos de honorários, comissões).
+/* Laboratório do Financeiro → Contratos e faturamento (19/11, 12h).
+   Decisão das sócias: na casca nova, o Financeiro tem só as quatro páginas da especificação do setor; Contratos e faturamento sai da
+   navegação. Na casca antiga, nada muda (igual à produção).
    Playwright + Chromium locais; servidor e fixtures fictícias do integracoes-lab. TODA chamada a *.supabase.co é interceptada.
    Uso: NODE_PATH=<módulos> node docs/qa/faturamento-lab.cjs [pasta de saída]  (padrão /tmp/faturamento-lab)
-   Verifica: totais contra os registros, grupos e filtros, painel de cada área, faturar e cancelar em dois passos (uma chamada à
-   função do banco), marcar comissão paga com data, estados vazios, V2 intacta e as 8 combinações. */
+   Verifica: casca nova sem a tela (endereço antigo abre a Visão geral, sem gravar); casca antiga com a tela como estava. */
 const fs = require('fs'); const path = require('path');
 const OUT = process.argv[2] || '/tmp/faturamento-lab'; fs.mkdirSync(OUT, { recursive: true });
 const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.cjs'), 'utf8');
@@ -45,53 +46,14 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
 const aba = async (pg, rot) => { await pg.click(V + ' .np-cc-abas button:text-is("' + rot + '")'); await pg.waitForTimeout(600); };
 (async () => {
   const srv = await servir(); const b = await chromium.launch();
-  rel.push('1. Contratos e faturamento — solicitações (perfil administradora, 1440 px)');
-  { const { ctx, pg, erros, escritas } = await abrir(b, {}); let e = await estado(pg);
-    const R = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\u00a0/g, ' '); const res = (e.resumo || '').replace(/\u00a0/g, ' ');
-    if (/^1 solicitação em análise/.test(res) && res.includes(R(3000)) && /1 autorizada a faturar/.test(res) && res.includes(R(900) + ' faturado no mês') && res.includes(R(120) + ' em comissões previstas')) ok(`totais conferem com os registros: "${e.resumo}"`); else falha('resumo: ' + e.resumo);
-    if (e.abas.join('|') === 'Solicitações*|Contratos de honorários|Comissões' && e.chips[0] === 'Em aberto2*' && e.chips.length === 6 && e.grupos.length === 2 && /^Em análise/.test(e.grupos[0]) && /:sf:sf1$/.test(e.grupos[0]) && /^Autorizadas, a faturar/.test(e.grupos[1]) && !e.tabela && !e.pilulas && !e.ruim) ok('três áreas; seis filtros de situação; em aberto mostra "Em análise" e "Autorizadas, a faturar"; sem tabela nem pílula'); else falha('lista: ' + JSON.stringify(e));
-    await pg.click(`${V} li.np-it[data-id="sf:sf2"] .np-it-abrir`); await pg.waitForTimeout(800); let p = await painel(pg);
-    let n0 = escritas.length; await pg.click(V + ' .np-painel .np-btn:text-is("Faturar")'); await pg.waitForTimeout(500); const umClique = escritas.length === n0; const p2 = await painel(pg);
-    await pg.click(V + ' .np-painel .np-btn:has-text("Confirmar: gerar 3 cobrança(s)")'); await pg.waitForTimeout(800); let w = escritas.slice(n0);
-    if (p && p.titulo === 'Alfa Fictícia Ltda' && /1\.500,00 em 3 parcelas/.test(p.props['Valor']) && /Marina Teste/.test(p.props['Decisão']) && p.secoes.join('|') === 'Parcelas|Descrição|Comissões' && p.mais === 'Dados da solicitação' && !('Forma' in p.principais) && p.itens === 4 && p.botoes.join('|') === 'Faturar|Cancelar a solicitação' && umClique && w.length === 1 && /rpc\/sf_faturar/.test(w[0]) && /"p_id":"sf2"/.test(w[0])) ok('painel da solicitação autorizada: valor, decisão, parcelas e comissões; faturar exige dois cliques e faz uma única chamada à função do banco'); else falha('faturar: ' + JSON.stringify([p, p2 && p2.botoes, umClique, w]));
-    await pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 }); await pg.waitForTimeout(400);
-    await pg.click(`${V} li.np-it[data-id="sf:sf1"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
-    n0 = escritas.length; await pg.click(V + ' .np-painel .np-btn:text-is("Cancelar a solicitação")'); await pg.waitForTimeout(500); const semEscrita = escritas.length === n0; await pg.fill('#ft3-mot', 'Teste fictício'); await pg.click(V + ' .np-painel .np-btn:text-is("Confirmar o cancelamento")'); await pg.waitForTimeout(800); w = escritas.slice(n0);
-    if (p && p.botoes.join('|') === 'Autorizar|Não autorizar|Cancelar a solicitação' && semEscrita && w.length === 1 && /rpc\/sf_cancelar/.test(w[0]) && /"p_motivo":"Teste fictício"/.test(w[0])) ok('solicitação em análise: autorizar, não autorizar e cancelar; o cancelamento pede o motivo no próprio painel antes de gravar'); else falha('cancelar: ' + JSON.stringify([p && p.botoes, semEscrita, w]));
-    await pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 }); await pg.waitForTimeout(400);
-    await pg.click(V + ' .np-cc-fl button:has-text("Todas")'); await pg.waitForTimeout(500); e = await estado(pg);
-    if (e.grupos.length === 4 && /^Faturadas/.test(e.grupos[2]) && /^Canceladas/.test(e.grupos[3])) ok('filtro "Todas": quatro situações em grupos, as encerradas fechadas'); else falha('todas: ' + JSON.stringify(e.grupos));
-    rel.push('2. Contratos de honorários e comissões');
-    await aba(pg, 'Contratos de honorários'); e = await estado(pg);
-    await pg.click(`${V} li.np-it[data-id="ch:ch1"] .np-it-abrir`); await pg.waitForTimeout(800); p = await painel(pg);
-    if (e.chips[0] === 'Ativos e assinados1*' && e.grupos.length === 1 && /^Ativo/.test(e.grupos[0]) && !e.tabela && p && p.titulo === 'Alfa Fictícia Ltda' && /7\.000,00/.test(p.props['Valor total']) && /10 × /.test(p.props['Parcelas']) && p.props['Êxito'] === '10%' && p.secoes.some(s => /^Aditivos · 1/.test(s)) && p.secoes.some(s => /^Solicitações de faturamento · 2/.test(s)) && p.botoes.join('|') === 'Solicitar faturamento|Editar|Novo aditivo') ok('contratos: filtro por situação, grupo por status; o painel traz honorários, vigência, aditivos, solicitações do contrato e as três ações'); else falha('contratos: ' + JSON.stringify([e.chips, e.grupos, p]));
-    await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await aba(pg, 'Comissões'); e = await estado(pg);
-    await pg.click(`${V} li.np-it .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
-    n0 = escritas.length; await pg.click(V + ' .np-painel .np-btn:text-is("Marcar as liberadas como pagas")'); await pg.waitForTimeout(500); const semE = escritas.length === n0; const temData = await pg.evaluate(() => !!document.querySelector('#ft3-dt')?.value);
-    await pg.click(V + ' .np-painel .np-btn:has-text("Confirmar:")'); await pg.waitForTimeout(800); w = escritas.slice(n0);
-    if (e.grupos.length === 1 && /liberado/.test(e.grupos[0]) && p && p.titulo === 'Marina Teste' && /72,00/.test(p.props['Liberada']) && /120,00/.test(p.props['Prevista']) && p.itens === 2 && semE && temData && w.length === 1 && /PATCH \/rest\/v1\/comissoes/.test(w[0]) && /"status":"paga"/.test(w[0]) && /k1/.test(w[0]) && !/k2/.test(w[0])) ok('comissões: uma linha por colaborador e mês com prevista, liberada e paga separadas; marcar pagas pede a data e altera só as liberadas'); else falha('comissões: ' + JSON.stringify([e.grupos, p, semE, temData, w]));
-    if (!escritas.some(x => /functions\/v1|asaas|chatguru|regua_/.test(x))) ok('em toda a sessão: nenhuma chamada ao Asaas, à régua ou a mensageria'); else falha('externas: ' + JSON.stringify(escritas));
-    if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3))); await ctx.close(); }
-  { const { ctx, pg, erros } = await abrir(b, { vazio: true }); const vz = [];
-    for (const a of ['Solicitações', 'Contratos de honorários', 'Comissões']) { await aba(pg, a); const e = await estado(pg); vz.push({ a, vazio: (e.vazio || '').slice(0, 50), ruim: e.ruim, tabela: e.tabela }); }
-    if (vz.every(x => x.vazio && !x.ruim && !x.tabela) && !erros.length) ok('sem registros: as três áreas explicam o vazio e oferecem a próxima ação'); else falha('vazios: ' + JSON.stringify([vz, erros.slice(0, 2)])); await ctx.close(); }
+  rel.push('1. Casca nova: Contratos e faturamento fora do Financeiro');
+  { const r = await contexto(b, { hash: '#faturamento', extraLS: { 'pp-tab': 'faturamento' } });
+    await r.pg.waitForFunction(() => typeof PP !== 'undefined' && PP.perfil && document.querySelector('#login')?.hidden && typeof S !== 'undefined', null, { timeout: 20000 }); await r.pg.evaluate(() => { S.tab = 'faturamento'; render(); }); await r.pg.waitForTimeout(900);
+    const e = await r.pg.evaluate(() => ({ tab: S.tab, menu: [...document.querySelectorAll('#np-tree .tab[data-tab]')].map(b => b.dataset.tab), vis: !!document.querySelector('#view-faturamento:not([hidden])') }));
+    if (e.tab === 'fin-visao' && !e.menu.includes('faturamento') && !e.vis && !r.escritas.length && !r.erros.length) ok('o endereço antigo abre a Visão geral do Financeiro; Contratos e faturamento fora do menu'); else falha('casca nova: ' + JSON.stringify([e, r.escritas.slice(0, 2), r.erros.slice(0, 2)])); await r.ctx.close(); }
+  rel.push('2. Casca antiga igual à produção');
   { const { ctx, pg, erros } = await abrir(b, { casca: 'v2' }); const e = await estado(pg);
-    if (e.h1v2 === 'Contratos e faturamento' && e.tabela && !e.abas.length && !erros.length) ok('V2 intacta: a tela segue como estava'); else falha('V2: ' + JSON.stringify([e.h1v2, e.tabela, e.abas, erros.slice(0, 2)])); await ctx.close(); }
-  rel.push('3. 375 / 768 / 1024 / 1440 × claro / escuro — lista e painel');
-  for (const w of [375, 768, 1024, 1440]) for (const tema of ['light', 'dark']) {
-    const { ctx, pg, erros } = await abrir(b, { w, h: w < 800 ? 780 : 900, tema }); const l1 = await lateral(pg);
-    const m = await medirContraste(pg, [{ sel: V + ' .np-resumo b', nome: 'número' }, { sel: V + ' .np-resumo span', nome: 'rótulo' }, { sel: V + ' .np-grp-h .t', nome: 'grupo' }, { sel: V + ' li.np-it .np-it-abrir .tx', nome: 'cliente' }, { sel: V + ' li.np-it .np-it-abrir .ctx', nome: 'contexto' }, { sel: V + ' li.np-it .np-valor', nome: 'valor' }, { sel: V + ' .np-cc-abas .np-seg button', nome: 'área' }, { sel: V + ' .np-cc-fl .np-chipf', nome: 'filtro' }]);
-    let alv = []; if (w === 375) alv = (await medirAlvos(pg, V)).filter(a => a.h < 44 && !/np-it$|np-check/.test(a.nome));
-    await pg.screenshot({ path: path.join(OUT, `faturamento-${w}-${tema}.png`) });
-    await pg.click(`${V} li.np-it[data-id="sf:sf2"] .np-it-abrir`); await pg.waitForTimeout(800); const l2 = await lateral(pg);
-    const mp = await medirContraste(pg, [{ sel: V + ' .np-painel .np-props dt', nome: 'rótulo' }, { sel: V + ' .np-painel .np-props dd', nome: 'valor' }, { sel: V + ' .np-painel .np-ft-lst .a', nome: 'parcela' }, { sel: V + ' .np-painel .np-btn', nome: 'botão' }]);
-    let alvP = []; if (w === 375) alvP = (await medirAlvos(pg, V + ' .np-painel')).filter(a => a.h < 44);
-    await pg.screenshot({ path: path.join(OUT, `faturamento-${w}-${tema}-painel.png`) });
-    if (w === 1440 && tema === 'light') { await pg.keyboard.press('Escape'); await aba(pg, 'Contratos de honorários'); await pg.click(`${V} li.np-it[data-id="ch:ch1"] .np-it-abrir`); await pg.waitForTimeout(800); await pg.screenshot({ path: path.join(OUT, 'faturamento-contratos.png') }); await pg.keyboard.press('Escape'); await aba(pg, 'Comissões'); await pg.click(`${V} li.np-it .np-it-abrir`); await pg.waitForTimeout(700); await pg.screenshot({ path: path.join(OUT, 'faturamento-comissoes.png') }); }
-    const ruins = [...m.ruins, ...mp.ruins], aus = [...m.ausentesObrigatorios, ...mp.ausentesObrigatorios];
-    if (l1 <= 0 && l2 <= 0 && !ruins.length && !aus.length && !alv.length && !alvP.length && !erros.length) ok(`${w} px ${tema}: sem rolagem lateral, contraste mínimo ${Math.min(m.minimo, mp.minimo).toFixed(2)}:1 em ${m.medidos.length + mp.medidos.length} medições${w === 375 ? ', alvos de toque ≥ 44 px' : ''}`);
-    else falha(`${w} ${tema}: lateral ${l1}/${l2} · contraste ${JSON.stringify(ruins.slice(0, 4))} · ausentes ${JSON.stringify(aus)} · alvos ${JSON.stringify([...alv, ...alvP].slice(0, 6))} · erros ${JSON.stringify(erros.slice(0, 2))}`);
-    await ctx.close(); }
+    if (e.h1v2 === 'Contratos e faturamento' && e.tabela && !e.abas.length && !erros.length) ok('Contratos e faturamento: a tela segue como estava'); else falha('V2: ' + JSON.stringify([e.h1v2, e.tabela, e.abas, erros.slice(0, 2)])); await ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.'); fs.writeFileSync(path.join(OUT, 'relatorio.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
