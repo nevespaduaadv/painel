@@ -75,7 +75,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     const r = {};
     for (const casca of ['v2', 'v3']) { const { ctx, pg, erros } = await contexto(b, { perfil, casca, w: 1440, h: 900, tema: 'light' }); r[casca] = await destinos(pg); r[casca].erros = erros; await ctx.close(); }
     // destinos que só existem na casca V3.1 (visão transversal; na V2 o mesmo conteúdo vive na ficha do cliente). Cada um exige o acesso da sua área.
-    const SO_V3 = { acompanhamento: 'clientes' };
+    const SO_V3 = { acompanhamento: 'clientes', 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro' }; // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
     const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t));
     const extrasOk = extras.every(t => SO_V3[t] && r.v2.tabs.includes(SO_V3[t])) && Object.keys(SO_V3).every(t => !r.v2.tabs.includes(SO_V3[t]) || extras.includes(t));
     const a = JSON.stringify(r.v2.tabs), c = JSON.stringify(r.v3.tabs);
