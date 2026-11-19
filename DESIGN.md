@@ -253,3 +253,6 @@ Contraste ≥ 4,5:1 texto e ≥ 3:1 componentes nos dois temas (medido no DOM). 
 - Toda tela nova parte dos componentes da seção 5; componente novo é proposto aqui antes de entrar.
 - Toda alteração visual passa por: captura em 375/768/1024/1440 × claro/escuro, medição de contraste, teclado, `prefers-reduced-motion`, perfil de teste `teste.juridico@…`.
 - Versões: V1 → V2 → V2.1 → V2.2 → V3 → **V3.1 (vigente)**. Histórico em `claude/motion-design-system-neves-padua.md` e documentos seguintes.
+
+### Central de Cobranças retirada também da casca antiga (19/11)
+Decisão das sócias: a Central sai da navegação nas duas cascas e os envios em lote não serão usados. Na casca antiga, o Financeiro mostra só Cobranças (Asaas), Clientes (Asaas) e Conta; saíram os atalhos "Central de disparos", "Enviar mensagem para todos os pendentes" (Régua) e "Histórico" (Clientes no Asaas). O código da Central e os objetos do banco não foram removidos.

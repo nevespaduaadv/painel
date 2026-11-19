@@ -80,7 +80,12 @@ const R = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' 
     for (const t of VS) { await ir(pg, t); const e = await estado(pg, t); vz.push({ t, vazio: (e.vazio || '').slice(0, 40), ruim: e.ruim, tabela: e.tabela }); }
     if (vz.every(x => !x.ruim && !x.tabela) && vz[1].vazio && vz[2].vazio && !erros.length) ok('sem registros: as quatro páginas abrem sem erro de valor; régua e retornos explicam o vazio'); else falha('vazios: ' + JSON.stringify([vz, erros.slice(0, 2)])); await ctx.close(); }
   { const { ctx, pg, erros } = await abrir(b, { casca: 'v2' }); const e = await estado(pg, 'fin-visao');
-    if (e.h1v2 === 'Visão geral' && e.abasV2 === 4 && !e.v3 && !erros.length) ok('V2 intacta: a tela segue como estava'); else falha('V2: ' + JSON.stringify([e.h1v2, e.abasV2, e.v3, erros.slice(0, 2)])); await ctx.close(); }
+    if (e.h1v2 === 'Visão geral' && e.abasV2 === 4 && !e.v3 && !erros.length) ok('V2 intacta: a tela segue como estava'); else falha('V2: ' + JSON.stringify([e.h1v2, e.abasV2, e.v3, erros.slice(0, 2)]));
+    const pgs = []; for (const t of VS) { await ir(pg, t); pgs.push(await pg.evaluate((t) => { const v = document.querySelector('#view-' + t); return { h1: !!v.querySelector('.head h1'), central: /Central de/i.test(v.textContent), txt: v.textContent.length }; }, t)); }
+    await pg.evaluate(() => { try { localStorage.setItem('pp-fin-sub', 'central'); } catch (_) {} S.finSub = 'central'; S.tab = 'financeiro'; render(); }); await pg.waitForTimeout(900);
+    const f2 = await pg.evaluate(() => ({ subs: [...document.querySelectorAll('#view-financeiro .tabs .tab')].map(b => b.textContent.trim()), sub: S.finSub, central: /Central de Cobran/i.test(document.querySelector('#view-financeiro').textContent) }));
+    if (pgs.every(x => x.h1 && !x.central && x.txt > 100) && f2.subs.slice(0, 3).join('|') === 'Cobranças (Asaas)|Clientes (Asaas)|Conta Asaas · Parâmetros' && !f2.subs.some(s => /Central/.test(s)) && f2.sub === 'asaas' && !f2.central && !erros.length) ok('casca antiga: as quatro páginas abrem, sem atalho para a Central; o Financeiro mostra só as três áreas do Asaas, mesmo com a Central gravada como última área');
+    else falha('casca antiga sem Central: ' + JSON.stringify([pgs, f2, erros.slice(0, 2)])); await ctx.close(); }
   rel.push('5. 375 / 768 / 1024 / 1440 × claro / escuro — as quatro páginas');
   for (const w of [375, 768, 1024, 1440]) for (const tema of ['light', 'dark']) {
     const { ctx, pg, erros } = await abrir(b, { w, h: w < 800 ? 780 : 900, tema }); const lat = [], ruins = [], aus = []; let alv = [], mn = 99, nm = 0;
