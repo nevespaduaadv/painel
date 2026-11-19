@@ -129,7 +129,7 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
   { const { ctx, pg } = await abrir(b, { sub: 'conta', contaErro: true }); const tx = await pg.evaluate((V) => document.querySelector(V + ' .np-fin-cartao .np-erro')?.textContent, V);
     if (/Não foi possível consultar a conta no Asaas: falha fictícia/.test(tx || '')) ok('conta: falha na consulta ao Asaas vira aviso com "Consultar de novo"; os parâmetros continuam editáveis'); else falha('conta erro: ' + tx); await ctx.close(); }
   for (const sub of ['clientes', 'conta']) { const { ctx, pg, erros } = await abrir(b, { sub, casca: 'v2' }); const v2 = await pg.evaluate((V) => ({ head: document.querySelector(V + ' .head h1')?.textContent, v3: !!document.querySelector(V + ' .np-toolbar'), abas: document.querySelectorAll(V + ' .tabs .tab').length }), V);
-    if (v2.head && !v2.v3 && v2.abas === 3 && !erros.length) ok(`V2 intacta: "${v2.head}"`); else falha('V2 ' + sub + ': ' + JSON.stringify([v2, erros.slice(0, 2)])); await ctx.close(); }
+    if (v2.head && !v2.v3 && v2.abas === 4 && !erros.length) ok(`V2 intacta: "${v2.head}"`); else falha('V2 ' + sub + ': ' + JSON.stringify([v2, erros.slice(0, 2)])); await ctx.close(); }
   for (const sub of ['clientes', 'conta']) for (const w of [375, 768, 1024, 1440]) for (const tema of ['light', 'dark']) {
     const { ctx, pg, erros } = await abrir(b, { sub, w, h: w < 800 ? 780 : 900, tema }); await pg.waitForTimeout(400);
     const l1 = await lateral(pg);
