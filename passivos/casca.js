@@ -70,7 +70,7 @@
   const trilha = el("span", { id: "np-trilha" }); brand?.before(trilha);
   const vistaSlot = el("div", { id: "np-barra-vista", role: "group", "aria-label": "Vista" }); $("#btnTema")?.before(vistaSlot);
   const tabAtual = () => { try { return S.tab; } catch (_) { return null; } };
-  window.NPCasca = {
+  window.NPCasca = { contar: (tab, fn, rotulo) => { CONT[tab] = { fn, rotulo: rotulo || ((n) => String(n)) }; },
     acomodar(itens) {
       if (!document.documentElement.classList.contains("np-casca-v3")) return itens;
       if (matchMedia("(max-width:900px)").matches) { vistaSlot.replaceChildren(); acaoSlot.replaceChildren(); return itens; } // celular/tablet retrato: tudo fica na faixa
@@ -144,6 +144,9 @@
     if (soltos.length) gs.push({ id: "outros", label: "Outros", icone: "ferramentas", cls: "", itens: soltos });
     return { fixos: FIXOS.map(byTab).filter(Boolean), perfil: byTab("perfil"), grupos: gs, links: itens.filter(i => i.link) };
   }
+  /* contagens da lateral (Figma de 18/11): só o que pede ação de quem está logado, e só quando há algo — sem número, sem ruído.
+     Cada módulo registra a sua em window.__NP_CONT[tab] = { fn, rotulo }; fn devolve null enquanto o dado não estiver carregado. */
+  const CONT = (window.__NP_CONT = window.__NP_CONT || {}); // registro compartilhado: independe da ordem de carga dos módulos
   const ativoDe = (i) => (i.tabs ? i.tabs.includes(S.tab) : (S.tab === i.tab || (i.alt || []).includes(S.tab))) && (!i.sel || i.sel());
   let abertos = {}; try { abertos = JSON.parse(localStorage.getItem(K("np-grupos")) || "{}"); } catch (_) {}
   const visivel = (e) => e && getComputedStyle(e).display !== "none";
@@ -153,7 +156,7 @@
   /* ---------- render da árvore (chamado por renderNav) ---------- */
   function montar() {
     const m = modelo(); const ativo = (i) => ativoDe(i);
-    const item = (i, extra) => { const b = itemNav(i, ativo(i)); semantica(b, ativo(i)); if (!temIcone(i) && I_TAB[i.tab]) b.querySelector("svg")?.replaceWith(ico(I_TAB[i.tab])); if (extra) b.classList.add(extra); return b; };
+    const item = (i, extra) => { const b = itemNav(i, ativo(i)); semantica(b, ativo(i)); { const c = CONT[i.tab]; let n = null; try { n = c ? c.fn() : null; } catch (_) {} if (n > 0 && !b.querySelector(".cnt")) { b.append(el("em", { class: "cnt", title: c.rotulo(n) }, String(n))); b.setAttribute("aria-label", (i.label || "") + ", " + c.rotulo(n)); } } if (!temIcone(i) && I_TAB[i.tab]) b.querySelector("svg")?.replaceWith(ico(I_TAB[i.tab])); if (extra) b.classList.add(extra); return b; };
     const lista = (botoes) => el("ul", { class: "np-lista" }, botoes.map(b => el("li", {}, b)));
     tree.replaceChildren(lista(m.fixos.map(i => { const b = item(i, "np-top"); if (FILHOS[i.tab]) b.classList.add("np-filho"); return b; })), el("div", { class: "np-sec" }));
     for (const g of m.grupos) {

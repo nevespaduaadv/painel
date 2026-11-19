@@ -184,6 +184,13 @@ Contraste ≥ 4,5:1 texto e ≥ 3:1 componentes nos dois temas (medido no DOM). 
 - Datas relativas calculadas no fuso de Brasília (regra já usada em `hojeISO`).
 - O que não existe no banco não aparece como se existisse; em prévias, leva a etiqueta "sugestão"; em produção, não aparece.
 
+### Ajustes a partir das propostas do Figma (18/11)
+
+- **Hoje:** saudação em serifa de 28 px no topo da tela, com a data embaixo, acima da faixa. A faixa diz o que pede ação hoje, na ordem de execução: prazos fatais hoje, atrasadas, tarefas para hoje, compromissos, avisos não lidos. Prazo fatal de hoje vem antes dos avisos. A linha da equipe fecha os grupos.
+- **Lateral com contagem:** Tarefas e prazos (as minhas que vencem hoje) e Avisos (não lidos). O número só aparece quando há algo; tem nome acessível. Publicações fica sem contagem até a classificação do acervo acompanhado no ADVBox estar em uso.
+- **Tarefas e prazos:** faixa na ordem atrasadas → fatais hoje → para hoje → em até 7 dias → abertas. Filtros rápidos "Atrasadas" e "Sem responsável". No painel de prazo fatal, a ação principal é "Concluir e confirmar protocolo".
+- **Carteira:** primeiro grupo "Exigem atenção" (contrato em atraso ou cliente sem responsável; o motivo aparece na linha). "sem responsável" em palavra, em vermelho, no lugar de "— ninguém —"; contagem na faixa e filtro próprio.
+
 ## 9. Governança
 
 - Toda tela nova parte dos componentes da seção 5; componente novo é proposto aqui antes de entrar.
