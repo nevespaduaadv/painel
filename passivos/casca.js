@@ -137,10 +137,10 @@
     const gs = [gCli, hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
       { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
       { id: "ferramentas", label: "Ferramentas", icone: "ferramentas", cls: "", itens: deGrupos(["juridico-ferr", "comercial", "marketing"]) }].filter(g => g && g.itens.length);
-    // Financeiro (19/11): as quatro páginas da especificação do setor vêm primeiro; o que já existia continua acessível logo abaixo.
+    // Financeiro (19/11): as quatro páginas da especificação do setor vêm primeiro; depois vêm as telas do Asaas (cobranças, clientes e conta), Contratos, Estoque e Inventário. A Central de Cobranças saiu da navegação.
     { const fin = gs.find(g => g.id === "financeiro"), podeFin = PP.perfil?.papel === "admin" || (PP.perfil?.acessos || []).includes("financeiro");
       if (fin && podeFin) { const novas = [["fin-visao", "Visão geral"], ["fin-regua", "Régua de cobrança"], ["fin-retornos", "Cobranças e retornos"], ["fin-recuperacao", "Recuperação"]].filter(([t]) => document.getElementById("view-" + t) && acesso(t)).map(([t, l]) => ({ tab: t, label: l, cls: "" }));
-        if (novas.length) fin.itens = [...novas, ...fin.itens.filter(i => !novas.some(n => n.tab === i.tab)).map(i => i.tab === "financeiro" ? { ...i, label: "Asaas e Central de Cobranças" } : i)]; } }
+        if (novas.length) fin.itens = [...novas, ...fin.itens.filter(i => !novas.some(n => n.tab === i.tab)).map(i => i.tab === "financeiro" ? { ...i, label: "Cobranças no Asaas" } : i)]; } }
     // itens do NAV que não entraram em fixos, hubs ou grupos conhecidos: grupo "Outros" (nunca se perde destino)
     const cobertos = new Set([...FIXOS, "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
