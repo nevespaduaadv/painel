@@ -12,7 +12,7 @@
   const K = { f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
   const SIT_B = { inadimplente: "Inadimplente", vai_ficar_inadimplente: "Vai ficar inadimplente", adimplente: "Adimplente" };
   const ETAPAS = { 0: "Contrato fechado", 1: "Cadastro ADVBox", 2: "Formulário enviado", 3: "Formulário respondido", 4: "Auditoria", 5: "R1 agendada", 6: "R1 feita", 7: "R2 feita", 8: "R3 feita", 9: "Ciclo encerrado", 10: "Ciclo mensal" };
-  const GRUPOS = [["atraso", "Contratos em atraso", "crit"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
+  const GRUPOS = [["atencao", "Exigem atenção", "att"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
   const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const digitos = (s) => String(s || "").replace(/\D/g, "");
   const brlCurto = (v) => { const n = +v || 0; if (n >= 1e6) return "R$ " + (n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mi"; if (n >= 1e4) return "R$ " + Math.round(n / 1e3).toLocaleString("pt-BR") + " mil"; return NPUI.brl(n); };
@@ -48,7 +48,9 @@
       const v = visPor.get(c.id) || null; const pass = passPor.get(c.id) || null;
       return { c, ks, total, atraso, neg, prazos, prox: prazos[0] || null, proc: v ? (+v.processos_ativos || 0) : null, sitB: pass?.situacao || null,
         tipo: v?.tipo_pessoa || c.tipo_pessoa || null, etapa: v?.etapa_fluxo ?? c.etapa_fluxo ?? null,
-        grupo: atraso ? "atraso" : neg ? "negociacao" : ks.length ? "em_dia" : "sem" };
+        semResp: !(c.responsavel || c.dados?.responsavel || resps(c).length),
+        // Figma de 18/11: quem pede ação vem primeiro — contrato em atraso ou cliente sem responsável (o motivo aparece na linha)
+        grupo: atraso || !(c.responsavel || c.dados?.responsavel || resps(c).length) ? "atencao" : neg ? "negociacao" : ks.length ? "em_dia" : "sem" };
     });
   }
   /* régua = estado do próximo prazo, com a mesma regra da lista de Tarefas (fatal até 7 dias, atrasado, hoje) */
@@ -59,7 +61,7 @@
     const f = K.f; const meu = meuColab(); const q = norm(f.q), qd = digitos(f.q);
     return regs.filter((r) => {
       if (f.escopo === "pj" && r.tipo === "PF") return false; if (f.escopo === "pf" && r.tipo !== "PF") return false;
-      if (f.atraso && !r.atraso) return false; if (f.neg && !r.neg) return false; if (f.proc && !(r.proc > 0)) return false; if (f.inad && r.sitB !== "inadimplente") return false;
+      if (f.semResp && !r.semResp) return false; if (f.atraso && !r.atraso) return false; if (f.neg && !r.neg) return false; if (f.proc && !(r.proc > 0)) return false; if (f.inad && r.sitB !== "inadimplente") return false;
       if (f.meus && !(meu && resps(r.c).includes(meu.id))) return false; if (f.resp && !resps(r.c).includes(f.resp)) return false;
       if (f.seg && (r.c.segmento || "") !== f.seg) return false; if (f.etapa !== "" && String(r.etapa ?? "") !== f.etapa) return false;
       if (q && !(norm(r.c.nome).includes(q) || norm(r.c.nome_fantasia).includes(q) || (qd.length >= 3 && digitos(r.c.cnpj).includes(qd)))) return false;
@@ -90,7 +92,7 @@
     return NPUI.linha({ id: r.c.id, regua: rg, atual: K.aberta === r.c.id,
       prazo: p ? { curta: p.curta, rel: p.rel, exata: p.exata + " · " + r.prox.titulo + " · " + p.rel, tom: tomDe(rg) } : { curta: "", exata: "sem prazo aberto" },
       titulo: r.c.nome || "(sem nome)", contexto: contexto(r), titleAbrir: "Ver resumo do cliente",
-      direita: [...marcas(r), valor(r.total, r.ks.length), NPUI.quem(respDe(r.c))].filter(Boolean),
+      direita: [...marcas(r), valor(r.total, r.ks.length), r.semResp ? NPUI.marca("sem responsável", "crit") : NPUI.quem(respDe(r.c))].filter(Boolean),
       onOpen: (li) => abrirPainel(r.c.id, { origem: li.querySelector(".np-it-abrir") }) });
   }
   function lista(regs) {
@@ -113,6 +115,7 @@
     const at = (k, l, n, title) => C({ label: l, n, on: f[k], grupo: "attr", title, onclick: () => { f[k] = !f[k]; renderList(); } });
     at("atraso", "Em atraso", regs.filter((r) => r.atraso).length, "Clientes com ao menos um contrato em atraso");
     at("neg", "Em negociação", regs.filter((r) => r.neg).length, "Clientes com contrato em negociação ou acordo");
+    if (regs.some((r) => r.semResp) || f.semResp) at("semResp", "Sem responsável", regs.filter((r) => r.semResp).length, "Clientes sem responsável em nenhuma frente");
     if (regs.some((r) => r.proc != null)) at("proc", "Com processo", regs.filter((r) => r.proc > 0).length, "Clientes com processo ativo");
     if (regs.some((r) => r.sitB)) at("inad", "Inadimplentes", regs.filter((r) => r.sitB === "inadimplente").length, "Inadimplentes com os bancos (ficha de passagem)");
     if (meu) at("meus", "Meus", regs.filter((r) => resps(r.c).includes(meu.id)).length, "Clientes em que sou responsável em alguma frente");
@@ -145,7 +148,7 @@
     const regs = registros(); const vis = filtrar(regs);
     const total = regs.reduce((s, r) => s + r.total, 0), nAt = regs.filter((r) => r.atraso).length, nInad = regs.filter((r) => r.sitB === "inadimplente").length;
     const temVis = regs.some((r) => r.proc != null);
-    const resumo = NPUI.resumo([{ n: regs.length, label: regs.length === 1 ? "cliente" : "clientes" }, { n: brlCurto(total), label: "em contratos" }, { n: nAt, label: "com atraso", tom: nAt ? "crit" : "zero" },
+    const resumo = NPUI.resumo([{ n: regs.length, label: regs.length === 1 ? "cliente" : "clientes" }, { n: brlCurto(total), label: "em contratos" }, { n: nAt, label: "com atraso", tom: nAt ? "crit" : "zero" }, regs.some((r) => r.semResp) ? { n: regs.filter((r) => r.semResp).length, label: "sem responsável", tom: "crit" } : null,
       temVis && nInad ? { n: nInad, label: "inadimplentes", tom: "att" } : null]);
     const fl = filtros(regs); const ro = typeof readOnly === "function" && readOnly();
     const maisAc = NPUI.ib("pontos", "Mais ações", () => NPUI.pop(maisAc, [{ label: "Exportar CSV (lista filtrada)", onclick: () => exportar(vis.slice().sort((a, b) => (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"))) }, { label: "Acompanhamento PJ", onclick: () => irPara("acompanhamento") }], { label: "Mais ações", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-ib[aria-label="Mais ações"]') }));

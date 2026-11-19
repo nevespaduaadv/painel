@@ -5,6 +5,8 @@
 const D={ok:false,carregando:false,prazos:[],tarefas:[],colab:[],eventos:[],leads:null,escopo:"minhas",cal:{ref:null,chave:null,agenda:[],carregando:false,dia:null},foco:{dia:null,modo:"dia"}};
 try{D.escopo=localStorage.getItem("pp-painel-escopo")||"minhas"}catch(_){}
 const meuColab=()=>D.colab.find(c=>c.perfil_id===PP.perfil?.id);
+/* contagem da lateral enquanto Tarefas ainda não foi aberta: mesmas tarefas minhas que vencem hoje, lidas dos prazos já carregados pela Home */
+window.PP_HOJE_CONT=()=>{const m=meuColab();return D.ok&&m?D.prazos.filter(z=>z.origem==="tarefa"&&z.responsavel_id===m.id&&z.faixa==="hoje").length:null};
 const fmtDT=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 async function carregar(){
   if(D.carregando)return;D.carregando=true;
@@ -274,7 +276,10 @@ function renderPainelV3(){
   const evHoje=(porDia[hoje]||[]).filter(i=>i.k==="evento").length;
   // resumo: só o que existe. Uma fileira de zeros não é informação de trabalho; sem nada, uma frase calma no mesmo lugar.
   const venHoje=(porDia[hoje]||[]).filter(i=>i.k==="prazo").length;
-  const itensRes=[{n:fatais.length,label:fatais.length===1?"fatal em 7 dias":"fatais em 7 dias",tom:"crit"},{n:atrasadas.length,label:atrasadas.length===1?"atrasada":"atrasadas",tom:"crit"},{n:venHoje,label:venHoje===1?"vence hoje":"vencem hoje",tom:"att"},{n:evHoje,label:evHoje===1?"compromisso hoje":"compromissos hoje",tom:""},{n:tarefas.length,label:tarefas.length===1?"aberta":"abertas",tom:""}].filter(i=>i.n>0);
+  // faixa do dia (Figma de 18/11): o que pede ação HOJE, na ordem em que deve ser feito. "Fatais em 7 dias" e o total de abertas saíram daqui:
+  // continuam em Tarefas e prazos; publicações a analisar só entram quando a classificação ADVBox (0116) estiver em uso, para não somar o acervo antigo.
+  const nFatHoje=prazos.filter(z=>z.prazo_fatal&&z.faixa==="hoje").length,paraHoje=Math.max(0,venHoje-nFatHoje),nAv=window.PP_AVISOS?.naoLidos?.()||0;
+  const itensRes=[{n:nFatHoje,label:nFatHoje===1?"prazo fatal hoje":"prazos fatais hoje",tom:"crit"},{n:atrasadas.length,label:atrasadas.length===1?"atrasada":"atrasadas",tom:"crit"},{n:paraHoje,label:paraHoje===1?"tarefa para hoje":"tarefas para hoje",tom:"att"},{n:evHoje,label:evHoje===1?"compromisso hoje":"compromissos hoje",tom:""},{n:nAv,label:nAv===1?"aviso não lido":"avisos não lidos",tom:""}].filter(i=>i.n>0);
   const resumo=itensRes.length?NPUI.resumo(itensRes):el("div",{class:"np-resumo np-resumo-calmo",role:"status","aria-live":"polite"},D.escopo==="equipe"?"Nada pendente na equipe":"Nada pendente para você");
   // quem vê a equipe e está em "Minhas": o que a equipe tem de crítico aparece numa linha, com o caminho para ver
   const podeEquipe=!!(esc.tudo||esc.nucleos);const daEquipe=z=>esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id);
@@ -294,7 +299,8 @@ function renderPainelV3(){
   // saudação + data (serifa) — substitui o cabeçalho da V2
   const nomeEq=esc.tudo?"equipe":"Jurídico";
   const linhaEq=eqFat>0||eqHoje>0?el("p",{class:"np-hoje-eq"},esc.tudo?"Na equipe: ":"No Jurídico: ",[eqHoje>0?[el("b",{},String(eqHoje)),eqHoje===1?" prazo vence hoje":" prazos vencem hoje"]:null,eqFat>0&&eqHoje>0?" · ":null,eqFat>0?[el("b",{},String(eqFat)),eqFat===1?" fatal nos próximos 7 dias":" fatais nos próximos 7 dias"]:null].flat().filter(Boolean)," ",el("button",{type:"button",class:"lnk",onclick:irEquipe},esc.tudo?"Ver a equipe":"Ver o Jurídico")):null;
-  corpo.append(el("div",{class:"np-hoje-h"},el("h1",{},`${sauda}${nome?", "+nome:""}`),el("span",{class:"np-hoje-d"},dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})),linhaEq));
+  // saudação no topo da tela, acima da faixa (Figma de 18/11); a linha da equipe vai para o fim dos grupos
+  v.prepend(el("div",{class:"np-hoje-h np-hoje-topo"},el("h1",{},`${sauda}${nome?", "+nome:""}.`),el("span",{class:"np-hoje-d"},dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase()))));
   // cronômetro rodando (Agora) — mesma leitura e as mesmas ações da V2
   if(!AG.ok)carregarAgora(meu);
   if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("b",{class:"np-cron"},"00:00:00");const tick=()=>{const s0=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s0/3600)).padStart(2,"0")}:${String(Math.floor(s0%3600/60)).padStart(2,"0")}:${String(s0%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
@@ -329,6 +335,7 @@ function renderPainelV3(){
     if(!dias.length)corpo.append(NPUI.vazio({titulo:"Nada marcado neste mês",texto:"Nenhum prazo ou compromisso no mês."}));
   }
   G.filter(Boolean).forEach(g=>corpo.append(g));
+  if(linhaEq)corpo.append(linhaEq);
   // atividade recente — por último, recolhida por padrão (mesmo filtro de setor da V2)
   const SETORES={"":"Todos",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo"};const SETOR_DE={juridico:"juridico",acordos:"juridico",acompanhamento_pj:"juridico",comercial:"comercial",marketing:"marketing",administrativo:"administrativo",pos_vendas:"comercial",rh:"administrativo",socios:"administrativo"};
   const escAtv=PP.escopoTarefas?.()||{tudo:true};D.atvSetor=D.atvSetor??(()=>{try{return localStorage.getItem("pp-painel-atv")||""}catch(_){return ""}})();
@@ -347,7 +354,7 @@ function renderPainelV3(){
   H3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{H3.aberta=null}});
   if(H3.aberta){const [,id]=H3.aberta.split(":");const e=D.cal.agenda.find(x=>x.id===id);if(e){const i={k:"evento",e,atrasada:false};abrirPainelHojeV3(i,null)}else H3.aberta=null}
 }
-document.head.append(el("style",{},`html.np-casca-v3 .np-hoje-h{display:flex;align-items:baseline;column-gap:14px;row-gap:4px;flex-wrap:wrap;padding:14px 0 14px}html.np-casca-v3 .np-hoje-h h1{font:500 var(--np-fs-7)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-hoje-d{font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-3)}
+document.head.append(el("style",{},`html.np-casca-v3 .np-hoje-topo{flex-direction:column;align-items:flex-start!important;row-gap:2px!important;padding:6px 0 10px!important}html.np-casca-v3 .np-hoje-topo h1{font-size:28px!important;line-height:36px!important}html.np-casca-v3 .np-corpo>p.np-hoje-eq{margin:14px 0 4px}@media (max-width:600px){html.np-casca-v3 .np-hoje-topo h1{font-size:24px!important;line-height:30px!important}}html.np-casca-v3 .np-hoje-h{display:flex;align-items:baseline;column-gap:14px;row-gap:4px;flex-wrap:wrap;padding:14px 0 14px}html.np-casca-v3 .np-hoje-h h1{font:500 var(--np-fs-7)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-hoje-d{font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-3)}
 html.np-casca-v3 .np-hoje-eq{flex:1 0 100%;margin:0;font:400 var(--np-fs-2)/1.45 var(--np-ui);color:var(--np-text-2)}html.np-casca-v3 .np-hoje-eq b{font:500 var(--np-fs-5)/1 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text)}html.np-casca-v3 .np-hoje-eq b.crit{color:var(--np-crit)}html.np-casca-v3 .np-hoje-eq .lnk{margin-left:6px}
 html.np-casca-v3 .np-resumo-calmo{font:italic 400 var(--np-fs-5)/1.2 var(--np-display);color:var(--np-text-2)}html.np-casca-v3 .np-atv-fl{list-style:none}html.np-casca-v3 .np-atv-s{font-style:italic;color:var(--np-text-3)}html.np-casca-v3 .np-it-vazia .lnk{font-style:normal;margin-left:6px}
 html.np-casca-v3 .np-agora{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;border:1px solid var(--np-line);border-left:3px solid var(--np-ok);border-radius:var(--np-r);background:var(--np-surface)}html.np-casca-v3 .np-agora .np-cron{font:500 var(--np-fs-3)/1 var(--np-display);font-variant-numeric:tabular-nums}html.np-casca-v3 .np-agora .tx{font:500 var(--np-fs-2)/1.3 var(--np-ui);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:48ch}html.np-casca-v3 .np-agora .ctx{color:var(--np-text-3);font-size:var(--np-fs-1)}html.np-casca-v3 .np-agora-a{margin-left:auto;display:flex;gap:4px}
