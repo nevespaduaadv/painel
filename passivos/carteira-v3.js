@@ -120,7 +120,7 @@
     if (regs.some((r) => r.sitB)) at("inad", "Inadimplentes", regs.filter((r) => r.sitB === "inadimplente").length, "Inadimplentes com os bancos (ficha de passagem)");
     if (meu) at("meus", "Meus", regs.filter((r) => resps(r.c).includes(meu.id)).length, "Clientes em que sou responsável em alguma frente");
     const extras = [f.q, f.seg, f.resp, f.etapa].filter((x) => x !== "" && x != null).length;
-    const mais = NPUI.chip({ label: "Mais filtros", n: extras || null, on: extras > 0, title: "Nome ou CNPJ, segmento, responsável, etapa do fluxo", onclick: (e) => NPUI.pop(e.currentTarget, () => {
+    const mais = NPUI.chip({ label: "Mais filtros", n: extras ? `(${extras})` : null, on: extras > 0, title: "Nome ou CNPJ, segmento, responsável, etapa do fluxo", onclick: (e) => NPUI.pop(e.currentTarget, () => {
       const q = el("input", { type: "search", class: "np-in", value: f.q, placeholder: "Nome, nome fantasia ou CNPJ", "aria-label": "Nome ou CNPJ" });
       let tq = null; q.oninput = () => { clearTimeout(tq); tq = setTimeout(() => { f.q = q.value.trim(); renderList(); }, 220); };
       const segs = [...new Set((S.clientes || []).map((c) => c.segmento).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -133,7 +133,7 @@
       return [el("div", { class: "np-pop-form" }, L("Nome ou CNPJ", q), L("Segmento", fSeg), L("Responsável (qualquer frente)", fResp), L("Etapa do fluxo", fEt),
         el("div", { style: "display:flex;justify-content:space-between;gap:8px" }, NPUI.btn("Limpar", { variante: "ghost", onclick: () => { K.f = { ...LIMPO }; NPUI.fecharPop(); renderList(); } }), NPUI.btn("Fechar", { onclick: () => NPUI.fecharPop() })))];
     }, { role: "dialog", label: "Mais filtros", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-chipf[aria-haspopup="dialog"]') }) });
-    mais.setAttribute("aria-haspopup", "dialog"); mais.setAttribute("aria-expanded", "false");
+    mais.setAttribute("aria-haspopup", "dialog"); mais.setAttribute("aria-expanded", "false"); mais.querySelector(".n")?.setAttribute("aria-label", extras + " filtros extras ativos");
     return { chips, fixos: [mais] };
   }
   const COLS_CSV = [{ k: "nome", t: "Cliente" }, { k: "nome_fantasia", t: "Nome fantasia" }, { k: "cnpj", t: "CNPJ" }, { k: "tipo_pessoa", t: "Tipo" }, { k: "cidade", t: "Cidade" }, { k: "uf", t: "UF" }, { k: "segmento", t: "Segmento" }, { k: "servico", t: "Serviço" }, { k: "status", t: "Status" }, { k: "etapa_fluxo", t: "Etapa" }, { k: "responsavel", t: "Responsável" }, { k: "data_fechamento", t: "Fechamento", f: (v) => v ? String(v).slice(0, 10).split("-").reverse().join("/") : "" }, { k: "_contratos", t: "Contratos ativos" }, { k: "_total", t: "Saldo em contratos", f: (v) => String(Math.round(v * 100) / 100).replace(".", ",") }, { k: "_atraso", t: "Contratos em atraso" }, { k: "_neg", t: "Em negociação" }, { k: "adimplente", t: "Adimplente", f: (v) => v == null ? "" : v ? "sim" : "não" }];

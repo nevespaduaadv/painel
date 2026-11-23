@@ -55,9 +55,37 @@ function abrir(id){R.sel=id;R.aba=admin()?"pdi":"pdi";R.dados=null;S.tab="equipe
 function fechar(){R.sel=null;R.dados=null;render();try{history.replaceState(null,"","#equipe")}catch(_){}}
 
 /* ---------- ficha ---------- */
+const rhV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 function renderFicha(v){
-  const c=R.dados;
+  const c=R.dados;const v3=rhV3();
   v.replaceChildren();
+  v.classList.toggle("np-v3",v3);
+  if(v3){
+    v.append(el("div",{style:"display:flex;align-items:center;gap:8px;padding:4px 0 10px;border-bottom:1px solid var(--np-line)"},
+      NPUI.btn("← Equipe",{variante:"ghost",onclick:fechar}),el("span",{style:"color:var(--np-text-3)"},"/"),el("span",{style:"font-weight:500;color:var(--np-text)"},c?.nome||"…")));
+    if(!c){v.append(NPUI.carregando(4));return}
+    const podeEditar=admin()||proprio(c);
+    const foto=avatar(c,76);const fIn=inp("file","",{accept:"image/*",style:"display:none"});fIn.onchange=()=>enviarFoto(c,fIn.files?.[0]);
+    const head=el("div",{class:"np-rh-head"},
+      el("div",{style:"position:relative"},foto,podeEditar?el("label",{class:"np-btn",style:"position:absolute;right:-4px;bottom:-4px;height:26px;padding:0 6px;font-size:12px",title:"Trocar foto"},"📷",fIn):null),
+      el("div",{style:"min-width:0;flex:1"},el("h1",{},c.nome,c.apelido?el("span",{style:"font-size:15px;font-weight:400;color:var(--np-text-3)"}," · "+c.apelido):null),
+        el("div",{class:"sub"},[c.cargo,NUCLEOS()[c.nucleo],c.oab?"OAB "+c.oab:null].filter(Boolean).join(" · ")),
+        el("div",{class:"rh-meta"},c.data_admissao?el("span",{},"Desde "+fmtD(c.data_admissao)+" ("+tempoCasa(c.data_admissao)+")"):null,c.cidade?el("span",{},c.cidade):null,c.data_nascimento?el("span",{},"Aniv. "+parseD(c.data_nascimento).toLocaleDateString("pt-BR",{day:"2-digit",month:"long"})):null,c.email?el("a",{href:"mailto:"+c.email},c.email):null,c.telefone?el("span",{},c.telefone):null,c.linkedin?el("a",{href:c.linkedin,target:"_blank",rel:"noopener"},"LinkedIn"):null,!c.ativo?NPUI.marca("inativo","crit"):null),
+        c.bio?el("div",{style:"margin-top:8px;white-space:pre-wrap;color:var(--np-text-2);font-size:var(--np-fs-2)"},c.bio):null,
+        c.responsabilidades?el("div",{class:"np-ts-sub",style:"margin-top:6px"},"Responsabilidades: "+c.responsabilidades):null),
+      podeEditar?NPUI.btn("Editar dados",{onclick:()=>window.PP_EQUIPE?.openColabForm(c)}):null);
+    v.append(head);
+    v.append(el("div",{class:"np-gestao-kpi-band",style:"margin-bottom:14px"},[
+      ["Horas 30d",(+c.horas_30d||0).toFixed(1).replace(".",",")+"h"],
+      ["Tarefas abertas",String(c.tarefas_abertas||0)],
+      ["Registros 30d",String(c.registros_30d||0)],
+      ["PDI em aberto",String(c.pdi_abertos||0)]
+    ].map(([l,x])=>el("div",{},el("div",{class:"k"},l),el("div",{class:"v"},x)))));
+    const abas=[["pdi","PDI e acompanhamento"]];if(admin())abas.push(["rh","Dados de RH"],["hist","Histórico"]);
+    if(abas.length>1)v.append(el("div",{style:"margin-bottom:12px"},NPUI.seg(abas,R.aba,k=>{R.aba=k;render()},"Seções da ficha")));
+    if(R.aba==="rh"&&admin())renderRH(v,c);else if(R.aba==="hist"&&admin())renderHist(v,c);else renderPDI(v,c);
+    return;
+  }
   v.append(el("div",{class:"crumbs"},el("button",{onclick:fechar},"Equipe"),el("span",{class:"sep"},"›"),el("span",{},c?.nome||"…")));
   if(!c){v.append(el("div",{class:"note"},"Carregando ficha…"));return}
   const podeEditar=admin()||proprio(c);
@@ -77,20 +105,20 @@ function renderFicha(v){
   if(R.aba==="rh"&&admin())renderRH(v,c);else if(R.aba==="hist"&&admin())renderHist(v,c);else renderPDI(v,c);
 }
 function renderPDI(v,c){
-  const podeVer=admin()||proprio(c);
-  if(!podeVer){v.append(el("div",{class:"card empty"},"O PDI é visível para a pessoa e para as sócias."));return}
-  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Plano de desenvolvimento (PDI)"),el("div",{class:"actions"},admin()?el("button",{class:"btn sm primary",onclick:()=>openPdiForm(c,{})},"+ Meta"):null)));
-  if(!R.pdi.length)sec.append(el("div",{class:"note"},"Nenhuma meta ainda."+(admin()?" Combine 2–3 metas por ciclo, com prazo e forma de medir.":"")));
+  const podeVer=admin()||proprio(c);const v3=rhV3();
+  if(!podeVer){v.append(v3?NPUI.vazio({titulo:"Acesso restrito",texto:"O PDI é visível para a pessoa e para as sócias."}):el("div",{class:"card empty"},"O PDI é visível para a pessoa e para as sócias."));return}
+  const sec=el("section",{class:v3?"np-rh-sec":"card section"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("h2",{},"Plano de desenvolvimento (PDI)"),el("div",{class:"actions"},admin()?el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openPdiForm(c,{})},"+ Meta"):null)));
+  if(!R.pdi.length)sec.append(el("div",{class:v3?"np-ts-sub":"note"},"Nenhuma meta ainda."+(admin()?" Combine 2–3 metas por ciclo, com prazo e forma de medir.":"")));
   for(const m of R.pdi){
-    const cor=m.status==="concluido"?"var(--ok,#2e7d4f)":m.status==="cancelado"?"var(--muted)":"var(--gold)";
-    sec.append(el("div",{class:"rh-meta-item"},el("div",{style:"flex:1;min-width:0"},el("div",{class:"n"},m.titulo,el("span",{class:"pill g",style:"margin-left:8px"},PDI_ST[m.status])),m.descricao?el("div",{class:"note",style:"white-space:pre-wrap"},m.descricao):null,
-        el("div",{class:"rh-prog"},el("div",{class:"rh-bar"},el("div",{style:`width:${m.progresso}%;background:${cor}`})),el("span",{class:"num"},m.progresso+"%"),m.prazo?el("span",{class:"note"},"até "+fmtD(m.prazo)):null)),
-      el("div",{class:"actions",style:"flex-wrap:nowrap"},el("button",{class:"btn sm",onclick:()=>openPdiForm(c,m)},admin()?"Editar":"Atualizar"))));
+    const cor=m.status==="concluido"?"var(--np-ok,var(--ok))":m.status==="cancelado"?"var(--np-text-3,var(--muted))":"var(--np-accent,var(--gold))";
+    sec.append(el("div",{class:"rh-meta-item"},el("div",{style:"flex:1;min-width:0"},el("div",{class:"n"},m.titulo," ",v3?NPUI.marca(PDI_ST[m.status]||m.status,m.status==="concluido"?"ok":m.status==="cancelado"?"muted":"att"):el("span",{class:"pill g",style:"margin-left:8px"},PDI_ST[m.status])),m.descricao?el("div",{class:v3?"np-ts-sub":"note",style:"white-space:pre-wrap"},m.descricao):null,
+        el("div",{class:"rh-prog"},el("div",{class:"rh-bar"},el("div",{style:`width:${m.progresso}%;background:${cor}`})),el("span",{class:"num np-num"},m.progresso+"%"),m.prazo?el("span",{class:v3?"np-ts-sub":"note"},"até "+fmtD(m.prazo)):null)),
+      el("div",{class:"actions",style:"flex-wrap:nowrap"},el("button",{class:v3?"np-btn":"btn sm",onclick:()=>openPdiForm(c,m)},admin()?"Editar":"Atualizar"))));
   }
   v.append(sec);
-  const regs=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Acompanhamento (1:1, feedbacks, avaliações)"),el("div",{class:"actions"},admin()?el("button",{class:"btn sm primary",onclick:()=>openRegForm(c)},"+ Registro"):null)));
-  if(!R.reg.length)regs.append(el("div",{class:"note"},"Nenhum registro."));
-  for(const r of R.reg)regs.append(el("div",{class:"rh-reg"},el("div",{class:"s"},fmtD(r.data)+" · "+(REG[r.tipo]||r.tipo)+(r.pdi_id?" · meta: "+(R.pdi.find(p=>p.id===r.pdi_id)?.titulo||""):"")+(admin()&&!r.visivel_colaborador?" · 🔒 só sócias":"")),el("div",{style:"white-space:pre-wrap"},r.texto),admin()?el("button",{class:"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir este registro?"))return;await SB.from("pdi_registros").delete().eq("id",r.id);carregar(c.id)}},"Excluir"):null));
+  const regs=el("section",{class:v3?"np-rh-sec":"card section"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("h2",{},"Acompanhamento (1:1, feedbacks, avaliações)"),el("div",{class:"actions"},admin()?el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openRegForm(c)},"+ Registro"):null)));
+  if(!R.reg.length)regs.append(el("div",{class:v3?"np-ts-sub":"note"},"Nenhum registro."));
+  for(const r of R.reg)regs.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(r.data)+" · "+(REG[r.tipo]||r.tipo)+(r.pdi_id?" · meta: "+(R.pdi.find(p=>p.id===r.pdi_id)?.titulo||""):"")+(admin()&&!r.visivel_colaborador?" · só sócias":"")),el("div",{style:"white-space:pre-wrap"},r.texto),admin()?el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir este registro?"))return;await SB.from("pdi_registros").delete().eq("id",r.id);carregar(c.id)}},"Excluir"):null));
   v.append(regs);
 }
 function openPdiForm(c,m){
@@ -113,13 +141,13 @@ function openRegForm(c){
   modal("Novo registro",body,async()=>{if(!texto.value.trim())throw new Error("Escreva o registro");const {error}=await SB.from("pdi_registros").insert({colaborador_id:c.id,pdi_id:meta.value||null,tipo:tipo.value,data:data.value,texto:texto.value.trim(),visivel_colaborador:vis.checked});if(error)throw error;toast("Registro salvo");carregar(c.id)});
 }
 function renderRH(v,c){
-  const r=R.rh||{};
-  const info=(l,x)=>el("div",{},el("div",{class:"eyebrow",style:"font-size:10.5px"},l),el("div",{},x||"—"));
+  const r=R.rh||{};const v3=rhV3();
+  const info=(l,x)=>el("div",{},el("div",{class:v3?"np-ts-sub":"eyebrow",style:v3?"":"font-size:10.5px"},l),el("div",{class:"np-num"},x||"—"));
   const docs=Array.isArray(r.documentos)?r.documentos:[];
-  v.append(el("section",{class:"card section",style:"border-left:3px solid var(--gold)"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Dados de RH"),el("div",{class:"note"},"Visível só para as sócias. Toda alteração fica na auditoria.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>openRHForm(c,r)},r.colaborador_id?"Editar dados de RH":"Preencher"))),
+  v.append(el("section",{class:v3?"np-rh-sec":"card section",style:v3?"":"border-left:3px solid var(--gold)"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("div",{},el("h2",{},"Dados de RH"),el("div",{class:v3?"np-ts-sub":"note"},"Visível só para as sócias. Toda alteração fica na auditoria.")),el("div",{class:"actions"},el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openRHForm(c,r)},r.colaborador_id?"Editar dados de RH":"Preencher"))),
     el("div",{style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"},info("Vínculo",VINCULO[r.vinculo]),info("Salário",brl(r.salario)),info("Jornada",r.jornada),info("Benefícios",r.beneficios),info("CPF",r.cpf),info("RG",r.rg),info("PIS",r.pis),info("Estado civil",r.estado_civil),info("Endereço",r.endereco),info("Contato de emergência",r.contato_emergencia),info("Banco / PIX",r.banco_pix),r.vinculo==="pj"?info("PJ",[r.razao_social_pj,r.cnpj_pj].filter(Boolean).join(" · ")):null),
-    r.observacoes?el("div",{class:"note",style:"margin-top:10px;white-space:pre-wrap"},r.observacoes):null,
-    el("div",{style:"margin-top:12px"},el("div",{class:"eyebrow",style:"font-size:10.5px"},"Documentos"),docs.length?el("ul",{style:"margin:4px 0 0;padding-left:18px"},docs.map(d=>el("li",{},el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info)"},d.titulo||d.url)))):el("div",{class:"note"},"Nenhum link (contrato, RG, comprovantes… no Drive)."))));
+    r.observacoes?el("div",{class:v3?"np-ts-sub":"note",style:"margin-top:10px;white-space:pre-wrap"},r.observacoes):null,
+    el("div",{style:"margin-top:12px"},el("div",{class:v3?"np-ts-sub":"eyebrow",style:v3?"":"font-size:10.5px"},"Documentos"),docs.length?el("ul",{style:"margin:4px 0 0;padding-left:18px"},docs.map(d=>el("li",{},el("a",{href:d.url,target:"_blank",rel:"noopener",style:"color:var(--info)"},d.titulo||d.url)))):el("div",{class:v3?"np-ts-sub":"note"},"Nenhum link (contrato, RG, comprovantes… no Drive)."))));
 }
 function openRHForm(c,r){
   const f={cpf:inp("text",r.cpf||""),rg:inp("text",r.rg||""),pis:inp("text",r.pis||""),estado_civil:inp("text",r.estado_civil||""),endereco:inp("text",r.endereco||""),contato_emergencia:inp("text",r.contato_emergencia||"",{placeholder:"Nome · telefone"}),vinculo:sel({"":"—",...VINCULO},r.vinculo||""),jornada:inp("text",r.jornada||"",{placeholder:"44h, 30h…"}),salario:inp("number",r.salario??"",{step:"0.01",min:0}),beneficios:inp("text",r.beneficios||"",{placeholder:"VR, VT, plano…"}),cnpj_pj:inp("text",r.cnpj_pj||""),razao_social_pj:inp("text",r.razao_social_pj||""),banco_pix:inp("text",r.banco_pix||""),observacoes:el("textarea",{rows:"3"},r.observacoes||"")};
@@ -134,9 +162,10 @@ function openRHForm(c,r){
   });
 }
 function renderHist(v,c){
-  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Histórico"),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>openHistForm(c)},"+ Registro"))));
-  if(!R.hist.length)sec.append(el("div",{class:"note"},"Nada registrado. Admissão, reajustes, promoções, férias, feedbacks formais, advertências."));
-  for(const h of R.hist)sec.append(el("div",{class:"rh-reg"},el("div",{class:"s"},fmtD(h.data)+" · "+(HIST[h.tipo]||h.tipo)+(h.valor!=null?" · "+brl(h.valor):"")),h.descricao?el("div",{style:"white-space:pre-wrap"},h.descricao):null,el("button",{class:"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir?"))return;await SB.from("colaboradores_historico").delete().eq("id",h.id);carregar(c.id)}},"Excluir")));
+  const v3=rhV3();
+  const sec=el("section",{class:v3?"np-rh-sec":"card section"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("h2",{},"Histórico"),el("div",{class:"actions"},el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openHistForm(c)},"+ Registro"))));
+  if(!R.hist.length)sec.append(el("div",{class:v3?"np-ts-sub":"note"},"Nada registrado. Admissão, reajustes, promoções, férias, feedbacks formais, advertências."));
+  for(const h of R.hist)sec.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(h.data)+" · "+(HIST[h.tipo]||h.tipo)+(h.valor!=null?" · "+brl(h.valor):"")),h.descricao?el("div",{style:"white-space:pre-wrap"},h.descricao):null,el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir?"))return;await SB.from("colaboradores_historico").delete().eq("id",h.id);carregar(c.id)}},"Excluir")));
   v.append(sec);
 }
 function openHistForm(c){
@@ -149,6 +178,9 @@ function cardAniversarios(){
   if(!R.aniv){carregarAniv();return null}
   const mes=new Date().getMonth()+1;const hoje=new Date().getDate();
   const ds=R.aniv.filter(a=>a.mes===mes).sort((a,b)=>a.dia-b.dia);if(!ds.length)return null;
+  if(rhV3()){
+    return el("div",{class:"np-aniv-strip"},el("b",{},"Aniversariantes do mês:"),ds.map(a=>el("button",{class:"np-aniv-chip",type:"button",onclick:()=>abrir(a.id)},(a.apelido||a.nome.split(" ")[0])+" · dia "+String(a.dia).padStart(2,"0")+(a.dia===hoje?" (hoje)":""))));
+  }
   return el("div",{class:"card section",style:"display:flex;gap:14px;flex-wrap:wrap;align-items:center"},el("b",{},"🎂 Aniversariantes do mês:"),ds.map(a=>el("button",{class:"rh-aniv",onclick:()=>abrir(a.id)},avatar(a,28),el("span",{},(a.apelido||a.nome.split(" ")[0])+" · "+String(a.dia).padStart(2,"0")+(a.dia===hoje?" 🎉":"")))));
 }
 
@@ -161,7 +193,7 @@ document.head.append(el("style",{},CSS));
 window.PP_RH={abrir,invalidar(){R.dados=null;R.aniv=null;if(R.sel)carregar(R.sel)}};
 {const _r=render;render=function(){_r();const ve=$("#view-equipe");if(!ve||S.tab!=="equipe")return;
   if(R.sel){renderFicha(ve);const h="#equipe/"+R.sel;if(location.hash!==h){try{history.replaceState(null,"",h)}catch(_){}}return}
-  const an=cardAniversarios();if(an){const kp=ve.querySelector(".kpis");if(kp)kp.before(an)}}}
+  const an=cardAniversarios();if(an){const tb=ve.querySelector(".np-toolbar"),kp=ve.querySelector(".kpis");if(rhV3()&&tb)tb.after(an);else if(kp)kp.before(an)}}}
 // rota #equipe/<id>
 {const _a=window.aplicarHash;if(typeof _a==="function")window.aplicarHash=function(){const r=_a();const [tab,id]=(location.hash||"").slice(1).split("/");if(tab==="equipe"){if(id&&id!==R.sel){R.sel=id;R.dados=null;carregar(id)}else if(!id&&R.sel){R.sel=null;R.dados=null}}return r}}
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){const [tab,id]=(location.hash||"").slice(1).split("/");if(tab==="equipe"&&id)abrir(id)}});

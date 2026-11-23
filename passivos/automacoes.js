@@ -54,13 +54,84 @@
   }
 
   // ---------- render ----------
+  const auV3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const confirmarPublicacao = (publicarAlvo, onDone) => {
+    const f = A.sel;
+    if (auV3() && NPUI.confirmar) {
+      NPUI.confirmar({
+        titulo: publicarAlvo ? "Publicar automação?" : "Despublicar automação?",
+        texto: publicarAlvo
+          ? `Ao publicar “${f.nome}”, o fluxo passará a disparar ações automáticas (incluindo mensagens de WhatsApp via ChatGuru) para os leads que atenderem aos acionadores.`
+          : `Ao despublicar “${f.nome}”, o fluxo volta para rascunho e deixa de inscrever novos leads automaticamente.`,
+        rotuloSim: publicarAlvo ? "Publicar fluxo" : "Voltar para rascunho",
+        rotuloNao: "Cancelar",
+        perigo: publicarAlvo,
+        onSim: async () => { const ok = await salvar(publicarAlvo); if (onDone) onDone(ok); }
+      });
+      return;
+    }
+    salvar(publicarAlvo).then((ok) => { if (onDone) onDone(ok); });
+  };
+
   function renderAuto() {
     const v = $("#view-automacoes"); if (!v) return;
+    const v3 = auV3();
+    v.classList.toggle("np-v3", v3);
     v.replaceChildren();
-    if (!A.ok) { if (!A.carregando) carregar(); v.append(el("div", { class: "note" }, "Carregando…")); return; }
+    if (!A.ok) { if (!A.carregando) carregar(); v.append(v3 ? NPUI.carregando(5) : el("div", { class: "note" }, "Carregando…")); return; }
     if (A.sel) renderBuilder(v); else renderLista(v);
   }
   function renderLista(v) {
+    const v3 = auV3();
+    if (v3) {
+      const pubs = A.lista.filter((f) => !!f.ativo).length;
+      const rascs = A.lista.length - pubs;
+      const ativasTot = A.lista.reduce((s, f) => s + (+f.ativas || 0), 0);
+      const segAbas = NPUI.seg([["todos", "Todos"], ["publicados", "Publicados"], ["rascunhos", "Rascunhos"]], A.abaLista, (k) => { A.abaLista = k; renderAuto(); });
+      const q = el("input", { type: "search", class: "np-tb-busca", value: A.busca, placeholder: "Pesquisar fluxos…", "aria-label": "Pesquisar fluxos de automação" });
+      q.oninput = () => { A.busca = q.value; renderAuto(); q.focus(); };
+      const criarPasta = () => {
+        const inpP = inp("text", "", { placeholder: "Nome da pasta" });
+        modal("Nova pasta de automações", el("div", { class: "form", style: "grid-template-columns:1fr" }, field("au-np", "Nome da pasta", inpP)), async () => {
+          if (!inpP.value.trim()) throw new Error("Informe o nome da pasta");
+          A.pastasNovas = [...(A.pastasNovas || []), inpP.value.trim()];
+          renderAuto();
+        });
+      };
+      v.append(NPUI.toolbar({
+        resumo: NPUI.resumo([
+          { n: A.lista.length, label: A.lista.length === 1 ? "fluxo" : "fluxos" },
+          ...(pubs ? [{ n: pubs, label: pubs === 1 ? "publicado" : "publicados", tom: "ok" }] : []),
+          ...(rascs ? [{ n: rascs, label: rascs === 1 ? "rascunho" : "rascunhos", tom: "att" }] : []),
+          ...(ativasTot ? [{ n: ativasTot, label: "inscrições ativas", tom: "info" }] : [])
+        ]),
+        direita: [segAbas, q, NPUI.btn("Criar pasta", { onclick: criarPasta }), NPUI.btn("+ Novo fluxo", { variante: "pri", onclick: () => novo() })]
+      }));
+
+      const lista = A.lista.filter((f) => (A.abaLista === "todos" || (A.abaLista === "publicados") === !!f.ativo) && (!A.busca || (f.nome || "").toLowerCase().includes(A.busca.toLowerCase())));
+      const pastas = [...new Set([...(A.pastasNovas || []), ...lista.map((f) => f.pasta).filter(Boolean)])].sort();
+      if (pastas.length) {
+        v.append(el("div", { class: "np-kb-filtros" }, el("div", { class: "np-filtros" },
+          NPUI.chip({ label: "Todas as pastas", on: !A.pastaFiltro, onclick: () => { A.pastaFiltro = ""; renderAuto(); } }),
+          ...pastas.map((p) => NPUI.chip({ label: p, on: A.pastaFiltro === p, onclick: () => { A.pastaFiltro = A.pastaFiltro === p ? "" : p; renderAuto(); } }))
+        )));
+      }
+      const vis = A.pastaFiltro ? lista.filter((f) => f.pasta === A.pastaFiltro) : lista;
+      if (!vis.length) {
+        v.append(NPUI.vazio({ titulo: "Nenhum fluxo encontrado", texto: "Crie um novo fluxo de trabalho ou ajuste os filtros acima." }));
+      } else {
+        const rows = vis.map((f) => NPUI.linha({
+          id: String(f.id),
+          prazo: { curta: `${f.ativas || 0} atv.`, exata: `${f.execucoes || 0} inscritos · ${f.ativas || 0} ativos` },
+          titulo: f.nome,
+          contexto: [f.pasta || null, f.descricao || null, `${f.execucoes || 0} inscrito(s)`, `atualizado ${fmtDH(f.updated_at)}`].filter(Boolean).join(" · "),
+          direita: [f.ativo ? NPUI.marca("Publicado", "ok") : NPUI.marca("Rascunho", "")],
+          onOpen: () => abrir(f.id)
+        }));
+        v.append(NPUI.grupo({ id: "au-lista", titulo: A.pastaFiltro ? `Pasta · ${A.pastaFiltro}` : "Fluxos de trabalho", n: rows.length, itens: rows }));
+      }
+      return;
+    }
     v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Comercial"), el("h1", {}, "Automações"), el("div", { class: "sub" }, "Fluxos de trabalho: acionadores + passos (mensagens de WhatsApp pelo ChatGuru, esperas, tarefas, etapas, tags e condições). Publique para valer para os leads.")),
       el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { const n = prompt("Nome da pasta:"); if (n && n.trim()) { A.pastasNovas = [...(A.pastasNovas || []), n.trim()]; renderAuto(); } } }, "Criar pasta"), el("button", { class: "btn primary", onclick: () => novo() }, "+ Criar fluxo de trabalho"))));
     const q = inp("search", A.busca, { placeholder: "Pesquisar…" }); q.oninput = () => { A.busca = q.value; renderAuto(); q.focus(); };
@@ -76,7 +147,17 @@
   }
   function novo() { A.sel = { id: null, nome: "Novo fluxo", descricao: "", pasta: "", ativo: false, parar_ao_responder: true, parar_ao_mudar_fase: true, definicao: { gatilhos: [], passos: [] } }; A.dirty = true; A.abaB = "construtor"; A.painel = null; A.execs = []; A.execsOk = false; location.hash = "#automacoes/novo"; renderAuto(); }
   function abrir(id) { const f = A.lista.find((x) => x.id === id); if (!f) return; A.sel = { ...f, definicao: { gatilhos: [], passos: [], ...(f.definicao || {}) } }; A.dirty = false; A.abaB = "construtor"; A.painel = null; A.execs = []; A.execsOk = false; location.hash = "#automacoes/" + id; renderAuto(); }
-  function fechar() { if (A.dirty && !confirm("Há alterações não salvas. Sair mesmo assim?")) return; A.sel = null; location.hash = "#automacoes"; invalidar(); }
+  function fechar() {
+    const sair = () => { A.sel = null; A.dirty = false; location.hash = "#automacoes"; invalidar(); };
+    if (A.dirty) {
+      if (auV3() && NPUI.confirmar) {
+        NPUI.confirmar({ titulo: "Descartar alterações não salvas?", texto: "Há alterações pendentes neste fluxo. Deseja voltar para a lista sem salvar?", rotuloSim: "Sair sem salvar", rotuloNao: "Continuar editando", perigo: true, onSim: sair });
+        return;
+      }
+      if (!confirm("Há alterações não salvas. Sair mesmo assim?")) return;
+    }
+    sair();
+  }
   async function salvar(publicar) {
     const f = A.sel; if (!f.nome.trim()) { toast("Dê um nome ao fluxo"); return false; }
     const def = compilar(f.definicao);
@@ -94,23 +175,49 @@
   // ---------- construtor ----------
   function renderBuilder(v) {
     const f = A.sel;
-    const nome = inp("text", f.nome, { style: "font-size:18px;font-weight:700;border:none;background:transparent;min-width:280px" }); nome.oninput = () => { f.nome = nome.value; A.dirty = true; };
-    const toggle = el("label", { style: "display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer" }, el("span", { class: "note" }, "Rascunho"), (() => { const c = el("input", { type: "checkbox", checked: f.ativo ? "" : null, style: "width:18px;height:18px;accent-color:var(--gold)" }); c.onchange = async () => { const ok = await salvar(c.checked); if (!ok) c.checked = !c.checked; }; return c; })(), el("span", {}, "Publicar"));
-    v.append(el("div", { class: "head", style: "align-items:center" }, el("div", { style: "display:flex;align-items:center;gap:10px" }, el("button", { class: "btn", onclick: fechar }, "← Lista de fluxos"), nome, el("span", { class: "pill " + (f.ativo ? "e1" : "c") }, f.ativo ? "Publicado" : "Rascunho")),
-      el("div", { class: "actions", style: "align-items:center" }, el("button", { class: "btn", onclick: testar }, "Testar fluxo de trabalho"), toggle, el("button", { class: "btn primary", onclick: () => salvar() }, A.dirty ? "Salvar" : "Salvo"))));
-    v.append(el("div", { class: "tabs", style: "margin-bottom:12px" }, [["construtor", "Construtor"], ["config", "Configurações"], ["inscricoes", `Histórico de inscrições`], ["registros", "Registros de execução"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String(A.abaB === k), onclick: () => { A.abaB = k; if ((k === "inscricoes" || k === "registros") && f.id && !A.execsOk) carregarExecs(f.id); renderAuto(); } }, t))));
+    const v3 = auV3();
+    if (v3) {
+      const nome = inp("text", f.nome, { class: "np-au-nome", "aria-label": "Nome do fluxo" });
+      nome.oninput = () => { f.nome = nome.value; A.dirty = true; };
+      const segAbas = NPUI.seg([
+        ["construtor", "Construtor"],
+        ["config", "Configurações"],
+        ["inscricoes", "Inscrições"],
+        ["registros", "Registros"]
+      ], A.abaB, (k) => { A.abaB = k; if ((k === "inscricoes" || k === "registros") && f.id && !A.execsOk) carregarExecs(f.id); renderAuto(); });
+      v.append(NPUI.toolbar({
+        resumo: el("div", { class: "np-tb-esq" },
+          NPUI.btn("← Fluxos", { onclick: fechar }),
+          NPUI.sepv(),
+          nome,
+          f.ativo ? NPUI.marca("Publicado", "ok") : NPUI.marca("Rascunho", "")
+        ),
+        direita: [
+          NPUI.btn("Testar", { onclick: testar }),
+          NPUI.btn(f.ativo ? "Despublicar" : "Publicar", { onclick: () => confirmarPublicacao(!f.ativo) }),
+          NPUI.btn(A.dirty ? "Salvar" : "Salvo", { variante: "pri", onclick: () => salvar() })
+        ]
+      }));
+      v.append(el("div", { class: "np-kb-filtros" }, segAbas));
+    } else {
+      const nome = inp("text", f.nome, { style: "font-size:18px;font-weight:700;border:none;background:transparent;min-width:280px" }); nome.oninput = () => { f.nome = nome.value; A.dirty = true; };
+      const toggle = el("label", { style: "display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer" }, el("span", { class: "note" }, "Rascunho"), (() => { const c = el("input", { type: "checkbox", checked: f.ativo ? "" : null, style: "width:18px;height:18px;accent-color:var(--gold)" }); c.onchange = async () => { const ok = await salvar(c.checked); if (!ok) c.checked = !c.checked; }; return c; })(), el("span", {}, "Publicar"));
+      v.append(el("div", { class: "head", style: "align-items:center" }, el("div", { style: "display:flex;align-items:center;gap:10px" }, el("button", { class: "btn", onclick: fechar }, "← Lista de fluxos"), nome, el("span", { class: "pill " + (f.ativo ? "e1" : "c") }, f.ativo ? "Publicado" : "Rascunho")),
+        el("div", { class: "actions", style: "align-items:center" }, el("button", { class: "btn", onclick: testar }, "Testar fluxo de trabalho"), toggle, el("button", { class: "btn primary", onclick: () => salvar() }, A.dirty ? "Salvar" : "Salvo"))));
+      v.append(el("div", { class: "tabs", style: "margin-bottom:12px" }, [["construtor", "Construtor"], ["config", "Configurações"], ["inscricoes", `Histórico de inscrições`], ["registros", "Registros de execução"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String(A.abaB === k), onclick: () => { A.abaB = k; if ((k === "inscricoes" || k === "registros") && f.id && !A.execsOk) carregarExecs(f.id); renderAuto(); } }, t))));
+    }
     if (A.abaB === "construtor") renderCanvas(v);
     else if (A.abaB === "config") renderConfig(v);
     else if (A.abaB === "inscricoes") renderInscricoes(v);
     else renderRegistros(v);
   }
   function renderCanvas(v) {
-    const f = A.sel, def = f.definicao;
+    const f = A.sel, def = f.definicao, v3 = auV3();
     const wrap = el("div", { class: "au-wrap" });
     const canvas = el("div", { class: "au-canvas" });
     // acionadores
     const trig = el("div", { class: "au-trigs" });
-    for (const g of def.gatilhos) { const G = GATILHOS[g.tipo] || { t: g.tipo, i: "•", desc: () => "" }; trig.append(el("div", { class: "au-node au-trig" + (A.painel?.id === g.id ? " sel" : ""), onclick: () => { A.painel = { kind: "gatilho", id: g.id }; renderAuto(); } }, el("div", { class: "au-ic", style: "background:#0c1f38" }, G.i), el("div", { class: "au-body" }, el("div", { class: "au-t" }, G.t), el("div", { class: "au-d" }, G.desc(g.config || {}))), el("button", { class: "au-x", title: "Remover", onclick: (e) => { e.stopPropagation(); def.gatilhos = def.gatilhos.filter((x) => x.id !== g.id); A.dirty = true; A.painel = null; renderAuto(); } }, "×"))); }
+    for (const g of def.gatilhos) { const G = GATILHOS[g.tipo] || { t: g.tipo, i: "•", desc: () => "" }; trig.append(el("div", { class: "au-node au-trig" + (A.painel?.id === g.id ? " sel" : ""), onclick: () => { A.painel = { kind: "gatilho", id: g.id }; renderAuto(); } }, el("div", { class: "au-ic", "data-tipo": "gatilho", style: v3 ? "" : "background:#0c1f38" }, G.i), el("div", { class: "au-body" }, el("div", { class: "au-t" }, G.t), el("div", { class: "au-d" }, G.desc(g.config || {}))), el("button", { class: "au-x", title: "Remover", onclick: (e) => { e.stopPropagation(); def.gatilhos = def.gatilhos.filter((x) => x.id !== g.id); A.dirty = true; A.painel = null; renderAuto(); } }, "×"))); }
     trig.append(el("button", { class: "au-add-trig", onclick: () => { A.painel = { kind: "novo_gatilho" }; renderAuto(); } }, "+ Adicionar novo acionador"));
     canvas.append(trig, el("div", { class: "au-line" }));
     canvas.append(renderLista_(def.passos, null));
@@ -119,12 +226,23 @@
   }
   // lista de passos (recursiva) — lista: array; dono: {lista} onde inserir
   function renderLista_(lista, fimLabel) {
-    const col = el("div", { class: "au-col" });
+    const col = el("div", { class: "au-col" }), v3 = auV3();
     col.append(botaoMais(lista, 0));
     lista.forEach((n, i) => {
       const P = PASSOS[n.tipo] || { t: n.tipo, i: "•", cor: "#999", desc: () => "" };
-      const card = el("div", { class: "au-node" + (A.painel?.id === n.id ? " sel" : ""), onclick: () => { A.painel = { kind: "passo", id: n.id }; renderAuto(); } }, el("div", { class: "au-ic", style: `background:${P.cor}` }, P.i), el("div", { class: "au-body" }, el("div", { class: "au-t" }, P.t), el("div", { class: "au-d" }, P.desc(n.config || {}))),
-        el("div", { class: "au-menu" }, el("button", { class: "au-x", title: "Duplicar", onclick: (e) => { e.stopPropagation(); lista.splice(i + 1, 0, clonar(n)); A.dirty = true; renderAuto(); } }, "⧉"), el("button", { class: "au-x", title: "Excluir", onclick: (e) => { e.stopPropagation(); if (n.tipo === "condicao" && ((n.sim || []).length || (n.nao || []).length) && !confirm("Excluir a condição e os passos dos dois ramos?")) return; lista.splice(i, 1); A.dirty = true; if (A.painel?.id === n.id) A.painel = null; renderAuto(); } }, "×")));
+      const removerPasso = () => { lista.splice(i, 1); A.dirty = true; if (A.painel?.id === n.id) A.painel = null; renderAuto(); };
+      const card = el("div", { class: "au-node" + (A.painel?.id === n.id ? " sel" : ""), onclick: () => { A.painel = { kind: "passo", id: n.id }; renderAuto(); } }, el("div", { class: "au-ic", "data-tipo": n.tipo, style: v3 ? "" : `background:${P.cor}` }, P.i), el("div", { class: "au-body" }, el("div", { class: "au-t" }, P.t), el("div", { class: "au-d" }, P.desc(n.config || {}))),
+        el("div", { class: "au-menu" }, el("button", { class: "au-x", title: "Duplicar", onclick: (e) => { e.stopPropagation(); lista.splice(i + 1, 0, clonar(n)); A.dirty = true; renderAuto(); } }, "⧉"), el("button", { class: "au-x", title: "Excluir", onclick: (e) => {
+          e.stopPropagation();
+          if (n.tipo === "condicao" && ((n.sim || []).length || (n.nao || []).length)) {
+            if (v3 && NPUI.confirmar) {
+              NPUI.confirmar({ titulo: "Excluir condição e ramos?", texto: "Esta condição possui passos nos caminhos Sim/Não. Todos serão removidos do fluxo.", rotuloSim: "Excluir condição", perigo: true, onSim: removerPasso });
+              return;
+            }
+            if (!confirm("Excluir a condição e os passos dos dois ramos?")) return;
+          }
+          removerPasso();
+        } }, "×")));
       col.append(card);
       if (n.tipo === "condicao") {
         n.sim = n.sim || []; n.nao = n.nao || [];
@@ -141,8 +259,9 @@
     return el("div", { class: "au-plus-wrap" }, b);
   }
   function abrirPicker(btn, lista, pos) {
+    const v3 = auV3();
     document.querySelectorAll(".au-picker").forEach((p) => p.remove());
-    const pk = el("div", { class: "au-picker" }, el("div", { class: "note", style: "padding:4px 8px" }, "Adicionar passo"), ...Object.entries(PASSOS).map(([k, P]) => el("button", { class: "au-pick", onclick: () => { const n = { id: uid(), tipo: k, config: padrao(k) }; if (k === "condicao") { n.sim = []; n.nao = []; } lista.splice(pos, 0, n); A.dirty = true; A.painel = { kind: "passo", id: n.id }; renderAuto(); } }, el("span", { class: "au-ic sm", style: `background:${P.cor}` }, P.i), P.t)));
+    const pk = el("div", { class: "au-picker" }, el("div", { class: "note", style: "padding:4px 8px" }, "Adicionar passo"), ...Object.entries(PASSOS).map(([k, P]) => el("button", { class: "au-pick", onclick: () => { const n = { id: uid(), tipo: k, config: padrao(k) }; if (k === "condicao") { n.sim = []; n.nao = []; } lista.splice(pos, 0, n); A.dirty = true; A.painel = { kind: "passo", id: n.id }; renderAuto(); } }, el("span", { class: "au-ic sm", "data-tipo": k, style: v3 ? "" : `background:${P.cor}` }, P.i), P.t)));
     btn.parentElement.append(pk);
     setTimeout(() => document.addEventListener("click", function h(e) { if (!pk.contains(e.target)) { pk.remove(); document.removeEventListener("click", h); } }), 0);
   }
@@ -151,7 +270,7 @@
 
   // ---------- painel lateral ----------
   function renderPainel() {
-    const f = A.sel, p = A.painel; const box = el("div", { class: "au-side" });
+    const f = A.sel, p = A.painel, v3 = auV3(); const box = el("div", { class: "au-side" });
     if (!p) { box.append(el("h3", {}, "Construtor"), el("p", { class: "note" }, "Clique em um acionador ou passo para editar. Use o \"+\" para inserir passos entre os existentes. Condições criam dois caminhos (Sim / Não) que se juntam depois."), el("div", { class: "note", style: "margin-top:10px" }, "Variáveis nas mensagens: {primeiro_nome} {nome} {empresa} {proprietario} {reuniao} {reuniao_data} {reuniao_hora} {link_reuniao}")); return box; }
     const fechar = el("button", { class: "au-x", style: "float:right", onclick: () => { A.painel = null; renderAuto(); } }, "×");
     const marca = () => { A.dirty = true; };
@@ -173,12 +292,12 @@
       tipo.onchange = () => { g.tipo = tipo.value; g.config = {}; marca(); desenhar(); renderCanvasOnly(); };
       desenhar();
       box.append(el("div", { class: "form", style: "grid-template-columns:1fr" }, field("g-tipo", "Quando", tipo)), cfgBox);
-      if (p.kind === "novo_gatilho") box.append(el("div", { class: "actions", style: "margin-top:10px" }, el("button", { class: "btn primary", onclick: () => { f.definicao.gatilhos.push(g); A.painel = { kind: "gatilho", id: g.id }; marca(); renderAuto(); } }, "Adicionar acionador")));
+      if (p.kind === "novo_gatilho") box.append(el("div", { class: "actions", style: "margin-top:10px" }, el("button", { class: v3 ? "np-btn pri" : "btn primary", onclick: () => { f.definicao.gatilhos.push(g); A.painel = { kind: "gatilho", id: g.id }; marca(); renderAuto(); } }, "Adicionar acionador")));
       return box;
     }
     const n = acharPasso(p.id); if (!n) return box;
     const P = PASSOS[n.tipo]; const c = n.config = n.config || {};
-    box.append(fechar, el("h3", {}, el("span", { class: "au-ic sm", style: `background:${P.cor};margin-right:8px` }, P.i), P.t));
+    box.append(fechar, el("h3", {}, el("span", { class: "au-ic sm", "data-tipo": n.tipo, style: (v3 ? "" : `background:${P.cor};`) + "margin-right:8px" }, P.i), P.t));
     const form = el("div", { class: "form", style: "grid-template-columns:1fr" });
     const upd = () => { marca(); renderCanvasOnly(); };
     if (n.tipo === "esperar") {
@@ -193,7 +312,7 @@
       form.append(field("e-rel", "Esperar", rel), linha, el("p", { class: "note" }, "As mensagens só saem em horário comercial; fora dele, ficam para o próximo horário."));
     } else if (n.tipo === "mensagem") {
       const ta = el("textarea", { rows: "9", style: "width:100%", placeholder: "Olá {primeiro_nome}, aqui é {proprietario}, da Neves Pádua…" }, c.texto || ""); ta.oninput = () => { c.texto = ta.value; upd(); };
-      form.append(el("div", { class: "f" }, el("label", {}, "Mensagem de WhatsApp"), ta), el("div", { class: "note", style: "display:flex;gap:4px;flex-wrap:wrap" }, "Inserir: ", ...["{primeiro_nome}", "{nome}", "{empresa}", "{proprietario}", "{reuniao}", "{link_reuniao}"].map((vv) => el("button", { class: "btn sm", onclick: () => { const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + vv + ta.value.slice(ta.selectionEnd ?? s); c.texto = ta.value; ta.focus(); upd(); } }, vv))), el("p", { class: "note" }, "Enviada pelo ChatGuru para o WhatsApp do lead; vira observação no lead. *texto* fica em negrito."));
+      form.append(el("div", { class: "f" }, el("label", {}, "Mensagem de WhatsApp"), ta), el("div", { class: "note", style: "display:flex;gap:4px;flex-wrap:wrap" }, "Inserir: ", ...["{primeiro_nome}", "{nome}", "{empresa}", "{proprietario}", "{reuniao}", "{link_reuniao}"].map((vv) => el("button", { class: v3 ? "np-btn" : "btn sm", onclick: () => { const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + vv + ta.value.slice(ta.selectionEnd ?? s); c.texto = ta.value; ta.focus(); upd(); } }, vv))), el("p", { class: "note" }, "Enviada pelo ChatGuru para o WhatsApp do lead; vira observação no lead. *texto* fica em negrito."));
     } else if (n.tipo === "tarefa") {
       const t = inp("text", c.titulo || ""), tp = sel({ ligar: "Ligar", whatsapp: "WhatsApp", social_selling: "Social selling", follow_up: "Follow-up", tarefa: "Tarefa" }, c.tarefa_tipo || "ligar"), pz = inp("number", String((c.prazo_minutos || 0) / 60), { min: "0", step: "1" });
       t.oninput = () => { c.titulo = t.value; upd(); }; tp.onchange = () => { c.tarefa_tipo = tp.value; upd(); }; pz.oninput = () => { c.prazo_minutos = (+pz.value || 0) * 60; upd(); };
@@ -217,37 +336,68 @@
     box.append(form);
     return box;
   }
-  function renderCanvasOnly() { const v = $("#view-automacoes"); const old = v.querySelector(".au-canvas"); if (!old) return; const tmp = el("div", {}); renderCanvas(tmp); old.replaceWith(tmp.querySelector(".au-canvas")); const b = v.querySelector(".head .btn.primary"); if (b) b.textContent = "Salvar"; }
+  function renderCanvasOnly() { const v = $("#view-automacoes"); const old = v.querySelector(".au-canvas"); if (!old) return; const tmp = el("div", {}); renderCanvas(tmp); old.replaceWith(tmp.querySelector(".au-canvas")); const b = v.querySelector(".head .btn.primary, .np-toolbar .np-btn.pri"); if (b) b.textContent = "Salvar"; }
 
   function renderConfig(v) {
-    const f = A.sel; const nome = inp("text", f.nome), desc = inp("text", f.descricao || ""), pasta = inp("text", f.pasta || "", { list: "au-pastas", placeholder: "Opcional" });
+    const f = A.sel, v3 = auV3();
+    const nome = inp("text", f.nome), desc = inp("text", f.descricao || ""), pasta = inp("text", f.pasta || "", { list: "au-pastas", placeholder: "Opcional" });
     const pr = el("input", { type: "checkbox", checked: f.parar_ao_responder ? "" : null }), pf = el("input", { type: "checkbox", checked: f.parar_ao_mudar_fase ? "" : null });
     const m = () => { f.nome = nome.value; f.descricao = desc.value; f.pasta = pasta.value.trim(); f.parar_ao_responder = pr.checked; f.parar_ao_mudar_fase = pf.checked; A.dirty = true; };
     [nome, desc, pasta].forEach((x) => x.oninput = m); pr.onchange = m; pf.onchange = m;
-    v.append(el("div", { class: "card section", style: "max-width:720px" }, el("div", { class: "form", style: "grid-template-columns:1fr" }, field("cf-n", "Nome", nome), field("cf-d", "Descrição", desc), field("cf-p", "Pasta", pasta), el("datalist", { id: "au-pastas" }, [...new Set(A.lista.map((x) => x.pasta).filter(Boolean))].map((p) => el("option", { value: p }))),
-      el("div", { class: "f" }, el("label", {}, "Interromper o fluxo quando…"), el("label", { style: "display:flex;gap:8px;align-items:center;font-weight:400" }, pr, "o lead responder no WhatsApp (recomendado para follow-ups)"), el("label", { style: "display:flex;gap:8px;align-items:center;font-weight:400" }, pf, "o lead mudar de etapa ou for fechado (exceto mudanças feitas pelo próprio fluxo)"))),
-      el("div", { class: "actions", style: "margin-top:10px" }, el("button", { class: "btn primary", onclick: () => salvar() }, "Salvar"), f.id ? el("button", { class: "btn danger", onclick: async () => { if (!confirm(`Excluir o fluxo "${f.nome}"? Execuções em andamento serão canceladas.`)) return; const { error } = await SB.from("fluxos_mensagens").delete().eq("id", f.id); if (error) { toast(error.message); return; } toast("Fluxo excluído"); A.sel = null; A.dirty = false; location.hash = "#automacoes"; invalidar(); } }, "Excluir fluxo") : null)));
+    const execExcluirFluxo = async () => {
+      const { error } = await SB.from("fluxos_mensagens").delete().eq("id", f.id);
+      if (error) { toast(error.message); throw error; }
+      toast("Fluxo excluído"); A.sel = null; A.dirty = false; location.hash = "#automacoes"; invalidar();
+    };
+    const pedirExcluir = () => {
+      if (v3 && NPUI.confirmar) {
+        NPUI.confirmar({ titulo: "Excluir fluxo de automação?", texto: `O fluxo “${f.nome}” será removido permanentemente e todas as execuções em andamento serão canceladas.`, rotuloSim: "Excluir fluxo", perigo: true, onSim: execExcluirFluxo });
+        return;
+      }
+      if (!confirm(`Excluir o fluxo "${f.nome}"? Execuções em andamento serão canceladas.`)) return;
+      execExcluirFluxo().catch(() => {});
+    };
+    v.append(el("div", { class: v3 ? "np-cfg-sec np-form-leitura" : "card section", style: v3 ? "" : "max-width:720px" },
+      el("div", { class: "form", style: "grid-template-columns:1fr" }, field("cf-n", "Nome", nome), field("cf-d", "Descrição", desc), field("cf-p", "Pasta", pasta), el("datalist", { id: "au-pastas" }, [...new Set(A.lista.map((x) => x.pasta).filter(Boolean))].map((p) => el("option", { value: p }))),
+        el("div", { class: "f" }, el("label", {}, "Interromper o fluxo quando…"), el("label", { style: "display:flex;gap:8px;align-items:center;font-weight:400" }, pr, "o lead responder no WhatsApp (recomendado para follow-ups)"), el("label", { style: "display:flex;gap:8px;align-items:center;font-weight:400" }, pf, "o lead mudar de etapa ou for fechado (exceto mudanças feitas pelo próprio fluxo)"))),
+      el("div", { class: v3 ? "np-form-rod" : "actions", style: v3 ? "" : "margin-top:10px" },
+        el("button", { class: v3 ? "np-btn pri" : "btn primary", onclick: () => salvar() }, "Salvar"),
+        f.id ? el("button", { class: v3 ? "np-btn danger" : "btn danger", onclick: pedirExcluir }, "Excluir fluxo") : null)));
   }
-  const ST = { ativo: ["Em andamento", "g"], concluido: ["Concluído", "e1"], cancelado: ["Interrompido", "c"] };
+  const ST = { ativo: ["Em andamento", "g", "info"], concluido: ["Concluído", "e1", "ok"], cancelado: ["Interrompido", "c", ""] };
   function renderInscricoes(v) {
-    if (!A.sel.id) { v.append(el("div", { class: "note" }, "Salve o fluxo para ver as inscrições.")); return; }
-    if (!A.execsOk) { v.append(el("div", { class: "note" }, "Carregando…")); return; }
-    v.append(el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Lead", "Etapa atual", "Inscrito em", "Motivo", "Situação", "Passo atual", "Próximo passo", ""].map((h) => el("th", {}, h)))),
-      el("tbody", {}, A.execs.length ? A.execs.map((x) => { const no = A.sel.definicao.nos?.[x.no_atual]; return el("tr", {}, el("td", {}, el("b", {}, x.lead_nome), x.lead_empresa ? el("div", { class: "note" }, x.lead_empresa) : null), el("td", { class: "note" }, x.lead_fase_nome || "—"), el("td", { class: "note" }, fmtDH(x.created_at)), el("td", { class: "note" }, x.contexto?.motivo || "—"), el("td", {}, el("span", { class: "pill " + (ST[x.status]?.[1] || "c") }, ST[x.status]?.[0] || x.status), x.motivo && x.status !== "ativo" ? el("div", { class: "note" }, x.motivo) : null), el("td", { class: "note" }, x.status === "ativo" && no ? PASSOS[no.tipo]?.t + " — " + PASSOS[no.tipo]?.desc(no.config || {}) : "—"), el("td", { class: "note" }, x.status === "ativo" && x.proximo_em ? fmtDH(x.proximo_em) : "—"), el("td", {}, x.status === "ativo" ? el("button", { class: "btn sm", onclick: async () => { const { error } = await SB.rpc("fluxo_execucao_cancelar", { p_exec: x.id }); if (error) { toast(error.message); return; } toast("Execução cancelada"); carregarExecs(A.sel.id); } }, "Cancelar") : null)); }) : el("tr", {}, el("td", { colspan: "8", class: "note" }, "Nenhum lead inscrito ainda."))))));
+    const v3 = auV3();
+    if (!A.sel.id) { v.append(v3 ? NPUI.vazio({ titulo: "Fluxo ainda não salvo", texto: "Salve o fluxo para consultar o histórico de inscrições." }) : el("div", { class: "note" }, "Salve o fluxo para ver as inscrições.")); return; }
+    if (!A.execsOk) { v.append(v3 ? NPUI.carregando(5) : el("div", { class: "note" }, "Carregando…")); return; }
+    v.append(el("div", { class: v3 ? "np-ts-tbl-wrap" : "card", style: v3 ? "" : "padding:0;overflow:auto" }, el("table", { class: v3 ? "np-ts-tbl" : "tbl" }, el("thead", {}, el("tr", {}, ...["Lead", "Etapa atual", "Inscrito em", "Motivo", "Situação", "Passo atual", "Próximo passo", ""].map((h) => el("th", {}, h)))),
+      el("tbody", {}, A.execs.length ? A.execs.map((x) => { const no = A.sel.definicao.nos?.[x.no_atual]; return el("tr", {}, el("td", {}, el("b", {}, x.lead_nome), x.lead_empresa ? el("div", { class: v3 ? "np-ts-sub" : "note" }, x.lead_empresa) : null), el("td", { class: v3 ? "np-ts-sub" : "note" }, x.lead_fase_nome || "—"), el("td", { class: v3 ? "np-ts-sub np-num" : "note" }, fmtDH(x.created_at)), el("td", { class: v3 ? "np-ts-sub" : "note" }, x.contexto?.motivo || "—"), el("td", {}, v3 ? NPUI.marca(ST[x.status]?.[0] || x.status, ST[x.status]?.[2] || "") : el("span", { class: "pill " + (ST[x.status]?.[1] || "c") }, ST[x.status]?.[0] || x.status), x.motivo && x.status !== "ativo" ? el("div", { class: v3 ? "np-ts-sub" : "note" }, x.motivo) : null), el("td", { class: v3 ? "np-ts-sub" : "note" }, x.status === "ativo" && no ? PASSOS[no.tipo]?.t + " — " + PASSOS[no.tipo]?.desc(no.config || {}) : "—"), el("td", { class: v3 ? "np-ts-sub np-num" : "note" }, x.status === "ativo" && x.proximo_em ? fmtDH(x.proximo_em) : "—"), el("td", {}, x.status === "ativo" ? el("button", { class: v3 ? "np-btn" : "btn sm", onclick: async () => { const { error } = await SB.rpc("fluxo_execucao_cancelar", { p_exec: x.id }); if (error) { toast(error.message); return; } toast("Execução cancelada"); carregarExecs(A.sel.id); } }, "Cancelar") : null)); }) : el("tr", {}, el("td", { colspan: "8", class: v3 ? "np-ts-sub" : "note" }, "Nenhum lead inscrito ainda."))))));
   }
   function renderRegistros(v) {
-    if (!A.sel.id) { v.append(el("div", { class: "note" }, "Salve o fluxo para ver os registros.")); return; }
-    if (!A.execsOk) { v.append(el("div", { class: "note" }, "Carregando…")); return; }
+    const v3 = auV3();
+    if (!A.sel.id) { v.append(v3 ? NPUI.vazio({ titulo: "Fluxo ainda não salvo", texto: "Salve o fluxo para consultar os registros de execução." }) : el("div", { class: "note" }, "Salve o fluxo para ver os registros.")); return; }
+    if (!A.execsOk) { v.append(v3 ? NPUI.carregando(5) : el("div", { class: "note" }, "Carregando…")); return; }
     const linhas = []; for (const x of A.execs) for (const h of x.historico || []) linhas.push({ em: h.em, lead: x.lead_nome, tipo: h.tipo, texto: h.texto, teste: x.contexto?.teste });
     linhas.sort((a, b) => (b.em || "").localeCompare(a.em || ""));
-    v.append(el("div", { class: "card", style: "padding:0;overflow:auto" }, el("table", { class: "tbl" }, el("thead", {}, el("tr", {}, ...["Quando", "Lead", "Ação", "Detalhe"].map((h) => el("th", {}, h)))),
-      el("tbody", {}, linhas.length ? linhas.slice(0, 400).map((l) => el("tr", {}, el("td", { class: "note" }, fmtDH(l.em)), el("td", {}, l.lead, l.teste ? el("span", { class: "pill c", style: "margin-left:6px" }, "teste") : null), el("td", {}, el("span", { class: "pill " + (l.tipo === "mensagem" ? "e1" : l.tipo === "parado" ? "e3" : "c") }, PASSOS[l.tipo]?.t || l.tipo)), el("td", { class: "note" }, l.texto))) : el("tr", {}, el("td", { colspan: "4", class: "note" }, "Nenhuma execução registrada."))))));
+    v.append(el("div", { class: v3 ? "np-ts-tbl-wrap" : "card", style: v3 ? "" : "padding:0;overflow:auto" }, el("table", { class: v3 ? "np-ts-tbl" : "tbl" }, el("thead", {}, el("tr", {}, ...["Quando", "Lead", "Ação", "Detalhe"].map((h) => el("th", {}, h)))),
+      el("tbody", {}, linhas.length ? linhas.slice(0, 400).map((l) => el("tr", {}, el("td", { class: v3 ? "np-ts-sub np-num" : "note" }, fmtDH(l.em)), el("td", {}, l.lead, l.teste ? (v3 ? el("span", { style: "margin-left:6px" }, NPUI.marca("Teste", "muted")) : el("span", { class: "pill c", style: "margin-left:6px" }, "teste")) : null), el("td", {}, v3 ? NPUI.marca(PASSOS[l.tipo]?.t || l.tipo, l.tipo === "mensagem" ? "ok" : l.tipo === "parado" ? "crit" : "muted") : el("span", { class: "pill " + (l.tipo === "mensagem" ? "e1" : l.tipo === "parado" ? "e3" : "c") }, PASSOS[l.tipo]?.t || l.tipo)), el("td", { class: v3 ? "np-ts-sub" : "note" }, l.texto))) : el("tr", {}, el("td", { colspan: "4", class: v3 ? "np-ts-sub" : "note" }, "Nenhuma execução registrada."))))));
   }
   async function testar() {
-    const f = A.sel; if (A.dirty || !f.id) { const ok = await salvar(); if (!ok) return; }
+    const f = A.sel, v3 = auV3(); if (A.dirty || !f.id) { const ok = await salvar(); if (!ok) return; }
     const host = $("#modalHost"); host.replaceChildren(); const close = () => host.replaceChildren();
     const q = inp("search", "", { placeholder: "Nome, empresa ou WhatsApp do lead…" }); const res = el("div", { style: "max-height:300px;overflow:auto;margin-top:8px" });
-    let t; q.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const { data } = await SB.from("leads").select("id,nome,empresa,whatsapp,status").or(`nome.ilike.%${q.value}%,empresa.ilike.%${q.value}%,whatsapp.ilike.%${q.value}%`).order("data_entrada", { ascending: false }).limit(15); res.replaceChildren(...(data || []).map((l) => el("div", { class: "ld-obs", style: "cursor:pointer", onclick: async () => { if (!confirm(`Iniciar o fluxo "${f.nome}" para ${l.nome}? Mensagens reais serão enviadas para o WhatsApp dele.`)) return; const { error } = await SB.rpc("fluxo_testar", { p_fluxo: f.id, p_lead: l.id }); if (error) { toast(error.message); return; } toast("Teste iniciado — acompanhe em Histórico de inscrições"); close(); A.abaB = "inscricoes"; carregarExecs(f.id); } }, el("b", {}, l.nome), el("span", { class: "note" }, ` · ${l.empresa || "—"} · ${l.whatsapp || "sem WhatsApp"} · ${l.status}`)))); }, 300); };
+    const dispararTeste = async (l) => {
+      const { error } = await SB.rpc("fluxo_testar", { p_fluxo: f.id, p_lead: l.id });
+      if (error) { toast(error.message); throw error; }
+      toast("Teste iniciado — acompanhe em Histórico de inscrições"); close(); A.abaB = "inscricoes"; carregarExecs(f.id);
+    };
+    let t; q.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const { data } = await SB.from("leads").select("id,nome,empresa,whatsapp,status").or(`nome.ilike.%${q.value}%,empresa.ilike.%${q.value}%,whatsapp.ilike.%${q.value}%`).order("data_entrada", { ascending: false }).limit(15); res.replaceChildren(...(data || []).map((l) => el("div", { class: "ld-obs", style: "cursor:pointer", onclick: () => {
+      if (v3 && NPUI.confirmar) {
+        NPUI.confirmar({ titulo: "Disparar teste real no WhatsApp?", texto: `Iniciar o fluxo “${f.nome}” para ${l.nome} (${l.whatsapp || "sem WhatsApp"})? Mensagens reais serão enviadas via ChatGuru.`, rotuloSim: "Iniciar teste", perigo: true, onSim: () => dispararTeste(l) });
+        return;
+      }
+      if (!confirm(`Iniciar o fluxo "${f.nome}" para ${l.nome}? Mensagens reais serão enviadas para o WhatsApp dele.`)) return;
+      dispararTeste(l).catch(() => {});
+    } }, el("b", {}, l.nome), el("span", { class: "note" }, ` · ${l.empresa || "—"} · ${l.whatsapp || "sem WhatsApp"} · ${l.status}`)))); }, 300); };
     host.append(el("div", { class: "modal", onclick: (e) => { if (e.target.classList.contains("modal")) close(); } }, el("div", { class: "card", role: "dialog", style: "max-width:560px" }, el("h2", {}, "Testar fluxo com um lead"), el("p", { class: "note" }, "Dica: use o seu próprio cadastro de lead (seu número) para ver as mensagens chegando. O teste roda mesmo com o fluxo em rascunho."), q, res, el("div", { class: "actions", style: "margin-top:10px" }, el("button", { class: "btn", onclick: close }, "Fechar")))));
     q.focus();
   }

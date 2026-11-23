@@ -80,19 +80,51 @@ function painel({ obra, label = "Detalhe", onClose }) {
   const modo = () => innerWidth <= 980 ? "cheia" : innerWidth <= 1179 ? "overlay" : "split";
   const aplicarModo = () => { const m = modo(); aside.dataset.modo = m; if (m === "cheia") { aside.setAttribute("role", "dialog"); aside.setAttribute("aria-modal", "true"); } else { aside.removeAttribute("role"); aside.removeAttribute("aria-modal"); } };
   const fechar = (devolver = true) => { if (!aberto) return; aberto = false; const fn = () => { obra.classList.remove("np-aberta"); aside.hidden = true; aside.setAttribute("inert", ""); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); doc.body.classList.remove("np-painel-cheia"); }; vt(fn).then(() => { onClose?.(); const alvo = (origem && origem.isConnected) ? origem : (ultimoId != null ? obra.querySelector(`.np-it[data-id="${ultimoId}"] .np-it-abrir, .np-it[data-id="${ultimoId}"] button`) : null); if (devolver && alvo) alvo.focus(); origem = null; }); };
+  /* Rodapé em linha única com no máximo 3 controles: 1 primário, até 1 secundário e transbordo ⋯ (NPUI.pop) para ações extras ou destrutivas. */
+  const normalizarPe = (itens) => {
+    const lista = [].concat(itens || []).filter(Boolean);
+    const ehCtrl = (e) => e instanceof Element && (e.matches("button,a.np-btn") || e.classList?.contains("np-btn"));
+    const controles = lista.filter(ehCtrl);
+    if (controles.length <= 3) return lista;
+    const pri = controles.find(e => e.classList.contains("pri")) || controles[0];
+    const restantes = controles.filter(e => e !== pri);
+    const destrutiva = (e) => e.classList.contains("danger") || e.classList.contains("crit") || /excluir|remover|apagar|desativar/i.test(e.textContent || "");
+    const sec = restantes.find(e => !destrutiva(e)) || restantes[0];
+    const extras = restantes.filter(e => e !== sec);
+    const outrosNos = lista.filter(e => !ehCtrl(e) && !(e instanceof Element && e.classList?.contains("sp")));
+    const btnMais = el("button", {
+      type: "button",
+      class: "np-ib np-p-mais",
+      "aria-label": "Mais ações",
+      title: "Mais ações",
+      "aria-haspopup": "menu",
+      "aria-expanded": "false",
+      onclick: (ev) => {
+        const menuItens = extras.map(b => ({
+          label: (b.textContent || b.getAttribute("aria-label") || b.title || "Ação").trim(),
+          tom: destrutiva(b) ? "crit" : "",
+          disabled: !!b.disabled,
+          title: b.title || null,
+          onclick: () => b.click(),
+        }));
+        pop(ev.currentTarget, menuItens, { role: "menu", label: "Mais ações", alinhar: "dir", refoco: ev.currentTarget });
+      },
+    }, svgIco(I.pontos));
+    return [pri, sec, el("span", { class: "sp" }), ...outrosNos, btnMais].filter(Boolean);
+  };
   /* `pend` guarda sempre o último conteúdo pedido: abrir() aplica o DOM dentro de uma view transition (assíncrona) e atualizar()
      pode chegar antes disso — sem isto, o esqueleto do abrir() sobrescreveria os dados já carregados (corrida vista no CI) */
   let pend = { c: null, p: null };
   const abrir = ({ trilha: tr, titulo, corpo: c, pe: p, origem: o, id, foco }) => {
     aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o; if (id != null) ultimoId = id; pend = { c, p: p || [] };
     const linhaTx = id != null ? obra.querySelector(`.np-it[data-id="${id}"] .tx`) : null; if (linhaTx && !ja) linhaTx.style.viewTransitionName = "np-titulo";
-    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...[].concat(pend.p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
+    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...normalizarPe(pend.p)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
     (ja ? Promise.resolve(fn()) : vt(fn)).then(() => { if (linhaTx) linhaTx.style.viewTransitionName = ""; if (foco) setTimeout(foco, ms(60)); else if (!ja) setTimeout(() => btnX.focus(), ms(60)); });
   };
   btnX.onclick = () => fechar();
   aside.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.defaultPrevented) { if (doc.querySelector("#np-pop.on")) return; e.stopPropagation(); fechar(); } });
   matchMedia("(max-width:980px)").addEventListener("change", () => { if (aberto) aplicarModo(); }); matchMedia("(max-width:1179px)").addEventListener("change", () => { if (aberto) aplicarModo(); });
-  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...[].concat(p).filter(Boolean)); } } };
+  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...normalizarPe(p)); } } };
 }
 
 /* ---------- props, passos, seções ---------- */
@@ -315,5 +347,91 @@ const modalV3 = (title, body, onSave, extra) => {
   return { fechar: restaurar, el: card };
 };
 modalV3.ativo = () => doc.documentElement.classList.contains("np-casca-v3"); /* o desvio do modal() só vale com a casca V3.1 ligada */
-window.NPUI = { form, modalV3, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+
+/* Diálogo acessível de confirmação explícita (role="alertdialog") — Onda 3C */
+const confirmar = ({ titulo = "Confirmar ação", texto = "", detalhe = null, rotuloSim = "Confirmar", rotuloNao = "Cancelar", perigo = false, onSim, origem } = {}) => {
+  const host = doc.querySelector("#modalHost") || doc.body;
+  const app = doc.querySelector("#app");
+  const origemEl = origem || (doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null);
+  const uid = "np-cf-" + Math.random().toString(36).slice(2, 8);
+  let fechado = false, enviando = false;
+
+  const erroBox = el("div", { class: "np-f-geral", role: "alert", hidden: true, tabindex: -1 });
+  const btnNao = el("button", { type: "button", class: "np-btn" }, rotuloNao);
+  const btnSim = el("button", { type: "button", class: "np-btn " + (perigo ? "danger" : "pri") }, rotuloSim);
+  const btnX = el("button", { type: "button", class: "np-ib", "aria-label": "Fechar" }, svgIco(I.x));
+
+  const corpo = el("div", { class: "np-alert-b" });
+  if (texto) corpo.append(el("p", { id: uid + "-d", class: "np-confirm-txt" }, texto));
+  if (detalhe) corpo.append(typeof detalhe === "string" ? el("div", { class: "np-diff-meta" }, detalhe) : detalhe);
+  corpo.append(erroBox);
+
+  const dlg = el("div", {
+    class: "np-alert-dlg np-confirm-dlg",
+    role: "alertdialog",
+    "aria-modal": "true",
+    "aria-labelledby": uid + "-t",
+    ...(texto ? { "aria-describedby": uid + "-d" } : {})
+  },
+    el("div", { class: "np-alert-h" }, el("h2", { id: uid + "-t" }, titulo), btnX),
+    corpo,
+    el("div", { class: "np-alert-f" }, btnNao, btnSim)
+  );
+  const bg = el("div", { class: "np-alert-bg" }, dlg);
+
+  const outroAberto = () => [...host.querySelectorAll('[role="dialog"],[role="alertdialog"]')].some((d) => d !== dlg);
+  const fechar = () => {
+    if (fechado) return;
+    fechado = true;
+    doc.removeEventListener("keydown", onKey, true);
+    if (bg.isConnected) bg.remove();
+    if (!outroAberto()) app?.removeAttribute("inert");
+    if (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") {
+      setTimeout(() => { try { origemEl.focus(); } catch (_) {} }, 0);
+    }
+  };
+
+  const focaveis = () => [...dlg.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((n) => !n.disabled && !n.hidden && n.offsetParent !== null);
+  const onKey = (e) => {
+    if (!dlg.isConnected) return;
+    if (e.key === "Escape") { if (enviando) return; e.preventDefault(); e.stopPropagation(); fechar(); return; }
+    if (e.key === "Tab") {
+      const fs = focaveis(); if (!fs.length) return;
+      const i = fs.indexOf(doc.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); fs[fs.length - 1].focus(); }
+      else if (!e.shiftKey && (i === fs.length - 1 || i === -1)) { e.preventDefault(); fs[0].focus(); }
+    }
+  };
+
+  btnNao.onclick = () => { if (!enviando) fechar(); };
+  btnX.onclick = () => { if (!enviando) fechar(); };
+  bg.addEventListener("mousedown", (e) => { if (e.target === bg && !enviando) fechar(); });
+  btnSim.onclick = async () => {
+    if (enviando || fechado) return;
+    erroBox.hidden = true;
+    enviando = true;
+    btnSim.disabled = true; btnNao.disabled = true; btnX.disabled = true;
+    const prevTxt = btnSim.textContent;
+    btnSim.textContent = "Aplicando…";
+    try {
+      if (typeof onSim === "function") await onSim();
+      if (!fechado) fechar();
+    } catch (e) {
+      enviando = false;
+      btnSim.disabled = false; btnNao.disabled = false; btnX.disabled = false;
+      btnSim.textContent = prevTxt;
+      erroBox.replaceChildren(el("b", {}, traduzErroBD(e)));
+      erroBox.hidden = false;
+      try { erroBox.focus(); } catch (_) {}
+    }
+  };
+
+  doc.addEventListener("keydown", onKey, true);
+  host.append(bg);
+  app?.setAttribute("inert", "");
+  setTimeout(() => { if (!fechado) (perigo ? btnNao : btnSim).focus(); }, 0);
+  return { fechar, el: dlg };
+};
+
+window.NPUI = { form, modalV3, confirmar, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

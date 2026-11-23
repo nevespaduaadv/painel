@@ -285,9 +285,215 @@
     v.append(ativ, tabs, porCli);
   }
 
+  // ---------- V3.1 (Onda 3A · cronômetro integrado, NPUI.seg, tipografia editorial sem pílulas, tabular-nums) ----------
+  const tsV3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  const statusEditorial = (a) => {
+    const mapa = { pendente: ["pendente", "att"], aprovado: ["aprovado", "ok"], correcao: ["corrigir", "crit"] };
+    const [txt, tom] = mapa[a.status] || [a.status || "—", "muted"];
+    const m = NPUI.marca(txt, tom);
+    if (a.obs_gestor) m.title = a.obs_gestor;
+    return m;
+  };
+  function barCronometroV3() {
+    const m = meu(); if (!m) return null;
+    if (H.cron) {
+      const c = H.cron;
+      const tempo = el("span", { class: "np-cron-tempo" }, "00:00:00");
+      const tick = () => {
+        const s = Math.max(0, Math.floor((Date.now() - new Date(c.inicio).getTime()) / 1000));
+        tempo.textContent = `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+      };
+      tick(); clearInterval(H.cronT); H.cronT = setInterval(tick, 1000);
+      const desc = el("input", { class: "np-cron-inp", type: "text", value: c.descricao || "", placeholder: "O que você está fazendo?" });
+      const ctx = [c.cliente_id ? S.clientes.find((x) => x.id === c.cliente_id)?.nome : null, ativNome(c.tipo_atividade)].filter(Boolean).join(" · ");
+      return el("div", { class: "np-cron-bar rodando" },
+        el("span", { class: "np-cron-dot", "aria-hidden": "true" }),
+        tempo,
+        NPUI.marca("em andamento", "att"),
+        ctx ? el("span", { class: "np-cron-meta" }, ctx) : null,
+        desc,
+        NPUI.btn("Parar e gravar", { variante: "pri", onclick: async () => {
+          const { error } = await SB.rpc("ts_cronometro_parar", { p_descricao: desc.value.trim() || null, p_descartar: false });
+          if (error) { toast(error.message); return; }
+          clearInterval(H.cronT); H.cron = null; toast("Horas gravadas"); inval(); render();
+        } }),
+        NPUI.btn("Descartar", { variante: "ghost", onclick: async () => {
+          if (!confirm("Descartar o tempo deste cronômetro?")) return;
+          await SB.rpc("ts_cronometro_parar", { p_descartar: true });
+          clearInterval(H.cronT); H.cron = null; render();
+        } })
+      );
+    }
+    return el("div", { class: "np-cron-bar" },
+      el("span", { class: "np-cron-tempo", style: "color:var(--np-text-3)" }, "00:00:00"),
+      el("span", { class: "np-cron-meta" }, "Cronômetro parado — inicie para registrar início e fim automaticamente."),
+      el("div", { style: "margin-left:auto" }, NPUI.btn("▶ Iniciar cronômetro", { onclick: () => iniciarCron() }))
+    );
+  }
+  function renderSemanaV3(v) {
+    const s = semanaDe(H.sem.data); if (!H.sem.ok) { carregarSemana(); }
+    const bar = barCronometroV3(); if (bar) v.append(bar);
+    const L = H.sem.lista, tot = L.reduce((x, a) => x + +a.horas, 0), cob = L.filter((a) => a.cobravel).reduce((x, a) => x + +a.horas, 0);
+    const selC = admin() ? Object.assign(selColab(H.sem.colab), { className: "np-tb-sel", onchange: (e) => { H.sem.colab = e.target.value || null; H.sem.ok = false; render(); } }) : el("span", { class: "np-cron-meta" }, meu()?.nome || "—");
+    v.append(el("div", { class: "np-ts-nav" },
+      el("div", { class: "np-ts-nav-l" },
+        NPUI.btn("‹", { onclick: () => { H.sem.data = addD(H.sem.data, -7); H.sem.ok = false; render(); } }),
+        el("span", { class: "np-ts-nav-lbl" }, `${fmt(s.ini)} – ${fmt(s.fim)}`),
+        NPUI.btn("›", { onclick: () => { H.sem.data = addD(H.sem.data, 7); H.sem.ok = false; render(); } }),
+        NPUI.btn("Hoje", { variante: "ghost", onclick: () => { H.sem.data = hoje(); H.sem.ok = false; render(); } }),
+        selC
+      ),
+      el("div", { class: "np-resumo" },
+        el("span", {}, el("b", {}, hFmt(tot)), "na semana"),
+        el("span", {}, el("b", {}, hFmt(cob)), "cobráveis")
+      )
+    ));
+    if (!H.sem.colab) { v.append(NPUI.vazio({ titulo: "Usuário sem colaborador vinculado", texto: "Peça ao administrador para vincular seu perfil na aba Usuários." })); return; }
+    if (!H.sem.ok) { v.append(NPUI.carregando(5)); return; }
+    const dias = [0, 1, 2, 3, 4, 5, 6].map((i) => addD(s.ini, i));
+    const hojeStr = hoje();
+    const tb = el("table", { class: "np-ts-tbl" },
+      el("thead", {}, el("tr", {}, el("th", {}, "Dia"), el("th", {}, "Horário"), el("th", {}, "Cliente / processo"), el("th", {}, "Atividade"), el("th", {}, "Descrição"), el("th", { class: "r" }, "Horas"), el("th", {}, "Status"), el("th", { class: "r" }, ""))),
+      el("tbody", {}, ...dias.flatMap((d) => {
+        const ls = L.filter((a) => a.data === d);
+        const t = ls.reduce((x, a) => x + +a.horas, 0);
+        const diaLbl = new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+        return [
+          el("tr", { class: "np-ts-dia" },
+            el("td", { colspan: 5 }, el("span", { class: "np-num" }, diaLbl), d === hojeStr ? [" · ", NPUI.marca("hoje", "att")] : null),
+            el("td", { class: "r" }, t ? hFmt(t) : ""),
+            el("td", {}),
+            el("td", { class: "r" }, NPUI.btn("+", { variante: "ghost", title: "Lançar neste dia", onclick: () => lancar({ data: d }) }))
+          ),
+          ...ls.map((a) => el("tr", {},
+            el("td", {}),
+            el("td", { class: "np-num np-ts-sub" }, a.inicio ? a.inicio.slice(0, 5) + (a.fim ? "–" + a.fim.slice(0, 5) : "") : "—"),
+            el("td", {}, a.cliente_nome || "—", a.numero_cnj ? el("div", { class: "np-ts-sub np-num" }, a.numero_cnj) : null),
+            el("td", {}, a.atividade_nome, a.tarefa_titulo ? el("div", { class: "np-ts-sub" }, "Tarefa: " + a.tarefa_titulo) : null, a.cobravel ? null : el("div", { class: "np-ts-sub" }, "não cobrável")),
+            el("td", { class: "np-ts-sub" }, a.descricao || ""),
+            el("td", { class: "r" }, hFmt(a.horas)),
+            el("td", {}, statusEditorial(a)),
+            el("td", { class: "r" }, NPUI.btn("Editar", { variante: "ghost", onclick: () => lancar({ ap: a }) }))
+          ))
+        ];
+      }))
+    );
+    v.append(el("div", { class: "np-ts-tbl-wrap" }, tb));
+    const corr = L.filter((a) => a.status === "correcao");
+    if (corr.length) v.append(el("div", { class: "np-mon-sem", style: "border-left-color:var(--np-crit)" }, el("span", {}, el("b", { style: "color:var(--np-crit)" }, `${corr.length} lançamento(s) devolvido(s) pelo gestor`), " — abra em Editar para ver a observação e corrigir.")));
+  }
+  function renderRelV3(v) {
+    const r = H.rel; if (!r.ok) carregarRel();
+    const ini = inp("date", r.ini, { class: "np-tb-sel" }), fim = inp("date", r.fim, { class: "np-tb-sel" });
+    const aplicar = () => { r.ini = ini.value; r.fim = fim.value; r.ok = false; render(); };
+    const mes = (n) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); r.ini = iso(d); d.setMonth(d.getMonth() + 1); d.setDate(0); r.fim = iso(d); r.ok = false; render(); };
+    const fc = multiSel("Todos os colaboradores", H.colab.filter((c) => c.ativo !== false || r.colabs.includes(c.id)).map((c) => ({ id: c.id, nome: c.nome })), r.colabs, (ids) => { if (ids.join() === r.colabs.join()) return; r.colabs = ids; r.ok = false; render(); });
+    const fcl = multiSel("Todos os clientes", [...S.clientes].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => ({ id: c.id, nome: c.nome || c.id })), r.clis, (ids) => { if (ids.join() === r.clis.join()) return; r.clis = ids; r.ok = false; render(); });
+    const fa = Object.assign(sel({ "": "Todas as atividades", ...Object.fromEntries(H.ativ.map((a) => [a.codigo, a.nome])) }, r.ativ), { className: "np-tb-sel", onchange: (e) => { r.ativ = e.target.value; r.ok = false; render(); } });
+    const fb = Object.assign(sel({ "": "Cobráveis e não", sim: "Só cobráveis", nao: "Só não cobráveis" }, r.cobr), { className: "np-tb-sel", onchange: (e) => { r.cobr = e.target.value; r.ok = false; render(); } });
+    const fs = Object.assign(sel({ "": "Qualquer status", aprovado: "Só aprovados", pendente: "Só pendentes", correcao: "Em correção" }, r.status), { className: "np-tb-sel", onchange: (e) => { r.status = e.target.value; r.ok = false; render(); } });
+    v.append(el("div", { class: "np-cron-bar" }, ini, el("span", { class: "np-cron-meta" }, "a"), fim, NPUI.btn("Aplicar", { onclick: aplicar }), NPUI.btn("Mês atual", { variante: "ghost", onclick: () => mes(0) }), NPUI.btn("Mês anterior", { variante: "ghost", onclick: () => mes(-1) }), fc, fcl, fa, fb, fs));
+    if (!r.ok) { v.append(NPUI.carregando(5)); return; }
+    const L = r.lista, tot = L.reduce((x, a) => x + +a.horas, 0), cob = L.filter((a) => a.cobravel).reduce((x, a) => x + +a.horas, 0), val = L.reduce((x, a) => x + +a.valor, 0);
+    const pendN = L.filter((a) => a.status !== "aprovado").length;
+    v.append(el("div", { class: "np-gestao-kpi-band", style: "margin-bottom:12px" }, [
+      ["Horas", hFmt(tot), `${L.length} lançamento(s)`],
+      ["Cobráveis", hFmt(cob), tot ? Math.round(100 * cob / tot) + "% do total" : "—"],
+      ["Valor (tabela/hora)", BRL2(val), "só cobráveis"],
+      ["Pendentes de aprovação", String(pendN), pendN ? "aguardando revisão" : "tudo aprovado", pendN ? "att" : "ok"]
+    ].map(([l, v2, h, cls]) => el("div", {}, el("div", { class: "k" }, l), el("div", { class: "v" + (cls ? " " + cls : "") }, v2), h ? el("div", { class: "h" }, h) : null))));
+    const grupo = (chave, rotulo, extra) => {
+      const m = new Map(); for (const a of L) { const k = a[chave] || "—"; const g = m.get(k) || { h: 0, c: 0, v: 0, n: 0 }; g.h += +a.horas; if (a.cobravel) g.c += +a.horas; g.v += +a.valor; g.n++; m.set(k, g); }
+      const rows = [...m.entries()].sort((a, b) => b[1].h - a[1].h);
+      return el("div", { class: "np-gestao-card" }, el("h3", {}, rotulo),
+        el("div", { class: "np-ts-tbl-wrap", style: "margin:0;border:0" }, el("table", { class: "np-ts-tbl" },
+          el("thead", {}, el("tr", {}, el("th", {}, rotulo), el("th", { class: "r" }, "Horas"), el("th", { class: "r" }, "Cobráveis"), el("th", { class: "r" }, "Valor"), el("th", { class: "r" }, "%"), ...(extra ? extra.cab.map((h) => el("th", { class: "r" }, h)) : []))),
+          el("tbody", {}, ...rows.map(([k, g]) => el("tr", {}, el("td", {}, k), el("td", { class: "r" }, hFmt(g.h)), el("td", { class: "r" }, hFmt(g.c)), el("td", { class: "r" }, BRL2(g.v)), el("td", { class: "r" }, tot ? Math.round(100 * g.h / tot) + "%" : "—"), ...(extra ? extra.cel(k, g) : []))),
+            rows.length ? el("tr", { class: "np-ts-tot" }, el("td", {}, "Total"), el("td", { class: "r" }, hFmt(tot)), el("td", { class: "r" }, hFmt(cob)), el("td", { class: "r" }, BRL2(val)), el("td", {}), ...(extra ? extra.cab.map(() => el("td", {})) : [])) : el("tr", {}, el("td", { colspan: 5 + (extra ? extra.cab.length : 0), class: "np-ts-sub" }, "Sem lançamentos"))))));
+    };
+    const cliExtra = { cab: ["Contratadas/mês", "Saldo", "Honorário mensal", "R$/h efetivo"], cel: (nome, g) => { const c = S.clientes.find((x) => x.nome === nome); const hc = c?.horas_contratadas_mes, hm = c?.honorario_mensal;
+      return [el("td", { class: "r" }, hc != null ? hFmt(hc) : "—"), el("td", { class: "r", style: hc != null && hc - g.c < 0 ? "color:var(--np-crit);font-weight:600" : "" }, hc != null ? hFmt(hc - g.c) : "—"), el("td", { class: "r" }, hm != null ? BRL2(hm) : "—"), el("td", { class: "r" }, hm != null && g.c > 0 ? BRL2(hm / g.c) : "—")]; } };
+    v.append(el("div", { class: "np-ts-rel-grid" }, grupo("frente_nome", "Por frente de trabalho"), grupo("colaborador_nome", "Por colaborador"), grupo("atividade_nome", "Por atividade")));
+    v.append(el("div", { style: "margin-bottom:12px" }, grupo("cliente_nome", "Por cliente", cliExtra)));
+    const acoes = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px" },
+      NPUI.btn("Exportar CSV", { onclick: () => exportarCSV(L) }),
+      r.colabs.length ? NPUI.btn(r.colabs.length === 1 ? "Relatório do colaborador…" : "Relatório dos colaboradores…", { variante: "pri", onclick: () => relatorioColaborador(L) }) : null,
+      r.clis.length ? NPUI.btn(r.clis.length === 1 ? "Relatório para o cliente…" : "Relatório para os clientes…", { variante: "pri", onclick: () => relatorioCliente() }) : null,
+      !r.colabs.length && !r.clis.length ? el("span", { class: "np-ts-sub" }, "Filtre por colaborador ou cliente para gerar o relatório imprimível") : null);
+    v.append(el("div", { class: "np-gestao-card" }, el("h3", {}, `Lançamentos (${L.length})`), acoes,
+      el("div", { class: "np-ts-tbl-wrap", style: "margin:0" }, el("table", { class: "np-ts-tbl" },
+        el("thead", {}, el("tr", {}, el("th", {}, "Data"), el("th", {}, "Colaborador"), el("th", {}, "Cliente"), el("th", {}, "Atividade"), el("th", {}, "Descrição"), el("th", { class: "r" }, "Horas"), el("th", {}, "Cobrável"), el("th", {}, "Status"), el("th", { class: "r" }, ""))),
+        el("tbody", {}, ...L.slice(0, 500).map((a) => el("tr", {}, el("td", { class: "np-num" }, fmt(a.data), a.inicio ? el("div", { class: "np-ts-sub" }, a.inicio.slice(0, 5) + (a.fim ? "–" + a.fim.slice(0, 5) : "")) : null), el("td", {}, a.colaborador_nome), el("td", {}, a.cliente_nome || "—"), el("td", {}, a.atividade_nome), el("td", { class: "np-ts-sub" }, a.descricao || ""), el("td", { class: "r" }, hFmt(a.horas)), el("td", {}, a.cobravel ? "sim" : "não"), el("td", {}, statusEditorial(a)), el("td", { class: "r" }, admin() || a.colaborador_id === meu()?.id ? NPUI.btn("Editar", { variante: "ghost", onclick: () => lancar({ ap: a }) }) : null))))))));
+  }
+  function renderAprV3(v) {
+    const A = H.apr; if (!A.ok) carregarApr();
+    const fc = Object.assign(selColab(A.colab, "Todos os colaboradores"), { className: "np-tb-sel", onchange: (e) => { A.colab = e.target.value; A.ok = false; render(); } });
+    const obs = el("input", { class: "np-cron-inp", type: "text", placeholder: "Observação para correção (obrigatória ao devolver)" });
+    const agir = async (status) => {
+      const ids = [...A.sel]; if (!ids.length) { toast("Marque os lançamentos"); return; }
+      if (status === "correcao" && !obs.value.trim()) { toast("Escreva o que precisa corrigir"); return; }
+      const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: status, p_obs: obs.value.trim() || null });
+      if (error) { toast(error.message); return; }
+      toast(`${data} lançamento(s) ${status === "aprovado" ? "aprovados" : "devolvidos"}`); A.sel.clear(); inval(); render();
+    };
+    const todos = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--np-ink)" });
+    todos.onchange = () => { if (todos.checked) A.lista.forEach((a) => A.sel.add(a.id)); else A.sel.clear(); render(); };
+    v.append(el("div", { class: "np-cron-bar" },
+      fc, obs,
+      NPUI.btn("Aprovar marcados", { variante: "pri", onclick: () => agir("aprovado") }),
+      NPUI.btn("Devolver", { onclick: () => agir("correcao") }),
+      NPUI.btn("Aprovar mês fechado", { variante: "ghost", onclick: async () => {
+        const d = new Date(); d.setDate(0); const lim = iso(d);
+        const ids = A.lista.filter((a) => a.status === "pendente" && a.data <= lim).map((a) => a.id);
+        if (!ids.length) { toast("Nada pendente até " + fmt(lim)); return; }
+        if (!confirm(`Aprovar ${ids.length} lançamento(s) pendente(s) até ${fmt(lim)}?`)) return;
+        const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: "aprovado", p_obs: null });
+        if (error) toast(error.message); else { toast(`${data} aprovado(s)`); inval(); render(); }
+      } })
+    ));
+    if (!A.ok) { v.append(NPUI.carregando(5)); return; }
+    if (!A.lista.length) { v.append(NPUI.vazio({ titulo: "Nada pendente de aprovação", texto: "Todos os lançamentos filtrados já estão aprovados." })); return; }
+    v.append(el("div", { class: "np-ts-tbl-wrap" }, el("table", { class: "np-ts-tbl" },
+      el("thead", {}, el("tr", {}, el("th", {}, todos), el("th", {}, "Data"), el("th", {}, "Colaborador"), el("th", {}, "Cliente"), el("th", {}, "Atividade"), el("th", {}, "Descrição"), el("th", { class: "r" }, "Horas"), el("th", {}, "Cobrável"), el("th", {}, "Status"))),
+      el("tbody", {}, ...A.lista.map((a) => {
+        const c = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--np-ink)" });
+        c.checked = A.sel.has(a.id); c.onchange = () => { if (c.checked) A.sel.add(a.id); else A.sel.delete(a.id); };
+        return el("tr", {}, el("td", {}, c), el("td", { class: "np-num" }, fmt(a.data), a.inicio ? el("div", { class: "np-ts-sub" }, a.inicio.slice(0, 5) + (a.fim ? "–" + a.fim.slice(0, 5) : "")) : null), el("td", {}, a.colaborador_nome), el("td", {}, a.cliente_nome || "—"), el("td", {}, a.atividade_nome), el("td", { class: "np-ts-sub" }, a.descricao || ""), el("td", { class: "r" }, hFmt(a.horas)), el("td", {}, a.cobravel ? "sim" : "não"), el("td", {}, statusEditorial(a)));
+      })))));
+  }
+  function renderHorasV3(v) {
+    v.classList.add("np-v3");
+    const btnLancar = NPUI.btn("+ Lançar horas", { variante: "pri", onclick: () => lancar({}) });
+    if (!H.ok) {
+      v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: "—", label: "carregando" }]), direita: [btnLancar] }), NPUI.carregando(5));
+      carregarBase().then(render);
+      return;
+    }
+    const eq = typeof PP.temAcesso === "function" ? PP.temAcesso("equipe") : admin();
+    if (H.aba === "rel" && !eq) H.aba = "semana";
+    if ((H.aba === "apr" || H.aba === "cfg") && !admin()) H.aba = "semana";
+    const abas = [["semana", "Minha semana"]];
+    if (eq) abas.push(["rel", "Relatórios"]);
+    if (admin()) abas.push(["apr", "Aprovação"], ["cfg", "Configurações"]);
+    const L = H.sem.lista || [];
+    const totSem = L.reduce((x, a) => x + +a.horas, 0);
+    const resumo = NPUI.resumo(H.aba === "semana"
+      ? [{ n: hFmt(totSem), label: "na semana" }, H.cron ? { n: "ativo", label: "cronômetro", tom: "att" } : { n: "parado", label: "cronômetro", tom: "zero" }]
+      : H.aba === "apr" ? [{ n: String((H.apr.lista || []).length), label: "pendentes", tom: (H.apr.lista || []).length ? "att" : "zero" }]
+      : [{ n: String((H.rel.lista || []).length), label: "lançamentos" }]);
+    v.append(NPUI.toolbar({
+      resumo,
+      filtros: [NPUI.seg(abas, H.aba, (k) => { H.aba = k; render(); }, "Seções de horas")],
+      direita: [btnLancar]
+    }));
+    ({ semana: renderSemanaV3, rel: renderRelV3, apr: renderAprV3, cfg: renderCfg })[H.aba](v);
+  }
+
   // ---------- render da aba Horas (substitui o conteúdo do tarefas.js) ----------
   function renderHoras() {
     const v = $("#view-horas"); if (!v) return; v.replaceChildren();
+    if (tsV3()) { renderHorasV3(v); return; }
+    v.classList.remove("np-v3");
     if (!H.ok) { v.append(el("div", { class: "note" }, "Carregando…")); carregarBase().then(render); return; }
     v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Equipe"), el("h1", {}, "Timesheet"), el("div", { class: "sub" }, "Horas por colaborador, cliente, atividade e tarefa — com cronômetro, cobrável × não cobrável e aprovação do gestor.")),
       el("div", { class: "actions" }, el("button", { class: "btn primary", onclick: () => lancar({}) }, "+ Lançar horas"))));

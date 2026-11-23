@@ -193,8 +193,235 @@ async function atualizar(){
   finally{V.carregando=false}
   if(S.tab==="visao")render();
 }
+/* ---------- V3.1 (Arquétipo 02 Analítico · Onda 3A) ---------- */
+const visaoV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const V3={secao:"tudo",grupos:{},painel:null,obra:null};
+function abrirCliV3(cid,sub){if(!cid)return;S.sel=cid;S.tab="clientes";S.sub=sub||"resumo";try{localStorage.setItem("pp-tab","clientes")}catch(_){}render()}
+function kpiBandV3(itens){
+  return el("div",{class:"np-gestao-kpi-band"},itens.map(([l,v,h,cls])=>el("div",{},el("div",{class:"k"},l),el("div",{class:"v"+(cls?" "+cls:"")},v),h?el("div",{class:"h"},h):null)));
+}
+function cardChartV3(titulo,sub,corpo,...extra){
+  return el("div",{class:"np-gestao-card"},el("h3",{},titulo),sub?el("div",{class:"sub"},sub):null,corpo,...extra);
+}
+function tabV3(cols,linhas,vazio){
+  return el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+    el("thead",{},el("tr",{},cols.map(c=>el("th",{class:c.r?"r":""},c.t)))),
+    el("tbody",{},linhas.length?linhas.map(l=>el("tr",{},cols.map(c=>el("td",{class:c.r?"r":""},c.f(l))))):el("tr",{},el("td",{colspan:cols.length,class:"np-ts-sub"},vazio||"Sem dados")))));
+}
+function abrirAlertaPainelV3(item,origem){
+  if(!V3.painel)return;
+  const props=NPUI.props(item.props||[]);
+  const corpo=[props,item.detalhe?NPUI.secao("Detalhes",el("div",{style:"white-space:pre-wrap"},item.detalhe)):null];
+  const pe=[];
+  if(item.cliente_id)pe.push(NPUI.btn("Abrir cliente",{variante:"pri",onclick:()=>abrirCliV3(item.cliente_id,item.sub||"resumo")}));
+  if(item.tab)pe.push(NPUI.btn(item.tabLabel||"Abrir módulo",{variante:pe.length?"":"pri",onclick:()=>{if(typeof irPara==="function")irPara(item.tab);else{S.tab=item.tab;render()}}}));
+  V3.painel.abrir({id:item.id,trilha:item.trilha,titulo:item.titulo,corpo,pe,origem});
+}
+function renderAlertasV3(cont){
+  const semReg=(D.semRegistro||[]).filter(c=>c.alerta);const lim=(D.semRegistro||[])[0]?.limite_dias??15;
+  const atras=(D.prazos||[]).filter(p=>p.faixa==="atrasada");
+  const fatais=(D.prazos||[]).filter(p=>p.prazo_fatal&&["hoje","d7"].includes(p.faixa));
+  const semProv=D.semProv||[];
+  const total=semReg.length+atras.length+fatais.length+semProv.length;
+  const sec=el("section",{class:"np-gestao-sec",id:"s-alertas"},
+    el("div",{class:"np-gestao-sh"},el("h2",{},"Alertas"),el("span",{class:"meta np-num"},total?`${total} ponto${total===1?"":"s"} de atenção`:"tudo em dia")));
+  if(!total){sec.append(el("div",{class:"np-gestao-ok"},"Nenhum alerta: clientes com registro recente, prazos em dia e processos com providência."));cont.append(sec);return}
+  const mkGrupo=(key,titulo,tom,rows)=>{
+    if(!rows.length)return;
+    const aberto=V3.grupos[key]!==false;
+    sec.append(NPUI.grupo({id:"gestao-"+key,titulo,n:rows.length,tom,aberto,onToggle:a=>{V3.grupos[key]=a},itens:rows}));
+  };
+  const acharCliId=(nome,id)=>id||(S.clientes||[]).find(c=>(c.nome||"").toLowerCase()===(nome||"").toLowerCase())?.id||null;
+  mkGrupo("atras","Prazos vencidos","crit",atras.map((p,idx)=>{
+    const cid=acharCliId(p.cliente_nome,p.cliente_id);
+    const dataTxt=fmtD(parseD(p.prazo));
+    const dados={id:`al-atras-${idx}`,trilha:"Alerta · Prazo vencido",titulo:p.descricao||"Prazo vencido",cliente_id:cid,tab:"tarefas",tabLabel:"Ver tarefas",props:[["Cliente",p.cliente_nome||"—"],["Prazo",dataTxt,"serif"],["Origem",p.origem==="tarefa"?"Tarefa":"Processo"],["Responsável",p.responsavel_nome||"—"],["Fatal",p.prazo_fatal?"Sim":"Não"]]};
+    const li=NPUI.linha({id:`al-atras-${idx}`,regua:"late",prazo:{curta:dataTxt,exata:dataTxt,tom:"late"},
+      titulo:p.descricao||"(sem descrição)",contexto:[el("b",{},p.cliente_nome||"—")," · ",p.origem==="tarefa"?"Tarefa":"Processo",p.responsavel_nome?" · "+p.responsavel_nome:""],
+      direita:[p.prazo_fatal?NPUI.marca("fatal","crit"):null,NPUI.btn("Ver",{variante:"ghost",onclick:e=>{e.stopPropagation();abrirAlertaPainelV3(dados,e.currentTarget)}})],
+      onOpen:liEl=>abrirAlertaPainelV3(dados,liEl.querySelector(".np-it-abrir"))});
+    li.classList.add("np-alerta-crit");return li;
+  }));
+  mkGrupo("fatais","Prazos fatais nos próximos 7 dias","crit",fatais.map((p,idx)=>{
+    const cid=acharCliId(p.cliente_nome,p.cliente_id);
+    const dataTxt=fmtD(parseD(p.prazo));
+    const dados={id:`al-fat-${idx}`,trilha:"Alerta · Prazo fatal",titulo:p.descricao||"Prazo fatal",cliente_id:cid,tab:"tarefas",tabLabel:"Ver prazos",props:[["Cliente",p.cliente_nome||"—"],["Prazo",dataTxt,"serif"],["Origem",p.origem==="tarefa"?"Tarefa":"Processo"],["Responsável",p.responsavel_nome||"—"]]};
+    const li=NPUI.linha({id:`al-fat-${idx}`,regua:"fatal",prazo:{curta:p.faixa==="hoje"?"hoje":dataTxt,exata:dataTxt,tom:"late"},
+      titulo:p.descricao||"(sem descrição)",contexto:[el("b",{},p.cliente_nome||"—")," · ",p.origem==="tarefa"?"Tarefa":"Processo",p.responsavel_nome?" · "+p.responsavel_nome:""],
+      direita:[NPUI.marca("fatal","crit")],
+      onOpen:liEl=>abrirAlertaPainelV3(dados,liEl.querySelector(".np-it-abrir"))});
+    li.classList.add("np-alerta-crit");return li;
+  }));
+  mkGrupo("semReg",`Clientes sem registro há mais de ${lim} dias`,"att",semReg.map((c,idx)=>{
+    const cid=acharCliId(c.cliente_nome,c.cliente_id||c.id);
+    const dados={id:`al-sr-${idx}`,trilha:"Alerta · Sem registro",titulo:c.cliente_nome||"Cliente",cliente_id:cid,sub:"acompanhamento",props:[["Dias sem registro",`${c.dias_sem_registro} dias`,"serif"],["Limite configurado",`${lim} dias`],["Último registro",c.ultimo_registro?fmtD(parseD(c.ultimo_registro)):"nunca"]]};
+    const li=NPUI.linha({id:`al-sr-${idx}`,regua:"att",prazo:{curta:`${c.dias_sem_registro}d`,exata:`${c.dias_sem_registro} dias sem registro`,tom:"att"},
+      titulo:c.cliente_nome||"—",contexto:[`sem registro na timeline há ${c.dias_sem_registro} dia${c.dias_sem_registro===1?"":"s"}`],
+      direita:[cid?NPUI.btn("Abrir cliente",{variante:"ghost",onclick:e=>{e.stopPropagation();abrirCliV3(cid,"acompanhamento")}}):null],
+      onOpen:liEl=>abrirAlertaPainelV3(dados,liEl.querySelector(".np-it-abrir"))});
+    li.classList.add("np-alerta-att");return li;
+  }));
+  mkGrupo("semProv","Processos sem providência (30+ dias)","att",semProv.map((p,idx)=>{
+    const cid=acharCliId(p.cliente_nome,p.cliente_id);
+    const dados={id:`al-sp-${idx}`,trilha:"Alerta · Processo sem providência",titulo:p.numero_cnj||"(sem nº)",cliente_id:cid,tab:"processos",tabLabel:"Ver processos",props:[["Cliente",p.cliente_nome||"—"],["Ação",p.tipo_acao||"—"],["Fase",p.fase||"—"],["Responsável",p.responsavel_nome||"—"],["Sem andamento",`${p.dias_sem_andamento||0} dias`,"serif"]]};
+    const li=NPUI.linha({id:`al-sp-${idx}`,regua:"att",prazo:{curta:`${p.dias_sem_andamento||0}d`,exata:`${p.dias_sem_andamento||0} dias sem andamento`,tom:"att"},
+      titulo:p.numero_cnj||"(sem nº)",contexto:[el("b",{},p.cliente_nome||"—"),p.tipo_acao?" · "+p.tipo_acao:"",p.fase?" · "+p.fase:"",p.responsavel_nome?" · "+p.responsavel_nome:""],
+      onOpen:liEl=>abrirAlertaPainelV3(dados,liEl.querySelector(".np-it-abrir"))});
+    li.classList.add("np-alerta-att");return li;
+  }));
+  cont.append(sec);
+}
+function renderVisaoV3(v){
+  v.classList.add("np-v3");
+  const perTxt=PERIODOS.find(p=>p[0]===V.periodo)?.[1]||"Últimos 3 meses";
+  const selP=el("select",{class:"np-tb-sel","aria-label":"Período",onchange:e=>{V.periodo=e.target.value;try{localStorage.setItem("pp-visao-periodo",V.periodo)}catch(_){}V.ok=false;atualizar()}},PERIODOS.map(([k,l])=>el("option",{value:k,selected:V.periodo===k?"":null},l)));
+  const btnAt=NPUI.btn("Atualizar",{onclick:()=>{V.ok=false;atualizar()}});
+  if(V.erro){
+    v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"erro",label:"gestão",tom:"crit"}]),direita:[selP,btnAt]}),NPUI.vazio({titulo:"Não foi possível carregar a visão geral",texto:V.erro}));
+    return;
+  }
+  if(!V.ok){
+    if(!V.carregando)atualizar();
+    v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"carregando"}]),direita:[selP,btnAt]}),NPUI.carregando(5));
+    return;
+  }
+  const c=D.carteira||{};const j=D.juridico||{};
+  const semReg=(D.semRegistro||[]).filter(x=>x.alerta);
+  const atras=(D.prazos||[]).filter(p=>p.faixa==="atrasada");
+  const fatais=(D.prazos||[]).filter(p=>p.prazo_fatal&&["hoje","d7"].includes(p.faixa));
+  const nAlertas=semReg.length+atras.length+fatais.length+(D.semProv||[]).length;
+  const secoes=[["tudo","Tudo"],["alertas","Alertas",nAlertas],["carteira","Carteira"],["juridico","Jurídico"],["financeiro","Financeiro"],["equipe","Equipe"]];
+  const resumo=NPUI.resumo([
+    {n:String(c.clientes_ativos??"—"),label:"clientes ativos"},
+    {n:BRL(c.saldo_sob_gestao),label:"sob gestão"},
+    {n:String(nAlertas),label:nAlertas===1?"alerta":"alertas",tom:nAlertas?"crit":"zero"}
+  ]);
+  v.append(NPUI.toolbar({
+    resumo,
+    filtros:secoes.map(([k,l,n])=>NPUI.chip({label:l,on:V3.secao===k,n:n!=null?n:null,onclick:()=>{V3.secao=k;render()}})),
+    direita:[selP,btnAt]
+  }));
+  const corpo=el("div",{class:"np-corpo"});
+  const obra=el("div",{class:"np-obra"},corpo);
+  V3.obra=obra;V3.painel=NPUI.painel({obra,label:"Detalhe do alerta",onClose:()=>{}});
+  v.append(obra);
+  const mostra=k=>V3.secao==="tudo"||V3.secao===k;
+
+  if(mostra("alertas"))renderAlertasV3(corpo);
+
+  if(mostra("carteira")){
+    const acordosP=D.acordosMes||[];const econO=soma(acordosP,"economia_obtida"),econP=soma(acordosP,"economia_projetada"),nAc=soma(acordosP,"acordos");
+    const EST={1:["Estágio 1","var(--np-ok)"],2:["Estágio 2","var(--np-att)"],3:["Estágio 3","var(--np-crit)"]};
+    const estItens=[1,2,3].map(e=>{const r=(D.estagios||[]).find(x=>+x.estagio===e)||{contratos:0,saldo:0};return {rotulo:EST[e][0],valor:+r.saldo,cor:EST[e][1],tip:`<b>${EST[e][0]}</b><br>${BRL(r.saldo)} · ${r.contratos} contrato${r.contratos==1?"":"s"} · ${r.clientes||0} cliente${r.clientes==1?"":"s"}`}});
+    const meses=acordosP.map(a=>fmtMes(a.mes));
+    const sec=el("section",{class:"np-gestao-sec",id:"s-carteira"},
+      el("div",{class:"np-gestao-sh"},el("h2",{},"Carteira"),el("span",{class:"meta"},`Posição de hoje · período: ${perTxt.toLowerCase()}`)),
+      kpiBandV3([
+        ["Clientes ativos",String(c.clientes_ativos??"—"),`${c.clientes_com_contrato_ativo??0} com contrato ativo`],
+        ["Saldo sob gestão",BRL(c.saldo_sob_gestao),`${c.contratos_ativos??0} contratos ativos`],
+        ["Em estágio 3",BRL(c.saldo_estagio3),`${c.contratos_estagio3??0} contratos · >90 dias`,c.contratos_estagio3?"crit":""],
+        ["Negociável hoje",BRL(c.saldo_negociavel_hoje),`${c.contratos_negociaveis_hoje??0} contratos com janela`],
+        ["Acordos no período",String(nAc),nAc?`${BRL(soma(acordosP,"valor_pago"))} pagos · desc. ${pct(acordosP.length?soma(acordosP,"desconto_medio")/acordosP.length:null)}`:"nenhum no período"],
+        ["Economia obtida",BRL(econO),nAc?`prevista: ${BRL(econP)} · ${econP?pct(econO/econP):"—"}`:"",econO>0?"ok":""]
+      ]),
+      el("div",{class:"np-gestao-grid"},
+        cardChartV3("Saldo por estágio","Res. CMN 4.966: 1 em dia/≤30d · 2 atraso 31–90d · 3 inadimplido >90d",hbar(estItens),el("div",{class:"np-ts-sub np-num"},`${c.contratos_estagio1??0} · ${c.contratos_estagio2??0} · ${c.contratos_estagio3??0} contratos`)),
+        cardChartV3("Saldo por banco","Contratos ativos · maiores credores",(D.bancos||[]).length?hbar((D.bancos||[]).map(b=>({rotulo:b.banco||"—",valor:+b.saldo,tip:`<b>${b.banco}</b><br>${BRL(b.saldo)} · ${b.contratos} contrato${b.contratos==1?"":"s"} · ${b.em_estagio3} em estágio 3`})),{cor:"var(--np-accent)"}):el("div",{class:"np-ts-sub"},"Sem contratos ativos")),
+        cardChartV3("Acordos por mês","Economia obtida × projetada na data do acordo",acordosP.length?vbars(meses,[{nome:"Economia obtida",cor:"var(--np-accent)",valores:acordosP.map(a=>a.economia_obtida)},{nome:"Economia projetada",cor:"var(--np-info)",valores:acordosP.map(a=>a.economia_projetada)}]):el("div",{class:"np-ts-sub"},"Nenhum acordo fechado no período"),legenda([{nome:"Economia obtida",cor:"var(--np-accent)"},{nome:"Economia projetada",cor:"var(--np-info)"}])),
+        cardChartV3("Saldo por produto","Contratos ativos",(D.produtos||[]).length?hbar((D.produtos||[]).map(p=>({rotulo:PRODUTOS[p.produto]||p.produto||"—",valor:+p.saldo,tip:`<b>${PRODUTOS[p.produto]||p.produto}</b><br>${BRL(p.saldo)} · ${p.contratos} contrato${p.contratos==1?"":"s"}`})),{cor:"var(--np-accent)"}):el("div",{class:"np-ts-sub"},"Sem contratos ativos"))
+      ),
+      el("div",{class:"np-gestao-card"},el("h3",{},"Por cliente"),tabV3([
+        {t:"Cliente",f:r=>el("span",{},r.cliente_nome,r.ativo?null:[" ",NPUI.marca("inativo","muted")])},
+        {t:"Contratos",r:1,f:r=>String(r.contratos_ativos)},{t:"Saldo",r:1,f:r=>BRL(r.saldo)},{t:"Estágio 3",r:1,f:r=>BRL(r.saldo_estagio3)},
+        {t:"Negociável",r:1,f:r=>BRL(r.saldo_negociavel)},{t:"Reserva acum.",r:1,f:r=>BRL(r.reserva_acumulada)},
+        {t:"Acordos",r:1,f:r=>String(r.acordos_fechados)},{t:"Processos",r:1,f:r=>String(r.processos_ativos)},
+        {t:"Tarefas",r:1,f:r=>String(r.tarefas_abertas)},
+        {t:"Último registro",f:r=>r.ultimo_registro?fmtD(parseD(r.ultimo_registro)):NPUI.marca("nunca","att")}
+      ],(D.clientes||[]).filter(r=>r.ativo||r.contratos_ativos>0),"Nenhum cliente")));
+    corpo.append(sec);
+  }
+
+  if(mostra("juridico")){
+    const andP=D.andMes||[];
+    const faixaTxt=(f,fatal)=>NPUI.marca(({atrasada:"vencido",hoje:"hoje",d7:"7 dias",d15:"15 dias",d30:"30 dias",depois:"depois"}[f]||f)+(fatal?" · fatal":""),f==="atrasada"||f==="hoje"||(f==="d7"&&fatal)?"crit":f==="d7"?"att":"muted");
+    const sec=el("section",{class:"np-gestao-sec",id:"s-juridico"},
+      el("div",{class:"np-gestao-sh"},el("h2",{},"Jurídico"),el("span",{class:"meta"},`${j.processos_ativos??0} processos ativos`)),
+      kpiBandV3([
+        ["Processos ativos",String(j.processos_ativos??0),`${j.processos_suspensos??0} suspensos · ${j.processos_encerrados??0} encerrados`],
+        ["Valor em causa",BRL(j.valor_causa_ativo),"processos ativos"],
+        ["Prazos vencidos",String(j.prazos_vencidos??0),"próximo prazo no passado",j.prazos_vencidos?"crit":""],
+        ["Prazos em 7 dias",String(j.prazos_7d??0),`${j.fatais_7d??0} fatais`,j.fatais_7d?"crit":""],
+        ["Sem providência",String(j.sem_providencia??0),"sem andamento em 30d e sem tarefa",j.sem_providencia?"att":""],
+        ["Andamentos",String(soma(andP,"andamentos")),`${soma(andP,"visiveis_cliente")} visíveis ao cliente`]
+      ]),
+      el("div",{class:"np-gestao-grid"},
+        cardChartV3("Processos por fase","Ativos",(D.fases||[]).length?hbar((D.fases||[]).map(f=>({rotulo:f.fase,valor:+f.processos,tip:`<b>${f.fase}</b><br>${f.processos} processo${f.processos==1?"":"s"} · ${BRL(f.valor_causa)} em causa`})),{fmt:v=>String(v),fmtTip:v=>v+" processos",cor:"var(--np-accent)"}):el("div",{class:"np-ts-sub"},"Nenhum processo ativo")),
+        cardChartV3("Processos por tipo de ação","Ativos · polo do cliente",(D.tipos||[]).length?hbar((D.tipos||[]).map(t=>({rotulo:t.tipo_acao,valor:+t.processos,tip:`<b>${t.tipo_acao}</b><br>${t.processos} · polo ${t.polo||"?"}`})),{fmt:v=>String(v),fmtTip:v=>v+" processos",cor:"var(--np-accent)"}):el("div",{class:"np-ts-sub"},"Nenhum processo ativo"))
+      ),
+      el("div",{class:"np-gestao-card"},el("h3",{},"Prazos nos próximos 30 dias"),el("div",{class:"sub"},"Tarefas abertas com prazo e próximo prazo de cada processo ativo"),
+        tabV3([{t:"Prazo",f:r=>el("span",{class:"np-num"},fmtD(parseD(r.prazo)))},{t:"Situação",f:r=>faixaTxt(r.faixa,r.prazo_fatal)},{t:"Cliente",f:r=>r.cliente_nome},{t:"O quê",f:r=>r.descricao},{t:"Origem",f:r=>r.origem==="tarefa"?"Tarefa":"Processo"},{t:"Responsável",f:r=>r.responsavel_nome||"—"}],D.prazos||[],"Nenhum prazo nos próximos 30 dias")));
+    corpo.append(sec);
+  }
+
+  if(mostra("financeiro")&&D.fin){
+    const f=D.fin;const R=val=>(+val||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+    const varM=f.recebido_mes_ant>0?(f.recebido_mes/f.recebido_mes_ant-1):null;
+    const meses=f.meses||[];const mx=Math.max(1,...meses.map(m=>Math.max(+m.recebido,+m.previsto)));const hojeM=new Date(Date.now()-3*3600e3).toISOString().slice(0,7);
+    const barras=el("div",{style:"display:grid;grid-template-columns:repeat("+Math.max(1,meses.length)+",1fr);gap:8px;align-items:end;height:140px"},meses.map(m=>{const rec=+m.recebido,prev=+m.previsto,atr=+m.atrasado;
+      return el("div",{style:"display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;text-align:center;font-size:11px;color:var(--np-text-3)",title:`${m.mes}: recebido ${R(rec)} · previsto ${R(prev)} · atrasado ${R(atr)}`},
+        el("div",{style:`height:${Math.round(100*Math.max(rec,prev)/mx)}%;position:relative;background:${m.mes>hojeM?"var(--np-line)":"var(--np-surface-2)"};border-radius:4px;overflow:hidden`},el("div",{style:`position:absolute;bottom:0;left:0;right:0;height:${Math.max(rec,prev)>0?Math.round(100*rec/Math.max(rec,prev)):0}%;background:var(--np-accent)`}),atr?el("div",{style:`position:absolute;top:0;left:0;right:0;height:${Math.round(100*atr/Math.max(rec,prev,atr))}%;background:var(--np-crit);opacity:.55`}):null),
+        el("div",{class:"np-num"},m.mes.slice(5)+"/"+m.mes.slice(2,4)))}));
+    const inad=(f.inadimplentes||[]).slice(0,8);
+    const sec=el("section",{class:"np-gestao-sec",id:"s-financeiro"},
+      el("div",{class:"np-gestao-sh"},el("h2",{},"Financeiro (Asaas)"),el("span",{class:"meta"},f.atrasado_n?`${f.atrasado_n} cobrança(s) em atraso`:"em dia")),
+      kpiBandV3([
+        ["Recebido no mês",R(f.recebido_mes),varM==null?"sem base anterior":`${varM>=0?"+":""}${pct(varM)} vs. mês ant. (${R(f.recebido_mes_ant)})`],
+        ["A vencer no mês",R(f.a_vencer_mes),"cobranças em aberto"],
+        ["Em atraso",R(f.atrasado),`${f.atrasado_n} cobrança(s) · ${f.atrasado_clientes} cliente(s)`,f.atrasado_n?"crit":""],
+        ["Previsão 90 dias",R(+f.previsao_30+ +f.previsao_60+ +f.previsao_90),`30d ${R(f.previsao_30)} · 60d ${R(f.previsao_60)} · 90d ${R(f.previsao_90)}`]
+      ]),
+      el("div",{class:"np-gestao-grid"},
+        cardChartV3("Recebido × previsto por mês","Dourado = recebido · neutro = previsto · vermelho = em atraso",barras),
+        cardChartV3("Maiores atrasos","Clientes com cobranças vencidas (Asaas)",inad.length?el("ul",{class:"np-lst"},inad.map((x,i)=>NPUI.linha({id:`inad-${i}`,regua:"late",prazo:{curta:`${x.dias}d`,exata:`${x.dias} dias em atraso`,tom:"late"},titulo:x.nome+(x.no_sistema?"":" (fora do sistema)"),contexto:[`${x.n}× em atraso`],direita:[el("span",{class:"np-num",style:"font-weight:500"},R(x.valor))],onOpen:()=>{if(x.no_sistema&&x.cliente_id)abrirCliV3(x.cliente_id,"geral")}}))):el("div",{class:"np-ts-sub"},"Nenhuma cobrança em atraso."))));
+    corpo.append(sec);
+  }
+
+  if(mostra("equipe")){
+    const hc=agrupar(D.horasColab,"colaborador_nome","horas"),ht=agrupar(D.horasTipo,"tipo_atividade","horas"),hcl=agrupar(D.horasCli,"cliente_nome","horas"),tt=agrupar(D.tlMes,"tipo","entradas");
+    const totH=hc.reduce((s,x)=>s+x[1],0),totTl=tt.reduce((s,x)=>s+x[1],0);
+    const pont=D.pont||[];const abertas=soma(pont,"abertas"),atrasadas=soma(pont,"atrasadas"),concl=soma(pont,"concluidas"),noPrazo=soma(pont,"concluidas_no_prazo"),comAtraso=soma(pont,"concluidas_com_atraso");
+    const hf={fmt:val=>horasFmt(val),fmtTip:val=>horasFmt(val),cor:"var(--np-accent)"};
+    const sec=el("section",{class:"np-gestao-sec",id:"s-equipe"},
+      el("div",{class:"np-gestao-sh"},el("h2",{},"Equipe e produtividade"),el("span",{class:"meta"},perTxt.toLowerCase())),
+      kpiBandV3([
+        ["Horas no período",horasFmt(totH),`${hc.length} colaborador${hc.length===1?"":"es"}`],
+        ["Registros na timeline",String(totTl),"no período"],
+        ["Tarefas abertas",String(abertas),`${atrasadas} atrasada${atrasadas===1?"":"s"}`,atrasadas?"crit":""],
+        ["Concluídas no prazo",noPrazo+comAtraso?pct(noPrazo/(noPrazo+comAtraso)):"—",`${concl} concluídas · ${comAtraso} com atraso`]
+      ]),
+      el("div",{class:"np-gestao-grid"},
+        cardChartV3("Horas por colaborador","No período",hc.length?hbar(hc.map(([n,h])=>({rotulo:n,valor:h})),hf):el("div",{class:"np-ts-sub"},"Sem horas lançadas")),
+        cardChartV3("Horas por tipo de atividade","No período",ht.length?hbar(ht.map(([n,h])=>({rotulo:TIPOS[n]||n,valor:h})),hf):el("div",{class:"np-ts-sub"},"Sem horas lançadas")),
+        cardChartV3("Horas por cliente","No período",hcl.length?hbar(hcl.slice(0,10).map(([n,h])=>({rotulo:n||"(interno)",valor:h})),hf):el("div",{class:"np-ts-sub"},"Sem horas lançadas")),
+        cardChartV3("Atividade registrada por tipo","Entradas na timeline",tt.length?hbar(tt.map(([n,val])=>({rotulo:TIPOS[n]||n,valor:val})),{fmt:val=>String(val),fmtTip:val=>val+" registros",cor:"var(--np-accent)"}):el("div",{class:"np-ts-sub"},"Sem registros"))
+      ),
+      el("div",{class:"np-gestao-card"},el("h3",{},"Por colaborador"),el("div",{class:"sub"},"Posição de hoje"),
+        tabV3([
+          {t:"Colaborador",f:r=>r.nome},{t:"Núcleo",f:r=>NUCLEOS[r.nucleo]||"—"},{t:"Horas mês",r:1,f:r=>horasFmt(r.horas_mes_atual)},
+          {t:"Horas 30d",r:1,f:r=>horasFmt(r.horas_30d)},{t:"Registros 30d",r:1,f:r=>String(r.registros_30d)},
+          {t:"Tarefas",r:1,f:r=>String(r.tarefas_abertas)},
+          {t:"Atrasadas",r:1,f:r=>r.tarefas_atrasadas>0?NPUI.marca(String(r.tarefas_atrasadas),"crit"):"0"},
+          {t:"Concluídas mês",r:1,f:r=>String(r.concluidas_mes)},{t:"Processos",r:1,f:r=>String(r.processos_ativos)}
+        ],D.equipe||[],"Nenhum colaborador cadastrado")));
+    corpo.append(sec);
+  }
+  corpo.append(NPUI.rodape("Fonte: views SQL do Supabase. Estágios conforme Res. CMN 4.966/2021."));
+}
+
 function renderVisao(){
   const v=$("#view-visao");v.replaceChildren();host=v;
+  if(visaoV3()){renderVisaoV3(v);return}
+  v.classList.remove("np-v3");
   const sel=el("select",{onchange:e=>{V.periodo=e.target.value;try{localStorage.setItem("pp-visao-periodo",V.periodo)}catch(_){}V.ok=false;atualizar()}},PERIODOS.map(([k,l])=>el("option",{value:k,selected:V.periodo===k?"":null},l)));
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Visão geral"),el("div",{class:"sub sub-periodo"},"Posição de hoje")),
     el("div",{class:"actions"},sel,el("button",{class:"btn",onclick:()=>{V.ok=false;atualizar()}},"Atualizar"))));
@@ -215,5 +442,5 @@ const css=document.createElement("style");css.textContent=`
 #view-visao .alerta{border-left:3px solid var(--crit);padding:10px 14px;background:var(--surface);border-radius:var(--r);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}#view-visao .alerta.ok{border-left-color:var(--ok)}
 .tip{position:fixed;pointer-events:none;background:var(--navy);color:#fff;font-size:12.5px;padding:7px 10px;border-radius:8px;z-index:40;max-width:280px;line-height:1.35}`;document.head.append(css);
 {const _r=render;render=function(){_r();const v=$("#view-visao");if(!v)return;v.hidden=S.tab!=="visao";if(S.tab==="visao")renderVisao()}}
-window.PP_VISAO={recarregar:()=>{V.ok=false;atualizar()}};
+window.PP_VISAO={recarregar:()=>{V.ok=false;atualizar()},v3:visaoV3};
 })();

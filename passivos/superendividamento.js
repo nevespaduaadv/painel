@@ -88,9 +88,64 @@ async function salvar(concluir){
 }
 
 /* ---------- tela ---------- */
+const seV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+
+function excluirPlanoV3(x){
+  NPUI.confirmar({
+    titulo:"Excluir plano de pagamento?",
+    texto:`O plano “${x.titulo||x.devedor_nome||"Sem título"}” será excluído permanentemente.`,
+    rotuloSim:"Excluir plano",
+    rotuloNao:"Cancelar",
+    perigo:true,
+    onSim:async()=>{
+      const {error}=await SB.from("planos_superendividamento").delete().eq("id",x.id);
+      if(error)throw error;
+      toast("Plano excluído");U.ok=false;await carregar();
+    }
+  });
+}
+
 function renderSE(){
   const v=$("#view-superendividamento");v.replaceChildren();
+  const v3=seV3();
+  v.classList.toggle("np-v3",v3);
   if(U.plano){renderPlano(v);return}
+  if(v3){
+    const novoPlano=()=>{U.plano={titulo:"",cliente_id:null,devedor:{},status:"rascunho"};U.ent=entradasPadrao();render()};
+    const concl=U.lista.filter(x=>x.status==="concluido").length;
+    const rasc=U.lista.length-concl;
+    v.append(NPUI.toolbar({
+      resumo:NPUI.resumo([
+        {n:U.lista.length,label:U.lista.length===1?"plano":"planos"},
+        ...(concl?[{n:concl,label:concl===1?"concluído":"concluídos",tom:"ok"}]:[]),
+        ...(rasc?[{n:rasc,label:rasc===1?"rascunho":"rascunhos",tom:"att"}]:[])
+      ]),
+      direita:[NPUI.btn("+ Novo plano",{variante:"pri",onclick:novoPlano})]
+    }));
+    if(!garantir()){v.append(NPUI.carregando(5));return}
+    if(!U.lista.length){
+      v.append(NPUI.vazio({titulo:"Nenhum plano cadastrado",texto:"Clique em “+ Novo plano” para calcular a capacidade de pagamento e gerar relatório, parecer e petição."}));
+    }else{
+      const rows=U.lista.map(x=>{
+        const btnDel=NPUI.ib("x","Excluir plano",ev=>{ev.stopPropagation();excluirPlanoV3(x)});
+        const dt=new Date(x.updated_at).toLocaleDateString("pt-BR");
+        return NPUI.linha({
+          id:String(x.id),
+          prazo:{curta:dt.slice(0,5),exata:dt},
+          titulo:x.titulo||x.devedor_nome||"Plano sem título",
+          contexto:[x.devedor_nome,x.cliente_nome,`${x.qtd_dividas||0} dívida(s)`,`Renda ${brl2(+x.renda||0)}`].filter(Boolean).join(" · "),
+          direita:[
+            el("span",{class:"np-fat-val"},brl2(+x.saldo_total||0)),
+            x.status==="concluido"?NPUI.marca("Concluído","ok"):NPUI.marca("Rascunho","att"),
+            btnDel
+          ],
+          onOpen:()=>abrir(x.id)
+        });
+      });
+      v.append(NPUI.grupo({id:"se-lista",titulo:"Planos de pagamento (Lei 14.181/2021)",n:rows.length,itens:rows}));
+    }
+    return;
+  }
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Superendividamento"),el("div",{class:"sub"},"Plano de pagamento (Lei 14.181/2021): renda, mínimo existencial, dívidas por credor, até 60 meses. Gera relatório, parecer e petição de juntada.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:()=>{U.plano={titulo:"",cliente_id:null,devedor:{},status:"rascunho"};U.ent=entradasPadrao();render()}},"+ Novo plano"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -107,42 +162,140 @@ function renderSE(){
 }
 async function abrir(id){const {data,error}=await SB.from("planos_superendividamento").select("*").eq("id",id).single();if(error){toast("Não foi possível abrir");return}U.plano={id:data.id,titulo:data.titulo,cliente_id:data.cliente_id,devedor:data.devedor||{},status:data.status};U.ent={...entradasPadrao(),...(data.entradas||{})};S.tab="superendividamento";render()}
 function renderPlano(v){
-  const p=U.plano,e=U.ent;const r=U.res=calcular(e);
+  const p=U.plano,e=U.ent;const r=U.res=calcular(e);const v3=seV3();
   const voltar=()=>{U.plano=null;U.ent=null;render()};
-  v.append(el("div",{class:"crumbs"},el("button",{class:"btn sm",onclick:voltar},"← Planos"),el("span",{},p.titulo||"Novo plano")));
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Superendividamento"),el("h1",{},p.devedor?.nome||p.titulo||"Novo plano"),el("div",{class:"sub"},"Preencha a situação atual e o plano; o resultado recalcula a cada alteração.")),
-    el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>salvar(false)},"Salvar rascunho"),el("button",{class:"btn primary",onclick:()=>salvar(true)},"Concluir"))));
+  if(v3){
+    v.append(NPUI.toolbar({
+      resumo:el("div",{class:"np-tb-esq"},
+        NPUI.btn("← Planos",{onclick:voltar}),
+        NPUI.sepv(),
+        el("div",{class:"np-calc-head"},el("b",{id:"se-v3-tit"},p.devedor?.nome||p.titulo||"Novo plano"),el("span",{class:"np-ts-sub"},"Preencha a situação atual e o plano; o resultado recalcula automaticamente."))
+      ),
+      direita:[
+        NPUI.btn("Salvar rascunho",{onclick:()=>salvar(false)}),
+        NPUI.btn("Concluir",{variante:"pri",onclick:()=>salvar(true)})
+      ]
+    }));
+  }else{
+    v.append(el("div",{class:"crumbs"},el("button",{class:"btn sm",onclick:voltar},"← Planos"),el("span",{},p.titulo||"Novo plano")));
+    v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Superendividamento"),el("h1",{},p.devedor?.nome||p.titulo||"Novo plano"),el("div",{class:"sub"},"Preencha a situação atual e o plano; o resultado recalcula a cada alteração.")),
+      el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>salvar(false)},"Salvar rascunho"),el("button",{class:"btn primary",onclick:()=>salvar(true)},"Concluir"))));
+  }
   const rec=()=>{const out=$("#se-out");if(out){const novo=renderResultado();out.replaceWith(novo)}};
   // ---- 1. Devedor
   const d=p.devedor;const cli=sel({"":"— fora da base (informe os dados abaixo) —",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},p.cliente_id||"");
   cli.onchange=()=>{p.cliente_id=cli.value||null;const c=S.clientes.find(x=>x.id===cli.value);if(c){d.nome=d.nome||c.nome;d.cpf=d.cpf||c.cnpj||c.cpf_titular||"";d.endereco=d.endereco||c.endereco||"";d.cidade=d.cidade||c.cidade||"";d.uf=d.uf||c.uf||""}render()};
-  const dv=(k,label,ph)=>{const i=inp("text",d[k]||"",{placeholder:ph||""});i.oninput=()=>{d[k]=i.value;if(k==="nome"){const h=$("#view-superendividamento h1");if(h)h.textContent=i.value||"Novo plano"}};return field("se-"+k,label,i)};
+  const dv=(k,label,ph)=>{const i=inp("text",d[k]||"",{placeholder:ph||""});i.oninput=()=>{d[k]=i.value;if(k==="nome"){const h=$("#se-v3-tit")||$("#view-superendividamento h1");if(h)h.textContent=i.value||"Novo plano"}};return field("se-"+k,label,i)};
   const tit=inp("text",p.titulo||"",{placeholder:"Ex.: Plano — Fulano · out/2026"});tit.oninput=()=>{p.titulo=tit.value};
-  v.append(el("div",{class:"card section"},el("h2",{},"1. Devedor"),el("div",{class:"form"},field("se-tit","Nome do cálculo",tit),field("se-cli","Cliente da base",cli),dv("nome","Nome completo"),dv("cpf","CPF","000.000.000-00"),dv("rg","RG"),dv("nacionalidade","Nacionalidade","brasileiro(a)"),dv("estado_civil","Estado civil"),dv("profissao","Profissão"),dv("endereco","Endereço completo","Rua, nº, bairro, cidade/UF, CEP"))));
+  v.append(el("section",{class:v3?"np-cfg-sec np-form-leitura":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("h2",{},"1. Devedor")):el("h2",{},"1. Devedor"),
+    el("div",{class:"form"},field("se-tit","Nome do cálculo",tit),field("se-cli","Cliente da base",cli),dv("nome","Nome completo"),dv("cpf","CPF","000.000.000-00"),dv("rg","RG"),dv("nacionalidade","Nacionalidade","brasileiro(a)"),dv("estado_civil","Estado civil"),dv("profissao","Profissão"),dv("endereco","Endereço completo","Rua, nº, bairro, cidade/UF, CEP"))));
   // ---- 2. Situação atual
   const nf=(k,label,help,attrs={})=>{const i=inp("text",e[k]??"",{placeholder:"0,00",...attrs});if(k==="renda"||k==="minimoPiso")dinheiro(i,v=>{e[k]=v;rec()});else i.onchange=()=>{e[k]=i.value;rec()};return field("se-"+k,label,i,help)};
-  const sec2=el("div",{class:"card section"},el("h2",{},"2. Situação atual"));
+  const sec2=el("section",{class:v3?"np-cfg-sec":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("h2",{},"2. Situação atual")):el("h2",{},"2. Situação atual"));
   const dataC=inp("date",e.dataCalculo||hojeISO());dataC.onchange=()=>{e.dataCalculo=dataC.value;rec()};
-  sec2.append(el("div",{class:"form"},nf("renda","Renda mensal líquida (R$)","Salário/benefício líquido, após descontos obrigatórios."),field("se-data","Data do cálculo",dataC),nf("comarca","Comarca do processo","Opcional — entra na petição.",{placeholder:"Ex.: Franca/SP"}),nf("processo","Nº do processo","Opcional — petição de juntada.",{placeholder:"0000000-00.0000.0.00.0000"})));
-  const tb=el("div",{class:"tbl"});
-  const linhasDiv=()=>{tb.replaceChildren(el("table",{},el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"CNPJ"),el("th",{},"Descrição"),el("th",{},"Tipo"),el("th",{class:"r"},"Saldo devedor"),el("th",{class:"r"},"Parcela atual"),el("th",{},"Consignado"),el("th",{}))),
+  sec2.append(el("div",{class:v3?"np-form-leitura form":"form"},nf("renda","Renda mensal líquida (R$)","Salário/benefício líquido, após descontos obrigatórios."),field("se-data","Data do cálculo",dataC),nf("comarca","Comarca do processo","Opcional — entra na petição.",{placeholder:"Ex.: Franca/SP"}),nf("processo","Nº do processo","Opcional — petição de juntada.",{placeholder:"0000000-00.0000.0.00.0000"})));
+  const tb=el("div",{class:v3?"np-ts-tbl-wrap":"tbl"});
+  const linhasDiv=()=>{tb.replaceChildren(el("table",{class:v3?"np-ts-tbl":""},el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"CNPJ"),el("th",{},"Descrição"),el("th",{},"Tipo"),el("th",{class:"r"},"Saldo devedor"),el("th",{class:"r"},"Parcela atual"),el("th",{},"Consignado"),el("th",{}))),
     el("tbody",{},e.dividas.map((dv,idx)=>{const c=(k,w,ph)=>{const i=inp("text",dv[k]||"",{placeholder:ph||"",style:`width:${w}px`});if(k==="saldo"||k==="parcela")dinheiro(i,v=>{dv[k]=v;rec()});else i.onchange=()=>{dv[k]=i.value;rec()};return i};const t=sel(TIPOS,dv.tipo||"outro");t.style.width="150px";t.onchange=()=>{dv.tipo=t.value;dv.consignado=t.value==="consignado"?true:dv.consignado;linhasDiv();rec()};
       const ck=el("input",{type:"checkbox"});ck.checked=!!dv.consignado;ck.onchange=()=>{dv.consignado=ck.checked;rec()};
       return el("tr",{},el("td",{},c("credor",170,"Banco…")),el("td",{},c("cnpj",140,"00.000.000/0001-00")),el("td",{},c("descricao",160,"Contrato nº…")),el("td",{},t),el("td",{class:"r"},c("saldo",110,"0,00")),el("td",{class:"r"},c("parcela",100,"0,00")),el("td",{},ck),
-        el("td",{},el("button",{class:"btn sm icon",title:"Remover",onclick:()=>{e.dividas.splice(idx,1);if(!e.dividas.length)e.dividas.push({credor:"",tipo:"outro"});linhasDiv();rec()},html:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'})))}))))};
+        el("td",{},v3?NPUI.ib("x","Remover dívida",()=>{e.dividas.splice(idx,1);if(!e.dividas.length)e.dividas.push({credor:"",tipo:"outro"});linhasDiv();rec()})
+          :el("button",{class:"btn sm icon",title:"Remover",onclick:()=>{e.dividas.splice(idx,1);if(!e.dividas.length)e.dividas.push({credor:"",tipo:"outro"});linhasDiv();rec()},html:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'})))}))))};
   linhasDiv();
-  sec2.append(el("h3",{},"Dívidas"),tb,el("div",{class:"actions",style:"justify-content:flex-start"},el("button",{class:"btn sm",onclick:()=>{e.dividas.push({credor:"",tipo:"pessoal",consignado:false});linhasDiv()}},"+ Dívida")));
+  sec2.append(el("h3",{class:v3?"np-rv-gh":""},"Dívidas"),tb,el("div",{class:"actions",style:"justify-content:flex-start;margin-top:8px"},v3?NPUI.btn("+ Dívida",{onclick:()=>{e.dividas.push({credor:"",tipo:"pessoal",consignado:false});linhasDiv()}}):el("button",{class:"btn sm",onclick:()=>{e.dividas.push({credor:"",tipo:"pessoal",consignado:false});linhasDiv()}},"+ Dívida")));
   v.append(sec2);
   // ---- 3. Plano
-  const sec3=el("div",{class:"card section"},el("h2",{},"3. Plano de pagamento"));
+  const sec3=el("section",{class:v3?"np-cfg-sec np-form-leitura":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("h2",{},"3. Plano de pagamento")):el("h2",{},"3. Plano de pagamento"));
   sec3.append(el("div",{class:"form"},nf("limitePct","Renda disponível para pagamento (%)","O restante é o mínimo existencial preservado. Praxe: 30%; consignado legal 35%+5%.",{placeholder:"30"}),nf("minimoPiso","Piso de referência do mínimo existencial (R$)","Decreto 11.150/2022: R$ 600. Só alerta; não altera a conta.",{placeholder:"600"}),
     nf("prazo","Prazo (meses, máx. 60)","Art. 104-A, §1º: plano de até 5 anos.",{placeholder:"60"}),nf("carenciaDias","Carência (dias)","Até a 1ª parcela.",{placeholder:"0"}),nf("juros","Juros do plano (% a.m.)","Praxe: 0% (só correção) — campo livre para a proposta.",{placeholder:"0"})));
   v.append(sec3);
   v.append(renderResultado());
 }
 function renderResultado(){
-  const r=U.res=calcular(U.ent);
+  const r=U.res=calcular(U.ent);const v3=seV3();
   const out=el("div",{id:"se-out",style:"display:flex;flex-direction:column;gap:18px"});
+  if(v3){
+    const kv=(l,val,h,tom)=>el("div",{},el("div",{class:"k"},l),el("div",{class:"v"+(tom?" "+tom:"")},val),h?el("div",{class:"h"},h):null);
+    out.append(el("div",{class:"np-gestao-kpi-band"},
+      kv("Renda mensal",brl2(r.renda),""),
+      kv("Comprometida hoje",r.comprometimento!=null?pct(r.comprometimento):"—",brl2(r.parcelas)+" em parcelas",r.comprometimento>0.3?"crit":""),
+      kv("Mínimo existencial",brl2(r.minimo),pct(1-r.limitePct)+" da renda",r.minimoAbaixoPiso?"att":""),
+      kv("Renda disponível",brl2(r.disponivel),pct(r.limitePct)+" da renda"),
+      kv("Saldo devedor total",brl2(r.saldo),`${r.rateio.length} credor(es)`)
+    ));
+    if(r.alertas.length)out.append(el("div",{class:"np-calc-alerta att"},...r.alertas.map(a=>el("div",{},a))));
+    const cenV3=(titulo,sub,p,meses,total,ok,extra)=>el("div",{class:"np-se-cen "+(ok?"ok":"crit")},
+      el("div",{class:"np-se-cen-h"},el("h3",{},titulo),NPUI.marca(ok?"Cabe na renda":"Não cabe",ok?"ok":"crit")),
+      el("p",{class:"np-ts-sub",style:"margin:0"},sub),
+      el("div",{class:"np-gestao-kpi-band"},
+        kv("Parcela",brl2(p),""),
+        kv("Prazo",meses!=null?`${meses} meses`:"—",meses!=null?"até "+fmtISO(addMeses(addDias(r.dataBase,r.carenciaDias),meses)):""),
+        kv("Total pago",brl2(total),r.juros?`juros ${pct(r.juros)} a.m.`:"sem juros")
+      ),
+      extra||null
+    );
+    const duas=el("div",{class:"np-gestao-grid"});
+    duas.append(cenV3(`Plano em ${r.prazo} meses`,"Saldo dividido no prazo (praxe do art. 104-A). Compare com a renda disponível.",r.cinco.parcela,r.cinco.meses,r.cinco.total,r.cinco.cabe,r.cinco.cabe?null:el("div",{class:"np-calc-nota"},`Para caber em ${r.prazo} meses: desconto de ${brl2(r.descontoNecessario)} no saldo (${r.saldo?pct(r.descontoNecessario/r.saldo):""}).`)));
+    duas.append(cenV3("O que cabe na renda","Parcela igual à renda disponível; prazo é o necessário para quitar.",r.cabe.parcela,r.cabe.meses,r.cabe.total,r.cabe.quitaEm60,r.cabe.quitaEm60?null:el("div",{class:"np-calc-nota"},r.cabe.meses==null?"A parcela não cobre os juros — reduza os juros ou aumente o percentual.":`Passa de 60 meses (${r.cabe.meses}). Precisa de desconto de ${brl2(r.descontoNecessario)} ou renda disponível maior.`)));
+    out.append(duas);
+    out.append(cenV3("Plano com desídia","Parcela igual à renda disponível pelo prazo informado; o que não couber fica declarado como saldo remanescente (desídia) no plano.",r.desidia.parcela,r.desidia.meses,r.desidia.total,true,
+      el("div",{class:"np-calc-nota"},r.desidia.remanescente>0?`Paga ${pct(r.desidia.pctPago)} do saldo. Saldo remanescente (desídia): ${brl2(r.desidia.remanescente)} — informado expressamente no plano, para conciliação/plano compulsório.`:"A parcela quita o saldo dentro do prazo: não há desídia.")));
+
+    const mkTbl=(titulo,cols,rows,vazio)=>el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("h2",{},titulo)),
+      el("div",{class:"np-ts-tbl-wrap"},
+        el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},...cols.map(c=>el("th",{class:c.num?"r":""},c.label)))),
+          el("tbody",{},rows.length?rows.map(row=>el("tr",{},...cols.map(c=>el("td",{class:c.num?"r":""},c.r(row))))):[el("tr",{},el("td",{colspan:String(cols.length),class:"np-ts-sub"},vazio||"—"))])
+        )
+      )
+    );
+    out.append(mkTbl("Rateio por credor (proporcional ao saldo)",[
+      {label:"Credor",r:x=>el("div",{},el("b",{},x.credor),el("div",{class:"np-ts-sub"},[x.descricao,TIPOS[x.tipo]].filter(Boolean).join(" · ")))},
+      {label:"Saldo",r:x=>brl2(x.saldo),num:true},{label:"% do total",r:x=>pct(x.prop),num:true},
+      {label:"Parcela atual",r:x=>brl2(x.parcelaAtual),num:true},{label:`Parcela em ${r.prazo} m`,r:x=>brl2(x.parcelaCinco),num:true},
+      {label:"Parcela “o que cabe”",r:x=>brl2(x.parcelaCabe),num:true},{label:"Com desídia: recebe / resta",r:x=>brl2(x.recebidoDesidia)+" / "+brl2(x.remanescenteDesidia),num:true}
+    ],r.rateio,"Informe as dívidas."));
+
+    if(r.rateioCredor.length<r.rateio.length){
+      out.append(mkTbl("Por credor (dívidas do mesmo credor somadas em uma parcela)",[
+        {label:"Credor",r:x=>el("div",{},el("b",{},x.credor),el("div",{class:"np-ts-sub"},`${x.itens} contrato(s)`))},
+        {label:"Saldo",r:x=>brl2(x.saldo),num:true},{label:"% do total",r:x=>pct(x.prop),num:true},
+        {label:`Parcela em ${r.prazo} m`,r:x=>brl2(x.parcelaCinco),num:true},{label:"Parcela “o que cabe”",r:x=>brl2(x.parcelaCabe),num:true},
+        {label:"Com desídia: recebe / resta",r:x=>brl2(x.recebidoDesidia)+" / "+brl2(x.remanescenteDesidia),num:true}
+      ],r.rateioCredor,"—"));
+    }
+
+    const det=el("details",{class:"np-se-det"},
+      el("summary",{},`Tabela mês a mês — plano em ${r.prazo} meses (${r.cinco.tabela.length} parcelas)`),
+      el("div",{class:"np-ts-tbl-wrap",style:"margin-top:8px"},
+        el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},el("th",{class:"r"},"#"),el("th",{},"Vencimento"),el("th",{class:"r"},"Parcela"),el("th",{class:"r"},"Juros"),el("th",{class:"r"},"Amortização"),el("th",{class:"r"},"Saldo"))),
+          el("tbody",{},r.cinco.tabela.map(l=>el("tr",{},el("td",{class:"r"},String(l.k)),el("td",{},fmtISO(l.data)),el("td",{class:"r"},brl2(l.valor)),el("td",{class:"r"},brl2(l.juros)),el("td",{class:"r"},brl2(l.amort)),el("td",{class:"r"},brl2(l.saldo)))))
+        )
+      )
+    );
+    out.append(det);
+
+    const cenSeg=NPUI.seg([
+      ["cinco",`Plano em ${r.prazo} meses`],
+      ["cabe","O que cabe na renda"],
+      ["desidia","Plano com desídia"]
+    ],U.ent.cenario||"cinco",k=>{U.ent.cenario=k;const outEl=$("#se-out");if(outEl)outEl.replaceWith(renderResultado())},"Cenário proposto");
+    out.append(el("section",{class:"np-cfg-sec np-form-leitura"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Documentos (.docx)"),el("p",{class:"desc"},"Gerados no papel timbrado do escritório. Escolha o cenário proposto para o parecer e para a petição."))),
+      el("div",{style:"margin-bottom:12px"},cenSeg),
+      el("div",{class:"actions",style:"justify-content:flex-start"},
+        NPUI.btn("Relatório do cálculo",{onclick:()=>gerar("relatorio")}),
+        NPUI.btn("Parecer ao cliente",{onclick:()=>gerar("parecer")}),
+        NPUI.btn("Petição de juntada do plano",{variante:"pri",onclick:()=>gerar("peticao")})
+      )
+    ));
+    return out;
+  }
   const K=(l,val,h,cls)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v",style:cls?`color:var(--${cls})`:""},val),el("div",{class:"h"},h));
   out.append(el("div",{class:"kpis"},K("Renda mensal",brl2(r.renda),""),K("Comprometida hoje",r.comprometimento!=null?pct(r.comprometimento):"—",brl2(r.parcelas)+" em parcelas",r.comprometimento>0.3?"crit":""),K("Mínimo existencial",brl2(r.minimo),pct(1-r.limitePct)+" da renda",r.minimoAbaixoPiso?"warn":""),K("Renda disponível",brl2(r.disponivel),pct(r.limitePct)+" da renda"),K("Saldo devedor total",brl2(r.saldo),`${r.rateio.length} credor(es)`)));
   if(r.alertas.length)out.append(el("div",{class:"card section",style:"border-left:3px solid var(--warn)"},r.alertas.map(a=>el("div",{},"⚠️ ",a))));

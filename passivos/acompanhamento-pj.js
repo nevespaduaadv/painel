@@ -433,13 +433,13 @@ function filtrosA3(regs){
   const top=[...cont.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]).filter(id=>!(meu&&id===meu.id));
   if(top.length){chips.push(NPUI.sepv());for(const id of top){const co=(A.colab||[]).find(x=>x.id===id);if(co)C({label:NPUI.curto(co.nome),on:f.resp===id,grupo:"resp",onclick:()=>{f.resp=f.resp===id?"":id;render()}})}}
   const extras=[f.fase,f.regua,f.resp&&f.resp!=="eu"&&!top.includes(f.resp)].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Fase, responsável estratégico, régua",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Fase, responsável estratégico, régua",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
     const fFase=sel({"":"Todas as fases",...FASE_L},f.fase),fResp=sel({"":"Todos os responsáveis",...Object.fromEntries((A.colab||[]).filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp==="eu"?(meu?.id||""):f.resp),fReg=sel({"":"Todas as réguas",...REGUA_L},f.regua);
     fFase.onchange=()=>{f.fase=fFase.value;render()};fResp.onchange=()=>{f.resp=fResp.value;render()};fReg.onchange=()=>{f.regua=fReg.value;render()};
     const L=(l,c)=>el("div",{},el("label",{},l),c);
     return [el("div",{class:"np-pop-form"},L("Fase",fFase),L("Responsável estratégico",fResp),L("Régua",fReg),
       el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{A3.f={escopo:"ativos",ciclo:false,mensal:false,pend:false,resp:"",fase:"",regua:""};NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-acompanhamento .np-chipf[aria-haspopup="dialog"]')})});
-  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
+  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");mais.querySelector(".n")?.setAttribute("aria-label",extras+" filtros extras ativos");
   return {chips,fixos:[mais]};
 }
 function renderAcompanhamentoV3(){

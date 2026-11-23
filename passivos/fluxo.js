@@ -198,8 +198,122 @@ async function checar(m){
   const {error}=await SB.from("monitoramentos").update({ultima_checagem:hojeISO(),proxima_checagem:addISO(hojeISO(),1),status:m.status==="pausado"?"pausado":"em_monitoramento"}).eq("id",m.id);
   if(error)toast("Não foi possível registrar");else{toast("Checagem registrada");recarregar()}
 }
+const M3={filtro:"todos",painel:null,obra:null,aberto:null};
+function prazoRelativoMon(m){
+  const hojeStr=hojeISO();
+  if(!m.proxima_checagem)return {txt:"sem data",tom:"muted",tip:"Sem próxima checagem"};
+  if(m.proxima_checagem===hojeStr)return {txt:"hoje",tom:"att",tip:"Próxima checagem: hoje ("+fmtD(parseD(m.proxima_checagem))+")"};
+  const d1=parseD(hojeStr),d2=parseD(m.proxima_checagem);
+  const diff=Math.round((d2-d1)/864e5);
+  if(diff<0){const ad=Math.abs(diff);return {txt:ad===1?"atrasado 1d":`há ${ad} dias`,tom:"late",tip:"Atrasado desde "+fmtD(d2)}}
+  if(diff===1)return {txt:"amanhã",tom:"ok",tip:"Próxima checagem: "+fmtD(d2)};
+  return {txt:`em ${diff}d`,tom:"",tip:"Próxima checagem: "+fmtD(d2)};
+}
+function abrirPainelMonV3(m,origem,silencioso){
+  if(!M3.painel)return;
+  M3.aberto=m.id;
+  const rel=prazoRelativoMon(m);
+  const docs=m.documentos||[];
+  const props=NPUI.props([
+    ["Status",MON_STATUS[m.status]||m.status],
+    ["Última checagem",m.ultima_checagem?fmtD(parseD(m.ultima_checagem)):"—","serif"],
+    ["Próxima checagem",m.proxima_checagem?`${fmtD(parseD(m.proxima_checagem))} (${rel.txt})`:"—","serif"],
+    ["Processos ativos",String(m.processos_ativos||0),"serif"],
+    ["Foi citado?",m.foi_citado==null?"—":m.foi_citado?"Sim":"Não"],
+    ["Responsável",m.responsavel_nome||"—"]
+  ]);
+  const corpo=[props,
+    NPUI.secao(`Documentos monitorados (${docs.length})`,docs.length?el("div",{class:"np-num",style:"display:flex;flex-direction:column;gap:4px;font-size:var(--np-fs-2)"},docs.map(d=>el("div",{},d))):el("div",{class:"np-sem"},"Nenhum documento cadastrado")),
+    m.observacoes?NPUI.secao("Observações",el("div",{style:"white-space:pre-wrap"},m.observacoes)):null
+  ];
+  const btnChecar=NPUI.btn("Checado hoje",{variante:"pri",onclick:()=>checar(m)});
+  const btnMov=m.status!=="nova_movimentacao"
+    ?NPUI.btn("Nova mov.",{onclick:async()=>{await SB.from("monitoramentos").update({status:"nova_movimentacao"}).eq("id",m.id);toast("Marcado com nova movimentação");recarregar()}})
+    :NPUI.btn("Analisada",{onclick:async()=>{await SB.from("monitoramentos").update({status:"em_monitoramento"}).eq("id",m.id);toast("Movimentação analisada");recarregar()}});
+  const mais=NPUI.btn("⋯",{variante:"ghost",title:"Mais ações",onclick:e=>NPUI.pop(e.currentTarget,[
+    {label:"Editar monitoramento",onclick:()=>openMonForm(m.cliente_id,m)},
+    {label:"Abrir cliente",onclick:()=>abrirClienteN3(m.cliente_id,"resumo")}
+  ],{label:"Mais ações",alinhar:"dir"})});
+  mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
+  M3.painel.abrir({id:m.id,trilha:"Jurídico · Monitoramento",titulo:m.cliente_nome||nomeCli(m.cliente_id),corpo,pe:[btnChecar,btnMov,mais],origem:silencioso?null:origem});
+}
+function renderMonitoramentoV3(v){
+  v.classList.add("np-v3");
+  if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"carregando"}])}),NPUI.carregando(6));return}
+  const ativos=X.mon.filter(m=>m.status!=="pausado");
+  const vencidos=X.mon.filter(m=>m.checagem_vencida);
+  const novas=X.mon.filter(m=>m.status==="nova_movimentacao");
+  const pausados=X.mon.filter(m=>m.status==="pausado");
+  const sem=S.clientes.filter(c=>c.ativo!==false&&!X.mon.some(m=>m.cliente_id===c.id));
+  const btnIniciar=sem.length?NPUI.btn("+ Iniciar",{variante:"pri",onclick:e=>NPUI.pop(e.currentTarget,sem.slice(0,25).map(c=>({label:c.nome,onclick:()=>openMonForm(c.id,{})})),{label:"Iniciar monitoramento",alinhar:"dir"})}):null;
+  const chips=[
+    ["todos","Todos",X.mon.length],
+    ["checar","A checar",vencidos.length],
+    ["nova","Nova mov.",novas.length],
+    ["ativo","Em monitoramento",ativos.length],
+    ["pausado","Pausados",pausados.length]
+  ];
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo([
+      {n:String(ativos.length),label:"monitorados"},
+      {n:String(vencidos.length),label:"a checar",tom:vencidos.length?"crit":"zero"},
+      {n:String(novas.length),label:"nova mov.",tom:novas.length?"att":"zero"}
+    ]),
+    filtros:chips.map(([k,l,n])=>NPUI.chip({label:l,on:M3.filtro===k,n,onclick:()=>{M3.filtro=k;render()}})),
+    direita:[btnIniciar].filter(Boolean)
+  }));
+  if(sem.length){
+    v.append(el("div",{class:"np-mon-sem"},
+      el("span",{},el("b",{},`${sem.length} cliente${sem.length===1?"":"s"} ativo${sem.length===1?"":"s"} sem monitoramento`),": ",sem.slice(0,5).map(c=>c.nome).join(", "),sem.length>5?` +${sem.length-5}`:""),
+      el("div",{class:"acoes"},sem.slice(0,3).map(c=>NPUI.btn("Iniciar "+c.nome.split(" ")[0],{onclick:()=>openMonForm(c.id,{})})))));
+  }
+  const lista=X.mon.filter(m=>{
+    if(M3.filtro==="checar")return !!m.checagem_vencida;
+    if(M3.filtro==="nova")return m.status==="nova_movimentacao";
+    if(M3.filtro==="ativo")return m.status!=="pausado";
+    if(M3.filtro==="pausado")return m.status==="pausado";
+    return true;
+  });
+  const corpo=el("div",{class:"np-corpo"});
+  const obra=el("div",{class:"np-obra"},corpo);
+  M3.obra=obra;M3.painel=NPUI.painel({obra,label:"Detalhe do monitoramento",onClose:()=>{M3.aberto=null}});
+  v.append(obra);
+  if(!lista.length){
+    corpo.append(NPUI.vazio({titulo:"Nenhum monitoramento neste filtro",texto:M3.filtro!=="todos"?"Limpe o filtro para ver todos os clientes monitorados.":"Use “+ Iniciar” para acompanhar clientes no Escavador."}));
+    return;
+  }
+  const ul=el("ul",{class:"np-lst"});
+  for(const m of lista){
+    const rel=prazoRelativoMon(m);
+    const docsN=(m.documentos||[]).length;
+    const ctx=[`${docsN} doc${docsN===1?"":"s"}`,`${m.processos_ativos||0} proc.`];
+    if(m.foi_citado)ctx.push("citado");
+    if(m.ultima_checagem)ctx.push("última "+fmtD(parseD(m.ultima_checagem)));
+    if(m.responsavel_nome)ctx.push(m.responsavel_nome);
+    const marcas=[];
+    if(m.status==="nova_movimentacao")marcas.push(NPUI.marca("nova mov.","att"));
+    else if(m.status==="pausado")marcas.push(NPUI.marca("pausado","muted"));
+    if(m.foi_citado)marcas.push(NPUI.marca("citado","crit"));
+    const li=NPUI.linha({
+      id:m.id,
+      regua:m.checagem_vencida?"late":m.status==="nova_movimentacao"?"att":null,
+      prazo:{curta:rel.txt,exata:rel.tip,tom:rel.tom},
+      titulo:m.cliente_nome||nomeCli(m.cliente_id),
+      contexto:[ctx.join(" · ")],
+      direita:[...marcas,NPUI.btn("Checado hoje",{onclick:e=>{e.stopPropagation();checar(m)}})],
+      atual:M3.aberto===m.id,
+      onOpen:liEl=>abrirPainelMonV3(m,liEl.querySelector(".np-it-abrir"))
+    });
+    ul.append(li);
+  }
+  corpo.append(ul);
+  if(M3.aberto){const cur=X.mon.find(x=>x.id===M3.aberto);if(cur)abrirPainelMonV3(cur,null,true);else M3.aberto=null}
+}
+window.PP_MON={prazoRelativoMon};
 function renderMonitoramento(){
   const v=$("#view-monitoramento");v.replaceChildren();
+  if(negV3()){renderMonitoramentoV3(v);return}
+  v.classList.remove("np-v3");
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Monitoramento processual"),el("div",{class:"sub"},"Uma linha por cliente: documentos monitorados no Escavador, última e próxima checagem. “Checado hoje” marca a verificação e agenda a próxima para amanhã."))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const hojeStr=hojeISO();
@@ -311,14 +425,14 @@ function filtrosN3(){
   const bancos=[...cont.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(x=>x[0]);const top=bancos.slice(0,3);
   if(top.length){chips.push(NPUI.sepv());for(const b of top)C({label:b,on:N3.bancos.has(b),grupo:"banco",onclick:()=>{if(N3.bancos.has(b))N3.bancos.delete(b);else N3.bancos.add(b);render()}})}
   const extras=[X.fCli,X.fResp&&!(meu&&N3.minhas&&X.fResp===meu.id),[...N3.bancos].some(b=>!top.includes(b))].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Cliente, responsável, banco",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Cliente, responsável, banco",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
     const fc=sel({"":"Todos os clientes",...Object.fromEntries([...new Set(X.neg.map(n=>n.cliente_id))].map(id=>[id,nomeCli(id)]).sort((a,b)=>a[1].localeCompare(b[1])))},X.fCli);fc.onchange=()=>{X.fCli=fc.value;render()};
     const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(X.colabs.filter(c=>c.ativo).map(c=>[c.id,c.nome]))},X.fResp);fr.onchange=()=>{X.fResp=fr.value;render()};
     const todosB=[...new Set(X.neg.map(n=>(n.banco||"").trim()).filter(Boolean))].sort();const fb=sel({"":"Todos os bancos",...Object.fromEntries(todosB.map(b=>[b,b]))},N3.bancos.size===1?[...N3.bancos][0]:"");fb.onchange=()=>{N3.bancos=fb.value?new Set([fb.value]):new Set();render()};
     const L=(l,c)=>el("div",{},el("label",{},l),c);
     return [el("div",{class:"np-pop-form"},L("Cliente",fc),L("Responsável",fr),L("Banco",fb),
       el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{limparN3();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-negociacoes .np-chipf[aria-haspopup="dialog"]')})});
-  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
+  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");mais.querySelector(".n")?.setAttribute("aria-label",extras+" filtros extras ativos");
   return {chips,fixos:[mais]};
 }
 function renderNegociacoesV3(){

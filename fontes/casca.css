@@ -140,7 +140,7 @@ html.np-casca-v3 .top .userbox .btn:hover{background:var(--np-surface-2)}
 html.np-casca-v3 .top .userbox #userName{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* véu da gaveta (reaproveita .sb-overlay do #app) */
-html.np-casca-v3 .sb-overlay{background:rgba(10,12,14,.32)}
+html.np-casca-v3 .sb-overlay{background:var(--np-scrim)}
 
 /* foco visível uniforme na casca */
 html.np-casca-v3 :is(#np-side,#np-fly,.top) :is(button,a,input,[tabindex]):focus-visible{outline:none;box-shadow:var(--np-focus)}
@@ -202,10 +202,13 @@ html:not(.np-casca-v3) .np-v3-only{display:none!important}
 /* ---------- V2 (15/11): barra e lateral fiéis ao DESIGN.md §4 ----------
    barra = menu · trilha "Grupo / Módulo" · espaço · vista (Lista/Quadro) · tema · conversas/avisos;
    lateral = marca · Buscar · ação primária em tinta · árvore · pessoa (menu da conta). */
-html.np-casca-v3 #np-acao:empty{display:none}
-html.np-casca-v3 #np-acao{margin-top:8px}
-html.np-casca-v3 #np-acao .np-btn{width:100%;height:34px;justify-content:flex-start;padding:0 12px;font-size:var(--np-fs-3)}
-html.np-casca-v3 .np-rail #np-acao .np-btn{width:36px;padding:0;justify-content:center;font-size:0;margin:0 auto;gap:0}
+html.np-casca-v3 #np-acao{margin-top:8px;min-height:36px;display:flex;align-items:center}
+html.np-casca-v3 #np-acao .np-btn{width:100%;height:36px;justify-content:flex-start;padding:0 12px;font-size:var(--np-fs-3)}
+html.np-casca-v3 #np-acao .np-btn.np-novo-rapido{background:var(--np-surface);border-color:var(--np-line-2);color:var(--np-text-2);font-weight:500}
+html.np-casca-v3 #np-acao .np-btn.np-novo-rapido:hover,html.np-casca-v3 #np-acao .np-btn.np-novo-rapido[aria-expanded="true"]{background:var(--np-surface-2);border-color:var(--np-ctrl);color:var(--np-text)}
+html.np-casca-v3 #np-acao .np-btn.np-novo-rapido .np-chev{margin-left:auto;width:13px;height:13px;opacity:.75}
+html.np-casca-v3 .np-rail #np-acao .np-btn{width:36px;height:36px;padding:0;justify-content:center;font-size:0;margin:0 auto;gap:0}
+html.np-casca-v3 .np-rail #np-acao .np-btn .np-chev,html.np-casca-v3 .np-rail #np-acao .np-btn span{display:none}
 html.np-casca-v3 .np-rail #np-acao .np-btn svg{width:16px;height:16px}
 html.np-casca-v3 #np-barra-vista{display:flex;align-items:center;gap:6px;flex:none}
 html.np-casca-v3 #np-barra-vista:empty{display:none}
@@ -224,7 +227,7 @@ html.np-casca-v3 header.top #busca:focus-within>svg{left:16px}
 html.np-casca-v3 header.top #busca:focus-within .res{left:-1px;right:-1px;top:calc(100% + 6px)}
 @keyframes np-paleta{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translate(-50%,0)}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 header.top #busca:focus-within{animation:none}}
-@media (pointer:coarse),(hover:none){html.np-casca-v3 .np-conta{width:44px;height:44px}html.np-casca-v3 #np-acao .np-btn{height:44px}}
+@media (pointer:coarse),(hover:none){html.np-casca-v3 .np-conta{width:44px;height:44px}html.np-casca-v3 #np-acao{min-height:44px}html.np-casca-v3 #np-acao .np-btn{height:44px}html.np-casca-v3 .np-rail #np-acao .np-btn{width:44px;height:44px}}
 
 /* ---------- V6 (16/11) · um só tema escuro ----------
    Com a casca V3.1 ligada, as variáveis da V2 (as telas que ainda não migraram) passam a apontar para os tokens --np-* nos dois temas:
@@ -234,12 +237,13 @@ html:root.np-casca-v3{
   --bg:var(--np-bg); --surface:var(--np-surface); --surface-2:var(--np-surface-2); --line:var(--np-line);
   --fg:var(--np-text); --muted:var(--np-text-2); --faint:var(--np-text-3);
   --ok:var(--np-ok); --warn:var(--np-att); --crit:var(--np-crit); --info:var(--np-info);
-  --btn-primary:var(--np-ink); --btn-primary-shadow:rgba(0,0,0,0); --on-dark:var(--np-inv);
+  --btn-primary:var(--np-ink); --btn-primary-shadow:transparent; --on-dark:var(--np-inv);
   --gold-soft:var(--np-surface-2); --ch-grid:var(--np-line);
   --shadow:none; --shadow-pop:var(--np-shadow);
 }
 html.np-casca-v3 .np-ag-livres{display:flex;gap:10px;align-items:baseline;margin:2px 0;padding:8px 12px;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text-3)}
 html.np-casca-v3 .np-ag-livres-r{font:italic 400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
+html.np-casca-v3 .switch input[type="checkbox"],html.np-casca-v3 td input[type="checkbox"]{accent-color:var(--np-ink)}
 
 
 html.np-casca-v3 #np-tree::-webkit-scrollbar{display:none}

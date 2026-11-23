@@ -151,8 +151,79 @@ function cardConta(x,{cliente=false}={}){
     x.tem_2fa?widget(x.id):el("div",{class:"note"},"Sem 2FA cadastrado."),
     el("div",{class:"actions totp-acoes"},cliente?el("button",{class:"btn sm",onclick:()=>{S.tab="clientes";S.sel=x.cliente_id;S.sub="resumo";render()}},"Ficha"):el("button",{class:"btn sm edit-only",title:"Editar conta",onclick:()=>formConta(x)},"Editar"),!cliente?el("button",{class:"btn sm edit-only",title:x.tem_2fa?"Substituir ou remover 2FA":"Configurar 2FA",onclick:()=>form2fa(x,()=>{A.ok=false;carregar()})},x.tem_2fa?"⚙":"Configurar 2FA"):null));
 }
+const au2faV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+function linhaContaV3(x,{cliente=false}={}){
+  const obs=x.observacoes&&x.observacoes!==OBS_IMPORT?x.observacoes:null;
+  const sub=[cliente?x.cliente_nome:x.titular,limpo(x.login)].filter(Boolean).join(" · ");
+  const acoes=cliente
+    ?[NPUI.btn("Ficha",{variante:"ghost",onclick:()=>{S.tab="clientes";S.sel=x.cliente_id;S.sub="resumo";render()}})]
+    :[
+        NPUI.btn("Editar",{variante:"ghost",onclick:()=>formConta(x)}),
+        NPUI.btn(x.tem_2fa?"2FA":"Configurar 2FA",{variante:x.tem_2fa?"ghost":"pri",onclick:()=>form2fa(x,()=>{A.ok=false;carregar()})})
+      ];
+  return el("div",{class:"np-totp-row"},
+    el("div",{class:"totp-info"},
+      el("div",{class:"n"},limpo(x.sistema),x.totp_emissor&&norm(limpo(x.totp_emissor))!==norm(limpo(x.sistema))?el("span",{class:"np-ts-sub"}," · "+limpo(x.totp_emissor)):null),
+      sub?el("div",{class:"s"},sub):null,
+      obs?el("div",{class:"s"},obs):null,
+      x.tem_senha?el("div",{class:"s np-totp-pass"},"Senha:",celSenha(x)):null
+    ),
+    x.tem_2fa?widget(x.id):NPUI.marca("Sem 2FA",""),
+    el("div",{class:"np-totp-acoes"},...acoes)
+  );
+}
+function renderAutenticadorV3(v){
+  v.classList.add("np-v3");
+  const ok=garantir();
+  const dirBruto=[
+    NPUI.btn("Importar do Google",{onclick:importarGoogle}),
+    NPUI.btn("Nova conta",{variante:"pri",icone:"mais",onclick:()=>formConta()})
+  ];
+  const direita=window.NPCasca?.acomodar?window.NPCasca.acomodar(dirBruto):dirBruto;
+  if(!ok){
+    v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:0,label:"contas"}]),direita}),NPUI.carregando(6));
+    return;
+  }
+  const com2fa=A.contas.filter(c=>c.tem_2fa).length;
+  const resumo=NPUI.resumo([
+    {n:A.contas.length,label:"contas do escritório"},
+    {n:com2fa,label:"com 2FA ativo",tom:com2fa?"ok":""},
+    A.clientes.length?{n:A.clientes.length,label:"acessos de clientes"}:null
+  ].filter(Boolean));
+  const q=el("input",{type:"search",id:"aut-q",class:"np-tb-busca",placeholder:"Sistema, grupo, login, cliente…",value:A.busca,"aria-label":"Buscar contas no autenticador",oninput:e=>{A.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$("#aut-q");if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}}});
+  v.append(NPUI.toolbar({resumo,filtrosFixos:[q],direita}));
+
+  const nq=norm(A.busca.trim());
+  const f=x=>!nq||norm([x.sistema,x.grupo,x.login,x.titular,x.totp_emissor,x.cliente_nome,x.observacoes].join(" ")).includes(nq);
+  const contas=A.contas.filter(f);
+  const cli=A.clientes.filter(f);
+
+  if(!A.contas.length&&!A.clientes.length){
+    v.append(NPUI.vazio({titulo:"Nenhuma conta cadastrada",texto:"Use “Importar do Google” para trazer todas as contas de uma vez ou “Nova conta” para cadastrar individualmente."}));
+    return;
+  }
+  const grupos=[...new Set(contas.map(c=>c.grupo||"Sem grupo"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  for(const g of grupos){
+    const listaG=contas.filter(c=>(c.grupo||"Sem grupo")===g);
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("h2",{},g),el("span",{class:"np-ts-sub"},`${listaG.length} ${listaG.length===1?"conta":"contas"}`)),
+      el("div",{class:"np-totp-lista"},listaG.map(c=>linhaContaV3(c)))
+    ));
+  }
+  if(cli.length){
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("h2",{},"Acessos de clientes com 2FA"),el("span",{class:"np-ts-sub"},`${cli.length} ${cli.length===1?"acesso":"acessos"}`)),
+      el("div",{class:"np-totp-lista"},cli.map(c=>linhaContaV3(c,{cliente:true})))
+    ));
+  }
+  if(nq&&!contas.length&&!cli.length){
+    v.append(NPUI.vazio({titulo:"Nenhuma conta encontrada",texto:"Ajuste o termo de busca para localizar outro sistema ou titular."}));
+  }
+}
 function renderAutenticador(){
   const v=$("#view-autenticador");v.replaceChildren();
+  if(au2faV3()){renderAutenticadorV3(v);return}
+  v.classList.remove("np-v3");
   const ok=garantir();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Autenticador"),el("div",{class:"sub"},"Contas do escritório (tribunais, Receita, bancos — no nome da advogada) com os códigos 2FA sempre visíveis, trocando a cada 30 segundos. Importe tudo de uma vez do Google Authenticator. Senhas e segredos ficam no cofre; cada consulta é registrada.")),
     el("div",{class:"actions edit-only"},el("button",{class:"btn sm",onclick:importarGoogle},"Importar do Google Authenticator"),el("button",{class:"btn sm primary",onclick:()=>formConta()},"+ Conta"))));

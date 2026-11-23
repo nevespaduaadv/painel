@@ -62,9 +62,102 @@ function linha(r,{gestor=false}={}){
       gestor&&r.status==="pendente"?el("button",{class:"btn sm",onclick:()=>decidir(r,"negada")},"Negar"):null,
       !gestor&&r.status==="pendente"&&meu&&r.colaborador_id===meu.id?el("button",{class:"btn sm",onclick:()=>cancelar(r)},"Cancelar"):null));
 }
+const reqV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const R3={painel:null,obra:null,aberto:null};
+const statusReqV3=s=>NPUI.marca(({pendente:"pendente",aprovada:"aprovada",negada:"negada",cancelada:"cancelada"})[s]||s,s==="pendente"?"att":s==="aprovada"?"ok":s==="negada"?"crit":"muted");
+function abrirPainelReqV3(r,{gestor=false,origem=null,silencioso=false}={}){
+  if(!R3.painel)return;
+  R3.aberto=r.id;
+  const meu=meuColab();
+  const props=NPUI.props([
+    ["Colaborador",r.colaborador_nome||"—"],
+    ["Tipo",r.tipo_nome||TIPOS[r.tipo]||r.tipo],
+    ["Período",periodo(r),"serif"],
+    ["Situação",STATUS[r.status]?.[0]||r.status],
+    ["Solicitado em",fmtDT(r.created_at),"serif"],
+    r.decidido_em?["Decisão",`${r.status==="aprovada"?"Aprovada":"Negada"}${r.decidido_por_nome?" por "+r.decidido_por_nome:""} em ${fmtDT(r.decidido_em)}`]:null
+  ].filter(Boolean));
+  const corpo=[props,
+    r.detalhe?NPUI.secao("Detalhe",el("div",{style:"white-space:pre-wrap"},r.detalhe)):null,
+    r.resposta?NPUI.secao("Resposta",el("div",{style:"white-space:pre-wrap"},r.resposta)):null,
+    (r.anexos||[]).length?NPUI.secao(`Anexos (${r.anexos.length})`,el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},...(r.anexos||[]).map(a=>NPUI.btn("📎 "+a.nome,{onclick:async()=>{const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}})))):null
+  ];
+  const pe=[];
+  if(gestor&&r.status==="pendente"){
+    pe.push(NPUI.btn("Aprovar",{variante:"pri",onclick:()=>decidir(r,"aprovada")}));
+    pe.push(NPUI.btn("Negar",{onclick:()=>decidir(r,"negada")}));
+  }else if(r.status==="pendente"&&meu&&r.colaborador_id===meu.id){
+    pe.push(NPUI.btn("Cancelar requisição",{onclick:()=>cancelar(r)}));
+  }
+  R3.painel.abrir({id:r.id,trilha:"Equipe · Requisição",titulo:`${r.colaborador_nome||""} · ${r.tipo_nome||TIPOS[r.tipo]||""}`.replace(/^\s*·\s*/,""),corpo,pe,origem:silencioso?null:origem});
+}
+function renderTelaV3(v){
+  v.classList.add("np-v3");
+  const gestor=aprova();const meu=meuColab();
+  const btnNova=NPUI.btn("+ Requisição",{variante:"pri",onclick:nova});
+  if(!R.ok){
+    if(!R.carregando&&!R.erro)carregar();
+    v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:R.erro?"indisponível":"carregando"}]),direita:[btnNova]}),
+      R.erro?NPUI.vazio({titulo:"Não foi possível carregar as requisições",texto:R.erro}):NPUI.carregando(5));
+    return;
+  }
+  const pend=R.lista.filter(r=>r.status==="pendente");
+  const hist=R.lista.filter(r=>r.status!=="pendente");
+  const minhas=R.lista.filter(r=>meu&&r.colaborador_id===meu.id);
+  if(!gestor&&R.filtro!=="minhas")R.filtro="minhas";
+  const filtros=gestor?[
+    NPUI.chip({label:"Pendentes",on:R.filtro==="pendente",n:pend.length,onclick:()=>{R.filtro="pendente";render()}}),
+    NPUI.chip({label:"Histórico",on:R.filtro==="historico",n:hist.length,onclick:()=>{R.filtro="historico";render()}}),
+    NPUI.chip({label:"Minhas",on:R.filtro==="minhas",n:minhas.length,onclick:()=>{R.filtro="minhas";render()}})
+  ]:[NPUI.chip({label:"Minhas requisições",on:true,n:minhas.length,onclick:()=>{}})];
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo(gestor?[
+      {n:String(pend.length),label:pend.length===1?"pendente":"pendentes",tom:pend.length?"att":"zero"},
+      {n:String(hist.length),label:"decididas",tom:"zero"}
+    ]:[{n:String(minhas.length),label:minhas.length===1?"requisição":"requisições"}]),
+    filtros,
+    direita:[btnNova]
+  }));
+  const lista=R.filtro==="minhas"?minhas:R.filtro==="historico"?hist.slice(0,100):pend;
+  const corpo=el("div",{class:"np-corpo"});
+  const obra=el("div",{class:"np-obra"},corpo);
+  R3.obra=obra;R3.painel=NPUI.painel({obra,label:"Detalhe da requisição",onClose:()=>{R3.aberto=null}});
+  v.append(obra);
+  if(!lista.length){
+    corpo.append(NPUI.vazio({titulo:R.filtro==="pendente"?"Nenhuma requisição pendente":"Nenhuma requisição encontrada",texto:"Use “+ Requisição” para solicitar férias, folgas, ausências ou home office."}));
+    return;
+  }
+  const ul=el("ul",{class:"np-lst"});
+  for(const r of lista){
+    const ctx=[periodo(r)];
+    if(r.detalhe)ctx.push(r.detalhe.slice(0,80)+(r.detalhe.length>80?"…":""));
+    if((r.anexos||[]).length)ctx.push(`${r.anexos.length} anexo(s)`);
+    const direita=[statusReqV3(r.status)];
+    if(gestor&&r.status==="pendente"&&R.filtro!=="minhas"){
+      direita.push(NPUI.btn("Aprovar",{variante:"pri",onclick:e=>{e.stopPropagation();decidir(r,"aprovada")}}));
+    }else if(r.status==="pendente"&&meu&&r.colaborador_id===meu.id){
+      direita.push(NPUI.btn("Cancelar",{variante:"ghost",onclick:e=>{e.stopPropagation();cancelar(r)}}));
+    }
+    ul.append(NPUI.linha({
+      id:r.id,
+      regua:r.status==="pendente"?"att":r.status==="negada"?"late":null,
+      prazo:{curta:fmtD(r.data_inicio).slice(0,5),exata:periodo(r),tom:r.status==="pendente"?"att":""},
+      titulo:(gestor&&R.filtro!=="minhas"?`${r.colaborador_nome} · `:"")+(r.tipo_nome||TIPOS[r.tipo]||r.tipo),
+      contexto:[ctx.join(" · ")],
+      direita,
+      atual:R3.aberto===r.id,
+      onOpen:liEl=>abrirPainelReqV3(r,{gestor:gestor&&R.filtro!=="minhas",origem:liEl.querySelector(".np-it-abrir")})
+    }));
+  }
+  corpo.append(ul);
+  if(R3.aberto){const cur=R.lista.find(x=>x.id===R3.aberto);if(cur)abrirPainelReqV3(cur,{gestor:gestor&&R.filtro!=="minhas",silencioso:true});else R3.aberto=null}
+}
 /* tela Requisições: gestores veem tudo (fila pendente primeiro); demais veem as suas */
 function renderTela(){
-  const v=$("#view-requisicoes");if(!v)return;v.replaceChildren();const gestor=aprova();const meu=meuColab();
+  const v=$("#view-requisicoes");if(!v)return;v.replaceChildren();
+  if(reqV3()){renderTelaV3(v);return}
+  v.classList.remove("np-v3");
+  const gestor=aprova();const meu=meuColab();
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Equipe"),el("h1",{},"Requisições"),el("div",{class:"sub"},"Pedidos da equipe (férias, folgas, horário reduzido, ausências) para aprovar, alterar e consultar. Os seus ficam em Meu perfil.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:nova},"+ Requisição"))));
   if(!R.ok){if(!R.carregando&&!R.erro)carregar();v.append(el("div",{class:"note"},R.erro?"Não foi possível carregar (o banco ainda não tem a tabela de requisições — rode a migração 0085).":"Carregando…"));return}

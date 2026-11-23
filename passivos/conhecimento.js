@@ -52,8 +52,280 @@ async function renderMd(md,host){
 }
 
 /* ---------- Telas ---------- */
+const kbV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+
+function excluirArtigo(a){
+  const executar=async()=>{
+    const {error}=await SB.from("conteudos").delete().eq("id",a.id);
+    if(error){toast("Só o administrador exclui");throw error;}
+    toast("Artigo excluído");K.sel=null;K.art=null;K.editando=false;K.ok=false;await carregar();
+  };
+  if(kbV3()&&NPUI.confirmar){
+    NPUI.confirmar({
+      titulo:"Excluir artigo da base?",
+      texto:`O artigo "${a.titulo||"Sem título"}" e todas as suas versões anteriores serão removidos permanentemente.`,
+      rotuloSim:"Excluir artigo",
+      rotuloNao:"Cancelar",
+      perigo:true,
+      onSim:executar
+    });
+    return;
+  }
+  if(!confirm("Excluir este artigo e todas as versões?"))return;
+  executar().catch(()=>{});
+}
+
+function renderConhecimentoV3(v){
+  v.classList.add("np-v3");
+  const ok=garantir();DOCS()?.garantir();
+  const areas=[...new Set(K.lista.map(c=>c.area||"juridico"))];
+  const visiveis=K.lista.filter(c=>!K.area||(c.area||"juridico")===K.area);
+  const temas=[...new Set(visiveis.map(c=>c.tema))];
+  const nDocs=DOCS()?.total||0;
+  const nRasc=visiveis.filter(c=>!c.publicado).length;
+
+  // Modo Documentos base ou Edição em tela dedicada
+  if(K.sel==="documentos"){
+    const bar=NPUI.toolbar({
+      resumo:el("div",{class:"np-tb-esq"},
+        NPUI.btn("← Voltar aos artigos",{onclick:()=>{K.sel=null;render()}}),
+        NPUI.sepv(),
+        NPUI.resumo([{n:nDocs||0,label:nDocs===1?"documento indexado":"documentos indexados"}])
+      ),
+      direita:[NPUI.btn("+ Artigo",{variante:"pri",onclick:()=>novoArtigo()})]
+    });
+    v.append(bar);
+    const wrap=el("div",{class:"np-kb-docs"});
+    if(DOCS()){DOCS().voltar=()=>{K.sel=null;render()};DOCS().render(wrap)}
+    else wrap.append(NPUI.vazio({titulo:"Documentos indisponíveis",texto:"O módulo de documentos base não foi carregado."}));
+    v.append(wrap);
+    return;
+  }
+
+  if(K.editando&&K.art){
+    renderEditorV3(v);
+    return;
+  }
+
+  const buscaInp=el("input",{type:"search",class:"np-tb-busca",value:K.busca,placeholder:"Buscar artigos e documentos…","aria-label":"Buscar na base de conhecimento"});
+  let tBusca;
+  buscaInp.oninput=()=>{K.busca=buscaInp.value;clearTimeout(tBusca);tBusca=setTimeout(buscar,350)};
+
+  const resumoItens=[
+    {n:visiveis.length,label:visiveis.length===1?"artigo":"artigos"},
+    {n:temas.length,label:temas.length===1?"tema":"temas"}
+  ];
+  if(nDocs)resumoItens.push({n:nDocs,label:"docs base"});
+  if(nRasc)resumoItens.push({n:nRasc,label:nRasc===1?"rascunho":"rascunhos",tom:"att"});
+
+  const areaChips=areas.length>1?[
+    NPUI.chip({label:"Todas",on:!K.area,onclick:()=>{K.area="";K.tema="";render()}}),
+    ...areas.map(a=>NPUI.chip({label:AREAS[a]||a,on:K.area===a,onclick:()=>{K.area=a;K.tema="";render()}}))
+  ]:[];
+
+  const temaChips=temas.length>1?[
+    NPUI.chip({label:"Todos os temas",on:!K.tema,onclick:()=>{K.tema="";render()}}),
+    ...temas.map(tm=>NPUI.chip({label:tm,on:K.tema===tm,onclick:()=>{K.tema=K.tema===tm?"":tm;render()}}))
+  ]:[];
+
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo(resumoItens),
+    direita:[
+      buscaInp,
+      NPUI.btn(nDocs?`Documentos base (${nDocs})`:"Documentos base",{onclick:()=>abrir("documentos")}),
+      NPUI.btn("+ Artigo",{variante:"pri",onclick:()=>novoArtigo()})
+    ]
+  }));
+
+  if(areaChips.length||temaChips.length){
+    const faixaFiltros=el("div",{class:"np-kb-filtros"});
+    if(areaChips.length)faixaFiltros.append(el("div",{class:"np-filtros"},...areaChips));
+    if(temaChips.length)faixaFiltros.append(el("div",{class:"np-filtros"},...temaChips));
+    v.append(faixaFiltros);
+  }
+
+  if(!ok){v.append(NPUI.carregando(6));return}
+
+  const obra=el("div",{class:"np-obra"});
+  const listaHost=el("div",{class:"np-corpo"});
+
+  if(K.resultados){
+    if(!K.resultados.length){
+      listaHost.append(NPUI.vazio({titulo:"Nenhum artigo encontrado",texto:`Sem resultados para “${K.busca.trim()}”. Tente outro termo ou consulte os documentos base.`}));
+    }else{
+      const its=K.resultados.map(r=>{
+        const trecho=r.trecho?Object.assign(el("span",{class:"np-kb-trecho"}),{innerHTML:sanitizar(r.trecho)}):null;
+        const ctx=[r.tema,trecho].filter(Boolean).flatMap((x,idx)=>idx?[" · ",x]:[x]);
+        return NPUI.linha({
+          id:r.slug,
+          prazo:{curta:"Artigo"},
+          titulo:r.titulo,
+          contexto:ctx,
+          atual:K.sel===r.slug,
+          onOpen:()=>abrir(r.slug)
+        });
+      });
+      listaHost.append(NPUI.grupo({id:"kb-res",titulo:`Resultados para “${K.busca.trim()}”`,n:its.length,itens:its}));
+    }
+    if(K.resultadosDocs?.length){
+      const dIts=K.resultadosDocs.map(r=>NPUI.linha({
+        id:"doc-"+r.id,
+        prazo:{curta:"Doc"},
+        titulo:r.titulo,
+        contexto:r.caminho||"JURÍDICO",
+        direita:[NPUI.marca("Documento","info")],
+        onOpen:()=>{const d=DOCS()?.lista.find(x=>x.id===r.id);if(d&&DOCS().abrir)DOCS().abrir(d);else if(r.url)window.open(r.url,"_blank","noopener")}
+      }));
+      listaHost.append(NPUI.grupo({id:"kb-docs",titulo:"Documentos base",n:dIts.length,itens:dIts}));
+    }
+  }else{
+    const temasVis=temas.filter(x=>!K.tema||x===K.tema);
+    if(!temasVis.length){
+      listaHost.append(NPUI.vazio({titulo:"Nenhum artigo nesta seleção",texto:"Crie o primeiro artigo ou limpe os filtros acima."}));
+    }else{
+      temasVis.forEach((tm,gi)=>{
+        const its=visiveis.filter(c=>c.tema===tm);
+        const ar=its[0]?.area||"juridico";
+        const rotGrupo=(!K.area&&areas.length>1&&tm!==AREAS[ar])?`${AREAS[ar]||ar} · ${tm}`:tm;
+        const rows=its.map(c=>NPUI.linha({
+          id:c.slug,
+          prazo:{curta:`v${c.versao}`},
+          titulo:c.titulo,
+          contexto:[c.resumo||null,c.autor_nome||null].filter(Boolean).join(" · "),
+          direita:[!c.publicado?NPUI.marca("Rascunho","att"):null].filter(Boolean),
+          atual:K.sel===c.slug,
+          onOpen:()=>abrir(c.slug)
+        }));
+        listaHost.append(NPUI.grupo({id:"kb-g-"+gi,titulo:rotGrupo,n:its.length,itens:rows}));
+      });
+    }
+  }
+
+  obra.append(listaHost);
+  const painel=NPUI.painel({
+    obra,
+    label:"Artigo da base de conhecimento",
+    onClose:()=>{K.sel=null;K.art=null;K.versoes=[];render()}
+  });
+  v.append(obra);
+
+  if(K.sel&&K.sel!=="documentos"){
+    if(!K.art){
+      painel.abrir({
+        trilha:["Base de conhecimento"],
+        titulo:"Carregando artigo…",
+        corpo:[NPUI.carregando(4)],
+        id:K.sel
+      });
+    }else{
+      const a=K.art;
+      const mdBox=el("div",{class:"np-kb-md"});
+      renderMd(a.corpo_md,mdBox);
+
+      const metaLinha=[
+        AREAS[a.area]||a.area,
+        a.tema,
+        `v${a.versao}`,
+        a.updated_at?"atualizado em "+new Date(a.updated_at).toLocaleDateString("pt-BR"):null,
+        a.origem&&a.origem!=="manual"?"origem: "+a.origem:null
+      ].filter((x,i,arr)=>x&&arr.indexOf(x)===i).join(" · ");
+
+      const blocos=[
+        el("div",{class:"np-kb-meta"},metaLinha,a.publicado?null:el("span",{class:"np-kb-msep"},NPUI.marca("Rascunho","att"))),
+        a.resumo?el("p",{class:"np-kb-resumo"},a.resumo):null,
+        a.tags?.length?el("div",{class:"np-kb-tags"},a.tags.join(" · ")):null,
+        mdBox
+      ].filter(Boolean);
+
+      const rel=K.lista.filter(c=>c.id!==a.id&&(c.tema===a.tema||(c.tags||[]).some(t=>(a.tags||[]).includes(t)))).slice(0,6);
+      if(rel.length){
+        blocos.push(NPUI.secao("Relacionados",el("div",{class:"np-kb-rel"},...rel.map(c=>NPUI.btn(c.titulo,{onclick:()=>abrir(c.slug)})))));
+      }
+
+      if(K.versoes.length){
+        blocos.push(NPUI.secao(`Versões anteriores (${K.versoes.length})`,
+          el("div",{class:"np-kb-vers"},...K.versoes.slice(0,5).map(x=>NPUI.btn(`v${x.versao} · ${new Date(x.created_at).toLocaleDateString("pt-BR")}`,{onclick:()=>verVersao(x)})))
+        ));
+      }
+
+      // Rodapé em linha única (<= 3 controles)
+      const btnMais=NPUI.ib("pontos","Mais ações",(e)=>{
+        const itens=[];
+        if(K.versoes.length)itens.push({label:`Ver versão v${K.versoes[0].versao}`,onclick:()=>verVersao(K.versoes[0])});
+        itens.push({label:"Abrir Documentos base",onclick:()=>abrir("documentos")});
+        if(PP.perfil?.papel==="admin")itens.push({label:"Excluir artigo",tom:"crit",onclick:()=>excluirArtigo(a)});
+        NPUI.pop(e.currentTarget,itens,{role:"menu",label:"Mais ações",alinhar:"dir"});
+      });
+      btnMais.classList.add("np-p-mais");
+
+      painel.abrir({
+        trilha:[AREAS[a.area]||a.area,el("span",{class:"sep"}),a.tema].filter(Boolean),
+        titulo:a.titulo,
+        corpo:blocos,
+        pe:[
+          NPUI.btn("Editar",{variante:"pri",onclick:()=>{K.editando=true;render()}}),
+          NPUI.btn("Copiar link",{onclick:()=>{navigator.clipboard?.writeText(location.origin+location.pathname+ROTA_ART());toast("Link copiado")}}),
+          el("span",{class:"sp"}),
+          btnMais
+        ],
+        id:a.slug
+      });
+    }
+  }
+}
+
+function renderEditorV3(v){
+  const a=K.art;const temas=[...new Set(K.lista.map(c=>c.tema))];
+  const tit=inp("text",a.titulo,{placeholder:"Título do artigo"});
+  const area=el("select",{},Object.entries(AREAS_MINHAS()).map(([val,l])=>el("option",{value:val,selected:(a.area||"juridico")===val?"":null},l)));
+  const tema=inp("text",a.tema,{list:"temas-dl",placeholder:"Tema"});
+  const dl=el("datalist",{id:"temas-dl"},temas.map(t=>el("option",{value:t})));
+  const res=inp("text",a.resumo||"",{placeholder:"Uma linha que aparece na lista e na busca"});
+  const tags=inp("text",(a.tags||[]).join(", "),{placeholder:"separadas por vírgula"});
+  const pub=el("select",{},el("option",{value:"true",selected:a.publicado?"":null},"Publicado"),el("option",{value:"false",selected:a.publicado?null:""},"Rascunho"));
+  const ta=el("textarea",{class:"np-kb-ta"},a.corpo_md||"");
+  const prev=el("div",{class:"np-kb-prev"});
+  let tp;const atualizar=()=>{clearTimeout(tp);tp=setTimeout(()=>renderMd(ta.value,prev),400)};ta.oninput=atualizar;atualizar();
+
+  const salvar=async()=>{
+    if(!tit.value.trim())return toast("Informe o título");
+    const row={titulo:tit.value.trim(),area:area.value,tema:tema.value.trim()||a.tema,resumo:res.value.trim()||null,tags:tags.value.split(",").map(s=>s.trim()).filter(Boolean),publicado:pub.value==="true",corpo_md:ta.value};
+    const {error}=a.id?await SB.from("conteudos").update(row).eq("id",a.id):await SB.from("conteudos").insert(row);
+    if(error){toast("Não foi possível salvar: "+(error.message||""));return}
+    toast("Artigo salvo");K.ok=false;K.editando=false;await carregar();
+    if(!a.id){const n=K.lista.find(c=>c.titulo===row.titulo&&c.tema===row.tema);if(n)abrir(n.slug)}else abrir(a.slug);
+  };
+
+  v.append(NPUI.toolbar({
+    resumo:el("div",{class:"np-tb-esq"},
+      NPUI.btn("← Cancelar",{onclick:()=>{K.editando=false;if(!a.id)K.sel=null;render()}}),
+      NPUI.sepv(),
+      el("span",{class:"np-kb-ed-tit"},a.id?`Editando: ${a.titulo}`:"Novo artigo")
+    ),
+    direita:[
+      a.id&&PP.perfil?.papel==="admin"?NPUI.btn("Excluir",{variante:"danger",onclick:()=>excluirArtigo(a)}):null,
+      NPUI.btn("Salvar",{variante:"pri",onclick:salvar})
+    ].filter(Boolean)
+  }));
+
+  const meta=el("div",{class:"np-form-leitura np-kb-ed-meta"},
+    el("div",{class:"form",style:"grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"},
+      field("kb-tit","Título",tit),
+      field("kb-area","Área",area),
+      el("div",{class:"f"},el("label",{for:"kb-tema"},"Tema"),el("div",{},Object.assign(tema,{id:"kb-tema"}),dl)),
+      field("kb-res","Resumo",res),
+      field("kb-tags","Tags",tags),
+      field("kb-pub","Situação",pub)
+    )
+  );
+  const split=el("div",{class:"np-kb-ed-split"},el("div",{class:"np-kb-ed-col"},ta),el("div",{class:"np-kb-ed-col"},prev));
+  v.append(meta,split);
+}
+
 function renderConhecimento(){
   const v=$("#view-conhecimento");v.replaceChildren();
+  if(kbV3()){renderConhecimentoV3(v);return}
+  v.classList.remove("np-v3");
   const ok=garantir();DOCS()?.garantir();
   const areas=[...new Set(K.lista.map(c=>c.area||"juridico"))];const visiveis=K.lista.filter(c=>!K.area||(c.area||"juridico")===K.area);
   const temas=[...new Set(visiveis.map(c=>c.tema))];
@@ -114,7 +386,7 @@ function renderEditor(main){
     toast("Artigo salvo");K.ok=false;K.editando=false;await carregar();
     if(!a.id){const n=K.lista.find(c=>c.titulo===row.titulo&&c.tema===row.tema);if(n)abrir(n.slug)}else abrir(a.slug);
   };
-  const excluir=async()=>{if(!confirm("Excluir este artigo e todas as versões?"))return;const {error}=await SB.from("conteudos").delete().eq("id",a.id);if(error){toast("Só o administrador exclui");return}toast("Artigo excluído");K.sel=null;K.ok=false;carregar()};
+  const excluir=()=>excluirArtigo(a);
   main.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},a.id?"Editando":"Novo artigo"),el("h1",{},a.id?a.titulo:"Novo artigo"),el("div",{class:"sub"},"Markdown: # títulos, **negrito**, listas, tabelas, > citações, ```mermaid para fluxogramas, <details><summary> para blocos recolhíveis.")),
     el("div",{class:"actions"},a.id&&PP.perfil?.papel==="admin"?el("button",{class:"btn danger",onclick:excluir},"Excluir"):null,el("button",{class:"btn",onclick:()=>{K.editando=false;if(!a.id)K.sel=null;render()}},"Cancelar"),el("button",{class:"btn primary",onclick:salvar},"Salvar"))));
   main.append(el("div",{class:"form",style:"grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"},field("kb-tit","Título",tit),field("kb-area","Área",area),el("div",{class:"f"},el("label",{for:"kb-tema"},"Tema"),el("div",{},Object.assign(tema,{id:"kb-tema"}),dl)),field("kb-res","Resumo",res),field("kb-tags","Tags",tags),field("kb-pub","Situação",pub)));
@@ -130,7 +402,7 @@ async function verVersao(x){
 }
 
 /* ---------- Integração ---------- */
-const CSS=`.md{line-height:1.6;font-size:15px}.md h1{font-size:24px;margin:18px 0 8px}.md h2{font-size:20px;margin:22px 0 8px;padding-top:10px;border-top:1px solid var(--line)}.md h3{font-size:17px;margin:16px 0 6px}.md p{margin:8px 0}.md ul,.md ol{margin:6px 0 10px;padding-left:22px}.md li{margin:3px 0}.md blockquote{margin:10px 0;padding:10px 14px;border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:6px}.md table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13.5px}.md th,.md td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left}.md th{background:var(--surface-2)}.md code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:13px}.md pre{background:var(--surface-2);padding:10px 12px;border-radius:8px;overflow:auto;font-size:13px}.md pre code{background:none;padding:0}.md details{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0;background:var(--surface)}.md summary{cursor:pointer;font-weight:700}.md details[open] summary{margin-bottom:8px}.md hr{border:0;border-top:1px solid var(--line);margin:16px 0}.md a{color:var(--info)}.md img{max-width:100%}.mermaid-box{margin:12px 0;overflow:auto;background:#fff;border-radius:8px;padding:8px}.mermaid-box svg{max-width:100%;height:auto}.md mark,.side mark{background:var(--gold-soft);padding:0 2px}@media (max-width:860px){#view-conhecimento>div[style*="grid-template-columns:300px"]{grid-template-columns:1fr!important}}`;
+const CSS=`.md{line-height:1.6;font-size:15px}.md h1{font-size:24px;margin:18px 0 8px}.md h2{font-size:20px;margin:22px 0 8px;padding-top:10px;border-top:1px solid var(--line)}.md h3{font-size:17px;margin:16px 0 6px}.md p{margin:8px 0}.md ul,.md ol{margin:6px 0 10px;padding-left:22px}.md li{margin:3px 0}.md blockquote{margin:10px 0;padding:10px 14px;border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:6px}.md table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13.5px}.md th,.md td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left}.md th{background:var(--surface-2)}.md code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:13px}.md pre{background:var(--surface-2);padding:10px 12px;border-radius:8px;overflow:auto;font-size:13px}.md pre code{background:none;padding:0}.md details{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0;background:var(--surface)}.md summary{cursor:pointer;font-weight:700}.md details[open] summary{margin-bottom:8px}.md hr{border:0;border-top:1px solid var(--line);margin:16px 0}.md a{color:var(--info)}.md img{max-width:100%}.mermaid-box{margin:12px 0;overflow:auto;background:var(--surface);border-radius:8px;padding:8px}.mermaid-box svg{max-width:100%;height:auto}.md mark,.side mark{background:var(--gold-soft);padding:0 2px}@media (max-width:860px){#view-conhecimento>div[style*="grid-template-columns:300px"]{grid-template-columns:1fr!important}}`;
 document.head.append(el("style",{},CSS));
 {const _r=render;render=function(){_r();const vk=$("#view-conhecimento");if(!vk)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="conhecimento")S.tab="clientes";vk.hidden=S.tab!=="conhecimento";if(S.tab==="conhecimento"){renderConhecimento();const h=ROTA_ART();if(location.hash!==h&&K.sel!=="novo"){try{history.replaceState(null,"",h)}catch(_){}}}}}
 // rota #conhecimento/<slug>

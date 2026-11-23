@@ -386,32 +386,82 @@ html = html.replace('const use=n=>(window.claude&&typeof claude.use==="function"
 must('</script>\n');
 const extra = `
 /* ---------- Usuários (admin) ---------- */
+let _usrFiltro="",_usrBusca="";
 async function renderUsuarios(){
   const v=$("#view-usuarios");v.replaceChildren();
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acessos"),el("h1",{},"Usuários"),el("div",{class:"sub"},"Para criar um usuário novo: Supabase → Authentication → Users → Add user (com Auto Confirm). Ele aparece aqui como 'pendente'; defina o perfil, as áreas que a pessoa vê e, se for cliente, a empresa. Administradores veem tudo; Tarefas, Agenda e Meu painel são de todos."))));
+  const isV3=document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+  if(isV3){v.classList.add("np-v3");v.append(NPUI.carregando(5))}
+  else{v.classList.remove("np-v3");v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acessos"),el("h1",{},"Usuários e acessos"),el("div",{class:"sub"},"Novos cadastros aparecem aqui com perfil pendente até a liberação de acesso. Defina o perfil, as áreas visíveis para cada pessoa e, quando for cliente, a empresa vinculada. Administradores têm acesso integral; Tarefas, Agenda e Hoje ficam disponíveis para toda a equipe."))))}
   const {data:ps,error}=await SB.from("perfis").select("*").order("email");
-  if(error){v.append(el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
+  if(error){v.replaceChildren(isV3?NPUI.vazio({titulo:"Não foi possível carregar os usuários",texto:"Tente novamente em alguns instantes."}):el("div",{class:"card empty"},"Não foi possível carregar os usuários."));return}
   const PAPEIS={admin:"Administrador",colaborador:"Colaborador",cliente:"Cliente",robo:"Robô (só pautas de marketing)",pendente:"Pendente (sem acesso)"};
+  const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento (WhatsApp)",superendividamento:"Superendividamento (só a calculadora)",tarefas_equipe:"Controle do jurídico (tarefas da equipe, Publicações DJEN)"};
   const clientes=[...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  const montarLinha=(p,v3)=>{
+    const nome=inp("text",p.nome||"");
+    if(!v3){nome.style.width="100%";nome.style.minWidth="140px"}else{nome.className="np-tb-busca";nome.style.minWidth="150px"}
+    const papel=sel(PAPEIS,p.papel);if(v3)papel.className="np-tb-sel";
+    const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");if(v3)cli.className="np-tb-sel";
+    const chks=Object.fromEntries(Object.keys(AREAS).map(a=>[a,el("input",{type:"checkbox",checked:(p.acessos||[]).includes(a)?"":null})]));
+    const aoSalvar=async()=>{
+      const acessos=Object.keys(AREAS).filter(a=>chks[a].checked);
+      const upd={nome:nome.value.trim(),papel:papel.value,cliente_id:papel.value==="cliente"?(cli.value||null):null,acessos};
+      if(papel.value==="cliente"&&!cli.value){toast("Escolha a empresa do cliente");return}
+      const {error}=await SB.from("perfis").update(upd).eq("id",p.id);
+      if(error){toast("Não foi possível salvar");return}
+      if(upd.papel==="admin"||upd.papel==="colaborador"){const {error:e2}=await SB.from("colaboradores").upsert({perfil_id:p.id,nome:upd.nome||p.email},{onConflict:"perfil_id"});if(e2)console.warn(e2)}
+      toast("Usuário salvo");
+    };
+    const salvar=v3?NPUI.btn("Salvar",{variante:"pri",onclick:aoSalvar}):el("button",{class:"btn sm primary",onclick:aoSalvar},"Salvar");
+    return el("tr",{},
+      el("td",{class:v3?"np-ts-sub":""},p.email||"—"),
+      el("td",{},nome),
+      el("td",{},papel),
+      el("td",{},cli),
+      el("td",{},el("div",{class:v3?"np-usr-areas":"",style:v3?"":"display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;padding:4px 0"},...Object.entries(AREAS).map(([a,l])=>el("label",{class:v3?"np-usr-chk":"switch",title:a==="admin"?"":"Admins sempre veem tudo."},chks[a]," "+l)))),
+      el("td",{},salvar)
+    );
+  };
+  if(isV3){
+    v.replaceChildren();
+    const pend=ps.filter(p=>p.papel==="pendente").length;
+    const eqN=ps.filter(p=>p.papel==="admin"||p.papel==="colaborador").length;
+    const cliN=ps.filter(p=>p.papel==="cliente").length;
+    const q=_usrBusca.trim().toLowerCase();
+    const lista=ps.filter(p=>{
+      if(_usrFiltro==="pendente"&&p.papel!=="pendente")return false;
+      if(_usrFiltro==="equipe"&&p.papel!=="admin"&&p.papel!=="colaborador")return false;
+      if(_usrFiltro==="cliente"&&p.papel!=="cliente")return false;
+      if(q&&!((p.email||"")+" "+(p.nome||"")).toLowerCase().includes(q))return false;
+      return true;
+    });
+    const resumo=NPUI.resumo([
+      {n:ps.length,label:"usuários"},
+      {n:eqN,label:"equipe",tom:"ok"},
+      pend?{n:pend,label:"pendentes",tom:"att"}:null,
+      {n:cliN,label:"clientes"}
+    ].filter(Boolean));
+    const qInp=el("input",{type:"search",class:"np-tb-busca",placeholder:"Buscar por nome ou e-mail…",value:_usrBusca,"aria-label":"Buscar usuários",oninput:e=>{_usrBusca=e.target.value;const pos=e.target.selectionStart;renderUsuarios().then(()=>{const n=v.querySelector(".np-tb-busca");if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}})}});
+    const filtros=[
+      NPUI.chip({label:"Todos",n:ps.length,on:_usrFiltro==="",onclick:()=>{_usrFiltro="";renderUsuarios()}}),
+      NPUI.chip({label:"Pendentes",n:pend||null,on:_usrFiltro==="pendente",onclick:()=>{_usrFiltro="pendente";renderUsuarios()}}),
+      NPUI.chip({label:"Equipe",n:eqN,on:_usrFiltro==="equipe",onclick:()=>{_usrFiltro="equipe";renderUsuarios()}}),
+      NPUI.chip({label:"Clientes",n:cliN,on:_usrFiltro==="cliente",onclick:()=>{_usrFiltro="cliente";renderUsuarios()}})
+    ];
+    v.append(NPUI.toolbar({resumo,filtros,filtrosFixos:[qInp]}));
+    if(!lista.length){v.append(NPUI.vazio({titulo:"Nenhum usuário encontrado",texto:"Ajuste os filtros ou a busca."}));return}
+    const tb=el("table",{class:"np-ts-tbl"},
+      el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},"Áreas (colaborador)"),el("th",{}))),
+      el("tbody",{},lista.map(p=>montarLinha(p,true)))
+    );
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Usuários e permissões"),el("p",{class:"desc"},"Administradores têm acesso integral; Tarefas, Agenda e Hoje ficam disponíveis para toda a equipe."))),
+      el("div",{class:"np-ts-tbl-wrap"},tb)
+    ));
+    return;
+  }
   const tb=el("table",{},el("thead",{},el("tr",{},el("th",{},"E-mail"),el("th",{},"Nome"),el("th",{},"Perfil"),el("th",{},"Empresa (se cliente)"),el("th",{},"Áreas (colaborador)"),el("th",{},""))),
-    el("tbody",{},ps.map(p=>{
-      const nome=inp("text",p.nome||"");
-      const papel=sel(PAPEIS,p.papel);
-      const cli=sel({"":"—",...Object.fromEntries(clientes.map(c=>[c.id,c.nome]))},p.cliente_id||"");
-      const AREAS={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento (WhatsApp)",superendividamento:"Superendividamento (só a calculadora)",tarefas_equipe:"Controle do jurídico (tarefas da equipe, Publicações DJEN)"};
-      const chks=Object.fromEntries(Object.keys(AREAS).map(a=>[a,el("input",{type:"checkbox",checked:(p.acessos||[]).includes(a)?"":null})]));
-      const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
-        const acessos=Object.keys(AREAS).filter(a=>chks[a].checked);
-        const upd={nome:nome.value.trim(),papel:papel.value,cliente_id:papel.value==="cliente"?(cli.value||null):null,acessos};
-        if(papel.value==="cliente"&&!cli.value){toast("Escolha a empresa do cliente");return}
-        const {error}=await SB.from("perfis").update(upd).eq("id",p.id);
-        if(error){toast("Não foi possível salvar");return}
-        // equipe ganha (ou atualiza) o registro em colaboradores, usado como responsável na timeline e nos processos
-        if(upd.papel==="admin"||upd.papel==="colaborador"){const {error:e2}=await SB.from("colaboradores").upsert({perfil_id:p.id,nome:upd.nome||p.email},{onConflict:"perfil_id"});if(e2)console.warn(e2)}
-        toast("Usuário salvo");
-      }},"Salvar");
-      return el("tr",{},el("td",{},p.email||"—"),el("td",{},nome),el("td",{},papel),el("td",{},cli),el("td",{},el("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},...Object.entries(AREAS).map(([a,l])=>el("label",{class:"switch",title:a==="admin"?"":"Admins sempre veem tudo."},chks[a]," "+l)))),el("td",{},salvar));
-    })));
+    el("tbody",{},ps.map(p=>montarLinha(p,false))));
   v.append(el("div",{class:"card section"},el("div",{class:"tbl"},tb)));
 }
 { const _render=render; render=function(){ _render(); const u=$("#view-usuarios"); if(u){u.hidden=S.tab!=="usuarios"; if(S.tab==="usuarios")renderUsuarios()} }; }
@@ -467,7 +517,9 @@ return html;
 }
 
 fs.mkdirSync(path.dirname(out),{recursive:true}); fs.writeFileSync(out, gerar('login')); console.log('ok', out);
-if(!ESPELHO){ fs.mkdirSync(path.dirname(outToken),{recursive:true}); fs.writeFileSync(outToken, gerar('token')); console.log('ok', outToken); }
+// Área do cliente: nunca recebe a navegação interna do escritório. As telas convertidas em fontes/painel.html (Regras, Calibração, Base de
+// acordos) testam a classe da casca nova; na página do cliente esse teste vira "false", e só a apresentação anterior existe ali.
+if(!ESPELHO){ fs.mkdirSync(path.dirname(outToken),{recursive:true}); fs.writeFileSync(outToken, gerar('token').split('document.documentElement.classList.contains("np-casca-v3")').join('false')); console.log('ok', outToken); }
 else { // copia os módulos, fontes e imagens para beta/passivos
   const src = path.join(base,'..','passivos'), dst = path.join(path.dirname(out),'passivos');
   fs.rmSync(dst,{recursive:true,force:true}); fs.mkdirSync(dst,{recursive:true});

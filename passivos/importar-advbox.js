@@ -96,11 +96,8 @@
     A.rodando = false; render();
   }
   // Deposita um arquivo JSON da extração (baixado do beta ou gerado pelo extrator) em importacao_bruta, em partes.
-  async function carregarArquivo(inp) {
-    const f = inp.files && inp.files[0]; if (!f) return;
-    const txt = await f.text(); try { const j = JSON.parse(txt); if (!j || typeof j !== "object" || !Object.keys(j).length) throw new Error("vazio"); } catch (e) { toast("Arquivo não é um JSON válido da extração: " + e.message); return; }
-    const m = /advbox-pj-\d{4}-\d{2}-\d{2}/.exec(f.name); const chave = m ? m[0] : ("advbox-pj-" + new Date().toISOString().slice(0, 10));
-    if (A.lotes.includes(chave) && !confirm(`Já existe o lote ${chave}. Substituir pelo arquivo?`)) return;
+  const advV3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  async function depositarLote(chave, txt) {
     A.rodando = true; render();
     try {
       const del = await SB.from("importacao_bruta").delete().eq("origem", "advbox").eq("chave", chave); if (del.error) throw del.error;
@@ -110,7 +107,102 @@
     } catch (e) { toast("Erro ao depositar: " + e.message); }
     A.rodando = false; render();
   }
+  async function carregarArquivo(inp) {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const txt = await f.text(); try { const j = JSON.parse(txt); if (!j || typeof j !== "object" || !Object.keys(j).length) throw new Error("vazio"); } catch (e) { toast("Arquivo não é um JSON válido da extração: " + e.message); return; }
+    const m = /advbox-pj-\d{4}-\d{2}-\d{2}/.exec(f.name); const chave = m ? m[0] : ("advbox-pj-" + new Date().toISOString().slice(0, 10));
+    if (A.lotes.includes(chave)) {
+      if (advV3() && window.NPUI?.confirmar) {
+        NPUI.confirmar({ titulo: "Substituir lote existente?", texto: `Já existe o lote ${chave}. Deseja substituí-lo pelo arquivo enviado?`, rotuloSim: "Substituir lote", perigo: true, onSim: () => depositarLote(chave, txt) });
+        return;
+      }
+      if (!confirm(`Já existe o lote ${chave}. Substituir pelo arquivo?`)) return;
+    }
+    await depositarLote(chave, txt);
+  }
+  function renderAbaV3(v) {
+    if (!A.carregado) { carregarBruto(); v.append(NPUI.carregando(5)); return; }
+    const sl = el("select", { class: "np-tb-sel", "aria-label": "Selecionar lote do ADVBox", onchange: (e) => { A.chave = e.target.value; A.bruto = null; A.prev = null; render(); } },
+      ...(A.lotes.length ? A.lotes.map((l) => el("option", { value: l, selected: A.chave === l }, l)) : [el("option", { value: "" }, "— nenhum lote —")])
+    );
+    const inpArq = el("input", { type: "file", accept: ".json,application/json", style: "display:none", onchange: () => carregarArquivo(inpArq) });
+    const resumo = NPUI.resumo([
+      { n: A.lotes.length, label: A.lotes.length === 1 ? "lote disponível" : "lotes disponíveis" },
+      A.prev ? { n: A.prev.processosNovos.length, label: "processos novos" } : null,
+      A.prev ? { n: A.prev.tar + A.prev.feitas, label: "tarefas na prévia" } : null
+    ].filter(Boolean));
+    const dirBruto = [
+      NPUI.btn("Carregar arquivo…", { disabled: A.rodando, onclick: () => inpArq.click() }),
+      NPUI.btn("Analisar lote", { variante: "pri", disabled: A.rodando || !A.chave, onclick: abrirLote })
+    ];
+    const direita = window.NPCasca?.acomodar ? window.NPCasca.acomodar(dirBruto) : dirBruto;
+    v.append(inpArq, NPUI.toolbar({ resumo, filtrosFixos: [sl], direita }));
+
+    if (!A.bruto || !A.prev) {
+      v.append(el("section", { class: "np-cfg-sec np-form-leitura" },
+        el("div", { class: "np-cfg-sh" }, el("h2", {}, "Como funciona a importação")),
+        el("p", { class: "np-ts-sub" }, "Selecione um lote depositado (extração advbox-pj-AAAA-MM-DD.json) e clique em Analisar lote para revisar o casamento de clientes e a prévia completa. Nada é gravado no banco até você confirmar a importação.")
+      ));
+      return;
+    }
+
+    const p = A.prev; const nomes = Object.keys(p.porCliente).sort();
+    const opts = { "": "— ignorar (não importar) —", ...Object.fromEntries([...S.clientes].sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).map((c) => [c.id, c.nome])) };
+
+    const kpis = [
+      ["Processos novos", p.processosNovos.length],
+      ["Tarefas a fazer", p.tar],
+      ["Feitas retroativas", p.feitas],
+      ["Registros no dossiê", p.reg],
+      ["Mudanças de etapa", p.etapas],
+      ["A fechar", p.fechar.length],
+      ["Já importados", p.jaImportado],
+      ["Sem cliente", p.semCliente],
+      ["Ignorados", p.ign]
+    ];
+    const confirmarImportar = (e) => {
+      NPUI.confirmar({
+        titulo: "Confirmar importação do ADVBox?",
+        texto: `Serão gravados ${p.processosNovos.length} processo(s), ${p.tar} tarefa(s) abertas, ${p.feitas} concluídas, ${p.reg} registro(s), ${p.etapas} mudança(s) de etapa e ${p.fechar.length} tarefa(s) a fechar.`,
+        rotuloSim: "Executar importação",
+        origem: e?.currentTarget,
+        onSim: () => importar()
+      });
+    };
+    v.append(el("section", { class: "np-cfg-sec" },
+      el("div", { class: "np-cfg-sh" },
+        el("div", {}, el("h2", {}, "Prévia da importação"), el("p", { class: "desc" }, "Confira os totais antes de gravar no banco.")),
+        NPUI.btn(A.rodando ? "Importando…" : "Importar lote", { variante: "pri", disabled: A.rodando, onclick: confirmarImportar })
+      ),
+      el("div", { class: "np-gestao-kpi-band" }, kpis.map(([l, n]) => el("div", { class: "np-gestao-kpi" }, el("span", { class: "n" }, String(n)), el("span", { class: "l" }, l)))),
+      p.processosNovos.length ? el("p", { class: "np-ts-sub", style: "margin-top:10px" }, "Processos a criar: " + p.processosNovos.map((x) => x.num + " (" + x.cliente.split(" ").slice(0, 2).join(" ") + ")").join(" · ")) : null,
+      A.log.length ? el("pre", { class: "np-adv-log" }, A.log.join("\n")) : null
+    ));
+
+    v.append(el("section", { class: "np-cfg-sec" },
+      el("div", { class: "np-cfg-sh" }, el("div", {}, el("h2", {}, "Clientes do ADVBox → clientes do sistema"), el("p", { class: "desc" }, "Confira o casamento automático. Quem ficar em “ignorar” não entra nesta importação."))),
+      el("div", { class: "np-ts-tbl-wrap" }, el("table", { class: "np-ts-tbl" },
+        el("thead", {}, el("tr", {}, el("th", {}, "No ADVBox"), el("th", {}, "Processos"), el("th", {}, "No sistema"), el("th", { class: "r" }, "A fazer"), el("th", { class: "r" }, "Feitas"), el("th", { class: "r" }, "Registros"), el("th", { class: "r" }, "Etapas"))),
+        el("tbody", {}, ...nomes.map((n) => {
+          const pc = p.porCliente[n];
+          const s = el("select", { class: "np-tb-sel", onchange: (e) => { A.mapa[n] = e.target.value; A.prev = prever(); render(); } },
+            ...Object.entries(opts).map(([k, l]) => el("option", { value: k, selected: (A.mapa[n] || "") === k }, l))
+          );
+          return el("tr", { class: A.mapa[n] ? "" : "np-adv-unmapped" },
+            el("td", {}, el("b", {}, n), el("div", { class: "np-ts-sub" }, pc.lids + " pasta(s)")),
+            el("td", { class: "np-ts-sub" }, pc.nums.join(", ") || "sem nº"),
+            el("td", {}, s),
+            el("td", { class: "r num" }, String(pc.tar)),
+            el("td", { class: "r num" }, String(pc.feitas)),
+            el("td", { class: "r num" }, String(pc.reg)),
+            el("td", { class: "r num" }, String(pc.etapas))
+          );
+        }))
+      ))
+    ));
+  }
   function renderAba(v) {
+    if (advV3()) { renderAbaV3(v); return; }
     if (!A.carregado) { carregarBruto(); v.append(el("div", { class: "note" }, "Carregando lotes…")); return; }
     const sl = sel(A.lotes.length ? Object.fromEntries(A.lotes.map((l) => [l, l])) : { "": "— nenhum lote —" }, A.chave); sl.onchange = () => { A.chave = sl.value; A.bruto = null; A.prev = null; render(); };
     const inp = el("input", { type: "file", accept: ".json,application/json", style: "display:none", onchange: () => carregarArquivo(inp) });
@@ -127,7 +219,14 @@
       p.processosNovos.length ? el("div", { class: "note", style: "margin-top:8px" }, "Processos a criar: " + p.processosNovos.map((x) => x.num + " (" + x.cliente.split(" ").slice(0, 2).join(" ") + ")").join(" · ")) : null,
       A.log.length ? el("pre", { style: "margin-top:10px;font-size:12px;white-space:pre-wrap" }, A.log.join("\n")) : null));
   }
-  function renderTela() { const v = $("#view-importar-advbox"); if (!v) return; v.replaceChildren(); v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Gestão"), el("h1", {}, "Importar do ADVBox"), el("div", { class: "sub" }, "Tarefas, comentários e etapas dos clientes PJ extraídos do ADVBox, para dentro de tarefas e do dossiê.")))); renderAba(v); }
+  function renderTela() {
+    const v = $("#view-importar-advbox"); if (!v) return;
+    v.replaceChildren();
+    if (advV3()) { v.classList.add("np-v3"); renderAbaV3(v); return; }
+    v.classList.remove("np-v3");
+    v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Gestão"), el("h1", {}, "Importar do ADVBox"), el("div", { class: "sub" }, "Tarefas, comentários e etapas dos clientes PJ extraídos do ADVBox, para dentro de tarefas e do dossiê."))));
+    renderAba(v);
+  }
   { const _r = render; render = function () { _r(); const v = $("#view-importar-advbox"); if (!v) return; const ok = PP.perfil?.papel === "admin"; if (!ok && S.tab === "importar-advbox") S.tab = "clientes"; v.hidden = S.tab !== "importar-advbox"; if (S.tab === "importar-advbox") renderTela(); }; }
   window.PP_IMPORTAR_ADVBOX = { renderAba };
 })();

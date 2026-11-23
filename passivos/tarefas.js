@@ -610,7 +610,7 @@ function filtrosV3(){
   if(nucs.length){chips.push(NPUI.sepv());for(const k of nucs.slice(0,3))C({label:NUCLEOS[k],on:f.nucleo===k,grupo:"nucleo",onclick:()=>{f.nucleo=f.nucleo===k?"":k;render()}})}
   /* "Mais filtros": todos os seletores da V2 (status completo, responsável, núcleo, cliente, tickets) — nenhuma combinação se perde */
   const extras=[f.resp&&!(meu&&f.resp===meu.id),f.cliente,f.nucleo&&!nucs.slice(0,3).includes(f.nucleo),["aberta","em_andamento","cancelada"].includes(f.status),f.tickets].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Status detalhado, responsável, núcleo, cliente"+(TICKETS_ATIVOS?", tickets":""),onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Status detalhado, responsável, núcleo, cliente"+(TICKETS_ATIVOS?", tickets":""),onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
     const fStatus=sel({abertas:"A fazer e fazendo",aberta:"Só a fazer",em_andamento:"Só fazendo",concluida:"Feitas",cancelada:"Canceladas",todas:"Todas"},f.status),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes");
     const fResp=podeResp?selColab(f.resp,"Todos os responsáveis"):null;
     const nTk=Object.keys(T.tickets||{}).length,nMeus=Object.values(T.tickets||{}).filter(x=>minhasAreas().includes(x.aguardando_area)).length;
@@ -689,8 +689,8 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";arqCom.onchange();temRegistro=true;liberar();historico(t.id,hist);noPe("Registrado")}catch(e){toast(e.message)}};
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();registrar()}});
   SB.from("tarefa_eventos").select("id").eq("tarefa_id",t.id).eq("tipo","comentario").limit(1).then(({data})=>{temRegistro=!!(data&&data.length);liberar();nota.textContent=temRegistro?"Já há andamento registrado — pode concluir direto ou acrescentar.":"Concluir exige o andamento preenchido (o que foi feito)."});
-  const nota=el("span",{class:"np-rodape",style:"padding:0;flex:1 1 100%"},"");
-  const andamento=NPUI.secao("Andamento",el("div",{style:"display:flex;gap:6px;align-items:flex-start"},com,btnArq,arqCom),hist);
+  const nota=el("div",{class:"np-rodape",style:"padding:4px 0 0"},"");
+  const andamento=NPUI.secao("Andamento",el("div",{style:"display:flex;gap:6px;align-items:flex-start"},com,btnArq,arqCom),nota,hist);
   /* feedback no lugar: a mensagem aparece no rodapé do painel, não em toast */
   const aviso=el("span",{class:"np-marca ok",role:"status","aria-live":"polite"});const noPe=(txt)=>{aviso.textContent=txt;aviso.animate([{opacity:0},{opacity:1}],{duration:NPUI.ms(160)});clearTimeout(noPe.t);noPe.t=setTimeout(()=>{aviso.textContent=""},4000)};
   /* cronômetro (PP_TS), Feito e Concluir — mesmas regras da V2 */
@@ -729,7 +729,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
     !aberta&&!readOnly()?{label:"Reabrir",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}}:null,
     {label:"Abrir em janela",title:"Tela da tarefa como na navegação atual",onclick:()=>openTarefa(t)},
   ].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
-  const pe=[btnConcluir,btnFeito,el("span",{class:"sp"}),aviso,mais,nota];
+  const pe=[btnConcluir,btnFeito,el("span",{class:"sp"}),aviso,mais];
   const trilha=[el("span",{},t.cliente_nome||"Sem cliente"),el("span",{class:"sep"}),el("span",{},NUCLEOS[t.nucleo]||"—")];
   V3.painel.abrir({id:t.id,trilha,titulo:t.titulo,corpo:[props,pend,cadeia,acomp,desc,trab,andamento],pe,origem:silencioso?null:origem,foco:focoAndamento?()=>com.focus():null});
   historico(t.id,hist);
