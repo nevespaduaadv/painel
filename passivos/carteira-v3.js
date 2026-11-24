@@ -75,6 +75,16 @@
     if (c.segmento) partes.push(c.segmento);
     return partes.join(" · ");
   }
+  /* marcas de situação: fora da lista, mas continuam no cabeçalho da ficha do cliente (ficha-v3.js usa PP_CARTEIRA_V3.marcas) */
+  function marcas(r) {
+    const m = [];
+    if (r.atraso) m.push(NPUI.marca(`${r.atraso} em atraso`, "late"));
+    else if (r.neg) m.push(NPUI.marca(r.neg === 1 ? "em negociação" : `${r.neg} em negociação`, "info"));
+    if (r.sitB === "inadimplente") m.push(NPUI.marca("inadimplente com bancos", "crit"));
+    else if (r.sitB === "vai_ficar_inadimplente") m.push(NPUI.marca("vai ficar inadimplente", "att"));
+    if (r.proc > 0) m.push(NPUI.marca(`${r.proc} processo${r.proc === 1 ? "" : "s"}`));
+    return m;
+  }
   function linha(r) {
     return NPUI.linha({ id: r.c.id, atual: K.aberta === r.c.id, titulo: r.c.nome || "(sem nome)", contexto: contexto(r) || null, titleAbrir: "Abrir a ficha do cliente",
       direita: [NPUI.marca(r.tipo === "PF" ? "PF" : "PJ"), r.semResp ? null : NPUI.quem(respDe(r.c))].filter(Boolean),

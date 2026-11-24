@@ -14,7 +14,7 @@ const { servir, contexto, medirContraste } = M.exports;
 const { chromium } = require('playwright');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const PARES = [['--bg', '--np-bg'], ['--surface', '--np-surface'], ['--surface-2', '--np-surface-2'], ['--line', '--np-line'], ['--fg', '--np-text'], ['--muted', '--np-text-2'], ['--faint', '--np-text-3'], ['--ok', '--np-ok'], ['--warn', '--np-att'], ['--crit', '--np-crit'], ['--info', '--np-info'], ['--btn-primary', '--np-ink'], ['--on-dark', '--np-inv']];
-const TELAS = [['historico', 'historico'], ['equipe', 'equipe']]; // telas ainda com a apresentação da V2 dentro da casca; Processos saiu daqui na V8 (processos-lab) e Publicações na V9 (publicacoes-lab)
+const TELAS = [['equipe', 'equipe']]; // Base de acordos (historico) saiu daqui: ganhou apresentação própria na versão do AI Studio (23/11) // telas ainda com a apresentação da V2 dentro da casca; Processos saiu daqui na V8 (processos-lab) e Publicações na V9 (publicacoes-lab)
 const vars = (pg, nomes) => pg.evaluate((n) => { const cs = getComputedStyle(document.documentElement); const o = {}; for (const k of n) o[k] = cs.getPropertyValue(k).trim().toLowerCase(); return o; }, nomes);
 const cor = (pg, v) => pg.evaluate((v) => { const i = document.createElement('i'); i.style.color = `var(${v})`; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; }, v);
 

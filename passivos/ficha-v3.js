@@ -44,6 +44,8 @@
     NPUI.pop(btn, itens, { role: "menu", label: `Empresas do grupo ${grupo}` });
   };
 
+  // usada no cabeçalho; tinha sido retirada na 2ª rodada do AI Studio e o cabeçalho novo deixava de aparecer (erro "cidadeTxt is not defined")
+  const cidadeTxt = (c) => c.cidade ? c.cidade + (c.uf && !/\/\w\w$/.test(c.cidade) ? "/" + c.uf : "") : null;
   function cabecalho(c, head) {
     head.dataset.v3 = "1"; head.classList.add("np-ficha-cab");
     const id = head.firstElementChild; if (!id || id.classList.contains("actions")) return;

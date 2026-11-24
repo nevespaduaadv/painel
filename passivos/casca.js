@@ -13,7 +13,8 @@
   // O tema (pp-tema) continua compartilhado de propósito, como já é hoje.
   const BETA = document.body?.dataset.espelho === "1";
   const K = (n) => n + (BETA ? "-beta" : "");
-  const lerChave = () => { try { return localStorage.getItem(K("np-casca")) || "v2"; } catch (_) { return "v2"; } };
+  const PADRAO = BETA ? "v2" : "v3";
+  const lerChave = () => { try { return localStorage.getItem(K("np-casca")) || PADRAO; } catch (_) { return PADRAO; } }; // visual novo é o padrão (decisão das sócias, 24/11); "v2" só para quem escolher no perfil
   const gravarChave = (v) => { try { localStorage.setItem(K("np-casca"), v); } catch (_) {} };
 
   /* ---------- bloco "Navegação" em Meu perfil (nas duas cascas) ---------- */

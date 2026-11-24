@@ -78,7 +78,8 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     const SO_V3 = { acompanhamento: 'clientes', 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro' }; // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
     // destinos que saem da navegação da V3.1 por decisão das sócias (19/11, 12h): telas do Asaas e Contratos e faturamento (na V2 continuam)
     const SO_V2 = ['financeiro', 'faturamento'];
-    const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t) && !SO_V2.includes(t)), retirados = SO_V2.filter(t => r.v3.tabs.includes(t));
+    const SO_V3_ADMIN = ['regras', 'calibracao']; // versão do AI Studio (23/11): Regras de projeção e Calibração entram no grupo Jurídico da casca nova (na antiga ficam dentro de Base de acordos)
+    const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t) && !SO_V3_ADMIN.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t) && !SO_V2.includes(t)), retirados = SO_V2.filter(t => r.v3.tabs.includes(t));
     const extrasOk = extras.every(t => SO_V3[t] && r.v2.tabs.includes(SO_V3[t])) && Object.keys(SO_V3).every(t => !r.v2.tabs.includes(SO_V3[t]) || extras.includes(t));
     const a = JSON.stringify(r.v2.tabs), c = JSON.stringify(r.v3.tabs);
     if (!faltam.length && !retirados.length && extrasOk) ok(`${perfil}: destinos da V2 presentes na V3.1, exceto os retirados do Financeiro [${SO_V2.filter(t => r.v2.tabs.includes(t))}]` + (extras.length ? ` + só-V3.1 [${extras}] (exige acesso a ${extras.map(t => SO_V3[t]).join(', ')})` : ' (nenhum extra)')); else falha(`${perfil}: destinos diferem\n        V2: ${a}\n        V3: ${c}`);
@@ -347,7 +348,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
         buscaW: Math.round(document.querySelector('#busca').getBoundingClientRect().width), faixa: Math.round(document.querySelector('#view-tarefas .np-toolbar').getBoundingClientRect().height) }; });
     if (v2.acao === 'Nova tarefa' && !v2.acaoNaFaixa && v2.vista.join('|') === 'Lista|Quadro' && !v2.vistaNaFaixa) ok('1440: "Nova tarefa" em tinta na lateral e Lista/Quadro na barra (nós movidos da faixa, sem duplicar)'); else falha('V2 lugares: ' + JSON.stringify(v2));
     if (!v2.switchVis && !v2.sairVis && !v2.nomeVis && v2.buscaW <= 2) ok('barra sem Visão do cliente, nome, Sair e campo de busca (ficam no menu da conta e na paleta)'); else falha('V2 barra: ' + JSON.stringify(v2));
-    if (v2.faixa <= 42) ok(`faixa de ferramentas com ${v2.faixa} px em 1440 (DS: 38)`); else falha('faixa alta: ' + v2.faixa);
+    if (v2.faixa <= 80) ok(`faixa de ferramentas com ${v2.faixa} px em 1440 (desenho do AI Studio: até duas linhas)`); else falha('faixa alta: ' + v2.faixa);
     // ação primária continua funcionando (abre o mesmo formulário)
     await pg.click('#np-acao .np-btn.pri'); await pg.waitForTimeout(500);
     const modal = await pg.evaluate(() => !!document.querySelector('#modalHost .modal, #modalHost [role="dialog"]')); if (modal) ok('"Nova tarefa" da lateral abre o formulário'); else falha('Nova tarefa não abriu');
@@ -362,7 +363,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     if (!cli.v.length && JSON.stringify(cli.a) === JSON.stringify(['+ Novo cliente'])) ok('Tarefas → Clientes: a lateral troca "Nova tarefa" por "+ Novo cliente" e a barra não herda Lista/Quadro'); else falha('Clientes: ' + JSON.stringify(cli));
     // troca para tela ainda sem faixa V3.1: a vista/ação anteriores somem
     await pg.evaluate(() => { S.tab = 'historico'; render(); }); await pg.waitForTimeout(500);
-    const limpo = await pg.evaluate(() => ({ v: document.querySelector('#np-barra-vista').children.length, a: document.querySelector('#np-acao').children.length })); if (!limpo.v && !limpo.a) ok('ao trocar para tela sem faixa V3.1 (Base de acordos) a barra e a lateral não herdam controles do módulo anterior'); else falha('resíduo: ' + JSON.stringify(limpo));
+    const limpo = await pg.evaluate(() => ({ v: document.querySelector('#np-barra-vista').children.length, a: document.querySelectorAll('#np-acao > :not(.np-novo-rapido)').length })); if (!limpo.v && !limpo.a) ok('ao trocar para tela sem faixa V3.1 (Base de acordos) a barra e a lateral não herdam controles do módulo anterior'); else falha('resíduo: ' + JSON.stringify(limpo));
     // menu da conta: Meu perfil, Visão do cliente e Sair acionam os controles originais
     await pg.evaluate(() => { window.__sair = 0; document.querySelector('#btnSair').addEventListener('click', (e) => { e.stopImmediatePropagation(); e.preventDefault(); window.__sair++; }, true); });
     await pg.click('.np-conta'); await pg.waitForTimeout(250);

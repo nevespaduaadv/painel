@@ -53,7 +53,7 @@ const sessao = (perfil) => ({ access_token: 'lab', refresh_token: 'lab', token_t
 async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', hash = '#acompanhamento', esperar = true, sem0104 = false } = {}) {
   const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = []; const leituras = [];
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: w < 900 });
-  await ctx.addInitScript(({ s, ref, casca, tema }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); if (casca === 'v3') localStorage.setItem('np-casca', 'v3'); localStorage.setItem('pp-tema', tema); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema });
+  await ctx.addInitScript(({ s, ref, casca, tema }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); localStorage.setItem('np-casca', casca === 'v3' ? 'v3' : 'v2'); localStorage.setItem('pp-tema', tema); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema });
   await ctx.route(/supabase\.co/, async (rota) => {
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
     const json = (b, status = 200, extra = {}) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0', ...extra }, body: JSON.stringify(b) });

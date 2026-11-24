@@ -92,7 +92,7 @@ const abrirBem = (pg, i) => pg.evaluate((i) => { window.PP_FICHA.openBemForm(S.c
     await ctx.close(); }
   { const { ctx, pg } = await abrir(b, { perfil: 'acordos' }); await pg.evaluate((B) => { window.__BENS = B; }, BENS); await pg.waitForTimeout(500);
     await abrirBem(pg, 0); await pg.waitForTimeout(200); const b0 = await botoes(pg); await pg.evaluate(() => document.querySelector('#modalHost').replaceChildren()); await abrirBem(pg, 1); await pg.waitForTimeout(200); const b1 = await botoes(pg);
-    if (!b0.some((x) => /Excluir/.test(x)) && !b1.some((x) => /Excluir/.test(x)) && b0.includes('Salvar')) ok('Acordos: edita o bem, mas não vê exclusão (exposto nem protegido)'); else falha('acordos: ' + JSON.stringify([b0, b1]));
+    if (!b0.some((x) => /Excluir/.test(x)) && !b1.some((x) => /Excluir/.test(x)) && b0.some((x) => /^Salvar/.test(x))) ok('Acordos: edita o bem, mas não vê exclusão (exposto nem protegido)'); else falha('acordos: ' + JSON.stringify([b0, b1]));
     await ctx.close(); }
   { const { ctx, pg, chamadas, trocar } = await abrir(b, { perfil: 'admin' }); await pg.evaluate((B) => { window.__BENS = B; }, BENS); await pg.waitForTimeout(500);
     await abrirBem(pg, 1); await pg.waitForTimeout(200); const bt = await botoes(pg);

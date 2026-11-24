@@ -512,7 +512,7 @@ if(modo==='token'){
 // Casca V3.1: boot da chave np-casca (só CSS/render; nunca acesso). Modo token não recebe a casca nova.
 // Espelho (/beta/) divide a origem do navegador com o sistema principal: a chave ganha sufixo -beta para que ligar a
 // casca nova no beta não mude a experiência em produção (o casca.js usa o mesmo sufixo via body[data-espelho]).
-html = html.replace('<!--CASCA_BOOT-->', modo==='token' ? '' : `<script>try{if(localStorage.getItem("np-casca${ESPELHO ? '-beta' : ''}")==="v3")document.documentElement.classList.add("np-casca-v3")}catch(_){}</script>`);
+html = html.replace('<!--CASCA_BOOT-->', modo==='token' ? '' : (ESPELHO ? `<script>try{if(localStorage.getItem("np-casca-beta")==="v3")document.documentElement.classList.add("np-casca-v3")}catch(_){}</script>` : `<script>try{if(localStorage.getItem("np-casca")!=="v2")document.documentElement.classList.add("np-casca-v3")}catch(_){document.documentElement.classList.add("np-casca-v3")}</script>`));
 return html;
 }
 

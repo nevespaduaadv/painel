@@ -63,7 +63,7 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
   const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = []; const leituras = [];
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: w < 900, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR' });
   await ctx.clock.install({ time: AGORA }); // Date/Timers do navegador partem do instante fixo e correm normalmente
-  await ctx.addInitScript(({ s, ref, casca, tema, extraLS }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); if (casca === 'v3') localStorage.setItem('np-casca', 'v3'); localStorage.setItem('pp-tema', tema); for (const [k, v] of Object.entries(extraLS)) localStorage.setItem(k, v); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema, extraLS });
+  await ctx.addInitScript(({ s, ref, casca, tema, extraLS }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); localStorage.setItem('np-casca', casca === 'v3' ? 'v3' : 'v2'); localStorage.setItem('pp-tema', tema); for (const [k, v] of Object.entries(extraLS)) localStorage.setItem(k, v); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema, extraLS });
   await ctx.route(/supabase\.co/, async (rota) => {
     const req = rota.request(); const u = new URL(req.url()); const p = u.pathname; const m = req.method(); const unico = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '');
     const json = (b, status = 200, extra = {}) => rota.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0', ...extra }, body: JSON.stringify(b) });
@@ -366,7 +366,7 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
   rel.push('5. Perfil colaborador (Jurídico): escopo e ações restritas');
   { const { ctx, pg, erros } = await contexto(b, { perfil: 'juridico', casca: 'v3', hash: '#avisos' });
     await pg.waitForFunction(() => document.querySelectorAll('#view-avisos li.np-it[data-id]').length >= 1, null, { timeout: 10000 }).catch(() => {});
-    const r = await pg.evaluate(() => ({ dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button, #np-acao button, #np-barra-vista button')].map(b => b.textContent.trim()), leituras: document.querySelectorAll('#view-avisos .np-num').length }));
+    const r = await pg.evaluate(() => ({ dir: [...document.querySelectorAll('#view-avisos .np-tb-dir button, #np-acao button:not(.np-novo-rapido), #np-barra-vista button')].map(b => b.textContent.trim()), leituras: document.querySelectorAll('#view-avisos .np-num').length }));
     if (!r.dir.length && !r.leituras) ok('colaborador: sem "Aviso"/"Discord" e sem contagem de leituras (só admin)'); else falha('colab avisos: ' + JSON.stringify(r));
     await pg.click('#view-avisos li[data-id="a1"] .np-it-abrir'); await esperaPainel(pg); const pe = await pg.evaluate(() => [...document.querySelectorAll('#view-avisos .np-painel .np-p-pe button')].map(b => b.textContent.trim()));
     if (pe.join() === 'Marcar como lido') ok('colaborador: painel do aviso só com "Marcar como lido" (sem Editar)'); else falha('colab pe: ' + pe.join(','));
