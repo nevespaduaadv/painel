@@ -205,3 +205,27 @@ test("prazos dos autos: ato sem intimação vira entrada própria com as hipóte
   assert.match(r[0].item.texto, /^\[Ato dos autos/);
   assert.equal(r[1].ok, false); assert.deepEqual(r[1].faltando, ["numero_processo"]);
 });
+
+// ---- carteira (autos por processo) ----
+import { mapearProcesso, puxarCarteira } from "./adaptador.mjs";
+test("carteira: mapeia o detalhe do processo e descobre o nosso lado pelo advogado", () => {
+  const det = { numero: "4010284-64.2026.8.26.0009", tribunal: "TJSP", classe: "Procedimento Comum", assunto: "Superendividamento", valor_causa: 1621, data_distribuicao: "2026-07-15T00:00:00", grau: "G1",
+    polo_ativo: "Fulana", advogados_ativo: "Maria Julia Neves De Padua", polo_passivo: "Banco X", advogados_passivo: "Beltrano", ultima_decisao: "2026-11-16", ultima_sincronizacao: "2026-11-24T17:46:00Z",
+    partes: [{ polo: "ativo", nome: "Fulana", cpf_cnpj: "111", tipo_pessoa: "fisica", advogados: "MJ", sigiloso: false }], movimentos: [{ data: "2026-11-20", descricao: "Juntada", grau: "G1" }, { data: "2026-11-24", descricao: "Conclusos", grau: "G1" }],
+    documentos: [{ id: 9, tipo: "PETIÇÃO", nome: "a.pdf", data_juntada: "2026-11-20", tem_markdown: true }], audiencias: [] };
+  const m = mapearProcesso(det, [{ data_audiencia: "2026-12-03T14:00:00", descricao: "Conciliação" }]);
+  assert.equal(m.numero, "40102846420268260009"); assert.equal(m.polo, "ativo"); assert.equal(m.parte_contraria, "Banco X"); assert.equal(m.advogado_contrario, "Beltrano");
+  assert.equal(m.capa.valor_causa, 1621); assert.equal(m.capa.data_distribuicao, "2026-07-15"); assert.equal(m.ultimo_andamento, "2026-11-24");
+  assert.deepEqual(m.audiencias, [{ data: "2026-12-03T14:00:00", descricao: "Conciliação" }]); assert.equal(m.documentos[0].lido, true);
+  assert.equal(mapearProcesso({ numero: "123" }), null);
+});
+test("carteira: só busca o detalhe do que está na base e desatualizado; respeita o limite", async () => {
+  const pedidos = [], gravados = [];
+  const lista = [{ numero: "0000001-11.2026.8.26.0001", ultima_sincronizacao: "2026-11-24T10:00:00Z" }, { numero: "0000002-22.2026.8.26.0001", ultima_sincronizacao: "2026-11-24T10:00:00Z" },
+    { numero: "0000003-33.2026.8.26.0001", ultima_sincronizacao: "2026-11-20T10:00:00Z" }, { numero: "0000004-44.2026.8.26.0001", ultima_sincronizacao: "2026-11-24T10:00:00Z" }];
+  const api = { get: async (c) => { pedidos.push(c); if (c === "/v1/processos") return { corpo: { processos: lista } }; if (c === "/v1/dashboard") return { corpo: {} }; return { corpo: { numero: c.split("/").pop(), movimentos: [], documentos: [], partes: [] } }; } };
+  const db = { rpc: async (n, a) => n === "sync_config_ler" ? { ativo: true, config: { contrato_confirmado: true } } : n === "sync_carteira_estado" ? { "00000011120268260001": null, "00000033320268260001": "2026-11-21T00:00:00Z", "00000044420268260001": "2026-11-23T00:00:00Z" } : (gravados.push(a.p.numero), "ok") };
+  const r = await puxarCarteira({ db, cliente: () => api, limite: 1, paralelo: 1 });
+  assert.equal(r.status, "ok"); assert.deepEqual(r.resumo, { na_carteira: 4, fora_da_base: 1, em_dia: 1, atualizados: 1, capas_preenchidas: 0, erros: 0, restantes: 1 });
+  assert.equal(gravados.length, 1); assert.equal(pedidos.filter((c) => /^\/v1\/processos\/\d/.test(c)).length, 1);
+});

@@ -69,3 +69,11 @@ O adaptador usa nomes candidatos (ajustáveis em `integracoes.config.mapa`, sem 
 - Prazos dos autos: prazo sem intimação no diário (`intimacao_ids` vazio) entra como registro próprio (`id_externo = autos:<ato>`), sempre como sugestão.
 - Webhook continua desligado (`SYNC_WEBHOOK_ATIVO` ausente).
 - Só leitura no fornecedor.
+
+## Carteira — autos por processo (24/11/2026, migração 0117)
+
+- Rota `/sync/carteira` (Jurídico) e, junto do agendamento, `puxarCarteira`: lê `/v1/processos` e, para cada processo da nossa base com leitura mais nova no Sync, `/v1/processos/{numero}`.
+- Grava um retrato por processo em `processo_sync` (capa, partes, movimentos, documentos, audiências) via `sync_receber_processo`. Não cria andamento, tarefa nem aviso.
+- A capa só preenche campo vazio do processo (vara, comarca, valor da causa, assunto, distribuição, tribunal, tipo de ação, parte contrária, advogado contrário, polo).
+- Processo do Sync que não está cadastrado no sistema é só contado (`fora_da_base`).
+- Até 40 processos por chamada; a tela repete enquanto houver restantes.
