@@ -76,9 +76,9 @@
     return partes.join(" · ");
   }
   function linha(r) {
-    return NPUI.linha({ id: r.c.id, atual: K.aberta === r.c.id, titulo: r.c.nome || "(sem nome)", contexto: contexto(r) || null, titleAbrir: "Ver resumo do cliente",
+    return NPUI.linha({ id: r.c.id, atual: K.aberta === r.c.id, titulo: r.c.nome || "(sem nome)", contexto: contexto(r) || null, titleAbrir: "Abrir a ficha do cliente",
       direita: [NPUI.marca(r.tipo === "PF" ? "PF" : "PJ"), r.semResp ? null : NPUI.quem(respDe(r.c))].filter(Boolean),
-      onOpen: (li) => abrirPainel(r.c.id, { origem: li.querySelector(".np-it-abrir") }) });
+      onOpen: () => { K.aberta = null; S.sel = r.c.id; S.sub = null; render(); } });
   }
   function lista(regs) {
     const host = el("div", { class: "np-corpo" });

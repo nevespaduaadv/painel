@@ -76,12 +76,13 @@ const ordenado = (a, sinal) => a.every((x, i) => !i || sinal * a[i - 1].localeCo
     const alvo = e.nomes[2]; await pg.fill('#np-carteira .np-busca-inline', alvo.slice(0, 5)); await pg.waitForTimeout(700); const bq = await estadoLista(pg);
     if (bq.nomes.length >= 1 && bq.nomes.every(n => n.toLowerCase().includes(alvo.slice(0, 5).toLowerCase())) && await pg.evaluate(() => document.activeElement?.classList.contains('np-busca-inline'))) ok(`busca "${alvo.slice(0, 5)}": ${bq.nomes.length} resultado(s), foco mantido no campo`); else falha('busca: ' + JSON.stringify(bq.nomes));
     await pg.fill('#np-carteira .np-busca-inline', ''); await pg.waitForTimeout(700);
-    await pg.click('#np-carteira li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(500);
-    const pn = await pg.evaluate(() => { const p = document.querySelector('#np-carteira .np-painel'); return p && !p.hidden ? p.textContent.slice(0, 200) : null; });
-    if (pn) ok('clicar no cliente abre o resumo ao lado (detalhes ficam no cliente)'); else falha('painel não abriu');
+    await pg.screenshot({ path: path.join(OUT, 'carteira-1440.png') });
+    await pg.click('#np-carteira li.np-it[data-id="c1"] .np-it-abrir'); await pg.waitForTimeout(700);
+    const pn = await pg.evaluate(() => ({ sel: S.sel, lista: !!document.querySelector('#np-carteira'), painel: !!document.querySelector('.np-painel:not([hidden])') }));
+    if (pn.sel === 'c1' && !pn.lista && !pn.painel) ok('clicar no cliente abre direto a ficha dele (sem resumo ao lado)'); else falha('clique: ' + JSON.stringify(pn));
     if (!escritas.length) ok('nenhuma gravação'); else falha('gravou: ' + JSON.stringify(escritas).slice(0, 200));
     if (!erros.length) ok('sem erros de página'); else falha('erros: ' + erros.join(' | ').slice(0, 300));
-    await pg.screenshot({ path: path.join(OUT, 'carteira-1440.png') }); await ctx.close(); }
+    await ctx.close(); }
   rel.push('2. Casca antiga, permissões e 375 px');
   { const { ctx, pg, erros } = await abrirCarteira(b, { casca: 'v2' }); const e = await pg.evaluate(() => ({ v3: !!document.querySelector('#np-carteira') }));
     if (!e.v3 && !erros.length) ok('casca antiga: tela anterior, sem a lista nova e sem erros'); else falha('v2: ' + JSON.stringify([e, erros]).slice(0, 200)); await ctx.close(); }

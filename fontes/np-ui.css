@@ -1626,3 +1626,7 @@ html.np-casca-v3 .np-ts-tempo-wrap input[type=time]{min-width:0;flex:1}
 html.np-casca-v3 #np-carteira .np-it{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"texto dir"}
 html.np-casca-v3 #np-carteira .np-it-chk,html.np-casca-v3 #np-carteira .np-it-prazo{display:none}
 @media (max-width:600px){html.np-casca-v3 #np-carteira .np-it{grid-template-columns:minmax(0,1fr);grid-template-areas:"texto" "dir"}}
+/* Processos simples (23/11): mesma lista enxuta da Carteira */
+html.np-casca-v3 .np-simples .np-it{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"texto dir"}
+html.np-casca-v3 .np-simples .np-it-chk,html.np-casca-v3 .np-simples .np-it-prazo{display:none}
+@media (max-width:600px){html.np-casca-v3 .np-simples .np-it{grid-template-columns:minmax(0,1fr);grid-template-areas:"texto" "dir"}}

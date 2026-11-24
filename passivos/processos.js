@@ -100,66 +100,42 @@ function filtrarP(){
     &&(!f.incompleto||(p.campos_faltando||[]).length)&&(!f.vencido||(p.dias_para_prazo!=null&&p.dias_para_prazo<0))&&(!f.semProv||p.sem_providencia)
     &&(!ql||[p.numero_cnj,p.parte_contraria,p.banco,p.cliente_nome,p.tipo_acao,p.tribunal,p.vara,p.pasta_codigo||(p.pasta_numero?String(p.pasta_numero).padStart(5,"0"):"")].join(" ").toLowerCase().includes(ql)));
 }
+/* Processos simples (pedido das sócias, 23/11): só a lista dos processos da base, com a pasta de cada um. Prazos, pendências e alertas ficam na ficha do processo. */
 function linhaP(p){
-  const d=p.dias_para_prazo,ativo=p.status==="ativo";const pz=p.proximo_prazo?NPUI.prazoTxt(p.proximo_prazo):null;
-  const regua=!ativo||d==null?null:d<0?"late":p.prazo_fatal&&d<=7?"fatal":d<=7?"att":null;
-  const m=[];
-  const fatal=!!(p.prazo_fatal&&p.proximo_prazo&&ativo);if(fatal){const k=NPUI.marca("fatal","crit");k.classList.add("np-so-largo");m.push(k)}
-  if((p.campos_faltando||[]).length){const k=NPUI.marca("incompleto","att");k.title="Falta: "+p.campos_faltando.join(", ");m.push(k)}
-  if(p.sem_providencia&&ativo){const k=NPUI.marca("sem providência","att");k.title="30 dias sem andamento nem tarefa";m.push(k)}
-  if(p.datajud_erro){const k=NPUI.marca("DataJud com erro","att");k.title=p.datajud_erro;m.push(k)}
-  if(!p.cliente_id)m.push(NPUI.marca("fora da base"));
-  if(!ativo)m.push(NPUI.marca(p.status||"—"));
-  const ctx=[p.cliente_nome||"Fora da base",(p.parte_contraria||p.banco)?"× "+(p.parte_contraria||p.banco):null,p.tipo_acao||p.area||null,[p.tribunal,p.vara].filter(Boolean).join(" ")||null,pastaP(p)||null].filter(Boolean).join(" · ");
-  return NPUI.linha({id:p.id,regua,atual:V3.aberta===p.id,riscado:p.status==="encerrado",prazo:pz?{curta:pz.curta,rel:fatal?[el("b",{},"fatal")," · ",pz.rel]:pz.rel,exata:pz.exata+(fatal?" · prazo fatal":""),tom:ativo&&d<0?"late":fatal&&d<=7?"crit":""}:null,
-    titulo:p.numero_cnj||"(sem número)",contexto:ctx,direita:[...m,p.responsavel_nome?NPUI.quem(p.responsavel_nome):el("span",{class:"np-sem"},"— ninguém —")],titleAbrir:"Abrir o processo",
-    onOpen:(li)=>abrirPainelP(p,{origem:li.querySelector(".np-it-abrir")})});
+  const m=[];const pa=pastaP(p);if(pa)m.push(NPUI.marca(pa));
+  if(p.status!=="ativo")m.push(NPUI.marca(p.status||"—"));
+  const ctx=[p.cliente_nome||"Fora da base",(p.parte_contraria||p.banco)?"× "+(p.parte_contraria||p.banco):null,p.tipo_acao||p.area||null,[p.tribunal,p.vara].filter(Boolean).join(" ")||null].filter(Boolean).join(" · ");
+  return NPUI.linha({id:p.id,riscado:p.status==="encerrado",titulo:p.numero_cnj||"(sem número)",contexto:ctx,direita:[...m,p.responsavel_nome?NPUI.quem(p.responsavel_nome):null],titleAbrir:"Abrir a ficha do processo",
+    onOpen:()=>window.PP_PROCESSOS.abrir(p.id)});
 }
-function filtrosP(ativos){
-  const f=P.f,chips=[];const C=(o)=>{const c=NPUI.chip(o);chips.push(c);return c};
-  const n=(fn)=>ativos.filter(fn).length;
-  C({label:"Prazo vencido",n:n(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0),on:!!f.vencido,grupo:"attr",title:"O próximo prazo já passou",onclick:()=>{f.vencido=!f.vencido;render()}}).classList.add("crit");
-  C({label:"Cadastro incompleto",n:n(p=>(p.campos_faltando||[]).length),on:!!f.incompleto,grupo:"attr",title:"Campos obrigatórios em branco",onclick:()=>{f.incompleto=!f.incompleto;render()}});
-  C({label:"Sem providência",n:n(p=>p.sem_providencia),on:!!f.semProv,grupo:"attr",title:"30 dias sem andamento nem tarefa",onclick:()=>{f.semProv=!f.semProv;render()}});
-  C({label:"Fora da base",n:n(p=>!p.cliente_id),on:f.cliente==="__sem",grupo:"attr",title:"Processos de pessoas que não estão no cadastro de clientes",onclick:()=>{f.cliente=f.cliente==="__sem"?"":"__sem";render()}});
-  const extras=[f.q.trim(),f.resp,f.area,f.cliente&&f.cliente!=="__sem"?f.cliente:"",f.status!=="ativo"?"s":""].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Busca, situação, cliente, responsável, área",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
-    let t=null;const q=el("input",{type:"search",placeholder:"Nº CNJ, parte, banco, cliente…",value:f.q,"aria-label":"Buscar processo",oninput:ev=>{f.q=ev.target.value;clearTimeout(t);t=setTimeout(()=>{V3.manterPop=true;render()},300)}});
-    const fs=sel({ativo:"Ativos",suspenso:"Suspensos",encerrado:"Encerrados","":"Todos"},f.status);fs.onchange=()=>{f.status=fs.value;render()};
-    const fc=sel({"":"Todos os clientes","__sem":"Só fora da base",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(c=>[c.id,c.nome]))},f.cliente);fc.onchange=()=>{f.cliente=fc.value;render()};
-    const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(P.colab.filter(c=>c.ativo!==false).map(c=>[c.id,c.nome]))},f.resp);fr.onchange=()=>{f.resp=fr.value;render()};
-    const areas=[...new Set(P.lista.map(p=>p.area).filter(Boolean))].sort();const fa=sel({"":"Todas as áreas","__sem":"Sem área",...Object.fromEntries(areas.map(a=>[a,a]))},f.area||"");fa.onchange=()=>{f.area=fa.value;render()};
-    const L=(l,c)=>el("div",{},el("label",{},l),c);
-    return [el("div",{class:"np-pop-form"},L("Buscar",q),L("Situação",fs),L("Cliente",fc),L("Responsável",fr),L("Área",fa),
-      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{limparP();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-processos .np-chipf[aria-haspopup="dialog"]')})});
-  mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
-  return {chips,fixos:[mais]};
+function filtrosP(){
+  const f=P.f,chips=[];
+  const n=(st)=>P.lista.filter(p=>!st||p.status===st).length;
+  for(const [k,l] of [["ativo","Ativos"],["suspenso","Suspensos"],["encerrado","Encerrados"],["","Todos"]]){if(k&&k!=="ativo"&&!n(k))continue;chips.push(NPUI.chip({label:l,n:n(k),on:f.status===k,grupo:"escopo",onclick:()=>{f.status=k;render()}}))}
+  return {chips,fixos:[]};
 }
 const erroP=()=>NPUI.faixaErro({texto:"Não foi possível carregar os processos. Confira a conexão.",onAcao:()=>{P.erro=null;carregar();render()}});
 function renderProcessosV3(v){
   v.classList.add("np-v3");V3.obra=null;V3.painel=null;
   if(!garantir()){if(P.erro&&!P.carregando){v.append(erroP());return}v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
-  const ativos=P.lista.filter(p=>p.status==="ativo");
-  const nV=ativos.filter(p=>p.dias_para_prazo!=null&&p.dias_para_prazo<0).length,nI=ativos.filter(p=>(p.campos_faltando||[]).length).length,nS=ativos.filter(p=>p.sem_providencia).length;
-  const resumo=NPUI.resumo([{n:ativos.length,label:ativos.length===1?"processo ativo":"processos ativos"},{n:nV,label:"com prazo vencido",tom:nV?"crit":"zero"},{n:nI,label:nI===1?"cadastro incompleto":"cadastros incompletos",tom:nI?"att":"zero"},{n:nS,label:"sem providência",tom:nS?"att":"zero"}]);
-  const lista=filtrarP();P.filtrados=lista;
+  Object.assign(P.f,{incompleto:false,vencido:false,semProv:false,resp:"",area:"",cliente:""});
+  const lista=filtrarP().sort((a,b)=>(a.cliente_nome||"\uffff").localeCompare(b.cliente_nome||"\uffff","pt-BR")||(a.numero_cnj||"").localeCompare(b.numero_cnj||""));P.filtrados=lista;
+  const resumo=NPUI.resumo([{n:lista.length,label:lista.length===1?"processo":"processos"}]);
+  let tq=null;const busca=el("input",{type:"search",class:"np-busca-inline",placeholder:"Buscar nº, cliente, parte, pasta…",value:P.f.q||"","aria-label":"Buscar processo",oninput:ev=>{P.f.q=ev.target.value;clearTimeout(tq);tq=setTimeout(()=>{render();const x=$("#view-processos .np-busca-inline");if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},300)}});
   const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,[{label:"Exportar CSV (lista filtrada)",onclick:()=>{const ls=P.filtrados||[];if(!ls.length){toast("Nada para exportar");return}exportarCSV("processos",ls,COLS_EXP);toast(`${ls.length} linha(s) exportada(s)`)}}],{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-processos .np-ib[aria-label="Mais ações"]')}));
   maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
   const ro=typeof readOnly==="function"&&readOnly();
-  const fl=filtrosP(ativos);
-  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[maisAc,ro?null:NPUI.btn("Novo processo",{variante:"pri",icone:"mais",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})})]}));
+  const fl=filtrosP();
+  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[busca,maisAc,ro?null:NPUI.btn("Novo processo",{variante:"pri",icone:"mais",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})})]}));
   if(V3.manterPop){V3.manterPop=false;NPUI.reancorarPop()}else NPUI.reancorarPop();
-  const obra=el("div",{class:"np-obra"});V3.obra=obra;const corpo=el("div",{class:"np-corpo"});
+  const obra=el("div",{class:"np-obra"});V3.obra=obra;const corpo=el("div",{class:"np-corpo np-simples"});
   if(!lista.length){
     const semNada=!P.lista.length;
-    corpo.append(NPUI.vazio(semNada?{titulo:"Nenhum processo cadastrado",texto:"Cadastre o primeiro processo para acompanhar prazos e andamentos.",acao:ro?null:"Novo processo",onAcao:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})}
+    corpo.append(NPUI.vazio(semNada?{titulo:"Nenhum processo cadastrado",texto:"Cadastre o primeiro processo.",acao:ro?null:"Novo processo",onAcao:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})}
       :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver os demais processos.",acao:"Limpar filtros",onAcao:()=>{limparP();render()}}));
   }else{
-    const ab=gruposAb();
-    for(const [k,l,tom] of GRUPOS_P){const its=lista.filter(p=>grupoP(p)===k);if(!its.length)continue;
-      corpo.append(NPUI.grupo({id:"proc-"+k,titulo:l,n:its.length,tom,aberto:ab[k]!=null?ab[k]!==false:true,onToggle:x=>{ab[k]=x;NPUI.pref.set("np-proc-grupos",JSON.stringify(ab))},itens:its.map(linhaP)}))}
-    const fora=P.lista.length-lista.length,f0=P.f;const soSit=f0.status==="ativo"&&!f0.q.trim()&&!f0.cliente&&!f0.resp&&!f0.area&&!f0.incompleto&&!f0.vencido&&!f0.semProv;
-    corpo.append(NPUI.rodape(`${lista.length} ${lista.length===1?"processo":"processos"} na lista`+(fora?soSit?` · mais ${fora} ${fora===1?"suspenso ou encerrado":"suspensos ou encerrados"} (Mais filtros › Situação)`:` · ${fora} fora dos filtros aplicados (de ${P.lista.length} no total)`:` · todos os ${P.lista.length} cadastrados`),[["late","prazo vencido"],["fatal","prazo fatal em até 7 dias"],["att","prazo em até 7 dias"]]));
+    corpo.append(el("ul",{class:"np-lst"},lista.map(linhaP)));
+    corpo.append(NPUI.rodape(`${lista.length} de ${P.lista.length} ${P.lista.length===1?"processo":"processos"} · por cliente, em ordem alfabética`));
   }
   obra.append(corpo);v.append(obra);
   V3.painel=NPUI.painel({obra,label:"Detalhe do processo",onClose:()=>{V3.aberta=null}});
