@@ -133,7 +133,7 @@
       return;
     }
     v.append(el("div", { class: "head" }, el("div", {}, el("div", { class: "eyebrow" }, "Comercial"), el("h1", {}, "Automações"), el("div", { class: "sub" }, "Fluxos de trabalho: acionadores + passos (mensagens de WhatsApp pelo ChatGuru, esperas, tarefas, etapas, tags e condições). Publique para valer para os leads.")),
-      el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => { const n = prompt("Nome da pasta:"); if (n && n.trim()) { A.pastasNovas = [...(A.pastasNovas || []), n.trim()]; renderAuto(); } } }, "Criar pasta"), el("button", { class: "btn primary", onclick: () => novo() }, "+ Criar fluxo de trabalho"))));
+      el("div", { class: "actions" }, el("button", { class: "btn", onclick: async () => { const n = await npPedirTexto({ titulo: "Nova pasta de fluxos", rotulo: "Nome da pasta", placeholder: "Ex.: Onboarding, Follow-up…", obrigatorio: true, confirmar: "Criar pasta" }); if (n && n.trim()) { A.pastasNovas = [...(A.pastasNovas || []), n.trim()]; renderAuto(); } } }, "Criar pasta"), el("button", { class: "btn primary", onclick: () => novo() }, "+ Criar fluxo de trabalho"))));
     const q = inp("search", A.busca, { placeholder: "Pesquisar…" }); q.oninput = () => { A.busca = q.value; renderAuto(); q.focus(); };
     v.append(el("div", { class: "tabs", style: "margin-bottom:10px" }, [["todos", "Todos os fluxos"], ["publicados", "Publicados"], ["rascunhos", "Rascunhos"]].map(([k, t]) => el("button", { class: "tab", "aria-selected": String(A.abaLista === k), onclick: () => { A.abaLista = k; renderAuto(); } }, t))), el("div", { class: "filters", style: "margin-bottom:10px" }, q));
     const lista = A.lista.filter((f) => (A.abaLista === "todos" || (A.abaLista === "publicados") === !!f.ativo) && (!A.busca || (f.nome || "").toLowerCase().includes(A.busca.toLowerCase())));
@@ -150,11 +150,8 @@
   function fechar() {
     const sair = () => { A.sel = null; A.dirty = false; location.hash = "#automacoes"; invalidar(); };
     if (A.dirty) {
-      if (auV3() && NPUI.confirmar) {
-        NPUI.confirmar({ titulo: "Descartar alterações não salvas?", texto: "Há alterações pendentes neste fluxo. Deseja voltar para a lista sem salvar?", rotuloSim: "Sair sem salvar", rotuloNao: "Continuar editando", perigo: true, onSim: sair });
-        return;
-      }
-      if (!confirm("Há alterações não salvas. Sair mesmo assim?")) return;
+      npConfirmar({ titulo: "Descartar alterações não salvas?", mensagem: "Há alterações pendentes neste fluxo. Deseja voltar para a lista sem salvar?", confirmar: "Sair sem salvar", cancelar: "Continuar editando", perigo: true, onSim: sair });
+      return;
     }
     sair();
   }
@@ -235,11 +232,8 @@
         el("div", { class: "au-menu" }, el("button", { class: "au-x", title: "Duplicar", onclick: (e) => { e.stopPropagation(); lista.splice(i + 1, 0, clonar(n)); A.dirty = true; renderAuto(); } }, "⧉"), el("button", { class: "au-x", title: "Excluir", onclick: (e) => {
           e.stopPropagation();
           if (n.tipo === "condicao" && ((n.sim || []).length || (n.nao || []).length)) {
-            if (v3 && NPUI.confirmar) {
-              NPUI.confirmar({ titulo: "Excluir condição e ramos?", texto: "Esta condição possui passos nos caminhos Sim/Não. Todos serão removidos do fluxo.", rotuloSim: "Excluir condição", perigo: true, onSim: removerPasso });
-              return;
-            }
-            if (!confirm("Excluir a condição e os passos dos dois ramos?")) return;
+            npConfirmar({ titulo: "Excluir condição e ramos?", mensagem: "Esta condição possui passos nos caminhos Sim/Não. Todos serão removidos do fluxo.", confirmar: "Excluir condição", perigo: true, onSim: removerPasso });
+            return;
           }
           removerPasso();
         } }, "×")));
@@ -350,12 +344,7 @@
       toast("Fluxo excluído"); A.sel = null; A.dirty = false; location.hash = "#automacoes"; invalidar();
     };
     const pedirExcluir = () => {
-      if (v3 && NPUI.confirmar) {
-        NPUI.confirmar({ titulo: "Excluir fluxo de automação?", texto: `O fluxo “${f.nome}” será removido permanentemente e todas as execuções em andamento serão canceladas.`, rotuloSim: "Excluir fluxo", perigo: true, onSim: execExcluirFluxo });
-        return;
-      }
-      if (!confirm(`Excluir o fluxo "${f.nome}"? Execuções em andamento serão canceladas.`)) return;
-      execExcluirFluxo().catch(() => {});
+      npConfirmar({ titulo: "Excluir fluxo de automação?", mensagem: `O fluxo “${f.nome}” será removido permanentemente e todas as execuções em andamento serão canceladas.`, confirmar: "Excluir fluxo", perigo: true, onSim: execExcluirFluxo });
     };
     v.append(el("div", { class: v3 ? "np-cfg-sec np-form-leitura" : "card section", style: v3 ? "" : "max-width:720px" },
       el("div", { class: "form", style: "grid-template-columns:1fr" }, field("cf-n", "Nome", nome), field("cf-d", "Descrição", desc), field("cf-p", "Pasta", pasta), el("datalist", { id: "au-pastas" }, [...new Set(A.lista.map((x) => x.pasta).filter(Boolean))].map((p) => el("option", { value: p }))),
@@ -391,12 +380,7 @@
       toast("Teste iniciado — acompanhe em Histórico de inscrições"); close(); A.abaB = "inscricoes"; carregarExecs(f.id);
     };
     let t; q.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const { data } = await SB.from("leads").select("id,nome,empresa,whatsapp,status").or(`nome.ilike.%${q.value}%,empresa.ilike.%${q.value}%,whatsapp.ilike.%${q.value}%`).order("data_entrada", { ascending: false }).limit(15); res.replaceChildren(...(data || []).map((l) => el("div", { class: "ld-obs", style: "cursor:pointer", onclick: () => {
-      if (v3 && NPUI.confirmar) {
-        NPUI.confirmar({ titulo: "Disparar teste real no WhatsApp?", texto: `Iniciar o fluxo “${f.nome}” para ${l.nome} (${l.whatsapp || "sem WhatsApp"})? Mensagens reais serão enviadas via ChatGuru.`, rotuloSim: "Iniciar teste", perigo: true, onSim: () => dispararTeste(l) });
-        return;
-      }
-      if (!confirm(`Iniciar o fluxo "${f.nome}" para ${l.nome}? Mensagens reais serão enviadas para o WhatsApp dele.`)) return;
-      dispararTeste(l).catch(() => {});
+      npConfirmar({ titulo: "Disparar teste real no WhatsApp?", mensagem: `Iniciar o fluxo “${f.nome}” para ${l.nome} (${l.whatsapp || "sem WhatsApp"})? Mensagens reais serão enviadas via ChatGuru.`, confirmar: "Iniciar teste", perigo: true, onSim: () => dispararTeste(l) });
     } }, el("b", {}, l.nome), el("span", { class: "note" }, ` · ${l.empresa || "—"} · ${l.whatsapp || "sem WhatsApp"} · ${l.status}`)))); }, 300); };
     host.append(el("div", { class: "modal", onclick: (e) => { if (e.target.classList.contains("modal")) close(); } }, el("div", { class: "card", role: "dialog", style: "max-width:560px" }, el("h2", {}, "Testar fluxo com um lead"), el("p", { class: "note" }, "Dica: use o seu próprio cadastro de lead (seu número) para ver as mensagens chegando. O teste roda mesmo com o fluxo em rascunho."), q, res, el("div", { class: "actions", style: "margin-top:10px" }, el("button", { class: "btn", onclick: close }, "Fechar")))));
     q.focus();

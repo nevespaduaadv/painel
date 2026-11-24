@@ -999,9 +999,212 @@ html.np-casca-v3 .np-usr-chk input[type=checkbox]{accent-color:var(--np-ink);mar
   html.np-casca-v3 .np-usr-chk{min-height:36px;padding:2px 0}
 }
 
+/* ============================================================================
+   Onda 4A · Fundação Global de Modais, Diálogos V3.1 & Blocos de Formulário
+   (confirmar, pedirTexto, secaoForm, maisCampos) — 100% html.np-casca-v3 + --np-*
+   ============================================================================ */
+html.np-casca-v3 .np-confirm-dlg{width:min(460px,100%)}
+html.np-casca-v3 .np-prompt-dlg{width:min(480px,100%)}
+html.np-casca-v3 .np-prompt-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+html.np-casca-v3 .np-prompt-lbl{font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-prompt-inp{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--np-line-2);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.45 var(--np-ui);box-sizing:border-box}
+html.np-casca-v3 textarea.np-prompt-inp{min-height:96px;resize:vertical}
+html.np-casca-v3 .np-prompt-inp:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-prompt-inp[aria-invalid="true"]{border-color:var(--np-crit)}
+html.np-casca-v3 .np-prompt-err{margin:0;font:500 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-crit)}
+html.np-casca-v3 .np-alert-f .np-btn.danger{color:var(--np-crit);border-color:var(--np-crit)}
+html.np-casca-v3 .np-alert-f .np-btn.danger:hover{background:color-mix(in srgb,var(--np-crit) 8%,var(--np-surface))}
 
+/* NPUI.secaoForm · divisor editorial limpo (sem caixa cinza) */
+html.np-casca-v3 .np-f-sec{grid-column:1 / -1;display:flex;flex-direction:column;gap:2px;padding:12px 0 2px;margin:6px 0 0;border-top:1px solid var(--np-line);background:transparent}
+html.np-casca-v3 .np-f-sec:first-child{border-top:0;padding-top:0;margin-top:0}
+html.np-casca-v3 .np-f-sec-t{margin:0;font:600 12.5px/1.3 var(--np-ui);color:var(--np-text-2);letter-spacing:0;text-transform:none}
+html.np-casca-v3 .np-f-sec-d{margin:0;font:400 12px/1.4 var(--np-ui);color:var(--np-text-3)}
 
+/* NPUI.maisCampos · bloco colapsável discreto (<details>) */
+html.np-casca-v3 .np-f-mais{grid-column:1 / -1;border-top:1px solid var(--np-line);margin:6px 0 0;padding:0;background:transparent}
+html.np-casca-v3 .np-f-mais-s{display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 2px;cursor:pointer;list-style:none;font:500 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-2);user-select:none;border-radius:var(--np-r)}
+html.np-casca-v3 .np-f-mais-s::-webkit-details-marker{display:none}
+html.np-casca-v3 .np-f-mais-s:hover{color:var(--np-text)}
+html.np-casca-v3 .np-f-mais-s:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-f-mais-chev{width:14px;height:14px;flex:none;color:var(--np-text-3);transform:rotate(-90deg);transition:transform .16s ease}
+html.np-casca-v3 .np-f-mais[open]>.np-f-mais-s .np-f-mais-chev{transform:rotate(0deg)}
+html.np-casca-v3 .np-f-mais-c{margin-left:auto;font:400 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-f-mais-b{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px;padding:6px 0 6px}
 
+@media (max-width:600px){
+  html.np-casca-v3 .np-f-mais-b{grid-template-columns:1fr}
+  html.np-casca-v3 .np-prompt-inp{min-height:44px}
+}
+@media (max-width:600px),(pointer:coarse),(hover:none){
+  html.np-casca-v3 .np-f-mais-s{min-height:44px}
+  html.np-casca-v3 .np-alert-f .np-btn{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  html.np-casca-v3 .np-f-mais-chev{transition:none}
+}
+
+/* ============================================================================
+   Onda 4B · Núcleo Jurídico Diário: Publicações (2 colunas), Audiências &
+   Processos/Pastas — 100% escopado em html.np-casca-v3 + tokens --np-*
+   ============================================================================ */
+
+/* Modal amplo (Tratar publicação em 2 colunas) */
+html.np-casca-v3 .card.np-modal-v3.np-modal-wide{width:min(1080px,96vw);max-width:1080px}
+html.np-casca-v3 .np-tr-grid{display:grid;grid-template-columns:minmax(0,46%) minmax(0,54%);gap:20px;align-items:start}
+html.np-casca-v3 .np-tr-esq{display:flex;flex-direction:column;gap:12px;min-width:0;padding-right:16px;border-right:1px solid var(--np-line)}
+html.np-casca-v3 .np-tr-dir{display:flex;flex-direction:column;gap:12px;min-width:0}
+html.np-casca-v3 .np-tr-cab{display:flex;flex-direction:column;gap:4px}
+html.np-casca-v3 .np-tr-cnj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-tr-cnj{font:600 var(--np-fs-3)/1.25 var(--np-mono,ui-monospace,SFMono-Regular,Menlo,monospace);color:var(--np-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+html.np-casca-v3 .np-tr-meta{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;font:400 var(--np-fs-1)/1.4 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-tr-meta b{color:var(--np-text);font-weight:500}
+html.np-casca-v3 .np-tr-meta a{color:var(--np-info);font-weight:500;text-decoration:none}
+html.np-casca-v3 .np-tr-meta a:hover{text-decoration:underline}
+
+/* Texto higienizado da intimação com destaques semânticos sutis */
+html.np-casca-v3 .np-tr-texto{max-height:36vh;overflow:auto;padding:12px 14px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface-2);color:var(--np-text);font:400 13.5px/1.62 var(--np-ui);white-space:pre-wrap;overflow-wrap:anywhere}
+html.np-casca-v3 .np-tr-hl{background:color-mix(in srgb,var(--np-att) 18%,transparent);color:var(--np-text);padding:0 3px;border-radius:3px;font-weight:500}
+html.np-casca-v3 .np-tr-hl-aud{background:color-mix(in srgb,var(--np-crit) 15%,transparent);color:var(--np-crit);padding:0 3px;border-radius:3px;font-weight:600}
+
+/* Bloco "Tarefas deste processo" dentro do modal de tratamento */
+html.np-casca-v3 .np-tr-tars{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-tr-tars-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-tr-tars-h h3{margin:0;font:600 12.5px/1.3 var(--np-ui);color:var(--np-text-2);text-transform:none;letter-spacing:0}
+html.np-casca-v3 .np-tr-tars-lst{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+html.np-casca-v3 .np-tr-tar-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid var(--np-line);border-left:2px solid var(--np-line-2);border-radius:var(--np-r);background:var(--np-surface);font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-tr-tar-row.crit{border-left-color:var(--np-crit)}
+html.np-casca-v3 .np-tr-tar-row.att{border-left-color:var(--np-att)}
+html.np-casca-v3 .np-tr-tar-row.ok{border-left-color:var(--np-ok);opacity:.78}
+html.np-casca-v3 .np-tr-tar-tit{font:500 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text);min-width:0;overflow-wrap:anywhere}
+html.np-casca-v3 .np-tr-tar-sub{font:400 11.5px/1.35 var(--np-ui);color:var(--np-text-3);margin-top:2px}
+html.np-casca-v3 .np-tr-tar-pz{flex:none;font:500 11.5px/1.2 var(--np-ui);font-variant-numeric:tabular-nums;color:var(--np-text-2);white-space:nowrap}
+html.np-casca-v3 .np-tr-tar-pz.crit{color:var(--np-crit)}
+html.np-casca-v3 .np-tr-vazio{font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-3);padding:8px 10px;border:1px dashed var(--np-line);border-radius:var(--np-r);background:transparent}
+
+/* Escolha de providência em 1 clique (cartões compactos de seleção única) */
+html.np-casca-v3 .np-tr-prov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:6px}
+html.np-casca-v3 .np-tr-prov-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:1px solid var(--np-line-2);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text-2);font:500 var(--np-fs-1)/1.25 var(--np-ui);text-align:left;cursor:pointer;transition:background .12s ease,border-color .12s ease,color .12s ease}
+html.np-casca-v3 .np-tr-prov-opt:hover{background:var(--np-hover);color:var(--np-text)}
+html.np-casca-v3 .np-tr-prov-opt:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-tr-prov-opt[aria-checked="true"]{background:var(--np-ink);border-color:var(--np-ink);color:var(--np-inv)}
+html.np-casca-v3 .np-tr-prov-opt span{font:400 11px/1.25 var(--np-ui);opacity:.78}
+html.np-casca-v3 .np-tr-painel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;padding:12px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface-2)}
+html.np-casca-v3 .np-tr-painel .full{grid-column:1 / -1}
+html.np-casca-v3 .np-tr-cadeia-box{grid-column:1 / -1;padding:10px 12px;border:1px solid var(--np-line);border-left:2px solid var(--np-accent);border-radius:var(--np-r);background:var(--np-surface);font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-tr-cadeia-grid{display:grid;grid-template-columns:auto 1fr auto;gap:3px 10px;margin-top:6px;font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-tr-chk{display:inline-flex;align-items:center;gap:8px;min-height:36px;font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text);cursor:pointer}
+html.np-casca-v3 .np-tr-chk input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--np-ink)}
+
+/* Indicador discreto de Audiência em Processos (lista + painel lateral) */
+html.np-casca-v3 .np-aud-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid color-mix(in srgb,var(--np-att) 36%,var(--np-line));border-radius:var(--np-r);background:color-mix(in srgb,var(--np-att) 10%,var(--np-surface));color:var(--np-att);font:500 12px/1.25 var(--np-ui);font-variant-numeric:tabular-nums;white-space:nowrap}
+html.np-casca-v3 .np-aud-badge.crit{border-color:color-mix(in srgb,var(--np-crit) 42%,var(--np-line));background:color-mix(in srgb,var(--np-crit) 11%,var(--np-surface));color:var(--np-crit)}
+html.np-casca-v3 .np-aud-badge svg{width:13px;height:13px;flex:none}
+html.np-casca-v3 .np-pr-aud-box{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--np-line);border-left:2px solid var(--np-att);border-radius:var(--np-r);background:var(--np-surface-2)}
+html.np-casca-v3 .np-pr-aud-box.crit{border-left-color:var(--np-crit)}
+html.np-casca-v3 .np-pr-aud-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-pr-aud-t{font:600 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-pr-aud-sub{font:400 var(--np-fs-1)/1.4 var(--np-ui);color:var(--np-text-2);overflow-wrap:anywhere}
+html.np-casca-v3 .np-pr-aud-act{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px}
+
+/* Ficha do Processo V3.1 (editorial, sem .np-pf-legado) */
+html.np-casca-v3 .np-pf-wrap{display:flex;flex-direction:column;gap:14px}
+html.np-casca-v3 .np-pf-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--np-line)}
+html.np-casca-v3 .np-pf-id{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 280px}
+html.np-casca-v3 .np-pf-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:400 var(--np-fs-1)/1.35 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-pf-top a{color:var(--np-text-2);text-decoration:none;border-bottom:1px solid transparent}
+html.np-casca-v3 .np-pf-top a:hover{color:var(--np-text);border-bottom-color:var(--np-line-2)}
+html.np-casca-v3 .np-pf-cnj{margin:0;font:500 var(--np-fs-6)/1.2 var(--np-display);color:var(--np-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+html.np-casca-v3 .np-pf-marcas{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+html.np-casca-v3 .np-pf-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-pf-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px 18px;padding:12px 14px;border:1px solid var(--np-line);border-radius:var(--np-r-lg);background:var(--np-surface)}
+html.np-casca-v3 .np-pf-kv{display:flex;flex-direction:column;gap:2px;min-width:0}
+html.np-casca-v3 .np-pf-kv dt{font:500 11.5px/1.3 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-pf-kv dd{margin:0;font:500 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-pf-obs{margin:0;padding:10px 14px;border-left:2px solid var(--np-line-2);background:var(--np-surface);color:var(--np-text-2);font:400 var(--np-fs-2)/1.55 var(--np-ui);white-space:pre-wrap}
+html.np-casca-v3 .np-pf-tabs{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:2px 0 6px;border-bottom:1px solid var(--np-line)}
+html.np-casca-v3 .np-pf-sec{display:flex;flex-direction:column;gap:10px}
+html.np-casca-v3 .np-pf-sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+html.np-casca-v3 .np-pf-sec-h h3{margin:0;font:600 var(--np-fs-3)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-pf-aud-passada{opacity:.68}
+html.np-casca-v3 .np-pf-pasta-res{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);font:400 var(--np-fs-2)/1.4 var(--np-ui);color:var(--np-text-2)}
+
+/* Responsivo Onda 4B · 1024px / 768px / 375px + alvos >= 44px */
+@media (max-width:960px){
+  html.np-casca-v3 .np-tr-grid{grid-template-columns:1fr;gap:16px}
+  html.np-casca-v3 .np-tr-esq{padding-right:0;padding-bottom:14px;border-right:0;border-bottom:1px solid var(--np-line)}
+  html.np-casca-v3 .np-tr-texto{max-height:28vh}
+}
+@media (max-width:600px){
+  html.np-casca-v3 .np-tr-painel{grid-template-columns:1fr}
+  html.np-casca-v3 .np-tr-prov-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html.np-casca-v3 .np-pf-meta{grid-template-columns:1fr}
+  html.np-casca-v3 .np-pf-acoes .np-btn{flex:1 1 auto;justify-content:center}
+}
+@media (max-width:600px),(pointer:coarse),(hover:none){
+  html.np-casca-v3 .np-tr-prov-opt,
+  html.np-casca-v3 .np-tr-chk,
+  html.np-casca-v3 .np-pf-acoes .np-btn,
+  html.np-casca-v3 .np-pr-aud-act .np-btn{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  html.np-casca-v3 .np-tr-prov-opt{transition:none}
+}
+
+/* ==========================================================================
+   Onda 4C · Ficha do Cliente em 3 Camadas, Qualificação Jurídica & Forms Densos
+   100% escopado em html.np-casca-v3 · zero cores hardcoded (apenas --np-*)
+   ========================================================================== */
+
+/* Camada 1: Faixa de identidade no cabeçalho do cliente */
+html.np-casca-v3 .np-fc-head-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+html.np-casca-v3 .np-fc-id-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:6px;font:400 var(--np-fs-1)/1.4 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-fc-doc-wrap{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;color:var(--np-text);font-weight:500}
+html.np-casca-v3 .np-fc-copy-btn,
+html.np-casca-v3 .np-fc-grupo-btn,
+html.np-casca-v3 .np-fc-drive-link{display:inline-flex;align-items:center;gap:5px;min-height:28px;padding:3px 9px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text-2);font:500 12px/1.25 var(--np-ui);text-decoration:none;cursor:pointer;transition:border-color var(--np-fast) var(--np-ease),color var(--np-fast) var(--np-ease),background var(--np-fast) var(--np-ease)}
+html.np-casca-v3 .np-fc-copy-btn:hover,
+html.np-casca-v3 .np-fc-grupo-btn:hover,
+html.np-casca-v3 .np-fc-drive-link:hover{border-color:var(--np-line-2);background:var(--np-surface-2);color:var(--np-text)}
+html.np-casca-v3 .np-fc-copy-btn[data-copiado="1"]{border-color:color-mix(in srgb,var(--np-ok) 45%,var(--np-line));background:color-mix(in srgb,var(--np-ok) 10%,var(--np-surface));color:var(--np-ok)}
+html.np-casca-v3 .np-fc-grupo-btn{border-color:color-mix(in srgb,var(--np-accent) 42%,var(--np-line));color:var(--np-text)}
+html.np-casca-v3 .np-fc-id-sep{color:var(--np-text-3);user-select:none}
+html.np-casca-v3 .np-fc-pop-list{display:flex;flex-direction:column;gap:4px;min-width:240px;max-width:320px}
+html.np-casca-v3 .np-fc-pop-t{font:500 11.5px/1.3 var(--np-ui);color:var(--np-text-3);padding:2px 6px 4px;border-bottom:1px solid var(--np-line)}
+html.np-casca-v3 .np-fc-pop-it{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:7px 8px;border:0;border-radius:var(--np-r);background:transparent;color:var(--np-text);font:400 var(--np-fs-2)/1.35 var(--np-ui);text-align:left;cursor:pointer}
+html.np-casca-v3 .np-fc-pop-it:hover{background:var(--np-surface-2)}
+html.np-casca-v3 .np-fc-pop-it[aria-current="true"]{font-weight:600;color:var(--np-accent)}
+
+/* Camadas 2 e 3: Seções editoriais do Cadastro */
+html.np-casca-v3 .np-fc-sec{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid var(--np-line);border-radius:var(--np-r-lg);background:var(--np-surface)}
+html.np-casca-v3 .np-fc-sec-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px 14px;flex-wrap:wrap}
+html.np-casca-v3 .np-fc-sec-h h2{margin:0;font:600 var(--np-fs-3)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-fc-sec-sub{margin:3px 0 0;font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-fc-sec-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Bloco unificado de Qualificação Jurídica */
+html.np-casca-v3 .np-fc-qual-box{padding:12px 14px;border:1px solid var(--np-line);border-left:2px solid var(--np-accent);border-radius:var(--np-r);background:var(--np-surface-2);font:400 var(--np-fs-2)/1.58 var(--np-ui);color:var(--np-text);overflow-wrap:anywhere;user-select:text}
+html.np-casca-v3 .np-fc-qual-vazio{font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-3)}
+
+/* Listas limpas .np-it para Sócios, Contatos, Bens e Acessos */
+html.np-casca-v3 .np-fc-list{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+html.np-casca-v3 .np-fc-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px 14px;padding:11px 4px;border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-fc-row:first-child{border-top:0;padding-top:4px}
+html.np-casca-v3 .np-fc-row-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+html.np-casca-v3 .np-fc-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-fc-row-t{font:600 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text);overflow-wrap:anywhere}
+html.np-casca-v3 .np-fc-row-sub{font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-2);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+html.np-casca-v3 .np-fc-row-obs{font:400 var(--np-fs-1)/1.45 var(--np-ui);color:var(--np-text-3);white-space:pre-wrap;overflow-wrap:anywhere}
+html.np-casca-v3 .np-fc-row-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+html.np-casca-v3 .np-fc-vault{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Contexto empresarial e onboarding retrátil */
+html.np-casca-v3 .np-fc-ctx-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;grid-column:1 / -1}
+html.np-casca-v3 .np-fc-ctx-card{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface)}
+html.np-casca-v3 .np-fc-ctx-card.full{grid-column:1 / -1}
+html.np-casca-v3 .np-fc-ctx-card h3{margin:0;font:600 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .np-fc-ctx-txt{font:400 var(--np-fs-2)/1.52 var(--np-ui);color:var(--np-text-2);white-space:pre-wrap;overflow-wrap:anywhere}
+html.np-casca-v3 .np-fc-flags{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 /* ---------- V8 — Processos (lista por prazo + painel com DataJud): só o que os componentes existentes não cobriam ---------- */
 html.np-casca-v3 .np-sec p.np-nota{color:var(--np-text-2)}
@@ -1386,3 +1589,35 @@ html.np-casca-v3 .fc3-gav p{margin:0}
 @media (max-width:600px){html.np-casca-v3 .fc3 :is(.fc3-kpis,.fc3-kpis.q4,.fc3-esq){grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .fc3 :is(.fc3-mini,.fc3-leg){grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .fc3 .fc3-board{grid-auto-columns:82vw}html.np-casca-v3 .fc3 .fc3-h h1{font-size:24px}html.np-casca-v3 .fc3 .fc3-busca{flex:1 1 100%}html.np-casca-v3 .fc3 .fc3-tools .dir{margin-left:0;width:100%;flex-wrap:wrap}html.np-casca-v3 .fc3 .fc3-k .v{font-size:23px}}
 @media (pointer:coarse),(max-width:900px){html.np-casca-v3 :is(.fc3,.fc3-gav) :is(.fc3-btn,.fc3-btn.sm,.fc3-fil,.fc3-sub .fc3-fil,.fc3-mais,.fc3-x,.fc3-eb button,.fc3-mes,.fc3-busca,button.fc3-tag){min-height:44px}html.np-casca-v3 :is(.fc3,.fc3-gav) .fc3-mais{width:44px;height:44px;margin:-10px -8px -6px 0}html.np-casca-v3 :is(.fc3,.fc3-gav) .fc3-lnk{display:inline-flex;align-items:center;min-height:44px}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 .fc3 .fc3-esq span{animation:none}html.np-casca-v3 :is(.fc3-gav,.fc3-veu){transition:none}}
+/* Documentos resumo */
+html.np-casca-v3 .np-fc-doc-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* Dicas e campos compostos dos formulários densos Onda 4C */
+html.np-casca-v3 .np-neg-calc-hint{margin-top:4px;font:400 var(--np-fs-1)/1.4 var(--np-ui);color:var(--np-text-2);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-neg-calc-hint.crit{color:var(--np-crit);font-weight:500}
+html.np-casca-v3 .np-ts-tempo-wrap{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+html.np-casca-v3 .np-ts-tempo-wrap input[type=time]{min-width:0;flex:1}
+
+/* Responsivo Onda 4C · 1024px / 768px / 375px + alvos >= 44px */
+@media (max-width:768px){
+  html.np-casca-v3 .np-fc-ctx-grid{grid-template-columns:1fr}
+  html.np-casca-v3 .np-fc-row{flex-direction:column;align-items:stretch}
+  html.np-casca-v3 .np-fc-row-ctrl{justify-content:flex-start}
+}
+@media (max-width:600px){
+  html.np-casca-v3 .np-fc-sec{padding:14px}
+  html.np-casca-v3 .np-fc-sec-act{width:100%}
+  html.np-casca-v3 .np-fc-sec-act .np-btn{flex:1 1 auto;justify-content:center}
+}
+@media (max-width:600px),(pointer:coarse),(hover:none){
+  html.np-casca-v3 .np-fc-copy-btn,
+  html.np-casca-v3 .np-fc-grupo-btn,
+  html.np-casca-v3 .np-fc-drive-link,
+  html.np-casca-v3 .np-fc-sec-act .np-btn,
+  html.np-casca-v3 .np-fc-pop-it{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  html.np-casca-v3 .np-fc-copy-btn,
+  html.np-casca-v3 .np-fc-grupo-btn,
+  html.np-casca-v3 .np-fc-drive-link{transition:none}
+}

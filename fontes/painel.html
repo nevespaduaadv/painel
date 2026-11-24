@@ -990,7 +990,7 @@ function spark(vals,atual){
 }
 
 /* ---------- Regras ---------- */
-const regrasV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const regrasV3=()=>!!window.NPUI?.ativo?.();
 const REGRAS_NUM_META=[
   ["minDiasAtraso","Mínimo de dias de atraso para projetar","Antes disso o painel mostra só a data de abertura da janela."],
   ["minRefs","Mínimo de acordos do credor para usar a mediana dele","Abaixo disso usa o grupo."],
@@ -1212,7 +1212,7 @@ function renderHistorico(){
   const porCredor={};for(const h of fechados){const k=normBanco(h.credor);(porCredor[k]??={nome:h.credor.split(" (")[0],grupo:h.grupo||grupoBanco(h.credor),av:[],pa:[]});(h.forma==="parcelado"?porCredor[k].pa:porCredor[k].av).push(descOf(h))}
   const rows=Object.values(porCredor).sort((a,b)=>(b.av.length+b.pa.length)-(a.av.length+a.pa.length));
 
-  if(document.documentElement.classList.contains("np-casca-v3")&&window.NPUI){
+  if(window.NPUI?.ativo?.()){
     v.classList.add("np-v3");
     const avAll=fechados.filter(h=>h.forma!=="parcelado").map(descOf).filter(x=>x!=null);
     const resumo=NPUI.resumo([
@@ -1297,7 +1297,7 @@ function openHistForm(h={}){
 /* ---------- Calibração ---------- */
 function renderCalib(){
   const v=$("#view-calibracao");v.replaceChildren();
-  const v3=document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+  const v3=!!window.NPUI?.ativo?.();
   v.classList.toggle("np-v3",v3);
   const acordos=S.contratos.filter(x=>x.acordo&&x.acordo.fechado);
   if(v3){
@@ -1404,24 +1404,42 @@ function renderCalib(){
 
 /* ---------- Formulários ---------- */
 function needDb(){if(S.db)return true;toast(S.dbStatus==="pending"?"Conectando ao banco de dados, aguarde alguns segundos…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta.");return false}
-function modal(title,body,onSave,extra){
-  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
+function modal(title,body,onSave,extra,opts){
+  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra,opts); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
   if(!needDb())return;
   const host=$("#modalHost");host.replaceChildren();
   const close=()=>host.replaceChildren();
+  const lblSalvar=opts?.confirmar||opts?.rotuloSalvar||body?.dataset?.rotuloSalvar||"Salvar";
+  const lblCancelar=opts?.cancelar||"Cancelar";
   const card=el("div",{class:"card",role:"dialog","aria-modal":"true"},el("h2",{},title),body,
-    el("div",{class:"actions"},extra||null,el("button",{class:"btn",onclick:close},"Cancelar"),el("button",{class:"btn primary",onclick:async()=>{try{await onSave();close()}catch(e){toast(e.message||"Não foi possível salvar")}}},"Salvar")));
+    el("div",{class:"actions"},extra||null,el("button",{class:"btn",onclick:close},lblCancelar),el("button",{class:"btn "+(opts?.perigo?"danger":"primary"),onclick:async()=>{try{await onSave();close()}catch(e){toast(e.message||"Não foi possível salvar")}}},lblSalvar)));
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
   card.querySelector("input,select,textarea")?.focus();
 }
+function npConfirmar(opts={}){
+  if(window.NPUI?.confirmar)return NPUI.confirmar(opts);
+  const ok=window.confirm(opts.mensagem||opts.texto||opts.titulo||"Confirmar ação?");
+  if(ok&&typeof opts.onSim==="function")return Promise.resolve(opts.onSim()).then(()=>true);
+  return Promise.resolve(!!ok);
+}
+function npPedirTexto(opts={}){
+  if(window.NPUI?.pedirTexto)return NPUI.pedirTexto(opts);
+  return Promise.resolve(window.prompt(opts.mensagem||opts.texto||opts.rotulo||opts.titulo||"",opts.valorInicial||""));
+}
+window.npConfirmar=npConfirmar;window.npPedirTexto=npPedirTexto;
 const field=(id,l,input,help)=>el("div",{class:"f"+(input.tagName==="TEXTAREA"?" full":"")},el("label",{for:id},l),Object.assign(input,{id}),help?el("div",{class:"help"},help):null);
 const inp=(type,value,attrs={})=>el("input",{type,value:value??"",...attrs});
 const sel=(opts,value)=>{const s=el("select",{});for(const[k,v]of Object.entries(opts))s.append(el("option",{value:k,selected:k===value?"":null},v));return s};
 const bancoInput=(value)=>{const i=inp("text",value,{list:"bancos",placeholder:"Ex.: Itaú",id:"k-banco"});const dl=el("datalist",{id:"bancos"},Object.keys(S.regras.fatoresBanco).map(b=>el("option",{value:b})));const w=el("div",{},i,dl);return {wrap:w,input:i}};
 
 function openClientForm(c={}){
+  const v3=!!window.NPUI?.ativo?.();
   const nome=inp("text",c.nome),cnpj=inp("text",c.cnpj),resp=inp("text",c.responsavel),res=inp("number",c.reservaAcumulada,{step:"100"}),notas=el("textarea",{},c.notasInternas||"");
-  const body=el("div",{class:"form"},field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ",cnpj),field("c-resp","Responsável no escritório",resp),field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas));
+  const body=v3
+    ?el("div",{class:"form"},
+      field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ / CPF",cnpj),field("c-resp","Responsável no escritório",resp),
+      NPUI.maisCampos("Reserva e notas internas",[field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas)],{aberto:!!(c.reservaAcumulada||c.notasInternas),contador:"auto"}))
+    :el("div",{class:"form"},field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ",cnpj),field("c-resp","Responsável no escritório",resp),field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas));
   /* 0111: exclusão física de cliente só pela administradora, pela função do banco, com motivo e só para cadastro feito por engano;
      para tirar o cliente da carteira, o caminho é o status "Encerrado" (Ficha → Cadastro → Editar ficha). Sem o botão para os demais. */
   const ehAdmin=typeof PP!=="undefined"&&PP.perfil?.papel==="admin"&&typeof SB!=="undefined";
@@ -1433,52 +1451,65 @@ function openClientForm(c={}){
     if(error){toast(error.code==="23503"?"Nada foi excluído: o cliente tem registros de trabalho. Mantenha-o como Encerrado.":error.code==="22023"?(error.message||"Nada foi excluído."):error.code==="42501"?"Sem permissão para excluir clientes. Nada foi excluído.":"Não foi possível excluir: "+(error.message||"erro")+". Nada foi excluído.");return}
     S.sel=null;$("#modalHost").replaceChildren();toast("Cliente excluído definitivamente");if(typeof notificar==="function")notificar("clientes")}},"Excluir definitivamente"):null;
   modal(c.id?"Editar cliente":"Novo cliente",body,async()=>{
-    if(!nome.value.trim())throw new Error("Informe o nome do cliente");
+    if(!nome.value.trim()){const e=new Error("Informe o nome do cliente");e.campo=nome;throw e}
     const data={nome:nome.value.trim(),cnpj:cnpj.value.trim(),responsavel:resp.value.trim(),reservaAcumulada:+res.value||0,notasInternas:notas.value,timeline:c.timeline||[],createdAt:c.createdAt||new Date().toISOString()};
     if(c.id)await S.db.doc("clientes/"+c.id).set(data);else{const ref=await S.db.collection("clientes").add(data);S.sel=ref.id}
     toast("Cliente salvo");
-  },extra);
+  },extra,{confirmar:c.id?"Salvar cliente":"Cadastrar cliente"});
 }
 function confirmInline(body,msg){let box=body.querySelector(".confirm");if(box){return box.dataset.ok==="1"}box=el("div",{class:"f full confirm",style:"color:var(--crit);font-weight:600"},msg+" Clique em Excluir novamente para confirmar.");box.dataset.ok="1";body.append(box);return false}
 
 function openContractForm(k={}){
   const R=S.regras;
+  const v3=!!window.NPUI?.ativo?.();
   const b=bancoInput(k.banco),prod=sel(PRODUTOS,k.produto||"giro"),gar=sel(GARANTIAS,k.garantia||"nenhuma"),sit=sel(SITUACOES,k.situacao||"cobranca"),tit=sel(TITULARES,k.titular||"PJ");
   const vo=inp("number",k.valorOriginal,{step:"100"}),sa=inp("number",k.saldoAtual,{step:"100"}),dc=inp("date",k.dataContrato),da=inp("date",k.dataInicioAtraso),pp=inp("number",k.parcelasPagas,{min:0}),pt=inp("number",k.parcelasTotal,{min:0}),pr=inp("number",k.prazoReservaMeses||"",{min:1,placeholder:"automático"}),am=inp("number",k.atualizacaoMensal??"",{step:"0.1",placeholder:String(R.atualizacaoMensal)});
   const cart=sel({"":"Automática","C1":"C1","C2":"C2","C3":"C3","C4":"C4","C5":"C5"},k.carteiraOverride||"");
   const notas=el("textarea",{},k.notas||"");
   const autoNote=el("div",{class:"help"});const upd=()=>{autoNote.textContent="Carteira automática: "+carteiraAuto(prod.value,gar.value)};prod.onchange=gar.onchange=upd;upd();
-  const body=el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
-    field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-dc","Data do contrato",dc),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
-    field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),field("k-sit","Situação",sit),field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
-    el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),field("k-notas","Notas internas",notas));
-  const extra=k.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este contrato?"))return;await S.db.doc("contratos/"+k.id).delete();$("#modalHost").replaceChildren();toast("Contrato excluído")}},"Excluir"):null;
+  const body=v3
+    ?el("div",{class:"form"},
+      NPUI.secaoForm("Contrato e saldo"),
+      el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
+      field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-sit","Situação",sit),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
+      NPUI.maisCampos("Parcelas, carteira e notas",[
+        field("k-dc","Data do contrato",dc),field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),
+        field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),
+        field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
+        el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),
+        field("k-notas","Notas internas",notas)
+      ],{contador:"auto"}))
+    :el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
+      field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-dc","Data do contrato",dc),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
+      field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),field("k-sit","Situação",sit),field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
+      el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),field("k-notas","Notas internas",notas));
+  const extra=k.id?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir contrato?",mensagem:`Remover o contrato ${k.banco||""} deste cliente?`,confirmar:"Excluir contrato",perigo:true,onSim:async()=>{await S.db.doc("contratos/"+k.id).delete();$("#modalHost").replaceChildren();toast("Contrato excluído")}})}} ,"Excluir"):null;
   modal(k.id?"Editar contrato":"Novo contrato",body,async()=>{
-    if(!b.input.value.trim())throw new Error("Informe o banco");
-    if(!da.value&&sit.value!=="quitado"&&sit.value!=="emdia")throw new Error("Informe o início do atraso");
+    if(!b.input.value.trim()){const e=new Error("Informe o banco");e.campo=b.input;throw e}
+    if(!da.value&&sit.value!=="quitado"&&sit.value!=="emdia"){const e=new Error("Informe o início do atraso");e.campo=da;throw e}
     const data={clienteId:k.clienteId,banco:b.input.value.trim(),titular:tit.value,produto:prod.value,garantia:gar.value,situacao:sit.value,valorOriginal:+vo.value||0,saldoAtual:+sa.value||+vo.value||0,dataContrato:dc.value||"",dataInicioAtraso:da.value||"",parcelasPagas:+pp.value||0,parcelasTotal:+pt.value||0,prazoReservaMeses:+pr.value||R.prazoReservaPadrao,atualizacaoMensal:am.value===""?null:+am.value,carteiraOverride:cart.value||"",notas:notas.value,acordo:k.acordo||null,createdAt:k.createdAt||new Date().toISOString()};
     if(!(data.banco in S.regras.fatoresBanco)){S.regras.fatoresBanco[data.banco]=0;await S.db.doc("config/regras").set(S.regras)}
     if(k.id)await S.db.doc("contratos/"+k.id).set(data);else await S.db.collection("contratos").add(data);
     toast("Contrato salvo");
-  },extra);
+  },extra,{confirmar:k.id?"Salvar contrato":"Cadastrar contrato"});
 }
 function openAcordoForm(k,p){
   const data=inp("date",new Date().toISOString().slice(0,10)),vp=inp("number","",{step:"100"}),desc=inp("number",p.faixa?Math.round(p.faixa.provavel*100):"",{min:0,max:100}),npar=inp("number",1,{min:1});
   vp.oninput=()=>{if(p.saldo&&vp.value)desc.value=Math.round((1-(+vp.value)/p.saldo)*100)};desc.oninput=()=>{if(p.saldo&&desc.value)vp.value=Math.round(p.saldo*(1-(+desc.value)/100))};
   const body=el("div",{class:"form"},field("a-data","Data do acordo",data),field("a-vp","Valor total pago/acordado (R$)",vp,`Saldo na data: ${BRL(p.saldo)}`),field("a-desc","Desconto obtido (%)",desc,p.faixa?`Projetado: ${pct(p.faixa.provavel)} à vista · ${pct(p.faixa.parcelado)} parcelado`:"Sem projeção para este contrato"),field("a-npar","Número de parcelas",npar,"1 = à vista"));
   modal("Registrar acordo fechado",body,async()=>{
-    if(!vp.value)throw new Error("Informe o valor acordado");
+    if(!vp.value){const e=new Error("Informe o valor acordado");e.campo=vp;throw e}
     const novo={...k,situacao:"acordo",acordo:{fechado:true,data:data.value,valorPago:+vp.value,descontoObtido:+desc.value,parcelas:+npar.value||1,descontoProjetado:p.faixa?((+npar.value||1)>1?p.faixa.parcelado:p.faixa.provavel):null,saldoNoAcordo:p.saldo,diasNoAcordo:p.dias}};delete novo.id;
     await S.db.doc("contratos/"+k.id).set(novo);toast("Acordo registrado e enviado para a calibração");
-  });
+  },null,{confirmar:"Registrar acordo"});
 }
 function openEventForm(c){
   const data=inp("date",new Date().toISOString().slice(0,10)),txt=el("textarea",{placeholder:"Ex.: Proposta formal enviada ao Itaú com pedido de 60% de desconto."});
   modal("Registrar atuação",el("div",{class:"form"},field("e-data","Data",data),field("e-txt","O que foi feito",txt)),async()=>{
-    if(!txt.value.trim())throw new Error("Descreva a atuação");
+    if(!txt.value.trim()){const e=new Error("Descreva a atuação");e.campo=txt;throw e}
     const tl=[...(c.timeline||[]),{data:data.value,texto:txt.value.trim(),id:Math.random().toString(36).slice(2,9)}].slice(-120);
     await S.db.doc("clientes/"+c.id).update({timeline:tl});toast("Atuação registrada");
-  });
+  },null,{confirmar:"Registrar atuação"});
 }
 async function removeEvent(c,e){if(!needDb())return;const tl=(c.timeline||[]).filter(x=>x.id!==e.id);await S.db.doc("clientes/"+c.id).update({timeline:tl})}
 
