@@ -188,8 +188,19 @@ export function clienteSync({ chave, fetch: f = globalThis.fetch, base = BASE, m
     }
     throw ultimo;
   }
+  // ÚNICA escrita no fornecedor: criar monitor (sem repetição automática, para não criar em dobro)
+  async function post(caminho, corpo) {
+    let r;
+    try { r = await f(new URL(caminho, base).toString(), { method: "POST", headers: { Authorization: `Bearer ${chave}`, Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(corpo ?? {}), redirect: "error", signal: AbortSignal.timeout(tempoLimiteMs) }); }
+    catch (_e) { throw new ErroSync("indisponivel", "Fornecedor inacessível (rede).", {}); }
+    const pedido = r.headers?.get?.("x-request-id") || null;
+    if (r.ok) { try { return { corpo: await r.json(), pedido }; } catch { return { corpo: null, pedido }; } }
+    if (r.status === 401 || r.status === 403) throw new ErroSync("autenticacao", "Chave recusada pelo fornecedor.", { status: r.status, pedido });
+    if (r.status === 402) throw new ErroSync("plano", "Conta sem plano ativo ou limite do plano atingido.", { status: 402, pedido });
+    throw new ErroSync(r.status === 429 ? "limite" : r.status >= 500 ? "indisponivel" : "recusada", "Requisição recusada pelo fornecedor.", { status: r.status, pedido });
+  }
   return {
-    get,
+    get, post,
     conta: () => get("/v1/conta"),
     intimacoes: (p) => get("/v1/intimacoes", p),
     intimacao: (id) => get(`/v1/intimacoes/${encodeURIComponent(id)}`),
@@ -384,4 +395,79 @@ export async function puxarCarteira({ db, cliente, limite = 40, paralelo = 4, it
   } catch (e) {
     return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r };
   }
+}
+
+
+// ---------- monitores por CPF/CNPJ dos clientes (aba Monitoramento) ----------
+const soDig = (v) => String(v ?? "").replace(/\D/g, "");
+async function monitoresDaFonte(api) { const { corpo } = await api.get("/v1/monitores"); const m = new Map(); for (const x of corpo?.monitores || []) m.set(String(x?.tipo) + ":" + soDig(x?.valor), x); return m; }
+// Cria no Sync um monitor para cada documento cadastrado que ainda não tem. Não confirma processo nenhum: descobrir não consome o plano.
+export async function criarMonitores({ db, cliente, limite = 60 }) {
+  const { ativo } = await integracao(db); if (!ativo) return { status: "desligada" };
+  const r = { a_criar: 0, criados: 0, ja_existiam: 0, erros: 0, restantes: 0 };
+  try {
+    const api = cliente(); const fila = (await db.rpc("sync_monitores_a_criar")) || []; r.a_criar = fila.length;
+    let naFonte = await monitoresDaFonte(api);
+    const agora = fila.slice(0, limite); r.restantes = fila.length - agora.length;
+    for (const it of agora) {
+      const chave = it.tipo + ":" + soDig(it.documento);
+      try {
+        let m = naFonte.get(chave);
+        if (m) r.ja_existiam++; else { await api.post("/v1/monitores", { tipo: it.tipo, valor: soDig(it.documento), pasta_id: null }); naFonte = await monitoresDaFonte(api); m = naFonte.get(chave); if (m) r.criados++; }
+        if (!m?.id) { r.erros++; await db.rpc("sync_monitor_registrar", { p_cliente: it.cliente_id, p_tipo: it.tipo, p_documento: it.documento, p_monitor: null, p_erro: "monitor não apareceu na lista do fornecedor" }); continue; }
+        await db.rpc("sync_monitor_registrar", { p_cliente: it.cliente_id, p_tipo: it.tipo, p_documento: it.documento, p_monitor: m.id, p_erro: null });
+      } catch (e) {
+        r.erros++; await db.rpc("sync_monitor_registrar", { p_cliente: it.cliente_id, p_tipo: it.tipo, p_documento: it.documento, p_monitor: null, p_erro: e instanceof ErroSync ? e.categoria : "erro" }).catch(() => {});
+        if (e instanceof ErroSync && ["autenticacao", "plano", "sem_credencial"].includes(e.categoria)) return { status: "erro", categoria: e.categoria, resumo: r };
+      }
+    }
+    return { status: r.erros ? "parcial" : "ok", resumo: r };
+  } catch (e) { return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r }; }
+}
+// Lê o que cada monitor encontrou e guarda. Processo novo (depois da primeira leitura) marca o cliente como "nova movimentação".
+export async function puxarDescobertos({ db, cliente, paralelo = 4 }) {
+  const { ativo } = await integracao(db); if (!ativo) return { status: "desligada" };
+  const r = { monitores: 0, lidos: 0, processos: 0, novos: 0, erros: 0, plano: null };
+  try {
+    const api = cliente(); const lista = (await db.rpc("sync_monitores_lista")) || []; r.monitores = lista.length; let i = 0;
+    const trabalhar = async () => { while (i < lista.length) { const it = lista[i++];
+      try { const { corpo } = await api.get(`/v1/monitores/${encodeURIComponent(it.monitor)}/descobertos`);
+        const procs = (Array.isArray(corpo?.processos) ? corpo.processos : []).map((p) => ({ numero: soDig(p?.numero), numero_mascara: p?.numero_mascara ?? null, tribunal: p?.tribunal ?? null, classe: p?.classe ?? null, assunto: p?.assunto ?? null,
+          orgao: p?.orgao ?? null, comarca: p?.comarca ?? null, valor_causa: p?.valor_causa ?? null, distribuicao: p?.distribuicao ?? null, segredo: p?.segredo === true, polo_ativo: p?.polo_ativo ?? null, polo_passivo: p?.polo_passivo ?? null, lido: p?.lido === true, arquivado: p?.arquivado === true }));
+        if (corpo?.cobranca && !r.plano) r.plano = { monitorados: corpo.cobranca.monitorados ?? null, limite: corpo.cobranca.limite_plano ?? null, vagas: corpo.cobranca.vagas_no_plano ?? null };
+        const n = await db.rpc("sync_monitor_descobertos", { p_documento: it.documento, p_processos: procs, p_checagem: corpo?.monitor?.ultima_checagem ?? null });
+        r.lidos++; r.processos += procs.length; r.novos += Number(n) || 0;
+      } catch (e) { if (e instanceof ErroSync && ["autenticacao", "plano", "sem_credencial"].includes(e.categoria)) throw e; r.erros++; } } };
+    await Promise.all(Array.from({ length: Math.max(1, paralelo) }, trabalhar));
+    return { status: r.erros ? "parcial" : "ok", resumo: r };
+  } catch (e) { return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r }; }
+}
+
+
+// ---------- processos da carteira do Sync que NÃO estão cadastrados no sistema (aba Monitoramento) ----------
+// Monitor por CPF/CNPJ põe o processo direto na carteira do Sync. Aqui cada um deles é ligado ao cliente pelo documento de uma
+// parte e entra na fila de "encontrados". Nada é cadastrado sozinho: a equipe decide na tela.
+export async function puxarEncontrados({ db, cliente, limite = 40, paralelo = 4, itens = 200, maxPaginas = 10, avisar = true }) {
+  const { ativo } = await integracao(db); if (!ativo) return { status: "desligada" };
+  const r = { fora_da_base: 0, conhecidos: 0, novos: 0, sem_cliente: 0, erros: 0, restantes: 0 };
+  try {
+    const api = cliente(); const lista = [];
+    for (let pagina = 1; pagina <= maxPaginas; pagina++) { const { corpo } = await api.get("/v1/processos", { itens, pagina, bloqueados: false }); const lote = Array.isArray(corpo?.processos) ? corpo.processos : []; lista.push(...lote); if (lote.length < itens) break; }
+    const base = (await db.rpc("sync_carteira_estado")) || {}; const est = (await db.rpc("sync_encontrados_estado")) || {};
+    const conhecidos = new Set(est.conhecidos || []); const donos = est.documentos || {};
+    const pend = [];
+    for (const it of lista) { const k = soDig(it?.numero); if (k.length !== 20 || k in base) continue; r.fora_da_base++; if (conhecidos.has(k)) { r.conhecidos++; continue; } pend.push({ k, it }); }
+    const agora = pend.slice(0, Math.max(1, limite)); r.restantes = pend.length - agora.length; let i = 0;
+    const trabalhar = async () => { while (i < agora.length) { const { k, it } = agora[i++];
+      try { const { corpo: det } = await api.get("/v1/processos/" + k);
+        let doc = null; for (const x of det?.partes || []) { const d = soDig(x?.cpf_cnpj); if (d && donos[d]) { doc = d; break; } }
+        const mov = (Array.isArray(det?.movimentos) ? det.movimentos : []).map((m) => comoData(m?.data)).filter(Boolean).sort();
+        const res = await db.rpc("sync_encontrado_receber", { p: { numero: k, numero_mascara: det?.numero ?? it?.numero ?? null, cliente_id: doc ? donos[doc] : null, documento: doc, tribunal: det?.tribunal ?? it?.tribunal ?? null, classe: det?.classe ?? null,
+          assunto: det?.assunto ?? null, polo_ativo: det?.polo_ativo ?? null, polo_passivo: det?.polo_passivo ?? null, valor_causa: typeof det?.valor_causa === "number" && det.valor_causa > 0 ? det.valor_causa : null,
+          data_distribuicao: comoData(det?.data_distribuicao), ultimo_andamento: mov.length ? mov[mov.length - 1] : null }, p_avisar: avisar });
+        if (res === "novo") { r.novos++; if (!doc) r.sem_cliente++; } else if (res === "conhecido" || res === "ja_cadastrado") r.conhecidos++; else r.erros++;
+      } catch (e) { if (e instanceof ErroSync && ["autenticacao", "plano", "sem_credencial"].includes(e.categoria)) throw e; r.erros++; } } };
+    await Promise.all(Array.from({ length: Math.max(1, paralelo) }, trabalhar));
+    return { status: r.erros ? "parcial" : "ok", resumo: r };
+  } catch (e) { return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r }; }
 }

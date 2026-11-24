@@ -479,7 +479,7 @@ html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;
 // os de "core" + as áreas da pessoa (admin = todas; cliente = só carteira e ficha).
 const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
-  ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['acompanhamento-pj','clientes'],['fluxo','juridico'],
+  ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['acompanhamento-pj','clientes'],['fluxo','juridico'],['monitoramento-sync','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['processo-sync','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
   ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['financeiro-controle','financeiro'],['faturamento','financeiro'],['dossie','core'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],

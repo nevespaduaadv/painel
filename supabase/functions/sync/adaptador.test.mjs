@@ -229,3 +229,21 @@ test("carteira: só busca o detalhe do que está na base e desatualizado; respei
   assert.equal(r.status, "ok"); assert.deepEqual(r.resumo, { na_carteira: 4, fora_da_base: 1, em_dia: 1, atualizados: 1, capas_preenchidas: 0, erros: 0, restantes: 1 });
   assert.equal(gravados.length, 1); assert.equal(pedidos.filter((c) => /^\/v1\/processos\/\d/.test(c)).length, 1);
 });
+
+// ---- monitores por CPF/CNPJ ----
+import { criarMonitores, puxarDescobertos } from "./adaptador.mjs";
+test("monitores: cria só o que falta, reaproveita o que já existe na fonte e registra o id", async () => {
+  const fonte = [{ id: 1, tipo: "oab", valor: "SP488803" }, { id: 7, tipo: "cnpj", valor: "11.222.333/0001-44" }]; const posts = [], reg = [];
+  const api = { get: async () => ({ corpo: { monitores: fonte } }), post: async (c, b) => { posts.push(b); fonte.push({ id: 100 + posts.length, tipo: b.tipo, valor: b.valor }); return { corpo: {} }; } };
+  const db = { rpc: async (n, a) => n === "sync_config_ler" ? { ativo: true, config: {} } : n === "sync_monitores_a_criar" ? [{ cliente_id: "c1", tipo: "cnpj", documento: "11222333000144" }, { cliente_id: "c1", tipo: "cpf", documento: "12345678901" }] : (reg.push(a), null) };
+  const r = await criarMonitores({ db, cliente: () => api });
+  assert.equal(r.status, "ok"); assert.deepEqual(r.resumo, { a_criar: 2, criados: 1, ja_existiam: 1, erros: 0, restantes: 0 });
+  assert.deepEqual(posts, [{ tipo: "cpf", valor: "12345678901", pasta_id: null }]); assert.deepEqual(reg.map((x) => x.p_monitor), [7, 101]);
+});
+test("monitores: lê os descobertos de cada monitor e soma os novos", async () => {
+  const api = { get: async (c) => ({ corpo: { monitor: { ultima_checagem: "2026-11-24T20:00:00Z" }, processos: [{ numero: "0000001-11.2026.8.26.0001", tribunal: "TJSP", lido: false, arquivado: false }], cobranca: { monitorados: 276, limite_plano: 800, vagas_no_plano: 524 } } }) };
+  const dados = []; const db = { rpc: async (n, a) => n === "sync_config_ler" ? { ativo: true, config: {} } : n === "sync_monitores_lista" ? [{ documento: "12345678901", monitor: 101 }] : (dados.push(a), 1) };
+  const r = await puxarDescobertos({ db, cliente: () => api });
+  assert.equal(r.status, "ok"); assert.deepEqual(r.resumo, { monitores: 1, lidos: 1, processos: 1, novos: 1, erros: 0, plano: { monitorados: 276, limite: 800, vagas: 524 } });
+  assert.equal(dados[0].p_processos[0].numero, "00000011120268260001");
+});
