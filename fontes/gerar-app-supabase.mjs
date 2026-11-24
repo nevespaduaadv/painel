@@ -96,11 +96,13 @@ html = html.replace('{tab:"painel",label:"Meu painel",cls:"edit-only"}', '{tab:"
   const fim = html.indexOf('    m.append(sec);return;\n  }\n', fim0) + '    m.append(sec);return;\n  }\n'.length;
   const antigo = html.slice(ini, fim);
   const novo = `  const EQ=!readOnly();
-  const SUBS=EQ?[["dossie","Dossiê"],["cliente","Cadastro"],["acompanhamento","Acompanhamento PJ"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],...(PP.podeFinanceiro?[["financeiro","Financeiro"]]:[])]
+  // pessoa física sem contrato de passivos (clientes vindos do ADVBox): ficha enxuta — Cadastro · Jurídico · Tarefas · Dossiê
+  const PFS=EQ&&c.tipo_pessoa==="PF"&&!ks.length;
+  const SUBS=EQ?(PFS?[["cliente","Cadastro"],["processos","Jurídico",cnt.processos],["tarefas","Tarefas",cnt.tarefas],["dossie","Dossiê"]]:[["dossie","Dossiê"],["cliente","Cadastro"],["acompanhamento","Acompanhamento PJ"],["passivos","Passivos",ks.length],["processos","Jurídico",cnt.processos],["negociacoes","Negocial",cnt.negociacoes],["tarefas","Tarefas",cnt.tarefas],...(PP.podeFinanceiro?[["financeiro","Financeiro"]]:[])])
     :[["resumo","Resumo"],["geral","Passivos"],["contratos","Contratos",ks.length],["reserva","Reserva de quitação"],["timeline","Andamento",cnt.timeline],["processos","Processos",cnt.processos]];
   if(EQ){const mapa={resumo:"dossie",timeline:"dossie",notas:"cliente",geral:"passivos",contratos:"passivos",reserva:"passivos"};if(mapa[S.sub]){if(["geral","contratos","reserva"].includes(S.sub))S.sub2=S.sub;S.sub=mapa[S.sub]}}
   if(EQ&&S.sub==="financeiro"&&!PP.podeFinanceiro)S.sub="dossie";
-  if(!S.sub||!(SUBS.some(s=>s[0]===S.sub)||(EQ&&S.sub==="documentos")))S.sub=EQ?"dossie":(MOD.resumo?"resumo":"geral");
+  if(!S.sub||!(SUBS.some(s=>s[0]===S.sub)||(EQ&&S.sub==="documentos")))S.sub=EQ?(PFS?"cliente":"dossie"):(MOD.resumo?"resumo":"geral");
   m.append(el("div",{class:"subtabs",role:"tablist"},SUBS.map(([k,l,n])=>el("button",{class:"subtab",role:"tab","aria-selected":String(S.sub===k||(k==="cliente"&&S.sub==="documentos")),onclick:()=>{S.sub=k;render()}},l,n!=null?el("span",{class:"cnt"},String(n)):null))));
   if(EQ&&S.sub==="documentos"){const host=el("div",{class:"main",style:"gap:14px"});m.append(host);if(window.PP_FICHA?.paginaDocumentos)window.PP_FICHA.paginaDocumentos(c,host);else host.append(el("div",{class:"note"},"Carregando…"));return}
   if(S.sub==="resumo"||S.sub==="dossie"||S.sub==="cliente"||S.sub==="financeiro"||(EQ&&S.sub==="acompanhamento")){
@@ -483,7 +485,7 @@ const MODULOS = [
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],
   ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
-  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['carteira-v3','clientes'],['ficha-v3','clientes'],['hubs','core'],['np-ui','core'],['casca','core'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['carteira-v3','clientes'],['ficha-v3','clientes'],['ficha-pf','core'],['hubs','core'],['np-ui','core'],['casca','core'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();
