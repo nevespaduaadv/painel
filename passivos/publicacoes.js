@@ -169,16 +169,30 @@ function linhaPub(p){
   if(!p.lida&&!p.ignorada)li.classList.add("np-nao-lida");
   return li;
 }
-/* estado das fontes: DJEN (busca automática) e Sync (integração). Os comandos do Sync ficam desativados até a ativação autorizada. */
+/* estado das fontes: DJEN (busca automática) e Sync (integração). Sem a integração instalada, os comandos do Sync ficam desativados. */
 function fontesPub(){
   const r=U.resumo||{},y=U.sync;
   const sync=!y.instalada?["não instalada neste ambiente",""]:!y.ativo?["desligada",""]:y.estado?.conexao==="ok"?["ligada","ok"]:y.estado?.conexao==="erro"?["ligada, com erro de conexão","crit"]:["ligada","att"];
   const b=el("button",{type:"button",class:"np-link","aria-haspopup":"dialog","aria-expanded":"false",onclick:e=>NPUI.pop(e.currentTarget,()=>{
-    const off="Disponível depois da ativação da integração pelas sócias.";
+    const adm=PP.perfil?.papel==="admin",inst=!!y.instalada;
+    const off=!inst?"A integração não está instalada neste ambiente.":"";
+    const chamar=async(rota)=>{const {data:{session}}=await SB.auth.getSession();if(!session)throw new Error("Faça login de novo");
+      const r=await fetch(SB_URL+"/functions/v1/sync/"+rota,{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+session.access_token},body:"{}"});
+      const j=await r.json().catch(()=>null);if(!r.ok)throw new Error(j?.erro==="so_administradora"?"Só a administradora pode fazer isso.":j?.erro==="so_juridico"?"Só quem tem acesso ao Jurídico pode sincronizar.":"A integração não respondeu ("+r.status+").");return j||{}};
+    const ocupar=async(btn,rotulo,fn)=>{const orig=btn.textContent;btn.disabled=true;btn.textContent=rotulo;try{await fn()}catch(e){toast(e.message||"Não foi possível concluir")}finally{btn.disabled=false;btn.textContent=orig}};
+    const testar=e=>ocupar(e.currentTarget,"Testando…",async()=>{const j=await chamar("testar");toast(j.ok?"Conexão com o Sync funcionando":"O Sync recusou a conexão"+(j.categoria?" ("+j.categoria+")":""));await carregarSync()});
+    const sincronizar=e=>ocupar(e.currentTarget,"Sincronizando…",async()=>{const j=await chamar("puxar");const z=j.resumo||{};
+      if(j.status==="desligada"){toast("A integração está desligada.");return}
+      if(j.status==="aguardando_contrato"){toast("A integração ainda não foi liberada para trazer publicações.");return}
+      toast(j.status==="erro"?"A sincronização falhou"+(j.categoria?" ("+j.categoria+")":""):`Sincronizado: ${z.novas||0} nova(s), ${z.prazos_sugeridos||0} prazo(s) sugerido(s)`+(j.status==="parcial"?" (parcial)":""));
+      NPUI.fecharPop();await recarregar()});
+    const alternar=e=>{const btn=e.currentTarget,ligar=!y.ativo;NPUI.confirmar({titulo:ligar?"Ligar a integração com o Sync?":"Desligar a integração com o Sync?",
+      texto:ligar?"O sistema volta a buscar intimações e prazos sugeridos no AtendeDireito Sync.":"O sistema para de buscar no Sync. O que já foi trazido continua no sistema.",rotuloSim:ligar?"Ligar":"Desligar",origem:btn,
+      onSim:async()=>{const {error}=await SB.rpc("sync_definir",{p_ativo:ligar,p_config:null});if(error){toast("Não foi possível alterar: "+(error.message||""));return}toast(ligar?"Integração ligada":"Integração desligada");NPUI.fecharPop();await carregarSync();render()}})};
     return [el("div",{class:"np-pop-form np-pub-integ"},el("h4",{},"AtendeDireito Sync"),
       NPUI.props([["Situação",NPUI.marca(sync[0],sync[1])],["Última verificação",y.estado?.verificado_em?dhBR(y.estado.verificado_em):"nunca"],["O que traz","intimações, prazos sugeridos e a origem de cada registro"],["Prazos","sempre como sugestão; só valem depois da conferência do Jurídico"]]),
-      el("div",{class:"np-pub-integ-ac"},NPUI.btn("Testar conexão",{disabled:true,title:off}),NPUI.btn("Sincronizar agora",{disabled:true,title:off}),NPUI.btn(y.ativo?"Desligar":"Ligar",{disabled:true,title:off})),
-      el("p",{class:"np-nota"},"Comandos desativados: a integração só é ligada com credencial configurada no servidor e autorização específica."),
+      el("div",{class:"np-pub-integ-ac"},NPUI.btn("Testar conexão",inst&&adm?{onclick:testar}:{disabled:true,title:off||"Só a administradora testa a conexão."}),NPUI.btn("Sincronizar agora",inst&&y.ativo?{onclick:sincronizar}:{disabled:true,title:off||"Ligue a integração para sincronizar."}),NPUI.btn(y.ativo?"Desligar":"Ligar",inst&&adm?{onclick:alternar}:{disabled:true,title:off||"Só a administradora liga ou desliga a integração."})),
+      el("p",{class:"np-nota"},!inst?"Comandos desativados: a integração só é ligada com credencial configurada no servidor e autorização específica.":"A sincronização automática roda de hora em hora, das 8h às 19h. Prazos entram sempre como sugestão."),
       el("div",{style:"display:flex;justify-content:flex-end"},NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Integração AtendeDireito Sync",alinhar:"dir",refoco:()=>$("#view-publicacoes .np-pub-fontes .np-link")})},"Ver integração");
   return el("div",{class:"np-pub-fontes"},el("span",{},el("b",{},"DJEN")," · última busca ",r.ultima_busca?dhBR(r.ultima_busca):"—",+(r.erros_recentes||0)?[" · ",NPUI.marca(`${r.erros_recentes} erro(s) em 48h`,"crit")]:null),
     el("span",{},el("b",{},"AtendeDireito Sync")," · ",NPUI.marca(sync[0],sync[1])," ",b));
