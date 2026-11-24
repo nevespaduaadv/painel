@@ -150,7 +150,10 @@ function renderTarefas(v){
 }
 
 /* ---------- ficha do lead ---------- */
-function abrirDetalhe(l){L.sel=l;L.aba="oportunidade";L.obs=[];L.histLead=[];L.audit=[];L.tarefasLead=[];renderDetalhe();carregarDetalhe(l.id);carregarTarefasLead(l.id)}
+function abrirDetalhe(l){
+  L.sel=l;L.aba="oportunidade";L.obs=[];L.histLead=[];L.audit=[];L.tarefasLead=[];
+  renderDetalhe();carregarDetalhe(l.id);carregarTarefasLead(l.id);
+}
 function renderDetalhe(){
   const l=L.leads.find(x=>x.id===L.sel.id)||L.sel;L.sel=l;
   const host=$("#modalHost");host.replaceChildren();const close=()=>{host.replaceChildren();L.sel=null};

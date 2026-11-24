@@ -8,11 +8,11 @@
 (() => {
   "use strict";
   const ligado = () => { try { return document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI && typeof equipe === "function" && equipe(); } catch (_) { return false; } };
-  const LIMPO = { escopo: "todos", atraso: false, neg: false, proc: false, inad: false, meus: false, seg: "", resp: "", etapa: "", q: "" };
+  const LIMPO = { ordem: "az", escopo: "todos", atraso: false, neg: false, proc: false, inad: false, meus: false, seg: "", resp: "", etapa: "", q: "" };
   const K = { f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
   const SIT_B = { inadimplente: "Inadimplente", vai_ficar_inadimplente: "Vai ficar inadimplente", adimplente: "Adimplente" };
   const ETAPAS = { 0: "Contrato fechado", 1: "Cadastro ADVBox", 2: "Formulário enviado", 3: "Formulário respondido", 4: "Auditoria", 5: "R1 agendada", 6: "R1 feita", 7: "R2 feita", 8: "R3 feita", 9: "Ciclo encerrado", 10: "Ciclo mensal" };
-  const GRUPOS = [["atraso", "Contratos em atraso", "crit"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
+  const GRUPOS = [["atencao", "Exigem atenção", "att"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
   const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const digitos = (s) => String(s || "").replace(/\D/g, "");
   const brlCurto = (v) => { const n = +v || 0; if (n >= 1e6) return "R$ " + (n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mi"; if (n >= 1e4) return "R$ " + Math.round(n / 1e3).toLocaleString("pt-BR") + " mil"; return NPUI.brl(n); };
@@ -48,7 +48,9 @@
       const v = visPor.get(c.id) || null; const pass = passPor.get(c.id) || null;
       return { c, ks, total, atraso, neg, prazos, prox: prazos[0] || null, proc: v ? (+v.processos_ativos || 0) : null, sitB: pass?.situacao || null,
         tipo: v?.tipo_pessoa || c.tipo_pessoa || null, etapa: v?.etapa_fluxo ?? c.etapa_fluxo ?? null,
-        grupo: atraso ? "atraso" : neg ? "negociacao" : ks.length ? "em_dia" : "sem" };
+        semResp: !(c.responsavel || c.dados?.responsavel || resps(c).length),
+        // Figma de 18/11: quem pede ação vem primeiro — contrato em atraso ou cliente sem responsável (o motivo aparece na linha)
+        grupo: atraso || !(c.responsavel || c.dados?.responsavel || resps(c).length) ? "atencao" : neg ? "negociacao" : ks.length ? "em_dia" : "sem" };
     });
   }
   /* régua = estado do próximo prazo, com a mesma regra da lista de Tarefas (fatal até 7 dias, atrasado, hoje) */
@@ -59,22 +61,21 @@
     const f = K.f; const meu = meuColab(); const q = norm(f.q), qd = digitos(f.q);
     return regs.filter((r) => {
       if (f.escopo === "pj" && r.tipo === "PF") return false; if (f.escopo === "pf" && r.tipo !== "PF") return false;
-      if (f.atraso && !r.atraso) return false; if (f.neg && !r.neg) return false; if (f.proc && !(r.proc > 0)) return false; if (f.inad && r.sitB !== "inadimplente") return false;
+      if (f.semResp && !r.semResp) return false; if (f.atraso && !r.atraso) return false; if (f.neg && !r.neg) return false; if (f.proc && !(r.proc > 0)) return false; if (f.inad && r.sitB !== "inadimplente") return false;
       if (f.meus && !(meu && resps(r.c).includes(meu.id))) return false; if (f.resp && !resps(r.c).includes(f.resp)) return false;
       if (f.seg && (r.c.segmento || "") !== f.seg) return false; if (f.etapa !== "" && String(r.etapa ?? "") !== f.etapa) return false;
       if (q && !(norm(r.c.nome).includes(q) || norm(r.c.nome_fantasia).includes(q) || (qd.length >= 3 && digitos(r.c.cnpj).includes(qd)))) return false;
       return true;
     });
   }
+  /* Carteira simples (pedido das sócias, 23/11): só a lista dos clientes. Situação dos contratos, valores e prazos ficam na ficha do cliente e na Gestão. */
   function contexto(r) {
     const c = r.c; const partes = [];
     if (c.cidade) partes.push(c.cidade + (c.uf && !/\/\w\w$/.test(c.cidade) ? "/" + c.uf : ""));
     if (c.segmento) partes.push(c.segmento);
-    partes.push(r.ks.length ? `${r.ks.length} contrato${r.ks.length === 1 ? "" : "s"}` : "sem contratos ativos");
-    const out = []; partes.forEach((x, i) => { if (i) out.push(" · "); out.push(x); });
-    if (r.prox) { const p = NPUI.prazoTxt(r.prox.prazo); out.push(el("span", { class: "sep" }, " · ")); out.push(el("span", { class: "rel " + tomDe(reguaDe(r)) }, p.rel)); }
-    return out;
+    return partes.join(" · ");
   }
+  /* marcas de situação: fora da lista, mas continuam no cabeçalho da ficha do cliente (ficha-v3.js usa PP_CARTEIRA_V3.marcas) */
   function marcas(r) {
     const m = [];
     if (r.atraso) m.push(NPUI.marca(`${r.atraso} em atraso`, "late"));
@@ -84,25 +85,18 @@
     if (r.proc > 0) m.push(NPUI.marca(`${r.proc} processo${r.proc === 1 ? "" : "s"}`));
     return m;
   }
-  const valor = (v, n) => n ? el("span", { class: "np-val np-cart-val", title: "saldo em contratos ativos" }, el("b", {}, NPUI.brl(v))) : null;
   function linha(r) {
-    const rg = reguaDe(r); const p = r.prox ? NPUI.prazoTxt(r.prox.prazo) : null;
-    return NPUI.linha({ id: r.c.id, regua: rg, atual: K.aberta === r.c.id,
-      prazo: p ? { curta: p.curta, rel: p.rel, exata: p.exata + " · " + r.prox.titulo + " · " + p.rel, tom: tomDe(rg) } : { curta: "", exata: "sem prazo aberto" },
-      titulo: r.c.nome || "(sem nome)", contexto: contexto(r), titleAbrir: "Ver resumo do cliente",
-      direita: [...marcas(r), valor(r.total, r.ks.length), NPUI.quem(respDe(r.c))].filter(Boolean),
-      onOpen: (li) => abrirPainel(r.c.id, { origem: li.querySelector(".np-it-abrir") }) });
+    return NPUI.linha({ id: r.c.id, atual: K.aberta === r.c.id, titulo: r.c.nome || "(sem nome)", contexto: contexto(r) || null, titleAbrir: "Abrir a ficha do cliente",
+      direita: [NPUI.marca(r.tipo === "PF" ? "PF" : "PJ"), r.semResp ? null : NPUI.quem(respDe(r.c))].filter(Boolean),
+      onOpen: () => { K.aberta = null; S.sel = r.c.id; S.sub = null; render(); } });
   }
   function lista(regs) {
     const host = el("div", { class: "np-corpo" });
     if (!(S.clientes || []).length) { host.append(NPUI.vazio({ titulo: "Nenhum cliente cadastrado", texto: S.db ? "Use “+ Novo cliente” para começar." : "Conectando ao banco de dados…" })); return host; }
-    const gs = GRUPOS.filter(([k]) => regs.some((r) => r.grupo === k));
-    if (!gs.length) { host.append(NPUI.vazio({ titulo: "Nenhum cliente com esses filtros", texto: "Tire um filtro para ver a carteira inteira.", acao: "Limpar filtros", onAcao: () => { K.f = { ...LIMPO }; renderList(); } })); return host; }
-    const ab = grupos();
-    for (const [k, l, tom] of gs) {
-      const its = regs.filter((r) => r.grupo === k).sort((a, b) => (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"));
-      host.append(NPUI.grupo({ id: "cart-" + k, titulo: l, n: its.length, tom, aberto: ab[k] !== false, onToggle: (v) => { ab[k] = v; NPUI.pref.set("np-carteira-grupos", JSON.stringify(ab)); }, itens: its.map(linha) }));
-    }
+    if (!regs.length) { host.append(NPUI.vazio({ titulo: "Nenhum cliente com esses filtros", texto: "Tire um filtro para ver a carteira inteira.", acao: "Limpar filtros", onAcao: () => { K.f = { ...LIMPO }; renderList(); } })); return host; }
+    const sinal = K.f.ordem === "za" ? -1 : 1;
+    const its = regs.slice().sort((a, b) => sinal * (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"));
+    host.append(el("ul", { class: "np-lst" }, its.map(linha)));
     return host;
   }
   function filtros(regs) {
@@ -110,30 +104,10 @@
     const esc = (k, l, n) => C({ label: l, n, on: f.escopo === k, grupo: "escopo", onclick: () => { f.escopo = k; renderList(); } });
     esc("todos", "Todos"); esc("pj", "PJ", regs.filter((r) => r.tipo !== "PF").length); esc("pf", "PF", regs.filter((r) => r.tipo === "PF").length);
     chips.push(NPUI.sepv());
-    const at = (k, l, n, title) => C({ label: l, n, on: f[k], grupo: "attr", title, onclick: () => { f[k] = !f[k]; renderList(); } });
-    at("atraso", "Em atraso", regs.filter((r) => r.atraso).length, "Clientes com ao menos um contrato em atraso");
-    at("neg", "Em negociação", regs.filter((r) => r.neg).length, "Clientes com contrato em negociação ou acordo");
-    if (regs.some((r) => r.proc != null)) at("proc", "Com processo", regs.filter((r) => r.proc > 0).length, "Clientes com processo ativo");
-    if (regs.some((r) => r.sitB)) at("inad", "Inadimplentes", regs.filter((r) => r.sitB === "inadimplente").length, "Inadimplentes com os bancos (ficha de passagem)");
-    if (meu) at("meus", "Meus", regs.filter((r) => resps(r.c).includes(meu.id)).length, "Clientes em que sou responsável em alguma frente");
-    const extras = [f.q, f.seg, f.resp, f.etapa].filter((x) => x !== "" && x != null).length;
-    const mais = NPUI.chip({ label: "Mais filtros", n: extras || null, on: extras > 0, title: "Nome ou CNPJ, segmento, responsável, etapa do fluxo", onclick: (e) => NPUI.pop(e.currentTarget, () => {
-      const q = el("input", { type: "search", class: "np-in", value: f.q, placeholder: "Nome, nome fantasia ou CNPJ", "aria-label": "Nome ou CNPJ" });
-      let tq = null; q.oninput = () => { clearTimeout(tq); tq = setTimeout(() => { f.q = q.value.trim(); renderList(); }, 220); };
-      const segs = [...new Set((S.clientes || []).map((c) => c.segmento).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-      const fSeg = sel({ "": "Todos os segmentos", ...Object.fromEntries(segs.map((s) => [s, s])) }, f.seg);
-      const fResp = sel({ "": "Todas as pessoas", ...Object.fromEntries((K.colab || []).filter((c) => c.ativo !== false).map((c) => [c.id, c.nome])) }, f.resp);
-      const fEt = sel({ "": "Todas as etapas", ...Object.fromEntries(Object.entries(ETAPAS).map(([k, v]) => [k, k + " · " + v])) }, f.etapa);
-      fSeg.onchange = () => { f.seg = fSeg.value; renderList(); }; fResp.onchange = () => { f.resp = fResp.value; renderList(); }; fEt.onchange = () => { f.etapa = fEt.value; renderList(); };
-      const L = (l, c) => el("div", {}, el("label", {}, l), c);
-      setTimeout(() => q.focus(), 0);
-      return [el("div", { class: "np-pop-form" }, L("Nome ou CNPJ", q), L("Segmento", fSeg), L("Responsável (qualquer frente)", fResp), L("Etapa do fluxo", fEt),
-        el("div", { style: "display:flex;justify-content:space-between;gap:8px" }, NPUI.btn("Limpar", { variante: "ghost", onclick: () => { K.f = { ...LIMPO }; NPUI.fecharPop(); renderList(); } }), NPUI.btn("Fechar", { onclick: () => NPUI.fecharPop() })))];
-    }, { role: "dialog", label: "Mais filtros", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-chipf[aria-haspopup="dialog"]') }) });
-    mais.setAttribute("aria-haspopup", "dialog"); mais.setAttribute("aria-expanded", "false");
-    return { chips, fixos: [mais] };
+    C({ label: f.ordem === "za" ? "Z–A" : "A–Z", on: false, title: f.ordem === "za" ? "Ordem decrescente (Z–A). Clique para crescente." : "Ordem crescente (A–Z). Clique para decrescente.", onclick: () => { f.ordem = f.ordem === "za" ? "az" : "za"; renderList(); } });
+    return { chips, fixos: [] };
   }
-  const COLS_CSV = [{ k: "nome", t: "Cliente" }, { k: "nome_fantasia", t: "Nome fantasia" }, { k: "cnpj", t: "CNPJ" }, { k: "tipo_pessoa", t: "Tipo" }, { k: "cidade", t: "Cidade" }, { k: "uf", t: "UF" }, { k: "segmento", t: "Segmento" }, { k: "servico", t: "Serviço" }, { k: "status", t: "Status" }, { k: "etapa_fluxo", t: "Etapa" }, { k: "responsavel", t: "Responsável" }, { k: "data_fechamento", t: "Fechamento", f: (v) => v ? String(v).slice(0, 10).split("-").reverse().join("/") : "" }, { k: "_contratos", t: "Contratos ativos" }, { k: "_total", t: "Saldo em contratos", f: (v) => String(Math.round(v * 100) / 100).replace(".", ",") }, { k: "_atraso", t: "Contratos em atraso" }, { k: "_neg", t: "Em negociação" }, { k: "adimplente", t: "Adimplente", f: (v) => v == null ? "" : v ? "sim" : "não" }];
+  const COLS_CSV = [{ k: "nome", t: "Cliente" }, { k: "nome_fantasia", t: "Nome fantasia" }, { k: "cnpj", t: "CNPJ" }, { k: "tipo_pessoa", t: "Tipo" }, { k: "cidade", t: "Cidade" }, { k: "uf", t: "UF" }, { k: "segmento", t: "Segmento" }, { k: "servico", t: "Serviço" }, { k: "status", t: "Status" }, { k: "etapa_fluxo", t: "Etapa" }, { k: "responsavel", t: "Responsável" }, { k: "data_fechamento", t: "Fechamento", f: (v) => v ? String(v).slice(0, 10).split("-").reverse().join("/") : "" }];
   function exportar(regs) { if (typeof exportarCSV !== "function") return; const ls = regs.map((r) => ({ ...r.c, _total: r.total, _contratos: r.ks.length, _atraso: r.atraso, _neg: r.neg })); if (!ls.length) { toast("Nada para exportar"); return; } exportarCSV("clientes", ls, COLS_CSV); toast(`${ls.length} linha(s) exportada(s)`); }
 
   function renderCarteira() {
@@ -143,18 +117,16 @@
     window.PP_CLIENTES_VISAO?.carregar?.(); carregarApoio();
     const v = el("div", { class: "np-v3 np-carteira", id: "np-carteira" }); m.append(v);
     const regs = registros(); const vis = filtrar(regs);
-    const total = regs.reduce((s, r) => s + r.total, 0), nAt = regs.filter((r) => r.atraso).length, nInad = regs.filter((r) => r.sitB === "inadimplente").length;
-    const temVis = regs.some((r) => r.proc != null);
-    const resumo = NPUI.resumo([{ n: regs.length, label: regs.length === 1 ? "cliente" : "clientes" }, { n: brlCurto(total), label: "em contratos" }, { n: nAt, label: "com atraso", tom: nAt ? "crit" : "zero" },
-      temVis && nInad ? { n: nInad, label: "inadimplentes", tom: "att" } : null]);
+    const resumo = NPUI.resumo([{ n: regs.length, label: regs.length === 1 ? "cliente" : "clientes" }]);
+    let tq = null; const busca = el("input", { type: "search", class: "np-busca-inline", placeholder: "Buscar nome ou CNPJ…", value: K.f.q || "", "aria-label": "Buscar cliente por nome ou CNPJ", oninput: (ev) => { K.f.q = ev.target.value.trim(); clearTimeout(tq); tq = setTimeout(() => { renderList(); const x = document.querySelector("#np-carteira .np-busca-inline"); if (x) { x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 300); } });
     const fl = filtros(regs); const ro = typeof readOnly === "function" && readOnly();
     const maisAc = NPUI.ib("pontos", "Mais ações", () => NPUI.pop(maisAc, [{ label: "Exportar CSV (lista filtrada)", onclick: () => exportar(vis.slice().sort((a, b) => (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"))) }, { label: "Acompanhamento PJ", onclick: () => irPara("acompanhamento") }], { label: "Mais ações", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-ib[aria-label="Mais ações"]') }));
     maisAc.setAttribute("aria-haspopup", "menu"); maisAc.setAttribute("aria-expanded", "false");
-    v.append(NPUI.toolbar({ resumo, filtros: fl.chips, filtrosFixos: fl.fixos, direita: [ro ? null : NPUI.btn("+ Novo cliente", { variante: "pri", disabled: !S.db, onclick: () => openClientForm({}) }), maisAc] }));
+    v.append(NPUI.toolbar({ resumo, filtros: fl.chips, filtrosFixos: fl.fixos, direita: [busca, ro ? null : NPUI.btn("+ Novo cliente", { variante: "pri", disabled: !S.db, onclick: () => openClientForm({}) }), maisAc] }));
     NPUI.reancorarPop();
     if (K.erro) v.append(NPUI.faixaErro({ texto: "Os prazos dos clientes não carregaram; a lista segue sem eles.", acao: "Tentar de novo", onAcao: () => carregarApoio(true) }));
     const obra = el("div", { class: "np-obra" }); K.obra = obra; const corpo = lista(vis);
-    corpo.append(NPUI.rodape(`${vis.length} de ${regs.length} cliente${regs.length === 1 ? "" : "s"}${vis.length === regs.length ? "" : " com estes filtros"} · ordem alfabética em cada grupo`, [["fatal", "prazo fatal"], ["late", "prazo vencido"], ["att", "vence hoje"]]));
+    corpo.append(NPUI.rodape(`${vis.length} de ${regs.length} cliente${regs.length === 1 ? "" : "s"}${vis.length === regs.length ? "" : " com estes filtros"} · ordem alfabética ${K.f.ordem === "za" ? "decrescente (Z–A)" : "crescente (A–Z)"}`));
     obra.append(corpo); v.append(obra);
     K.painel = NPUI.painel({ obra, label: "Resumo do cliente", onClose: () => { K.aberta = null; } });
     if (K.aberta) { if (regs.some((r) => r.c.id === K.aberta)) abrirPainel(K.aberta, { silencioso: true }); else K.aberta = null; }

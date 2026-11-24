@@ -87,7 +87,7 @@ function formEvento(ev={},padrao={}){
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"ag-tit"},"Título"),Object.assign(titulo,{id:"ag-tit"})),field("ag-tipo","Tipo",tipo),field("ag-colab","Responsável / agenda de",colab,"Vai para o Google Calendar dessa pessoa, se a sincronização dela estiver ligada."),
     field("ag-data","Data",data),el("div",{class:"f"},el("label",{},"Horário"),el("div",{style:"display:flex;gap:8px;align-items:center"},hIni,el("span",{class:"note"},"às"),hFim),el("label",{style:"display:inline-flex;gap:6px;align-items:center;margin-top:6px;font-size:13px"},inteiro," dia inteiro")),
     field("ag-cli","Cliente",cli),field("ag-pro","Processo",pro),field("ag-local","Local / link",local),field("ag-desc","Observações",desc));
-  const extra=ev.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Cancelar este compromisso?"))return;const {error}=await SB.from("agenda_eventos").update({cancelado:true}).eq("id",ev.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível cancelar":"Compromisso cancelado");recarregar()}},"Cancelar compromisso"):null;
+  const extra=ev.id?el("button",{class:"btn danger",onclick:async(e)=>{const btn=e.currentTarget;if(btn.disabled)return;btn.disabled=true;try{const ok=await npConfirmar({titulo:"Cancelar compromisso?",mensagem:`"${ev.titulo||"Este compromisso"}" será marcado como cancelado na agenda.`,confirmar:"Cancelar compromisso",perigo:true});if(!ok)return;const {error}=await SB.from("agenda_eventos").update({cancelado:true}).eq("id",ev.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível cancelar":"Compromisso cancelado");recarregar()}finally{btn.disabled=false}}},"Cancelar compromisso"):null;
   modal(ev.id?"Editar compromisso":"Novo compromisso",body,async()=>{
     if(!titulo.value.trim())throw new Error("Informe o título");if(!data.value)throw new Error("Informe a data");
     let ini,fim;if(inteiro.checked){ini=new Date(data.value+"T00:00:00");fim=addD(ini,1)}else{if(!hIni.value||!hFim.value)throw new Error("Informe o horário");ini=new Date(data.value+"T"+hIni.value+":00");fim=new Date(data.value+"T"+hFim.value+":00");if(fim<=ini)fim=addMin(ini,60)}
@@ -297,10 +297,34 @@ function renderAgendaV3(){
   G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
   if(G3.aberta){const e=todosItens().find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
 }
-document.head.append(el("style",{},`html.np-casca-v3 .np-ag-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-ag-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-ag-s{font:400 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-3)}
-html.np-casca-v3 .ag-ev.marco{background:transparent;border:1px dotted var(--muted);border-left:3px dotted var(--c);color:var(--np-text-2)}
-html.np-casca-v3 .np-grade-w{overflow:auto;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);margin:0 0 10px}html.np-casca-v3 .np-fora{margin:0 0 8px;font-size:var(--np-fs-1)}html.np-casca-v3 .np-vinc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}html.np-casca-v3 .np-vinc li{display:flex;align-items:center;gap:4px;flex-wrap:wrap}`));
+function rotuloPeriodoPTBR(ref,modo="mes"){
+  if(modo==="semana"){
+    const s0=inicioSemana(ref),s1=addD(s0,6);
+    const txt=s0.getMonth()===s1.getMonth()
+      ?`${s0.getDate()} a ${s1.getDate()} de ${s1.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}`
+      :`${s0.getDate()} de ${s0.toLocaleDateString("pt-BR",{month:"long"})} a ${s1.getDate()} de ${s1.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}`;
+    return txt;
+  }
+  if(modo==="dia")return ref.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase());
+  return ref.toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase());
+}
+document.head.append(el("style",{},`html.np-casca-v3 .np-ag-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-ag-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text);text-transform:none}html.np-casca-v3 .np-ag-s{font:400 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .ag-mes{font-family:var(--np-ui);color:var(--np-text)}
+html.np-casca-v3 .ag-mh{text-transform:none;letter-spacing:.01em;font:600 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-3);background:var(--np-surface-2);border-bottom:1px solid var(--np-line);padding:8px 4px}
+html.np-casca-v3 .ag-mc{border-bottom:1px solid var(--np-line);border-right:1px solid var(--np-line);background:var(--np-surface);color:var(--np-text)}
+html.np-casca-v3 .ag-mc:hover{background:var(--np-hover)}
+html.np-casca-v3 .ag-mc.fora{opacity:.48;background:var(--np-bg)}
+html.np-casca-v3 .ag-mc.hoje .ag-dn{background:var(--np-ink);color:var(--np-inv)}
+html.np-casca-v3 .ag-mn .ag-dn{font:500 var(--np-fs-2)/1 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text-2)}
+html.np-casca-v3 .ag-mq{background:var(--np-surface-2);color:var(--np-text-3);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .ag-ev{background:var(--np-surface-2);color:var(--np-text);border:1px solid var(--np-line);border-left:3px solid var(--c,var(--np-ink));border-radius:var(--np-r);font:400 var(--np-fs-1)/1.3 var(--np-ui);padding:3px 6px}
+html.np-casca-v3 .ag-ev:hover{filter:none;border-color:var(--np-line-2);background:var(--np-hover)}
+html.np-casca-v3 .ag-ev.atrasada{--c:var(--np-crit);border-left-color:var(--np-crit)}
+html.np-casca-v3 .ag-ev.marco{background:transparent;border:1px dotted var(--np-text-3);border-left:3px dotted var(--c);color:var(--np-text-2)}
+html.np-casca-v3 .ag-mais{color:var(--np-text-2);font:500 var(--np-fs-1)/1.2 var(--np-ui)}html.np-casca-v3 .ag-mais:hover{color:var(--np-text);text-decoration:underline}
+html.np-casca-v3 .ag-legenda{color:var(--np-text-3);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-grade-w{overflow:auto;border:1px solid var(--np-line);border-radius:var(--np-r-lg);background:var(--np-surface);margin:0 0 10px}html.np-casca-v3 .np-fora{margin:0 0 8px;font-size:var(--np-fs-1)}html.np-casca-v3 .np-vinc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}html.np-casca-v3 .np-vinc li{display:flex;align-items:center;gap:4px;flex-wrap:wrap}`));
 
 {const _r=render;render=function(){_r();const v=$("#view-agenda");if(!v)return;v.hidden=S.tab!=="agenda";if(S.tab==="agenda"){if(agendaV3())renderAgendaV3();else{v.classList.remove("np-v3");renderAgenda()}}}}
-window.PP_AGENDA={recarregar,novo:formEvento,sincronizar:sincronizarAgora,v3:agendaV3,abrir:id=>{const e=todosItens().find(x=>x.id===id);if(e&&agendaV3()&&G3.painel)abrirPainelAgV3(e,null);else if(e)abrir(e)},ir:(d,modo)=>{if(d)A.ref=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(modo){A.modo=modo;try{localStorage.setItem("pp-agenda-modo",modo)}catch(_){}}irPara("agenda")}};
+window.PP_AGENDA={recarregar,novo:formEvento,sincronizar:sincronizarAgora,v3:agendaV3,rotuloPeriodo:rotuloPeriodoPTBR,DIAS,abrir:id=>{const e=todosItens().find(x=>x.id===id);if(e&&agendaV3()&&G3.painel)abrirPainelAgV3(e,null);else if(e)abrir(e)},ir:(d,modo)=>{if(d)A.ref=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(modo){A.modo=modo;try{localStorage.setItem("pp-agenda-modo",modo)}catch(_){}}irPara("agenda")}};
 })();

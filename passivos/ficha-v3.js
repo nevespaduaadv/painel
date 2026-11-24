@@ -8,14 +8,89 @@
   "use strict";
   const ligado = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
   const $ = (s, r = document) => r.querySelector(s);
-  const docTxt = (c) => { const d = String(c.cnpj || "").replace(/\D/g, ""); if (!d) return null; const f = typeof fmtDoc === "function" ? fmtDoc(c.cnpj) : c.cnpj; return (c.tipo_pessoa === "PF" || d.length === 11 ? "CPF " : "CNPJ ") + f; };
-  const cidadeTxt = (c) => c.cidade ? c.cidade + (c.uf && !/\/\w\w$/.test(c.cidade) ? "/" + c.uf : "") : null;
+  const STATUS_MAP = { ativo: ["Ativo", "ok"], onboarding: ["Em onboarding", "att"], prospect: ["Prospect", "info"], encerrado: ["Encerrado", "muted"] };
+  const docFmt = (c) => { const d = String(c.cnpj || "").replace(/\D/g, ""); if (!d) return null; const f = typeof fmtDoc === "function" ? fmtDoc(c.cnpj) : c.cnpj; const tipo = c.tipo_pessoa === "PF" || d.length === 11 ? "CPF" : "CNPJ"; return { tipo, valor: f, texto: `${tipo} ${f}` }; };
+  const copiarDoc = (valor, tipo, btn) => {
+    const ok = () => {
+      btn.dataset.copiado = "1";
+      const orig = btn.dataset.orig || btn.textContent;
+      btn.dataset.orig = orig;
+      btn.textContent = "Copiado";
+      if (typeof toast === "function") toast(`${tipo} copiado`);
+      clearTimeout(btn._tCopy);
+      btn._tCopy = setTimeout(() => { delete btn.dataset.copiado; btn.textContent = orig; }, 1600);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(valor).then(ok).catch(() => {
+        try { const ta = el("textarea", { style: "position:fixed;opacity:0" }, valor); document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); ok(); } catch (_) {}
+      });
+    } else {
+      try { const ta = el("textarea", { style: "position:fixed;opacity:0" }, valor); document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); ok(); } catch (_) {}
+    }
+  };
+  const abrirGrupoPop = (c, grupo, btn) => {
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const gNorm = norm(grupo);
+    const membros = (S.clientes || []).filter((x) => norm(x.grupo || x.dados?.grupo) === gNorm).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    const itens = [
+      el("div", { class: "np-fc-pop-t" }, `Grupo econômico · ${grupo} (${membros.length})`),
+      ...membros.map((m) => ({
+        label: m.nome || "(sem nome)",
+        atual: m.id === c.id,
+        title: m.id === c.id ? "Cliente atual" : `Abrir ficha de ${m.nome || "cliente"}`,
+        onclick: () => { if (m.id !== c.id) { S.sel = m.id; render(); } }
+      }))
+    ];
+    NPUI.pop(btn, itens, { role: "menu", label: `Empresas do grupo ${grupo}` });
+  };
 
+  // usada no cabeçalho; tinha sido retirada na 2ª rodada do AI Studio e o cabeçalho novo deixava de aparecer (erro "cidadeTxt is not defined")
+  const cidadeTxt = (c) => c.cidade ? c.cidade + (c.uf && !/\/\w\w$/.test(c.cidade) ? "/" + c.uf : "") : null;
   function cabecalho(c, head) {
     head.dataset.v3 = "1"; head.classList.add("np-ficha-cab");
     const id = head.firstElementChild; if (!id || id.classList.contains("actions")) return;
     const resp = c.responsavel || c.dados?.responsavel || null;
-    const ctx = [docTxt(c), cidadeTxt(c), c.segmento, resp ? "Responsável: " + resp : null].filter(Boolean);
+    const docInfo = docFmt(c);
+    const grupo = String(c.grupo || c.dados?.grupo || "").trim();
+    const stInfo = STATUS_MAP[c.status || "ativo"] || [c.status || "Ativo", "muted"];
+    const metaExtras = [cidadeTxt(c), c.segmento, resp ? "Responsável: " + resp : null].filter(Boolean);
+
+    const idItens = [];
+    if (docInfo) {
+      const btnCopy = el("button", {
+        type: "button",
+        class: "np-fc-copy-btn",
+        title: `Copiar ${docInfo.tipo}`,
+        "aria-label": `Copiar ${docInfo.tipo} ${docInfo.valor}`,
+        onclick: (e) => { e.stopPropagation(); copiarDoc(docInfo.valor, docInfo.tipo, btnCopy); }
+      }, "Copiar");
+      idItens.push(el("span", { class: "np-fc-doc-wrap" }, el("span", {}, docInfo.texto), btnCopy));
+    }
+    if (grupo) {
+      const norm = (s) => String(s || "").trim().toLowerCase();
+      const qtdGrupo = (S.clientes || []).filter((x) => norm(x.grupo || x.dados?.grupo) === norm(grupo)).length;
+      const btnGrupo = el("button", {
+        type: "button",
+        class: "np-fc-grupo-btn",
+        title: "Ver empresas do grupo econômico",
+        onclick: (e) => { e.stopPropagation(); abrirGrupoPop(c, grupo, btnGrupo); }
+      }, `Grupo: ${grupo}` + (qtdGrupo > 1 ? ` (${qtdGrupo})` : ""));
+      idItens.push(btnGrupo);
+    }
+    if (c.pasta_drive_url) {
+      idItens.push(el("a", {
+        class: "np-fc-drive-link",
+        href: c.pasta_drive_url,
+        target: "_blank",
+        rel: "noopener",
+        title: "Abrir pasta do cliente no Google Drive"
+      }, "Pasta no Drive ↗"));
+    }
+    if (metaExtras.length) {
+      if (idItens.length) idItens.push(el("span", { class: "np-fc-id-sep", "aria-hidden": "true" }, "·"));
+      idItens.push(el("span", {}, metaExtras.join(" · ")));
+    }
+
     // valor e marcas: as MESMAS contas da Carteira V3.1 (PP_CARTEIRA_V3), que repetem as da V2
     const reg = window.PP_CARTEIRA_V3?.registro?.(c.id) || null;
     const marcas = reg && window.PP_CARTEIRA_V3?.marcas ? window.PP_CARTEIRA_V3.marcas(reg) : [];
@@ -23,9 +98,11 @@
       ? el("span", { class: "np-ficha-val", title: "saldo em contratos ativos" }, el("b", {}, NPUI.brl(reg.total)), ` em ${reg.ks.length} contrato${reg.ks.length === 1 ? "" : "s"} ativo${reg.ks.length === 1 ? "" : "s"}`)
       : el("span", { class: "np-ficha-val vazio" }, "sem contratos ativos")) : null;
     id.classList.add("np-ficha-id");
-    id.replaceChildren(el("h1", { class: "np-ficha-nome" }, c.nome || "(sem nome)"),
-      ctx.length ? el("p", { class: "np-ficha-ctx" }, ctx.join(" · ")) : null,
-      valor || marcas.length ? el("div", { class: "np-ficha-marcas" }, valor, ...marcas) : null);
+    id.replaceChildren(
+      el("div", { class: "np-fc-head-top" }, el("h1", { class: "np-ficha-nome" }, c.nome || "(sem nome)"), NPUI.marca(stInfo[0], stInfo[1])),
+      idItens.length ? el("div", { class: "np-fc-id-row" }, ...idItens) : null,
+      valor || marcas.length ? el("div", { class: "np-ficha-marcas" }, valor, ...marcas) : null
+    );
     const acts = head.querySelector(":scope > .actions");
     if (acts) { acts.classList.add("np-ficha-acoes"); acts.querySelectorAll(".btn").forEach((b) => b.classList.add("np-ficha-b")); }
   }

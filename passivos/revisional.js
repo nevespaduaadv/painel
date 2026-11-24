@@ -125,10 +125,44 @@ function calcular(e,media,selic){
 }
 
 // ---------- tela ----------
+const rvV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+
 function renderRevisional(){
   const v=$("#view-revisional");if(!v)return;v.replaceChildren();
-  if(!V.ok){v.append(el("div",{class:"note"},"Carregando…"));carregar().then(()=>{if(V.abrirContrato){abrirContrato(V.abrirContrato);V.abrirContrato=null}render()});return}
+  const v3=rvV3();
+  v.classList.toggle("np-v3",v3);
+  if(!V.ok){v.append(v3?NPUI.carregando(5):el("div",{class:"note"},"Carregando…"));carregar().then(()=>{if(V.abrirContrato){abrirContrato(V.abrirContrato);V.abrirContrato=null}render()});return}
   if(V.contrato){renderCalculadora(v);return}
+  if(v3){
+    const concl=V.lista.filter(r=>r.status==="concluida").length;
+    const rasc=V.lista.length-concl;
+    v.append(NPUI.toolbar({
+      resumo:NPUI.resumo([
+        {n:V.lista.length,label:V.lista.length===1?"revisão":"revisões"},
+        ...(concl?[{n:concl,label:concl===1?"concluída":"concluídas",tom:"ok"}]:[]),
+        ...(rasc?[{n:rasc,label:rasc===1?"rascunho":"rascunhos",tom:"att"}]:[])
+      ]),
+      direita:[NPUI.btn("+ Nova revisão",{variante:"pri",onclick:novaRevisao})]
+    }));
+    if(!V.lista.length){
+      v.append(NPUI.vazio({titulo:"Nenhuma revisão cadastrada",texto:"Clique em “+ Nova revisão” ou abra um contrato do cliente para iniciar a triagem técnica."}));
+    }else{
+      const rows=V.lista.map(r=>{
+        const achados=[r.constatadas?`${r.constatadas} constatada${r.constatadas>1?"s":""}`:null,r.indicios?`${r.indicios} indício${r.indicios>1?"s":""}`:null].filter(Boolean).join(" · ")||"Sem teses marcadas";
+        const dt=new Date(r.updated_at).toLocaleDateString("pt-BR");
+        return NPUI.linha({
+          id:String(r.id),
+          prazo:{curta:dt.slice(0,5),exata:dt},
+          titulo:`${r.cliente_nome||"—"} — ${r.banco||"—"}`,
+          contexto:[PRODUTOS[r.produto]||r.produto||null,r.titulo||null,achados,r.criado_por_nome||null].filter(Boolean).join(" · "),
+          direita:[r.status==="concluida"?NPUI.marca("Concluída","ok"):NPUI.marca("Rascunho","att")],
+          onOpen:()=>abrirRevisao(r)
+        });
+      });
+      v.append(NPUI.grupo({id:"rv-lista",titulo:"Revisões contratuais",n:rows.length,itens:rows}));
+    }
+    return;
+  }
   v.append(el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Revisional de contratos"),el("p",{class:"note"},"Compare os encargos do contrato com a taxa média do BACEN na data da contratação e marque as teses revisionais do escritório. Triagem técnica: o enquadramento final é do advogado.")),
     el("div",{class:"actions"},el("button",{class:"btn primary",onclick:novaRevisao},"+ Nova revisão"))));
   const sec=el("section",{class:"card section"},el("h3",{},`Revisões (${V.lista.length})`));
@@ -163,6 +197,28 @@ function recalcular(){V.res=calcular(V.ent,V.media,V.selic);const out=$("#rv-out
 
 function renderCalculadora(v){
   const k=V.contrato,e=V.ent,r=V.res||{};const c=S.clientes.find(x=>x.id===k.clienteId);
+  const v3=rvV3();
+  if(v3){
+    const meta=[PRODUTOS[k.produto]||k.produto||null,GARANTIAS[k.garantia]||null,`valor original ${BRL(+k.valorOriginal||0)}`,k.dataContrato?"contratado em "+k.dataContrato.split("-").reverse().join("/"):null].filter(Boolean).join(" · ");
+    v.append(NPUI.toolbar({
+      resumo:el("div",{class:"np-tb-esq"},
+        NPUI.btn("← Revisões",{onclick:()=>{V.contrato=null;V.rev=null;render()}}),
+        NPUI.sepv(),
+        el("div",{class:"np-calc-head"},el("b",{},`${c?.nome||"Cliente"} — ${k.banco||"Banco"}`),el("span",{class:"np-ts-sub"},meta))
+      ),
+      direita:[
+        NPUI.btn("Abrir cliente",{onclick:()=>{S.tab="clientes";S.sel=k.clienteId;S.sub="contratos";render()}}),
+        NPUI.btn("Parecer",{onclick:parecer}),
+        window.PP_PECAS?NPUI.btn("Gerar peça (.docx)",{onclick:()=>PP_PECAS.abrir(contextoPeca())}):null,
+        NPUI.btn("Salvar",{onclick:()=>salvar(false)}),
+        NPUI.btn("Concluir revisão",{variante:"pri",onclick:()=>salvar(true)})
+      ].filter(Boolean)
+    }));
+    v.append(renderEntradas());
+    v.append(el("div",{id:"rv-out",style:"display:contents"},renderResultado(r),renderTeses(r)));
+    v.append(el("div",{class:"np-form-leitura np-calc-disclaimer"},"A comparação com a taxa média é um indicador inicial, não uma conclusão (Tema 27/STJ; Tema 1.378/STJ pendente). Para cliente PJ, o CDC só se aplica com vulnerabilidade demonstrada. A quantificação de capitalização e excesso depende de perícia contábil sobre a evolução do saldo."));
+    return;
+  }
   v.append(el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Jurídico · Revisional"),el("h1",{},`${c?.nome||"Cliente"} — ${k.banco||"Banco"}`),el("p",{class:"note"},`${PRODUTOS[k.produto]||k.produto||""} · ${GARANTIAS[k.garantia]||""} · valor original ${BRL(+k.valorOriginal||0)}${k.dataContrato?" · contratado em "+k.dataContrato.split("-").reverse().join("/"):""}`)),
     el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>{V.contrato=null;V.rev=null;render()}},"← Revisões"),el("button",{class:"btn",onclick:()=>{S.tab="clientes";S.sel=k.clienteId;S.sub="contratos";render()}},"Abrir cliente"),el("button",{class:"btn",onclick:parecer},"Parecer (imprimir)"),window.PP_PECAS?el("button",{class:"btn",onclick:()=>PP_PECAS.abrir(contextoPeca())},"Gerar peça (.docx)"):null,el("button",{class:"btn primary",onclick:()=>salvar(false)},"Salvar"),el("button",{class:"btn gold",onclick:()=>salvar(true)},"Concluir revisão"))));
   v.append(renderEntradas());
@@ -171,7 +227,7 @@ function renderCalculadora(v){
 }
 function campo(label,input,help){return field("rv-"+label.replace(/\W+/g,"-").toLowerCase(),label,input,help)}
 function renderEntradas(){
-  const e=V.ent;const on=(inpt,fn)=>{inpt.addEventListener("change",()=>{fn(inpt.value);recalcular()});return inpt};
+  const e=V.ent;const v3=rvV3();const on=(inpt,fn)=>{inpt.addEventListener("change",()=>{fn(inpt.value);recalcular()});return inpt};
   const serie=sel(Object.fromEntries(V.series.filter(s=>s.grupo!=="referencia").map(s=>[s.codigo,`${s.codigo} · ${s.nome}`])),String(e.serie));serie.onchange=()=>{e.serie=+serie.value;atualizarMedia()};
   const data=inp("date",e.data);data.onchange=()=>{e.data=data.value;atualizarMedia()};
   const sistema=on(sel({price:"Price (parcelas fixas)",sac:"SAC (amortização constante)",rotativo:"Rotativo (limite / conta)"},e.sistema),v=>e.sistema=v);
@@ -179,54 +235,90 @@ function renderEntradas(){
   const t=(k)=>on(inp("number",e.tarifas[k]||"",{step:"0.01",min:"0"}),v=>e.tarifas[k]=+v||0);
   const o3=(k,opts)=>on(sel(opts,e[k]),v=>e[k]=v);
   const SNN={sim:"Sim",nao:"Não",nao_sei:"Não sei / verificar"};
-  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h3",{},"1. Dados do contrato"),el("span",{class:"note"},"Taxas em % · valores em R$")));
+  const sec=el("section",{class:v3?"np-cfg-sec np-form-leitura":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"1. Dados do contrato"),el("p",{class:"desc"},"Taxas em % · valores em R$")))
+      :el("div",{class:"section-h"},el("h3",{},"1. Dados do contrato"),el("span",{class:"note"},"Taxas em % · valores em R$")));
   sec.append(el("div",{class:"form"},campo("Série do BACEN (modalidade)",serie,"Taxa média mensal, recursos livres, PJ"),campo("Data da contratação",data),campo("Valor liberado",n("valor",{step:"100"})),campo("Sistema",sistema),campo("Prazo (meses)",n("prazo",{step:"1"})),
     campo("Taxa mensal contratada (%)",n("taxaMensal",{step:"0.0001"})),campo("Taxa anual contratada (%)",n("taxaAnual",{step:"0.0001"}),"Como consta no contrato"),campo("Parcela contratual (R$)",n("parcela",{step:"0.01"}),"Opcional: para a taxa implícita (TIR)"),campo("Valor financiado (R$)",n("valorFinanciado",{step:"0.01"}),"Liberado + IOF/tarifas/seguro financiados; vazio = valor liberado"),campo("Carência (meses até a 1ª parcela, além de 1)",n("carencia",{step:"1",min:"0"}),"Ex.: 1ª parcela 90 dias após = 2"),campo("CET anual informado (%)",n("cet",{step:"0.0001"})),
     campo("Cláusula expressa de capitalização",o3("clausulaCap",{sim:"Sim, expressa (mensal)",nao:"Não há",nao_consta:"Não verifiquei ainda"})),campo("Capitalização diária prevista",o3("capDiaria",{nao:"Não",sim:"Sim"})),campo("Porte da empresa",o3("porte",{me_epp:"ME / EPP",medio:"Médio porte",grande:"Grande porte"}),"Afeta CET e CDC")));
-  sec.append(el("h3",{style:"margin-top:14px"},"2. Encargos de inadimplência"),el("div",{class:"form"},campo("Juros de mora (% a.m.)",n("moraJuros",{step:"0.01"})),campo("Multa moratória (%)",n("multa",{step:"0.01"})),campo("Comissão de permanência prevista",o3("comissaoPerm",{nao:"Não",sim:"Sim"})),campo("Cumulada com juros/multa/correção",o3("comissaoCumulada",{nao:"Não",sim:"Sim"}))));
-  sec.append(el("h3",{style:"margin-top:14px"},"3. Tarifas e produtos embutidos (R$)"),el("div",{class:"form"},campo("TAC (abertura de crédito)",t("tac")),campo("TEC (emissão de boleto/carnê)",t("tec")),campo("Tarifa de cadastro",t("cadastro")),campo("Tarifa de avaliação do bem",t("avaliacao")),campo("Registro do contrato",t("registro")),campo("Seguro prestamista",t("seguro")),campo("IOF financiado",t("iof")),campo("Outras tarifas",t("outras")),
+  sec.append(v3?el("div",{class:"np-cfg-sh np-calc-subh"},el("h2",{},"2. Encargos de inadimplência")):el("h3",{style:"margin-top:14px"},"2. Encargos de inadimplência"),
+    el("div",{class:"form"},campo("Juros de mora (% a.m.)",n("moraJuros",{step:"0.01"})),campo("Multa moratória (%)",n("multa",{step:"0.01"})),campo("Comissão de permanência prevista",o3("comissaoPerm",{nao:"Não",sim:"Sim"})),campo("Cumulada com juros/multa/correção",o3("comissaoCumulada",{nao:"Não",sim:"Sim"}))));
+  sec.append(v3?el("div",{class:"np-cfg-sh np-calc-subh"},el("h2",{},"3. Tarifas e produtos embutidos (R$)")):el("h3",{style:"margin-top:14px"},"3. Tarifas e produtos embutidos (R$)"),
+    el("div",{class:"form"},campo("TAC (abertura de crédito)",t("tac")),campo("TEC (emissão de boleto/carnê)",t("tec")),campo("Tarifa de cadastro",t("cadastro")),campo("Tarifa de avaliação do bem",t("avaliacao")),campo("Registro do contrato",t("registro")),campo("Seguro prestamista",t("seguro")),campo("IOF financiado",t("iof")),campo("Outras tarifas",t("outras")),
     campo("Cliente já tinha relacionamento com o banco",o3("relacionamentoAnterior",SNN)),campo("Avaliação/registro comprovados (laudo, registro)",o3("avaliacaoComprovada",SNN)),campo("Seguro com livre escolha / possibilidade de recusa",o3("seguroOpcional",SNN))));
   return sec;
 }
 const PILL={forte:["e3","Indício forte"],indicio:["e2","Indício"],dentro:["e1","Dentro da média"]};
+const PILL_TOM={forte:"crit",indicio:"att",dentro:"ok"};
 function renderResultado(r){
-  const e=V.ent;const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h3",{},"4. Resultado"),el("span",{class:"note"},r.serieNome?`Série ${e.serie} · ${r.serieNome}`:"")));
-  if(V.carregandoMedia){sec.append(el("div",{class:"note"},"Consultando o BACEN…"));return sec}
-  if(V.erroMedia)sec.append(el("div",{class:"note",style:"color:var(--crit)"},V.erroMedia));
-  const kpi=(l,v,h)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v"},v),h?el("div",{class:"h"},h):null);
+  const e=V.ent;const v3=rvV3();
+  const sec=el("section",{class:v3?"np-cfg-sec":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"4. Resultado"),r.serieNome?el("p",{class:"desc"},`Série ${e.serie} · ${r.serieNome}`):null))
+      :el("div",{class:"section-h"},el("h3",{},"4. Resultado"),el("span",{class:"note"},r.serieNome?`Série ${e.serie} · ${r.serieNome}`:"")));
+  if(V.carregandoMedia){sec.append(v3?NPUI.carregando(3):el("div",{class:"note"},"Consultando o BACEN…"));return sec}
+  if(V.erroMedia)sec.append(el("div",{class:v3?"np-calc-alerta crit":"note",style:v3?"":"color:var(--crit)"},V.erroMedia));
   const mes=r.mes?fmtMes(r.mes):"—";
-  sec.append(el("div",{class:"kpis rv-kpis"},
-    kpi("Taxa contratada",pc(num(e.taxaMensal),2)+" a.m.",r.taxaAA!=null?`${pc(r.taxaAA,2)} a.a. equivalente`:"informe a taxa mensal"),
-    kpi(`Média BACEN · ${mes}`,r.media!=null?pc(r.media,2)+" a.m.":"—",r.mediaAA!=null?`${pc(r.mediaAA,2)} a.a. · ${(V.ctx||[]).map(x=>`${x.mes.slice(0,2)}: ${x.valor?.toFixed(2)}`).join(" · ")}`:"sem dado do mês"),
-    kpi("Razão contratada ÷ média",r.razao!=null?r.razao.toLocaleString("pt-BR",{maximumFractionDigits:2})+"×":"—",r.classe?el("span",{class:"pill "+PILL[r.classe][0]},PILL[r.classe][1]):"—"),
-    r.tetoPronampe?kpi("Teto Pronampe",pc(r.tetoPronampe.am,2)+" a.m.",`Selic ${pc(r.tetoPronampe.selic,2)} + ${r.tetoPronampe.spread}% a.a. · ${r.acimaTeto?"ACIMA do teto":"dentro do teto"}`):
-    kpi("Capitalização (duodécuplo)",r.duodecuplo!=null?`12× = ${pc(r.duodecuplo,2)}`:"—",r.capSituacao?({sem_anual:"Contrato sem taxa anual: falta de transparência",proporcional:"Anual = 12× mensal: capitalização NÃO presumida",presume:`Anual entre 12× e ${pc(r.equivalente,2)}: presume pactuação (Súm. 541)`,acima_equivalente:`Anual acima da equivalente (${pc(r.equivalente,2)}): inconsistência, verificar`,abaixo:"Anual abaixo de 12× a mensal: verificar"})[r.capSituacao]:"")));
+  const capHint=r.capSituacao?({sem_anual:"Contrato sem taxa anual: falta de transparência",proporcional:"Anual = 12× mensal: capitalização NÃO presumida",presume:`Anual entre 12× e ${pc(r.equivalente,2)}: presume pactuação (Súm. 541)`,acima_equivalente:`Anual acima da equivalente (${pc(r.equivalente,2)}): inconsistência, verificar`,abaixo:"Anual abaixo de 12× a mensal: verificar"})[r.capSituacao]:"";
+
+  if(v3){
+    const kpiV3=(l,val,h,tom)=>el("div",{},el("div",{class:"k"},l),el("div",{class:"v"+(tom?" "+tom:"")},val),h?el("div",{class:"h"},h):null);
+    sec.append(el("div",{class:"np-gestao-kpi-band"},
+      kpiV3("Taxa contratada",pc(num(e.taxaMensal),2)+" a.m.",r.taxaAA!=null?`${pc(r.taxaAA,2)} a.a. equivalente`:"informe a taxa mensal"),
+      kpiV3(`Média BACEN · ${mes}`,r.media!=null?pc(r.media,2)+" a.m.":"—",r.mediaAA!=null?`${pc(r.mediaAA,2)} a.a. · ${(V.ctx||[]).map(x=>`${x.mes.slice(0,2)}: ${x.valor?.toFixed(2)}`).join(" · ")}`:"sem dado do mês"),
+      kpiV3("Razão contratada ÷ média",r.razao!=null?r.razao.toLocaleString("pt-BR",{maximumFractionDigits:2})+"×":"—",r.classe?NPUI.marca(PILL[r.classe][1],PILL_TOM[r.classe]):"—",r.classe?PILL_TOM[r.classe]:""),
+      r.tetoPronampe?kpiV3("Teto Pronampe",pc(r.tetoPronampe.am,2)+" a.m.",`Selic ${pc(r.tetoPronampe.selic,2)} + ${r.tetoPronampe.spread}% a.a. · ${r.acimaTeto?"ACIMA do teto":"dentro do teto"}`,r.acimaTeto?"crit":"ok"):
+      kpiV3("Capitalização (duodécuplo)",r.duodecuplo!=null?`12× = ${pc(r.duodecuplo,2)}`:"—",capHint)
+    ));
+  }else{
+    const kpi=(l,v,h)=>el("div",{class:"card kpi"},el("div",{class:"l"},l),el("div",{class:"v"},v),h?el("div",{class:"h"},h):null);
+    sec.append(el("div",{class:"kpis rv-kpis"},
+      kpi("Taxa contratada",pc(num(e.taxaMensal),2)+" a.m.",r.taxaAA!=null?`${pc(r.taxaAA,2)} a.a. equivalente`:"informe a taxa mensal"),
+      kpi(`Média BACEN · ${mes}`,r.media!=null?pc(r.media,2)+" a.m.":"—",r.mediaAA!=null?`${pc(r.mediaAA,2)} a.a. · ${(V.ctx||[]).map(x=>`${x.mes.slice(0,2)}: ${x.valor?.toFixed(2)}`).join(" · ")}`:"sem dado do mês"),
+      kpi("Razão contratada ÷ média",r.razao!=null?r.razao.toLocaleString("pt-BR",{maximumFractionDigits:2})+"×":"—",r.classe?el("span",{class:"pill "+PILL[r.classe][0]},PILL[r.classe][1]):"—"),
+      r.tetoPronampe?kpi("Teto Pronampe",pc(r.tetoPronampe.am,2)+" a.m.",`Selic ${pc(r.tetoPronampe.selic,2)} + ${r.tetoPronampe.spread}% a.a. · ${r.acimaTeto?"ACIMA do teto":"dentro do teto"}`):
+      kpi("Capitalização (duodécuplo)",r.duodecuplo!=null?`12× = ${pc(r.duodecuplo,2)}`:"—",capHint)));
+  }
+
   const linhas=[];
   if(r.contratada){const cen=[["Contratada ("+(e.sistema==="sac"?"SAC":"Price")+")",r.contratada],["Sem capitalização (juros simples sobre saldo, SAC)",r.semCapitalizacao],r.pelaMedia?[`Pela média BACEN (${pc(r.media,2)} a.m.)`,r.pelaMedia]:null].filter(Boolean);
-    linhas.push(el("table",{class:"tbl"},el("thead",{},el("tr",{},el("th",{},"Cenário"),el("th",{},"1ª parcela"),el("th",{},"Total pago"),el("th",{},"Juros"),el("th",{},"Diferença"))),el("tbody",{},cen.map(([l,x])=>el("tr",{},el("td",{},l),el("td",{class:"num"},brl(x.parcela)),el("td",{class:"num"},brl(x.total)),el("td",{class:"num"},brl(x.juros)),el("td",{class:"num"},x===r.contratada?"—":brl(r.contratada.juros-x.juros)))))));
-    if(r.tir!=null)linhas.push(el("div",{class:"note"},`Taxa implícita da parcela informada (TIR, base ${brl(r.valorBase)}${r.carencia?`, carência ${r.carencia} mês(es)`:""}): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.10?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente (confira valor financiado e carência antes de concluir)":r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p. — diferença pequena, compatível com contagem de dias do 1º período; confirmar pelos extratos":"compatível com a contratada"}.`));
-    if(r.encargosFinanciados)linhas.push(el("div",{class:"note"},`Encargos financiados no principal: ${brl(r.encargosFinanciados)} — os juros incidem também sobre IOF/tarifas (base de juros ${brl(r.valorBase)}).`));
-  }else if(r.rotativo){linhas.push(el("div",{class:"note"},`Rotativo: juros de ${brl(r.rotativo.jurosMes)}/mês sobre ${brl(num(e.valor))} (${brl(r.rotativo.juros12)} em 12 meses)${r.rotativo.jurosMesMedia!=null?` · pela média seriam ${brl(r.rotativo.jurosMesMedia)}/mês (${brl(r.rotativo.juros12Media)} em 12 meses)`:""}.`))}
-  else linhas.push(el("div",{class:"note"},"Informe valor, prazo e taxa mensal para simular as parcelas."));
+    const tbl=el("table",{class:v3?"np-ts-tbl":"tbl"},el("thead",{},el("tr",{},el("th",{},"Cenário"),el("th",{class:v3?"r":""},"1ª parcela"),el("th",{class:v3?"r":""},"Total pago"),el("th",{class:v3?"r":""},"Juros"),el("th",{class:v3?"r":""},"Diferença"))),el("tbody",{},cen.map(([l,x])=>el("tr",{},el("td",{},l),el("td",{class:v3?"r":"num"},brl(x.parcela)),el("td",{class:v3?"r":"num"},brl(x.total)),el("td",{class:v3?"r":"num"},brl(x.juros)),el("td",{class:v3?"r":"num"},x===r.contratada?"—":brl(r.contratada.juros-x.juros))))));
+    linhas.push(v3?el("div",{class:"np-ts-tbl-wrap"},tbl):tbl);
+    if(r.tir!=null)linhas.push(el("div",{class:v3?"np-calc-nota np-form-leitura":"note"},`Taxa implícita da parcela informada (TIR, base ${brl(r.valorBase)}${r.carencia?`, carência ${r.carencia} mês(es)`:""}): ${pc(r.tir,3)} a.m. — ${r.tirDif>0.10?"acima da contratada em "+pc(r.tirDif,3)+" p.p.: indício de cobrança divergente (confira valor financiado e carência antes de concluir)":r.tirDif>0.05?"acima da contratada em "+pc(r.tirDif,3)+" p.p. — diferença pequena, compatível com contagem de dias do 1º período; confirmar pelos extratos":"compatível com a contratada"}.`));
+    if(r.encargosFinanciados)linhas.push(el("div",{class:v3?"np-calc-nota np-form-leitura":"note"},`Encargos financiados no principal: ${brl(r.encargosFinanciados)} — os juros incidem também sobre IOF/tarifas (base de juros ${brl(r.valorBase)}).`));
+  }else if(r.rotativo){linhas.push(el("div",{class:v3?"np-calc-nota np-form-leitura":"note"},`Rotativo: juros de ${brl(r.rotativo.jurosMes)}/mês sobre ${brl(num(e.valor))} (${brl(r.rotativo.juros12)} em 12 meses)${r.rotativo.jurosMesMedia!=null?` · pela média seriam ${brl(r.rotativo.jurosMesMedia)}/mês (${brl(r.rotativo.juros12Media)} em 12 meses)`:""}.`))}
+  else linhas.push(el("div",{class:v3?"np-ts-sub":"note"},"Informe valor, prazo e taxa mensal para simular as parcelas."));
   const tar=r.tarifas?Object.values(r.tarifas).reduce((a,b)=>a+b,0):0;
-  if(tar)linhas.push(el("div",{class:"note"},`Tarifas e produtos embutidos: ${brl(tar)} · repetição potencial com as respostas atuais: ${brl(r.repeticaoPotencial||0)}${r.iofEsperado!=null&&r.tarifas.iof?` · IOF esperado ≈ ${brl(r.iofEsperado)}${r.iofAcima?" (cobrado acima)":""}`:""}.`));
+  if(tar)linhas.push(el("div",{class:v3?"np-calc-nota np-form-leitura":"note"},`Tarifas e produtos embutidos: ${brl(tar)} · repetição potencial com as respostas atuais: ${brl(r.repeticaoPotencial||0)}${r.iofEsperado!=null&&r.tarifas.iof?` · IOF esperado ≈ ${brl(r.iofEsperado)}${r.iofAcima?" (cobrado acima)":""}`:""}.`));
   sec.append(el("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:12px"},linhas));
   return sec;
 }
 const ST={constatada:["e3","Constatada"],indicio:["e2","Indício"],nao_aplica:["e1","Não se aplica"],verificar:["g","Verificar"]};
+const ST_TOM={constatada:"crit",indicio:"att",nao_aplica:"ok",verificar:"muted"};
 const ACOL={alto:"acolhimento alto",medio_alto:"acolhimento médio-alto",medio:"acolhimento médio",em_queda:"acolhimento em queda",informativo:"informativo"};
 function statusDe(t,r){const m=V.teseStatus[t.codigo];if(m&&!m.automatico)return m.status;return (r.auto&&r.auto[t.codigo])||(m?m.status:"verificar")}
 function renderTeses(r){
-  const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h3",{},"5. Teses revisionais"),el("span",{class:"note"},"Automáticas vêm da calculadora; as demais o advogado marca. Alterar manualmente sobrepõe o automático.")));
+  const v3=rvV3();
+  const sec=el("section",{class:v3?"np-cfg-sec np-form-leitura":"card section"},
+    v3?el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"5. Teses revisionais"),el("p",{class:"desc"},"Automáticas vêm da calculadora; as demais o advogado marca. Alterar manualmente sobrepõe o automático.")))
+      :el("div",{class:"section-h"},el("h3",{},"5. Teses revisionais"),el("span",{class:"note"},"Automáticas vêm da calculadora; as demais o advogado marca. Alterar manualmente sobrepõe o automático.")));
   const grupos=[["encargos","Encargos do período de normalidade"],["mora","Encargos de inadimplência"],["tarifas","Tarifas e produtos embutidos"],["processual","Título, procedimento e garantias"]];
   for(const [g,label] of grupos){const ts=V.teses.filter(t=>t.grupo===g);if(!ts.length)continue;
-    sec.append(el("h4",{style:"margin:14px 0 6px"},label));
+    sec.append(el("h4",{class:v3?"np-rv-gh":"",style:v3?"":"margin:14px 0 6px"},label));
     sec.append(el("div",{class:"rv-teses"},ts.map(t=>{const st=statusDe(t,r);const m=V.teseStatus[t.codigo]||{};const auto=r.auto&&t.codigo in r.auto;
       const s=sel(Object.fromEntries(Object.entries(ST).map(([k,v])=>[k,v[1]])),st);s.onchange=()=>{V.teseStatus[t.codigo]={...m,status:s.value,automatico:false};const out=$("#rv-out");if(out)out.lastChild.replaceWith(renderTeses(V.res||{}));else render()};
       const nota=el("textarea",{rows:"1",placeholder:"Nota / fundamento do caso"},m.nota||"");nota.onchange=()=>{V.teseStatus[t.codigo]={...(V.teseStatus[t.codigo]||{status:st,automatico:auto&&!m.status}),nota:nota.value}};
       const imp=r.impactos&&r.impactos[t.codigo];
-      return el("div",{class:"rv-tese rv-"+st},el("div",{class:"rv-tese-h"},el("span",{class:"pill "+ST[st][0]},ST[st][1]),el("b",{},t.nome),auto&&!(m.status&&!m.automatico)?el("span",{class:"pill c"},"auto"):null,t.acolhimento?el("span",{class:"note"},ACOL[t.acolhimento]):null,imp!=null?el("span",{class:"note num"},`· impacto ≈ ${brl(imp)}`):null),
-        el("div",{class:"note"},t.fundamento),t.descricao?el("div",{class:"note",style:"color:var(--faint)"},t.descricao):null,t.alerta?el("div",{class:"note",style:"color:var(--warn)"},"⚠ "+t.alerta):null,
+      return el("div",{class:"rv-tese rv-"+st},
+        el("div",{class:"rv-tese-h"},
+          v3?NPUI.marca(ST[st][1],ST_TOM[st]):el("span",{class:"pill "+ST[st][0]},ST[st][1]),
+          el("b",{},t.nome),
+          auto&&!(m.status&&!m.automatico)?(v3?NPUI.marca("Auto","info"):el("span",{class:"pill c"},"auto")):null,
+          t.acolhimento?el("span",{class:v3?"np-ts-sub":"note"},ACOL[t.acolhimento]):null,
+          imp!=null?el("span",{class:v3?"np-ts-sub np-num":"note num"},`· impacto ≈ ${brl(imp)}`):null
+        ),
+        el("div",{class:v3?"np-ts-sub":"note"},t.fundamento),
+        t.descricao?el("div",{class:v3?"np-ts-sub":"note",style:v3?"":"color:var(--faint)"},t.descricao):null,
+        t.alerta?el("div",{class:v3?"np-calc-alerta att":"note",style:v3?"":"color:var(--warn)"},(v3?"Atenção: ":"⚠ ")+t.alerta):null,
         el("div",{class:"rv-tese-f"},s,nota))})));
   }
   return sec;

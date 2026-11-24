@@ -98,8 +98,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .crumbs .sep{color:var(--faint)}
 .btn-voltar{display:inline-flex}
 .crumbs .crumb-cli{display:none}
-.switch{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;cursor:pointer;user-select:none;white-space:nowrap}
-.switch input{accent-color:var(--gold);width:16px;height:16px}
+.switch{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;line-height:1.3;min-height:24px;cursor:pointer;user-select:none;white-space:nowrap}
+.switch input[type="checkbox"],td input[type="checkbox"]{accent-color:var(--gold);width:16px;height:16px;min-width:16px;min-height:16px;padding:0;margin:0;border:0;background:transparent;flex:none;vertical-align:middle}
 
 .wrap{max-width:1440px;width:100%;margin:0 auto;padding-block:20px 48px;padding-inline:24px}
 @media (max-width:600px){.wrap{padding-inline:14px}}
@@ -244,7 +244,7 @@ td .sub{display:block;font-size:12px;color:var(--faint)}
 .tbl-tools .sp{flex:1}
 .tbl-foot{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:12.5px;color:var(--faint);border-top:1px solid var(--line)}
 td.r,th.r{text-align:right}
-td input{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+td input:not([type="checkbox"]):not([type="radio"]){width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
 
 .empty{padding:28px 20px;text-align:center;color:var(--muted)}
 .empty h3{color:var(--fg);margin-bottom:6px}
@@ -990,8 +990,177 @@ function spark(vals,atual){
 }
 
 /* ---------- Regras ---------- */
+const regrasV3=()=>!!window.NPUI?.ativo?.();
+const REGRAS_NUM_META=[
+  ["minDiasAtraso","Mínimo de dias de atraso para projetar","Antes disso o painel mostra só a data de abertura da janela."],
+  ["minRefs","Mínimo de acordos do credor para usar a mediana dele","Abaixo disso usa o grupo."],
+  ["descontoBase","Desconto base regulatório (p.p. sobre a provisão)","Só quando não há histórico."],
+  ["fatorParcelado","Cenário parcelado (p.p. em relação ao à vista)","Usado quando o credor não tem acordo parcelado na base."],
+  ["amplitude","Amplitude da faixa (± p.p.)","Com 3+ referências a faixa vira o intervalo interquartil."],
+  ["tetoDesconto","Teto de desconto (%)",""],
+  ["margemReserva","Margem de segurança da reserva (%)",""],
+  ["prazoReservaPadrao","Prazo de reserva sem data de atraso (meses)","Com data de atraso o prazo é automático: meses até a janela típica de acordo. Pode ser fixado por contrato."],
+  ["janelaMesesPrivado","Janela típica de acordo — banco privado (meses de atraso)",""],
+  ["janelaMesesPublico","Janela típica de acordo — banco público (meses de atraso)","BB, Caixa, BNB, Banrisul…"],
+  ["prazoReservaMinimo","Prazo mínimo de reserva (meses)",""],
+  ["descontoGarantiaReal","Garantia real: desconto provável (%)","Alienação fiduciária/hipoteca: projeção conservadora e alerta de risco de perda do bem."],
+  ["amplitudeGarantiaReal","Garantia real: amplitude da faixa (p.p.)",""],
+  ["diasSemRegistro","Alerta: dias sem registro na timeline","Usado pelo dashboard de gestão para apontar clientes parados."],
+  ["atualizacaoMensal","Atualização do saldo em atraso (% a.m.)","Juros de mora + correção para estimar a dívida na data-alvo. Padrão 1% a.m.; pode ser sobrescrito por contrato."]
+];
+const REGRAS_FATOR_META=()=>[
+  ["fatoresGarantia","Fator por garantia",GARANTIAS,"“risco” = garantia real (alienação fiduciária/hipoteca): alerta de perda do bem e projeção conservadora. “travar” desliga a projeção."],
+  ["fatoresGrupo","Fator por grupo de credor (base regulatória)",GRUPOS,"Cooperativas negociam menos desconto que bancos de varejo (41–67% × 79–97% no histórico)."],
+  ["fatoresTitular","Fator por titular",TITULARES,"Para PJ o painel aplica ajuste específico até haver base própria."],
+  ["fatoresProduto","Fator por produto",PRODUTOS,""],
+  ["fatoresSituacao","Fator por situação",SITUACOES,"Fatores de ajuste por fase administrativa ou execução."],
+  ["fatoresBanco","Fator por banco",null,"Flexibilidade observada por instituição. Comece em 0 e calibre com os acordos reais."]
+];
+const R3_CFG={draft:null,aba:"parametros",baseJson:null};
+function garantirDraftRegras(){
+  const curJson=JSON.stringify(S.regras);
+  if(!R3_CFG.draft||(!diffRegras(S.regras,R3_CFG.draft).length&&R3_CFG.baseJson!==curJson)){
+    R3_CFG.draft=structuredClone(S.regras);
+    R3_CFG.baseJson=curJson;
+  }
+  return R3_CFG.draft;
+}
+function diffRegras(atual,rascunho){
+  if(!atual||!rascunho)return [];
+  const out=[];
+  for(const [k,label] of REGRAS_NUM_META){
+    if(atual[k]!==rascunho[k])out.push({chave:k,label,anterior:atual[k]??"—",novo:rascunho[k]??"—"});
+  }
+  for(const [fk,titulo,labels] of REGRAS_FATOR_META()){
+    const a=atual[fk]||{},b=rascunho[fk]||{};
+    const keys=new Set([...Object.keys(a),...Object.keys(b)]);
+    for(const k of keys){
+      const va=a[k],vb=b[k];
+      if(va!==vb){
+        const nomeItem=labels&&labels[k]?labels[k]:k;
+        out.push({chave:`${fk}.${k}`,label:`${titulo} · ${nomeItem}`,anterior:va===undefined?"(novo)":va,novo:vb===undefined?"(removido)":vb});
+      }
+    }
+  }
+  return out;
+}
+function descartarDraftRegras(){
+  R3_CFG.draft=structuredClone(S.regras);
+  R3_CFG.baseJson=JSON.stringify(S.regras);
+  render();
+}
+async function aplicarDraftRegras(){
+  if(!R3_CFG.draft)return;
+  S.regras=structuredClone(R3_CFG.draft);
+  R3_CFG.baseJson=JSON.stringify(S.regras);
+  await saveRegras();
+}
+function abrirRevisaoRegrasV3(){
+  const draft=garantirDraftRegras();
+  const diffs=diffRegras(S.regras,draft);
+  if(!diffs.length){toast("Nenhuma alteração pendente");return}
+  const operador=(window.PP?.perfil?.nome||window.PP?.perfil?.email||S.user?.email||"Operador autenticado");
+  const nCli=(S.clientes||[]).filter(c=>c.ativo!==false).length;
+  const host=document.body;
+  const fechar=()=>{bg.remove();document.removeEventListener("keydown",onKey)};
+  const onKey=e=>{if(e.key==="Escape")fechar()};
+  const btnCanc=NPUI.btn("Cancelar",{onclick:fechar});
+  const btnOk=NPUI.btn("Confirmar e aplicar",{variante:"pri",onclick:async()=>{
+    btnOk.disabled=true;btnOk.textContent="Aplicando…";
+    try{await aplicarDraftRegras();fechar()}catch(e){btnOk.disabled=false;btnOk.textContent="Confirmar e aplicar";toast("Não foi possível aplicar")}
+  }});
+  const tbl=el("table",{class:"np-diff-tbl"},
+    el("thead",{},el("tr",{},el("th",{},"Parâmetro"),el("th",{class:"r"},"Anterior → Novo"))),
+    el("tbody",{},diffs.map(d=>el("tr",{},
+      el("td",{},d.label),
+      el("td",{class:"r"},el("span",{class:"np-diff-old"},String(d.anterior)),"→ ",el("span",{class:"np-diff-new"},String(d.novo)))))));
+  const dlg=el("div",{class:"np-alert-dlg",role:"alertdialog","aria-modal":"true","aria-labelledby":"np-regras-rev-tit"},
+    el("div",{class:"np-alert-h"},el("h2",{id:"np-regras-rev-tit"},`Revisar e aplicar ${diffs.length} alteraç${diffs.length===1?"ão":"ões"}`),NPUI.ib("x","Fechar",fechar)),
+    el("div",{class:"np-alert-b"},
+      el("div",{class:"np-diff-meta"},
+        el("div",{},"Estas alterações recalculam imediatamente as projeções de desconto, faixa e janela de acordo para ",el("b",{},nCli?`${nCli} cliente${nCli===1?"":"s"} ativo${nCli===1?"":"s"}`:"toda a carteira"),"."),
+        el("div",{class:"op"},`Operador responsável: ${operador}`)),
+      tbl),
+    el("div",{class:"np-alert-f"},btnCanc,btnOk));
+  const bg=el("div",{class:"np-alert-bg",onclick:e=>{if(e.target===bg)fechar()}},dlg);
+  host.append(bg);
+  document.addEventListener("keydown",onKey);
+  btnCanc.focus?.();
+}
+function renderRegrasV3(v){
+  v.classList.add("np-v3");
+  const D=garantirDraftRegras();
+  const diffs=diffRegras(S.regras,D);
+  const changedSet=new Set(diffs.map(d=>d.chave));
+  const abas=[["parametros","Parâmetros do motor"],["fatores","Fatores de ajuste"],["regulatoria","Tabela regulatória"]];
+  const btnRest=NPUI.btn("Restaurar padrão",{variante:"ghost",onclick:()=>{R3_CFG.draft=structuredClone(REGRAS_PADRAO);render()}});
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo([
+      {n:String(REGRAS_NUM_META.length),label:"parâmetros"},
+      {n:String(Object.keys(D.fatoresBanco||{}).length),label:"bancos"},
+      diffs.length?{n:String(diffs.length),label:diffs.length===1?"pendente":"pendentes",tom:"att"}:{n:"0",label:"pendentes",tom:"zero"}
+    ]),
+    filtros:[NPUI.seg(abas,R3_CFG.aba,k=>{R3_CFG.aba=k;render()},"Seções de regras")],
+    direita:[btnRest]
+  }));
+  if(diffs.length){
+    v.append(el("div",{class:"np-draft-bar",role:"status","aria-live":"polite"},
+      el("span",{},el("b",{},`${diffs.length} alteraç${diffs.length===1?"ão":"ões"} não salva${diffs.length===1?"":"s"}`)," · as projeções da carteira só mudam após revisão e confirmação."),
+      el("div",{class:"acoes"},
+        NPUI.btn("Descartar",{variante:"ghost",onclick:descartarDraftRegras}),
+        NPUI.btn("Revisar e aplicar",{variante:"pri",onclick:abrirRevisaoRegrasV3}))));
+  }
+  if(R3_CFG.aba==="parametros"){
+    const grid=el("div",{class:"np-cfg-grid"},REGRAS_NUM_META.map(([key,label,help])=>{
+      const inpEl=el("input",{id:"r-"+key,type:"number",step:"any",value:D[key]??0,onchange:e=>{D[key]=+e.target.value;render()}});
+      return el("div",{class:"np-cfg-field"+(changedSet.has(key)?" changed":"")},
+        el("label",{for:"r-"+key},label),inpEl,help?el("div",{class:"help"},help):null);
+    }));
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Como o painel projeta"),el("div",{class:"desc"},"1) Com acordos reais do credor, parte da mediana à vista. 2) Sem histórico do credor, usa a mediana do grupo. 3) Sem histórico algum, aplica provisão regulatória + desconto base, somando fatores de garantia, produto, situação, titular e banco."))),
+      grid));
+  }else if(R3_CFG.aba==="fatores"){
+    for(const [fk,titulo,labelsOrig,help] of REGRAS_FATOR_META()){
+      const labels=labelsOrig||Object.fromEntries(Object.keys(D[fk]||{}).map(b=>[b,b]));
+      const sec=el("section",{class:"np-cfg-sec"},
+        el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},titulo),help?el("div",{class:"desc"},help):null)),
+        el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},el("th",{},"Item"),el("th",{class:"r"},"Ajuste (p.p.)"))),
+          el("tbody",{},Object.entries(labels).map(([k,l])=>{
+            const cur=(D[fk]||{})[k];
+            const isChg=changedSet.has(`${fk}.${k}`);
+            return el("tr",{},el("td",{},l),el("td",{class:"r"},el("input",{id:`f-${fk}-${k}`,class:"np-cfg-fator-inp"+(isChg?" changed":""),value:(cur==="travar"||cur==="risco")?cur:(cur??0),onchange:e=>{
+              const t=e.target.value.trim().toLowerCase();
+              D[fk]=D[fk]||{};
+              D[fk][k]=(t==="travar"||t==="risco")?t:(+t||0);
+              render();
+            }})));
+          })))));
+      if(fk==="fatoresBanco"){
+        const inpB=el("input",{id:"novoBanco",placeholder:"Novo banco…"});
+        sec.append(el("div",{class:"np-cfg-add"},inpB,NPUI.btn("+ Adicionar banco",{onclick:()=>{
+          const n=inpB.value.trim();if(!n)return;
+          D.fatoresBanco=D.fatoresBanco||{};
+          if(!(n in D.fatoresBanco))D.fatoresBanco[n]=0;
+          render();
+        }})));
+      }
+      v.append(sec);
+    }
+  }else{
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tabela regulatória (referência)"),el("div",{class:"desc"},"Anexo I da Res. BCB 352/2023: provisão mínima para ativos inadimplidos (atraso > 90 dias) = A + B × meses contados do mês do inadimplemento, até 100%."))),
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Carteira"),el("th",{class:"r"},"A (mês 0)"),el("th",{class:"r"},"B (por mês)"),el("th",{class:"r"},"6 meses"),el("th",{class:"r"},"12 meses"),el("th",{class:"r"},"100% em"))),
+        el("tbody",{},Object.entries(CARTEIRAS).map(([k,c])=>el("tr",{},el("td",{},el("b",{},k)," ",el("span",{class:"np-ts-sub"},c.nome.slice(5))),el("td",{class:"r"},pct(c.A)),el("td",{class:"r"},(c.B*100).toFixed(1)+" p.p."),el("td",{class:"r"},pct(Math.min(1,c.A+c.B*6))),el("td",{class:"r"},pct(Math.min(1,c.A+c.B*12))),el("td",{class:"r"},Math.ceil((1-c.A)/c.B)+" meses"))))))));
+  }
+}
+window.PP_REGRAS_V3={diffRegras,getDraft:()=>garantirDraftRegras(),discardDraft:descartarDraftRegras,openReview:abrirRevisaoRegrasV3,applyDraft:aplicarDraftRegras};
 function renderRegras(){
-  const v=$("#view-regras");v.replaceChildren();const R=S.regras;
+  const v=$("#view-regras");v.replaceChildren();
+  if(regrasV3()){renderRegrasV3(v);return}
+  v.classList.remove("np-v3");
+  const R=S.regras;
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Motor de projeção"),el("h1",{},"Regras de projeção"),el("div",{class:"sub"},"Ajustes em pontos percentuais somados à provisão mínima regulatória. Alterações valem para todos os clientes imediatamente."))));
   const g=el("div",{class:"card section"},el("h3",{},"Como o painel projeta"),
     el("div",{class:"note"},"1) Se o credor tem acordos reais na Base de acordos, a projeção parte da mediana dos descontos à vista daquele credor. 2) Se não tem, usa a mediana do grupo (varejo, cooperativa, FIDC…). 3) Sem histórico algum, cai na base regulatória: provisão mínima do banco + desconto base. Em todos os casos somam-se os fatores de garantia, produto, situação, titular e banco."),
@@ -1040,11 +1209,68 @@ function renderHistorico(){
   const v=$("#view-historico");v.replaceChildren();
   const hs=[...S.historico].sort((a,b)=>(b.data||"").localeCompare(a.data||""));
   const fechados=hs.filter(h=>h.status==="fechado");
+  const porCredor={};for(const h of fechados){const k=normBanco(h.credor);(porCredor[k]??={nome:h.credor.split(" (")[0],grupo:h.grupo||grupoBanco(h.credor),av:[],pa:[]});(h.forma==="parcelado"?porCredor[k].pa:porCredor[k].av).push(descOf(h))}
+  const rows=Object.values(porCredor).sort((a,b)=>(b.av.length+b.pa.length)-(a.av.length+a.pa.length));
+
+  if(window.NPUI?.ativo?.()){
+    v.classList.add("np-v3");
+    const avAll=fechados.filter(h=>h.forma!=="parcelado").map(descOf).filter(x=>x!=null);
+    const resumo=NPUI.resumo([
+      {n:fechados.length,label:"acordos fechados",tom:"ok"},
+      {n:hs.length-fechados.length,label:"propostas"},
+      {n:rows.length,label:"credores na base"},
+      avAll.length?{n:pct(mediana(avAll)),label:"mediana à vista"}:null
+    ].filter(Boolean));
+    const dirBruto=(typeof readOnly==="function"&&readOnly())?[]:[NPUI.btn("Registrar acordo",{variante:"pri",icone:"mais",onclick:()=>openHistForm({})})];
+    const direita=window.NPCasca?.acomodar?window.NPCasca.acomodar(dirBruto):dirBruto;
+    v.append(NPUI.toolbar({resumo,direita}));
+    if(rows.length){
+      v.append(el("section",{class:"np-cfg-sec"},
+        el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Resumo por credor"),el("p",{class:"desc"},"Mediana e faixa de desconto dos acordos fechados que alimentam a projeção."))),
+        el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"Grupo"),el("th",{class:"r"},"Acordos"),el("th",{class:"r"},"À vista · mediana"),el("th",{class:"r"},"À vista · faixa"),el("th",{class:"r"},"Parcelado · mediana"))),
+          el("tbody",{},rows.map(r=>el("tr",{},
+            el("td",{},el("b",{},r.nome)),
+            el("td",{class:"np-ts-sub"},GRUPOS[r.grupo]||"—"),
+            el("td",{class:"r num"},String(r.av.length+r.pa.length)),
+            el("td",{class:"r num"},pct(mediana(r.av))),
+            el("td",{class:"r num"},r.av.length?`${pct(Math.min(...r.av))} – ${pct(Math.max(...r.av))}`:"—"),
+            el("td",{class:"r num"},pct(mediana(r.pa)))
+          )))
+        ))
+      ));
+    }
+    if(!hs.length){
+      v.append(NPUI.vazio({titulo:"Nenhum acordo na base",texto:"Registre os acordos já fechados pelo escritório para que a projeção use a experiência real com cada banco."}));
+      return;
+    }
+    const podeEd=!(typeof readOnly==="function"&&readOnly());
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("h2",{},"Todos os acordos"),el("span",{class:"np-ts-sub"},`${hs.length} registros`)),
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Data"),el("th",{},"Credor"),el("th",{},"Produto"),el("th",{},"Titular"),el("th",{},"Fase"),el("th",{class:"r"},"Dívida"),el("th",{class:"r"},"Acordo"),el("th",{class:"r"},"Desconto"),el("th",{},"Forma"),el("th",{},"Status"),podeEd?el("th",{}):null)),
+        el("tbody",{},hs.map(h=>el("tr",{},
+          el("td",{class:"num np-ts-sub"},fmtD(parseD(h.data))),
+          el("td",{},el("b",{},h.credor),h.obs?el("div",{class:"np-ts-sub",style:"max-width:320px"},h.obs):null),
+          el("td",{},PRODUTOS[h.produto]||h.produto||"—"),
+          el("td",{class:"np-ts-sub"},h.titular||"—"),
+          el("td",{class:"np-ts-sub"},FASES[h.fase]||h.fase||"—"),
+          el("td",{class:"r num"},BRL(+h.divida)),
+          el("td",{class:"r num"},BRL(+h.valorAcordo)),
+          el("td",{class:"r num"},el("b",{},pct(descOf(h)))),
+          el("td",{},h.forma==="parcelado"?`${h.parcelas?h.parcelas+"x":"parcelado"}`:"à vista"),
+          el("td",{},NPUI.marca(h.status==="fechado"?"Fechado":"Proposta",h.status==="fechado"?"ok":"att")),
+          podeEd?el("td",{},NPUI.btn("Editar",{variante:"ghost",onclick:()=>openHistForm(h)})):null
+        )))
+      ))
+    ));
+    return;
+  }
+
+  v.classList.remove("np-v3");
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Como cada credor negocia"),el("h1",{},"Base de acordos"),el("div",{class:"sub"},`${fechados.length} acordos fechados e ${hs.length-fechados.length} propostas. É esta base que alimenta a projeção dos clientes.`)),
     el("div",{class:"actions edit-only"},el("button",{class:"btn primary",onclick:()=>openHistForm({})},"+ Registrar acordo"))));
   // resumo por credor
-  const porCredor={};for(const h of fechados){const k=normBanco(h.credor);(porCredor[k]??={nome:h.credor.split(" (")[0],grupo:h.grupo||grupoBanco(h.credor),av:[],pa:[]});(h.forma==="parcelado"?porCredor[k].pa:porCredor[k].av).push(descOf(h))}
-  const rows=Object.values(porCredor).sort((a,b)=>(b.av.length+b.pa.length)-(a.av.length+a.pa.length));
   v.append(el("div",{class:"card section"},el("h3",{},"Resumo por credor"),el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Credor"),el("th",{},"Grupo"),el("th",{class:"r"},"Acordos"),el("th",{class:"r"},"À vista · mediana"),el("th",{class:"r"},"À vista · faixa"),el("th",{class:"r"},"Parcelado · mediana"))),
     el("tbody",{},rows.map(r=>el("tr",{},el("td",{},el("b",{},r.nome)),el("td",{},GRUPOS[r.grupo]),el("td",{class:"r num"},r.av.length+r.pa.length),el("td",{class:"r num"},pct(mediana(r.av))),el("td",{class:"r num"},r.av.length?`${pct(Math.min(...r.av))} – ${pct(Math.max(...r.av))}`:"—"),el("td",{class:"r num"},pct(mediana(r.pa))))))))));
   if(!hs.length){v.append(el("div",{class:"card empty"},el("h3",{},"Nenhum acordo na base"),el("div",{},"Registre os acordos já fechados pelo escritório para que a projeção use a experiência real com cada banco.")));return}
@@ -1071,7 +1297,101 @@ function openHistForm(h={}){
 /* ---------- Calibração ---------- */
 function renderCalib(){
   const v=$("#view-calibracao");v.replaceChildren();
+  const v3=!!window.NPUI?.ativo?.();
+  v.classList.toggle("np-v3",v3);
   const acordos=S.contratos.filter(x=>x.acordo&&x.acordo.fechado);
+  if(v3){
+    const rows=acordos.map(k=>{const c=S.clientes.find(x=>x.clienteId===k.clienteId||x.id===k.clienteId);const cart=k.carteiraOverride||carteiraAuto(k.produto,k.garantia);return {k,c,cart,real:+k.acordo.descontoObtido/100,proj:k.acordo.descontoProjetado!=null?+k.acordo.descontoProjetado:null}});
+    const porBanco={};for(const r of rows){(porBanco[r.k.banco]??={n:0,soma:0,desvio:0,nd:0});const s=porBanco[r.k.banco];s.n++;s.soma+=r.real;if(r.proj!=null){s.desvio+=(r.real-r.proj);s.nd++}}
+    const bancosArr=Object.entries(porBanco);
+    const mediaReal=rows.length?rows.reduce((a,r)=>a+r.real,0)/rows.length:null;
+    const comProj=rows.filter(r=>r.proj!=null);
+    const desvioGlobal=comProj.length?comProj.reduce((a,r)=>a+(r.real-r.proj),0)/comProj.length:null;
+    const ajustesDisp=bancosArr.filter(([,s])=>s.nd>=3&&Math.abs(s.desvio/s.nd)>=0.03).length;
+
+    v.append(NPUI.toolbar({
+      resumo:NPUI.resumo([
+        {n:acordos.length,label:acordos.length===1?"acordo":"acordos"},
+        {n:bancosArr.length,label:bancosArr.length===1?"banco":"bancos"},
+        ...(ajustesDisp?[{n:ajustesDisp,label:ajustesDisp===1?"ajuste sugerido":"ajustes sugeridos",tom:"att"}]:[])
+      ])
+    }));
+
+    if(!acordos.length){
+      v.append(NPUI.vazio({titulo:"Nenhum acordo de cliente registrado",texto:"Use “Registrar acordo” no card do contrato quando um acordo for fechado. Enquanto isso, a projeção se apoia na Base de acordos."}));
+      return;
+    }
+
+    const kv=(l,val,h,tom)=>el("div",{},el("div",{class:"k"},l),el("div",{class:"v"+(tom?" "+tom:"")},val),h?el("div",{class:"h"},h):null);
+    v.append(el("div",{class:"np-gestao-kpi-band",style:"margin-bottom:14px"},
+      kv("Acordos fechados",String(acordos.length),`${bancosArr.length} banco(s) com histórico`),
+      kv("Desconto médio real",mediaReal!=null?pct(mediaReal):"—","sobre saldo na data do acordo"),
+      kv("Desvio médio global",desvioGlobal!=null?(desvioGlobal*100>0?"+":"")+(desvioGlobal*100).toFixed(1)+" p.p.":"—",comProj.length?`${comProj.length} acordo(s) com projeção registrada`:"sem projeção salva"),
+      kv("Ajustes sugeridos",String(ajustesDisp),ajustesDisp?"desvio ≥ 3 p.p. com 3+ acordos":"todos os bancos calibrados",ajustesDisp?"att":"ok")
+    ));
+
+    const pedirAjuste=(b,atual,novo,dv,n)=>{
+      const det=el("div",{class:"np-diff-meta"},
+        el("div",{},el("b",{},b),": fator global ",el("span",{class:"np-diff-old"},atual+" p.p."),el("span",{class:"np-diff-new"},novo+" p.p.")),
+        el("div",{class:"op"},`Baseado em ${n} acordo(s) com desvio médio de ${(dv*100>0?"+":"")+(dv*100).toFixed(1)} p.p. (real − projetado). Esta alteração atualiza as projeções de todos os contratos abertos deste banco.`)
+      );
+      if(NPUI.confirmar){
+        NPUI.confirmar({
+          titulo:`Ajustar fator global de ${b}?`,
+          texto:"Confirme antes de aplicar este ajuste nas regras globais de projeção do escritório.",
+          detalhe:det,
+          rotuloSim:`Aplicar ${novo} p.p.`,
+          rotuloNao:"Cancelar",
+          onSim:async()=>{S.regras.fatoresBanco[b]=novo;await saveRegras();renderCalib();}
+        });
+      }else{
+        S.regras.fatoresBanco[b]=novo;saveRegras();
+      }
+    };
+
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Por banco"),el("p",{class:"desc"},"Comparação entre o desconto médio obtido e a projeção do sistema. Ajustes alteram o fator global do banco nas Regras de projeção."))),
+      el("div",{class:"np-ts-tbl-wrap"},
+        el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},el("th",{},"Banco"),el("th",{class:"r"},"Acordos"),el("th",{class:"r"},"Desconto médio real"),el("th",{class:"r"},"Desvio médio (real − projetado)"),el("th",{class:"r"},"Fator atual"),el("th",{},"Sugestão"))),
+          el("tbody",{},bancosArr.map(([b,s])=>{
+            const dv=s.nd?s.desvio/s.nd:0;const atual=S.regras.fatoresBanco[b]??0;const novo=Math.round(atual+dv*100);
+            const precisa=s.nd>=3&&Math.abs(dv)>=0.03;
+            return el("tr",{},
+              el("td",{},el("b",{},b)),
+              el("td",{class:"r"},String(s.n)),
+              el("td",{class:"r"},pct(s.soma/s.n)),
+              el("td",{class:"r"},s.nd?(dv*100>0?"+":"")+(dv*100).toFixed(1)+" p.p.":"—"),
+              el("td",{class:"r"},atual+" p.p."),
+              el("td",{},precisa?NPUI.btn(`Ajustar para ${novo} p.p.`,{onclick:()=>pedirAjuste(b,atual,novo,dv,s.nd)}):NPUI.marca(s.nd<3?"Aguardando 3 acordos":"Calibrado",s.nd<3?"":"ok"))
+            );
+          }))
+        )
+      )
+    ));
+
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("h2",{},"Acordos fechados nos clientes")),
+      el("div",{class:"np-ts-tbl-wrap"},
+        el("table",{class:"np-ts-tbl"},
+          el("thead",{},el("tr",{},el("th",{},"Cliente"),el("th",{},"Banco"),el("th",{},"Produto"),el("th",{},"Carteira"),el("th",{class:"r"},"Dias de atraso"),el("th",{class:"r"},"Saldo"),el("th",{class:"r"},"Projetado"),el("th",{class:"r"},"Real"),el("th",{},"Forma"),el("th",{},"Data"))),
+          el("tbody",{},rows.sort((a,b)=>(b.k.acordo.data||"").localeCompare(a.k.acordo.data||"")).map(r=>el("tr",{},
+            el("td",{},r.c?r.c.nome:"—"),
+            el("td",{},r.k.banco),
+            el("td",{},PRODUTOS[r.k.produto]),
+            el("td",{},r.cart),
+            el("td",{class:"r"},r.k.acordo.diasNoAcordo!=null?String(r.k.acordo.diasNoAcordo):"—"),
+            el("td",{class:"r"},BRL(+r.k.acordo.saldoNoAcordo||+r.k.saldoAtual)),
+            el("td",{class:"r"},r.proj!=null?pct(r.proj):"—"),
+            el("td",{class:"r"},pct(r.real)),
+            el("td",{},(r.k.acordo.parcelas||1)>1?`${r.k.acordo.parcelas}x`:"à vista"),
+            el("td",{class:"np-num"},fmtD(parseD(r.k.acordo.data)))
+          )))
+        )
+      )
+    ));
+    return;
+  }
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Projetado × real"),el("h1",{},"Calibração"),el("div",{class:"sub"},"Acordos fechados nos clientes do painel, comparados com o que o sistema havia projetado. Cada um também entra automaticamente na Base de acordos."))));
   if(!acordos.length){v.append(el("div",{class:"card empty"},el("h3",{},"Nenhum acordo de cliente registrado"),el("div",{},"Use “Registrar acordo” no card do contrato quando um acordo for fechado. Enquanto isso, a projeção se apoia na Base de acordos.")));return}
   const rows=acordos.map(k=>{const c=S.clientes.find(x=>x.clienteId===k.clienteId||x.id===k.clienteId);const cart=k.carteiraOverride||carteiraAuto(k.produto,k.garantia);return {k,c,cart,real:+k.acordo.descontoObtido/100,proj:k.acordo.descontoProjetado!=null?+k.acordo.descontoProjetado:null}});
@@ -1084,72 +1404,112 @@ function renderCalib(){
 
 /* ---------- Formulários ---------- */
 function needDb(){if(S.db)return true;toast(S.dbStatus==="pending"?"Conectando ao banco de dados, aguarde alguns segundos…":"Banco de dados indisponível nesta visualização. Abra o painel pelo link do artefato, conectado à sua conta.");return false}
-function modal(title,body,onSave,extra){
-  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
+function modal(title,body,onSave,extra,opts){
+  if(window.NPUI&&NPUI.modalV3&&NPUI.modalV3.ativo())return NPUI.modalV3(title,body,onSave,extra,opts); /* V5: com a casca nova ligada, mesmo formulário com a experiência do NPUI.form (sem ela, segue abaixo sem mudança) */
   if(!needDb())return;
   const host=$("#modalHost");host.replaceChildren();
   const close=()=>host.replaceChildren();
+  const lblSalvar=opts?.confirmar||opts?.rotuloSalvar||body?.dataset?.rotuloSalvar||"Salvar";
+  const lblCancelar=opts?.cancelar||"Cancelar";
   const card=el("div",{class:"card",role:"dialog","aria-modal":"true"},el("h2",{},title),body,
-    el("div",{class:"actions"},extra||null,el("button",{class:"btn",onclick:close},"Cancelar"),el("button",{class:"btn primary",onclick:async()=>{try{await onSave();close()}catch(e){toast(e.message||"Não foi possível salvar")}}},"Salvar")));
+    el("div",{class:"actions"},extra||null,el("button",{class:"btn",onclick:close},lblCancelar),el("button",{class:"btn "+(opts?.perigo?"danger":"primary"),onclick:async()=>{try{await onSave();close()}catch(e){toast(e.message||"Não foi possível salvar")}}},lblSalvar)));
   host.append(el("div",{class:"modal",onclick:e=>{if(e.target.classList.contains("modal"))close()}},card));
   card.querySelector("input,select,textarea")?.focus();
 }
+function npConfirmar(opts={}){
+  if(window.NPUI?.confirmar)return NPUI.confirmar(opts);
+  const ok=window.confirm(opts.mensagem||opts.texto||opts.titulo||"Confirmar ação?");
+  if(ok&&typeof opts.onSim==="function")return Promise.resolve(opts.onSim()).then(()=>true);
+  return Promise.resolve(!!ok);
+}
+function npPedirTexto(opts={}){
+  if(window.NPUI?.pedirTexto)return NPUI.pedirTexto(opts);
+  return Promise.resolve(window.prompt(opts.mensagem||opts.texto||opts.rotulo||opts.titulo||"",opts.valorInicial||""));
+}
+window.npConfirmar=npConfirmar;window.npPedirTexto=npPedirTexto;
 const field=(id,l,input,help)=>el("div",{class:"f"+(input.tagName==="TEXTAREA"?" full":"")},el("label",{for:id},l),Object.assign(input,{id}),help?el("div",{class:"help"},help):null);
 const inp=(type,value,attrs={})=>el("input",{type,value:value??"",...attrs});
 const sel=(opts,value)=>{const s=el("select",{});for(const[k,v]of Object.entries(opts))s.append(el("option",{value:k,selected:k===value?"":null},v));return s};
 const bancoInput=(value)=>{const i=inp("text",value,{list:"bancos",placeholder:"Ex.: Itaú",id:"k-banco"});const dl=el("datalist",{id:"bancos"},Object.keys(S.regras.fatoresBanco).map(b=>el("option",{value:b})));const w=el("div",{},i,dl);return {wrap:w,input:i}};
 
 function openClientForm(c={}){
+  const v3=!!window.NPUI?.ativo?.();
   const nome=inp("text",c.nome),cnpj=inp("text",c.cnpj),resp=inp("text",c.responsavel),res=inp("number",c.reservaAcumulada,{step:"100"}),notas=el("textarea",{},c.notasInternas||"");
-  const body=el("div",{class:"form"},field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ",cnpj),field("c-resp","Responsável no escritório",resp),field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas));
-  const extra=c.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este cliente e manter os contratos órfãos?"))return;await S.db.doc("clientes/"+c.id).delete();S.sel=null;$("#modalHost").replaceChildren();toast("Cliente excluído")}},"Excluir"):null;
+  const body=v3
+    ?el("div",{class:"form"},
+      field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ / CPF",cnpj),field("c-resp","Responsável no escritório",resp),
+      NPUI.maisCampos("Reserva e notas internas",[field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas)],{aberto:!!(c.reservaAcumulada||c.notasInternas),contador:"auto"}))
+    :el("div",{class:"form"},field("c-nome","Nome / razão social",nome),field("c-cnpj","CNPJ",cnpj),field("c-resp","Responsável no escritório",resp),field("c-res","Reserva acumulada pelo cliente (R$)",res,"Atualize conforme o cliente informar."),field("c-notas","Notas internas (não aparecem na visão do cliente)",notas));
+  /* 0111: exclusão física de cliente só pela administradora, pela função do banco, com motivo e só para cadastro feito por engano;
+     para tirar o cliente da carteira, o caminho é o status "Encerrado" (Ficha → Cadastro → Editar ficha). Sem o botão para os demais. */
+  const ehAdmin=typeof PP!=="undefined"&&PP.perfil?.papel==="admin"&&typeof SB!=="undefined";
+  const extra=c.id&&ehAdmin?el("button",{class:"btn danger",onclick:async()=>{
+    let mot=body.querySelector("#c-motivo");
+    if(!mot){mot=el("textarea",{id:"c-motivo",rows:2,placeholder:"Ex.: cadastro duplicado por engano"});body.append(el("div",{class:"f full confirm"},el("label",{for:"c-motivo"},"Exclusão definitiva — só para cadastro feito por engano: o cliente precisa estar Encerrado e não ter contratos, atas, registros no dossiê, bens, processos ou cobranças. Para tirar o cliente da carteira, use o status Encerrado. Motivo:"),mot));mot.focus();return}
+    const motivo=mot.value.trim();if(motivo.length<10){toast("Informe o motivo (pelo menos 10 caracteres). Nada foi excluído.");mot.focus();return}
+    const {error}=await SB.rpc("cliente_excluir_definitivo",{p_id:c.id,p_motivo:motivo});
+    if(error){toast(error.code==="23503"?"Nada foi excluído: o cliente tem registros de trabalho. Mantenha-o como Encerrado.":error.code==="22023"?(error.message||"Nada foi excluído."):error.code==="42501"?"Sem permissão para excluir clientes. Nada foi excluído.":"Não foi possível excluir: "+(error.message||"erro")+". Nada foi excluído.");return}
+    S.sel=null;$("#modalHost").replaceChildren();toast("Cliente excluído definitivamente");if(typeof notificar==="function")notificar("clientes")}},"Excluir definitivamente"):null;
   modal(c.id?"Editar cliente":"Novo cliente",body,async()=>{
-    if(!nome.value.trim())throw new Error("Informe o nome do cliente");
+    if(!nome.value.trim()){const e=new Error("Informe o nome do cliente");e.campo=nome;throw e}
     const data={nome:nome.value.trim(),cnpj:cnpj.value.trim(),responsavel:resp.value.trim(),reservaAcumulada:+res.value||0,notasInternas:notas.value,timeline:c.timeline||[],createdAt:c.createdAt||new Date().toISOString()};
     if(c.id)await S.db.doc("clientes/"+c.id).set(data);else{const ref=await S.db.collection("clientes").add(data);S.sel=ref.id}
     toast("Cliente salvo");
-  },extra);
+  },extra,{confirmar:c.id?"Salvar cliente":"Cadastrar cliente"});
 }
 function confirmInline(body,msg){let box=body.querySelector(".confirm");if(box){return box.dataset.ok==="1"}box=el("div",{class:"f full confirm",style:"color:var(--crit);font-weight:600"},msg+" Clique em Excluir novamente para confirmar.");box.dataset.ok="1";body.append(box);return false}
 
 function openContractForm(k={}){
   const R=S.regras;
+  const v3=!!window.NPUI?.ativo?.();
   const b=bancoInput(k.banco),prod=sel(PRODUTOS,k.produto||"giro"),gar=sel(GARANTIAS,k.garantia||"nenhuma"),sit=sel(SITUACOES,k.situacao||"cobranca"),tit=sel(TITULARES,k.titular||"PJ");
   const vo=inp("number",k.valorOriginal,{step:"100"}),sa=inp("number",k.saldoAtual,{step:"100"}),dc=inp("date",k.dataContrato),da=inp("date",k.dataInicioAtraso),pp=inp("number",k.parcelasPagas,{min:0}),pt=inp("number",k.parcelasTotal,{min:0}),pr=inp("number",k.prazoReservaMeses||"",{min:1,placeholder:"automático"}),am=inp("number",k.atualizacaoMensal??"",{step:"0.1",placeholder:String(R.atualizacaoMensal)});
   const cart=sel({"":"Automática","C1":"C1","C2":"C2","C3":"C3","C4":"C4","C5":"C5"},k.carteiraOverride||"");
   const notas=el("textarea",{},k.notas||"");
   const autoNote=el("div",{class:"help"});const upd=()=>{autoNote.textContent="Carteira automática: "+carteiraAuto(prod.value,gar.value)};prod.onchange=gar.onchange=upd;upd();
-  const body=el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
-    field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-dc","Data do contrato",dc),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
-    field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),field("k-sit","Situação",sit),field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
-    el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),field("k-notas","Notas internas",notas));
-  const extra=k.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este contrato?"))return;await S.db.doc("contratos/"+k.id).delete();$("#modalHost").replaceChildren();toast("Contrato excluído")}},"Excluir"):null;
+  const body=v3
+    ?el("div",{class:"form"},
+      NPUI.secaoForm("Contrato e saldo"),
+      el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
+      field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-sit","Situação",sit),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
+      NPUI.maisCampos("Parcelas, carteira e notas",[
+        field("k-dc","Data do contrato",dc),field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),
+        field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),
+        field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
+        el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),
+        field("k-notas","Notas internas",notas)
+      ],{contador:"auto"}))
+    :el("div",{class:"form"},el("div",{class:"f"},el("label",{for:"k-banco"},"Banco / instituição"),b.wrap),field("k-tit","Titular da dívida",tit),field("k-prod","Tipo de contrato",prod),field("k-gar","Garantia",gar),
+      field("k-vo","Valor contratado (R$)",vo),field("k-sa","Saldo devedor atual (R$)",sa,"Se vazio, usa o valor contratado."),field("k-dc","Data do contrato",dc),field("k-da","Início do atraso",da,"Obrigatório para projetar."),
+      field("k-pp","Parcelas pagas",pp),field("k-pt","Total de parcelas",pt),field("k-sit","Situação",sit),field("k-pr","Prazo de reserva (meses)",pr,"Define também a data-alvo da previsão de acordo."),field("k-am","Atualização do saldo (% a.m.)",am,`Vazio = padrão das regras (${R.atualizacaoMensal}%). Use a taxa do contrato se o banco aplicar juros remuneratórios.`),
+      el("div",{class:"f"},el("label",{for:"k-cart"},"Carteira (Res. BCB 352)"),Object.assign(cart,{id:"k-cart"}),autoNote),field("k-notas","Notas internas",notas));
+  const extra=k.id?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir contrato?",mensagem:`Remover o contrato ${k.banco||""} deste cliente?`,confirmar:"Excluir contrato",perigo:true,onSim:async()=>{await S.db.doc("contratos/"+k.id).delete();$("#modalHost").replaceChildren();toast("Contrato excluído")}})}} ,"Excluir"):null;
   modal(k.id?"Editar contrato":"Novo contrato",body,async()=>{
-    if(!b.input.value.trim())throw new Error("Informe o banco");
-    if(!da.value&&sit.value!=="quitado"&&sit.value!=="emdia")throw new Error("Informe o início do atraso");
+    if(!b.input.value.trim()){const e=new Error("Informe o banco");e.campo=b.input;throw e}
+    if(!da.value&&sit.value!=="quitado"&&sit.value!=="emdia"){const e=new Error("Informe o início do atraso");e.campo=da;throw e}
     const data={clienteId:k.clienteId,banco:b.input.value.trim(),titular:tit.value,produto:prod.value,garantia:gar.value,situacao:sit.value,valorOriginal:+vo.value||0,saldoAtual:+sa.value||+vo.value||0,dataContrato:dc.value||"",dataInicioAtraso:da.value||"",parcelasPagas:+pp.value||0,parcelasTotal:+pt.value||0,prazoReservaMeses:+pr.value||R.prazoReservaPadrao,atualizacaoMensal:am.value===""?null:+am.value,carteiraOverride:cart.value||"",notas:notas.value,acordo:k.acordo||null,createdAt:k.createdAt||new Date().toISOString()};
     if(!(data.banco in S.regras.fatoresBanco)){S.regras.fatoresBanco[data.banco]=0;await S.db.doc("config/regras").set(S.regras)}
     if(k.id)await S.db.doc("contratos/"+k.id).set(data);else await S.db.collection("contratos").add(data);
     toast("Contrato salvo");
-  },extra);
+  },extra,{confirmar:k.id?"Salvar contrato":"Cadastrar contrato"});
 }
 function openAcordoForm(k,p){
   const data=inp("date",new Date().toISOString().slice(0,10)),vp=inp("number","",{step:"100"}),desc=inp("number",p.faixa?Math.round(p.faixa.provavel*100):"",{min:0,max:100}),npar=inp("number",1,{min:1});
   vp.oninput=()=>{if(p.saldo&&vp.value)desc.value=Math.round((1-(+vp.value)/p.saldo)*100)};desc.oninput=()=>{if(p.saldo&&desc.value)vp.value=Math.round(p.saldo*(1-(+desc.value)/100))};
   const body=el("div",{class:"form"},field("a-data","Data do acordo",data),field("a-vp","Valor total pago/acordado (R$)",vp,`Saldo na data: ${BRL(p.saldo)}`),field("a-desc","Desconto obtido (%)",desc,p.faixa?`Projetado: ${pct(p.faixa.provavel)} à vista · ${pct(p.faixa.parcelado)} parcelado`:"Sem projeção para este contrato"),field("a-npar","Número de parcelas",npar,"1 = à vista"));
   modal("Registrar acordo fechado",body,async()=>{
-    if(!vp.value)throw new Error("Informe o valor acordado");
+    if(!vp.value){const e=new Error("Informe o valor acordado");e.campo=vp;throw e}
     const novo={...k,situacao:"acordo",acordo:{fechado:true,data:data.value,valorPago:+vp.value,descontoObtido:+desc.value,parcelas:+npar.value||1,descontoProjetado:p.faixa?((+npar.value||1)>1?p.faixa.parcelado:p.faixa.provavel):null,saldoNoAcordo:p.saldo,diasNoAcordo:p.dias}};delete novo.id;
     await S.db.doc("contratos/"+k.id).set(novo);toast("Acordo registrado e enviado para a calibração");
-  });
+  },null,{confirmar:"Registrar acordo"});
 }
 function openEventForm(c){
   const data=inp("date",new Date().toISOString().slice(0,10)),txt=el("textarea",{placeholder:"Ex.: Proposta formal enviada ao Itaú com pedido de 60% de desconto."});
   modal("Registrar atuação",el("div",{class:"form"},field("e-data","Data",data),field("e-txt","O que foi feito",txt)),async()=>{
-    if(!txt.value.trim())throw new Error("Descreva a atuação");
+    if(!txt.value.trim()){const e=new Error("Descreva a atuação");e.campo=txt;throw e}
     const tl=[...(c.timeline||[]),{data:data.value,texto:txt.value.trim(),id:Math.random().toString(36).slice(2,9)}].slice(-120);
     await S.db.doc("clientes/"+c.id).update({timeline:tl});toast("Atuação registrada");
-  });
+  },null,{confirmar:"Registrar atuação"});
 }
 async function removeEvent(c,e){if(!needDb())return;const tl=(c.timeline||[]).filter(x=>x.id!==e.id);await S.db.doc("clientes/"+c.id).update({timeline:tl})}
 

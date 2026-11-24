@@ -43,7 +43,7 @@ function openForm(a){
   const exp=inp("date",a.expira_em||"");const chks=Object.fromEntries(Object.entries(AREAS).map(([k,l])=>{const i=el("input",{type:"checkbox"});i.checked=(a.areas||[]).includes(k);return [k,i]}));
   const body=el("div",{class:"form"},field("av-tit","Título",tit),field("av-txt","Texto",txt),el("div",{class:"f full"},el("label",{},"Para quem"),el("div",{class:"note"},"Sem marcar nada = todo o escritório."),el("div",{style:"display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"},...Object.entries(AREAS).map(([k,l])=>el("label",{class:"switch"},chks[k]," "+l)))),
     el("div",{class:"f"},el("label",{},"Fixado no topo"),el("label",{class:"switch"},fix," manter em destaque")),field("av-exp","Expira em (opcional)",exp,"Depois dessa data o aviso some da lista."));
-  const extra=a.id?el("button",{class:"btn danger",onclick:async()=>{if(!window.confirm("Excluir este aviso?"))return;await SB.from("avisos").delete().eq("id",a.id);$("#modalHost").replaceChildren();toast("Aviso excluído");invalidar()}},"Excluir"):null;
+  const extra=a.id?el("button",{class:"btn danger",onclick:async(e)=>{const btn=e.currentTarget;if(btn.disabled)return;btn.disabled=true;try{const ok=await npConfirmar({titulo:"Excluir aviso?",mensagem:`O aviso "${a.titulo||"Sem título"}" será removido permanentemente do painel de toda a equipe.`,confirmar:"Excluir aviso",perigo:true});if(!ok)return;const {error}=await SB.from("avisos").delete().eq("id",a.id);if(error){toast(error.message);return}$("#modalHost").replaceChildren();toast("Aviso excluído");invalidar()}finally{btn.disabled=false}}},"Excluir"):null;
   modal(a.id?"Editar aviso":"Novo aviso",body,async()=>{
     if(!tit.value.trim()||!txt.value.trim())throw new Error("Informe título e texto");
     const areas=Object.keys(AREAS).filter(k=>chks[k].checked);
@@ -142,7 +142,8 @@ function grupoHojeAvV3(){
 }
 
 {const _r=render;render=function(){_r();const v=$("#view-avisos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="avisos")S.tab="clientes";v.hidden=S.tab!=="avisos";if(S.tab==="avisos"){if(avisosV3())renderAvisosV3();else{v.classList.remove("np-v3");renderAvisos()}}
-  if(S.tab==="painel"&&eq){const vp=$("#view-painel");if(avisosV3()){const old=vp?.querySelector(".np-hoje-avisos");if(old)old.remove();const g=grupoHojeAvV3();const corpo=vp?.querySelector(".np-corpo");const ancora=corpo?.querySelector(".np-hoje-h");if(g&&corpo){const ag=corpo.querySelector(".np-agora");if(ag)ag.after(g);else if(ancora)ancora.after(g);else corpo.prepend(g)}}else{const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}}
-window.PP_AVISOS={invalidar,v3:avisosV3};
+  if(S.tab==="painel"&&eq){const vp=$("#view-painel");if(avisosV3()){const old=vp?.querySelector(".np-hoje-avisos");if(old)old.remove();const g=grupoHojeAvV3();const corpo=vp?.querySelector(".np-corpo");const ancora=corpo?.querySelector(".np-hoje-h");if(g&&corpo){const fat=corpo.querySelector('.np-grp[data-g="fatais"]'),ag=corpo.querySelector(".np-agora");/* Figma de 18/11: prazo fatal de hoje vem antes do aviso */if(fat)fat.after(g);else if(ag)ag.after(g);else if(ancora)ancora.after(g);else corpo.prepend(g)}}else{const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}}
+window.PP_AVISOS={invalidar,v3:avisosV3,naoLidos:()=>AV.ok?AV.lista.filter(a=>!a.lida).length:null};
+(window.__NP_CONT=window.__NP_CONT||{}).avisos={fn:()=>window.PP_AVISOS.naoLidos(),rotulo:n=>n===1?"1 aviso não lido":n+" avisos não lidos"};
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){SB.channel("avisos").on("postgres_changes",{event:"*",schema:"public",table:"avisos"},()=>invalidar()).subscribe()}});
 })();

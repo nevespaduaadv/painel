@@ -173,8 +173,262 @@ function recomendacaoPadrao(teses){const c=teses.filter(t=>t.status==="constatad
   return "Com os dados disponíveis, não identificamos irregularidade objetiva no contrato. Recomendamos a conferência do contrato integral e dos extratos antes de qualquer conclusão; a estratégia, neste caso, tende a ser a negociação do passivo e não a revisão judicial.";}
 
 // ---------- tela: Modelos de peças ----------
+const pcV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const PECAS_MAP={inicial:"Inicial / Parecer",embargos:"Embargos à execução",monitoria:"Embargos monitórios",contestacao:"Contestação"};
+P.filtroStatus="todos";
+P.buscaCampos="";
+
+function renderPecasV3(v){
+  v.classList.add("np-v3");
+  if(!P.ok){v.append(NPUI.carregando(5));carregar().then(()=>render());return}
+
+  const revisados=P.blocos.filter(b=>!b.rascunho).length;
+  const rascunhos=P.blocos.filter(b=>b.rascunho).length;
+  const segAbas=NPUI.seg([
+    ["modelos","Modelos"],
+    ["blocos","Blocos por tese"],
+    ["escritorio","Escritório"],
+    ["campos","Campos"]
+  ],P.aba,k=>{P.aba=k;render()},"Seções de modelos de peças");
+
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo([
+      {n:P.modelos.length,label:P.modelos.length===1?"modelo":"modelos"},
+      {n:revisados,label:"blocos revisados",tom:"ok"},
+      ...(rascunhos?[{n:rascunhos,label:"rascunhos",tom:"att"}]:[])
+    ]),
+    direita:[segAbas]
+  }));
+
+  if(P.aba==="modelos"){
+    const mAtivo=P.modelos.find(x=>x.id===P.modelo)||null;
+    const obra=el("div",{class:"np-obra"});
+    const listaHost=el("div",{class:"np-corpo"});
+    if(!P.modelos.length){
+      listaHost.append(NPUI.vazio({titulo:"Nenhum modelo cadastrado",texto:"Cadastre modelos de peça no banco para gerar documentos .docx."}));
+    }else{
+      const rows=P.modelos.map(m=>{
+        const nSec=(m.secoes||[]).length;
+        return NPUI.linha({
+          id:String(m.id),
+          prazo:{curta:`${nSec} seç.`},
+          titulo:m.nome,
+          contexto:m.descricao||"",
+          direita:[m.ativo?NPUI.marca("Ativo","ok"):NPUI.marca("Inativo","")],
+          atual:P.modelo===m.id,
+          onOpen:()=>{P.modelo=P.modelo===m.id?null:m.id;render()}
+        });
+      });
+      listaHost.append(NPUI.grupo({id:"pc-modelos",titulo:"Modelos de peça",n:rows.length,itens:rows}));
+    }
+    obra.append(listaHost);
+    const painel=NPUI.painel({
+      obra,
+      label:"Modelo de peça",
+      onClose:()=>{P.modelo=null;render()}
+    });
+    v.append(obra);
+
+    if(mAtivo){
+      const secoes=structuredClone(mAtivo.secoes||[]);
+      const lista=el("div",{class:"pc-secoes"});
+      const desenhar=()=>{
+        lista.replaceChildren();
+        secoes.forEach((s,i)=>{
+          const tit=inp("text",s.titulo,{placeholder:"Título da seção (vazio = sem título)"});
+          const txt=el("textarea",{rows:String(Math.min(12,Math.max(4,(s.texto||"").split("\n").length+1)))},s.texto||"");
+          tit.oninput=()=>s.titulo=tit.value;
+          txt.oninput=()=>s.texto=txt.value;
+          const ctrls=admin()?el("div",{class:"np-pc-sec-act"},
+            NPUI.btn("↑",{title:"Mover acima",onclick:()=>{if(i>0){[secoes[i-1],secoes[i]]=[secoes[i],secoes[i-1]];desenhar()}}}),
+            NPUI.btn("↓",{title:"Mover abaixo",onclick:()=>{if(i<secoes.length-1){[secoes[i+1],secoes[i]]=[secoes[i],secoes[i+1]];desenhar()}}}),
+            NPUI.btn("Remover",{variante:"danger",onclick:()=>{secoes.splice(i,1);desenhar()}})
+          ):null;
+          lista.append(el("div",{class:"pc-secao"},
+            el("div",{class:"pc-secao-h"},el("span",{class:"np-ts-sub np-num"},`#${i+1} · ${s.chave}`),ctrls),
+            tit,txt
+          ));
+        });
+      };
+      desenhar();
+
+      const salvarModelo=async()=>{
+        const {error}=await SB.from("modelos_peca").update({secoes,updated_at:new Date().toISOString()}).eq("id",mAtivo.id);
+        if(error){toast(error.message);return}
+        mAtivo.secoes=secoes;toast("Modelo salvo");render();
+      };
+
+      painel.abrir({
+        trilha:["Modelos de peça"],
+        titulo:mAtivo.nome,
+        corpo:[
+          mAtivo.descricao?el("p",{class:"np-kb-resumo"},mAtivo.descricao):null,
+          lista
+        ].filter(Boolean),
+        pe:admin()?[
+          NPUI.btn("Salvar modelo",{variante:"pri",onclick:salvarModelo}),
+          NPUI.btn("+ Seção",{onclick:()=>{secoes.push({chave:"secao"+(secoes.length+1),titulo:"",texto:""});desenhar()}}),
+          NPUI.btn("Fechar",{variante:"ghost",onclick:()=>{P.modelo=null;render()}})
+        ]:[
+          el("span",{class:"np-ts-sub"},"Somente administradores editam."),
+          el("span",{class:"sp"}),
+          NPUI.btn("Fechar",{onclick:()=>{P.modelo=null;render()}})
+        ],
+        id:String(mAtivo.id)
+      });
+    }
+    return;
+  }
+
+  if(P.aba==="blocos"){
+    const teses=(window.PP_REVISIONAL?.teses?.()||[]);
+    const baseLista=teses.length?teses:[...new Set(P.blocos.map(b=>b.tese))].map(c=>({codigo:c,nome:c}));
+    const chipsPeca=Object.entries(PECAS_MAP).map(([k,l])=>NPUI.chip({label:l,on:P.peca===k,onclick:()=>{P.peca=k;render()}}));
+    const chipsSt=[
+      ["todos","Todos"],
+      ["revisados","Revisados"],
+      ["rascunhos","Rascunhos"]
+    ].map(([k,l])=>NPUI.chip({label:l,on:P.filtroStatus===k,onclick:()=>{P.filtroStatus=k;render()}}));
+
+    v.append(el("div",{class:"np-kb-filtros"},
+      el("div",{class:"np-filtros"},...chipsPeca),
+      el("div",{class:"np-filtros"},...chipsSt)
+    ));
+
+    const filtradas=baseLista.filter(t=>{
+      const b=P.blocos.find(x=>x.tese===t.codigo&&x.peca===P.peca);
+      const isRasc=!b||!!b.rascunho;
+      if(P.filtroStatus==="revisados")return !isRasc;
+      if(P.filtroStatus==="rascunhos")return isRasc;
+      return true;
+    });
+
+    const tAtiva=filtradas.find(x=>x.codigo===P.tese)||null;
+    const obra=el("div",{class:"np-obra"});
+    const listaHost=el("div",{class:"np-corpo"});
+
+    if(!filtradas.length){
+      listaHost.append(NPUI.vazio({titulo:"Nenhum bloco neste filtro",texto:"Altere o tipo de peça ou o filtro de revisão acima."}));
+    }else{
+      const rows=filtradas.map(t=>{
+        const b=P.blocos.find(x=>x.tese===t.codigo&&x.peca===P.peca);
+        const rasc=!b||!!b.rascunho;
+        return NPUI.linha({
+          id:t.codigo,
+          prazo:{curta:rasc?"Rasc.":"Rev.",tom:rasc?"att":""},
+          titulo:t.nome,
+          contexto:b?.titulo||t.codigo,
+          direita:[rasc?NPUI.marca("Rascunho","att"):NPUI.marca("Revisado","ok")],
+          atual:P.tese===t.codigo,
+          onOpen:()=>{P.tese=P.tese===t.codigo?null:t.codigo;render()}
+        });
+      });
+      listaHost.append(NPUI.grupo({id:"pc-blocos",titulo:`Teses · ${PECAS_MAP[P.peca]||P.peca}`,n:rows.length,itens:rows}));
+    }
+    obra.append(listaHost);
+    const painel=NPUI.painel({
+      obra,
+      label:"Bloco por tese",
+      onClose:()=>{P.tese=null;render()}
+    });
+    v.append(obra);
+
+    if(tAtiva){
+      const b=structuredClone(P.blocos.find(x=>x.tese===tAtiva.codigo&&x.peca===P.peca)||{tese:tAtiva.codigo,peca:P.peca,rascunho:true});
+      const mkTa=(k,rows)=>{const ta=el("textarea",{rows:String(rows)},b[k]||"");ta.oninput=()=>b[k]=ta.value;return ta};
+      const tit=inp("text",b.titulo||"");tit.oninput=()=>b.titulo=tit.value;
+
+      const formBox=el("div",{class:"form",style:"grid-template-columns:1fr"},
+        field("b-tit","Título do tópico na peça",tit),
+        field("b-fatos","Fatos (parágrafos para “Dos fatos”)",mkTa("fatos",4)),
+        field("b-fund","Fundamentação jurídica",mkTa("fundamentos",8)),
+        field("b-ped","Pedidos (um por linha)",mkTa("pedidos",3)),
+        field("b-prov","Provas / documentos (um por linha)",mkTa("provas",2)),
+        field("b-par","Texto para o parecer ao cliente (linguagem simples)",mkTa("parecer",3))
+      );
+
+      const salvarBloco=async(pecaAlvo)=>{
+        const row={tese:b.tese,peca:pecaAlvo,titulo:b.titulo||null,fatos:b.fatos||null,fundamentos:b.fundamentos||null,pedidos:b.pedidos||null,provas:b.provas||null,parecer:b.parecer||null,rascunho:false,updated_at:new Date().toISOString()};
+        const {error}=await SB.from("blocos_tese").upsert(row);
+        if(error){toast(error.message);return}
+        await carregar(true);
+        toast(pecaAlvo===b.peca?"Bloco salvo (marcado como revisado)":"Copiado para "+(PECAS_MAP[pecaAlvo]||pecaAlvo));
+        render();
+      };
+
+      const btnCopiar=NPUI.btn("Copiar para…",{onclick:(e)=>{
+        const destinos=Object.entries(PECAS_MAP).filter(([k])=>k!==P.peca).map(([k,l])=>({label:l,onclick:()=>salvarBloco(k)}));
+        NPUI.pop(e.currentTarget,destinos,{role:"menu",label:"Copiar bloco para",alinhar:"dir"});
+      }});
+
+      painel.abrir({
+        trilha:["Blocos por tese",el("span",{class:"sep"}),PECAS_MAP[P.peca]||P.peca],
+        titulo:tAtiva.nome,
+        corpo:[
+          el("div",{class:"np-kb-meta"},PECAS_MAP[P.peca]||P.peca," · ",b.rascunho?NPUI.marca("Rascunho","att"):NPUI.marca("Revisado","ok")),
+          formBox
+        ],
+        pe:admin()?[
+          NPUI.btn("Salvar bloco",{variante:"pri",onclick:()=>salvarBloco(b.peca)}),
+          btnCopiar,
+          NPUI.btn("Fechar",{variante:"ghost",onclick:()=>{P.tese=null;render()}})
+        ]:[
+          el("span",{class:"np-ts-sub"},"Somente administradores editam."),
+          el("span",{class:"sp"}),
+          NPUI.btn("Fechar",{onclick:()=>{P.tese=null;render()}})
+        ],
+        id:tAtiva.codigo
+      });
+    }
+    return;
+  }
+
+  if(P.aba==="escritorio"){
+    const e=structuredClone(P.escritorio||{});const adv=(e.advogados||[])[0]||{};
+    const mk=(k,val)=>{const x=inp("text",val||"");x.oninput=()=>e[k]=x.value;return x};
+    const an=inp("text",adv.nome||""),ao=inp("text",adv.oab||"");
+    const box=el("div",{class:"np-form-leitura"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Qualificação do escritório"),el("p",{class:"desc"},"Dados preenchidos automaticamente nas petições e pareceres gerados em .docx."))),
+      el("div",{class:"form"},
+        field("e-nome","Razão social",mk("nome",e.nome)),
+        field("e-cnpj","CNPJ",mk("cnpj",e.cnpj)),
+        field("e-end","Endereço",mk("endereco",e.endereco)),
+        field("e-cid","Cidade",mk("cidade",e.cidade)),
+        field("e-uf","UF",mk("uf",e.uf)),
+        field("e-cep","CEP",mk("cep",e.cep)),
+        field("e-mail","E-mail",mk("email",e.email)),
+        field("e-adv","Advogado(a) signatário(a)",an),
+        field("e-oab","OAB",ao)
+      ),
+      admin()?el("div",{class:"np-form-rod"},NPUI.btn("Salvar qualificação",{variante:"pri",onclick:async()=>{
+        e.advogados=[{nome:an.value.trim(),oab:ao.value.trim()}];
+        const {error}=await SB.from("escritorio").upsert({id:"escritorio",dados:e,updated_at:new Date().toISOString()});
+        if(error){toast(error.message);return}
+        P.escritorio=e;toast("Escritório salvo");
+      }})):el("p",{class:"np-ts-sub"},"Somente administradores editam a qualificação do escritório.")
+    );
+    v.append(box);
+    return;
+  }
+
+  // Campos disponíveis
+  const q=el("input",{type:"search",class:"np-tb-busca",value:P.buscaCampos,placeholder:"Filtrar campos…","aria-label":"Filtrar campos automáticos"});
+  q.oninput=()=>{P.buscaCampos=q.value;render()};
+  const term=P.buscaCampos.trim().toLowerCase();
+  const linhas=CAMPOS.filter(([k,l])=>!term||k.toLowerCase().includes(term)||l.toLowerCase().includes(term));
+  v.append(el("div",{class:"np-kb-filtros"},q,el("span",{class:"np-ts-sub"},"Use entre chaves duplas nos modelos e blocos. Campos sem valor saem destacados em « » no .docx.")));
+  v.append(el("div",{class:"np-ts-tbl-wrap"},
+    el("table",{class:"np-ts-tbl"},
+      el("thead",{},el("tr",{},el("th",{},"Campo"),el("th",{},"O que insere"))),
+      el("tbody",{},linhas.length?linhas.map(([k,l])=>el("tr",{},el("td",{},el("code",{class:"np-code"},"{{"+k+"}}")),el("td",{},l))):[el("tr",{},el("td",{colspan:"2",class:"np-ts-sub"},"Nenhum campo corresponde ao filtro."))])
+    )
+  ));
+}
+
 function renderPecas(){
   const v=$("#view-pecas");if(!v)return;v.replaceChildren();
+  if(pcV3()){renderPecasV3(v);return}
+  v.classList.remove("np-v3");
   if(!P.ok){v.append(el("div",{class:"note"},"Carregando…"));carregar().then(()=>render());return}
   v.append(el("div",{class:"section-h"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Modelos de peças"),el("p",{class:"note"},"Modelos (estrutura da peça com campos automáticos) e blocos por tese (fatos, fundamentos, pedidos, provas e texto do parecer). A peça é gerada na tela Revisional com as teses marcadas."))));
   v.append(el("div",{class:"tabs",style:"margin:0 0 12px;justify-content:flex-start"},[["modelos","Modelos"],["blocos","Blocos por tese"],["escritorio","Escritório"],["campos","Campos disponíveis"]].map(([k,l])=>el("button",{class:"tab cm-niv","aria-selected":String(P.aba===k),onclick:()=>{P.aba=k;render()}},l))));
@@ -206,7 +460,7 @@ function renderBlocos(v){
   const tit=inp("text",b.titulo||"");tit.oninput=()=>b.titulo=tit.value;
   const sec=el("section",{class:"card section"},el("div",{class:"section-h"},el("h3",{},t.nome),b.rascunho?el("span",{class:"pill g"},"rascunho — ainda não revisado"):el("span",{class:"pill e1"},"revisado pelo escritório")),
     el("div",{class:"form"},field("b-tit","Título do tópico na peça",tit),field("b-fatos","Fatos (parágrafos para “Dos fatos”)",f("fatos",5)),field("b-fund","Fundamentação jurídica",f("fundamentos",12)),field("b-ped","Pedidos (um por linha)",f("pedidos",3)),field("b-prov","Provas / documentos (um por linha)",f("provas",2)),field("b-par","Texto para o parecer ao cliente (linguagem simples)",f("parecer",4))));
-  if(admin())sec.append(el("div",{class:"actions",style:"margin-top:10px"},el("button",{class:"btn primary",onclick:async()=>{const row={tese:b.tese,peca:b.peca,titulo:b.titulo||null,fatos:b.fatos||null,fundamentos:b.fundamentos||null,pedidos:b.pedidos||null,provas:b.provas||null,parecer:b.parecer||null,rascunho:false,updated_at:new Date().toISOString()};const {error}=await SB.from("blocos_tese").upsert(row);if(error){toast(error.message);return}await carregar(true);toast("Bloco salvo (marcado como revisado)");render()}},"Salvar bloco"),el("button",{class:"btn",onclick:async()=>{const outra=prompt("Copiar para qual peça? (inicial, embargos, monitoria, contestacao)",P.peca==="inicial"?"embargos":"inicial");if(!outra||!["inicial","embargos","monitoria","contestacao"].includes(outra))return;const row={tese:b.tese,peca:outra,titulo:b.titulo||null,fatos:b.fatos||null,fundamentos:b.fundamentos||null,pedidos:b.pedidos||null,provas:b.provas||null,parecer:b.parecer||null,rascunho:false,updated_at:new Date().toISOString()};const {error}=await SB.from("blocos_tese").upsert(row);if(error){toast(error.message);return}await carregar(true);toast("Copiado para "+outra)}},"Copiar para a outra peça")));
+  if(admin())sec.append(el("div",{class:"actions",style:"margin-top:10px"},el("button",{class:"btn primary",onclick:async()=>{const row={tese:b.tese,peca:b.peca,titulo:b.titulo||null,fatos:b.fatos||null,fundamentos:b.fundamentos||null,pedidos:b.pedidos||null,provas:b.provas||null,parecer:b.parecer||null,rascunho:false,updated_at:new Date().toISOString()};const {error}=await SB.from("blocos_tese").upsert(row);if(error){toast(error.message);return}await carregar(true);toast("Bloco salvo (marcado como revisado)");render()}},"Salvar bloco"),el("button",{class:"btn",onclick:async(e)=>{const btn=e.currentTarget;const validas=["inicial","embargos","monitoria","contestacao"];const outra=await npPedirTexto({titulo:"Copiar bloco para outra peça",mensagem:"Informe o destino: inicial, embargos, monitoria ou contestacao.",rotulo:"Peça de destino",valorInicial:P.peca==="inicial"?"embargos":"inicial",placeholder:"Ex.: embargos",obrigatorio:true,validar:v=>validas.includes(v.trim())?null:"Use uma das opções: inicial, embargos, monitoria ou contestacao.",confirmar:"Copiar bloco"});if(!outra)return;const dest=outra.trim();if(!validas.includes(dest))return;btn.disabled=true;try{const row={tese:b.tese,peca:dest,titulo:b.titulo||null,fatos:b.fatos||null,fundamentos:b.fundamentos||null,pedidos:b.pedidos||null,provas:b.provas||null,parecer:b.parecer||null,rascunho:false,updated_at:new Date().toISOString()};const {error}=await SB.from("blocos_tese").upsert(row);if(error){toast(error.message);return}await carregar(true);toast("Copiado para "+dest)}finally{btn.disabled=false}}},"Copiar para a outra peça")));
   v.append(sec);
 }
 function renderEscritorio(v){

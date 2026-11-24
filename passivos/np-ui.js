@@ -80,19 +80,51 @@ function painel({ obra, label = "Detalhe", onClose }) {
   const modo = () => innerWidth <= 980 ? "cheia" : innerWidth <= 1179 ? "overlay" : "split";
   const aplicarModo = () => { const m = modo(); aside.dataset.modo = m; if (m === "cheia") { aside.setAttribute("role", "dialog"); aside.setAttribute("aria-modal", "true"); } else { aside.removeAttribute("role"); aside.removeAttribute("aria-modal"); } };
   const fechar = (devolver = true) => { if (!aberto) return; aberto = false; const fn = () => { obra.classList.remove("np-aberta"); aside.hidden = true; aside.setAttribute("inert", ""); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); doc.body.classList.remove("np-painel-cheia"); }; vt(fn).then(() => { onClose?.(); const alvo = (origem && origem.isConnected) ? origem : (ultimoId != null ? obra.querySelector(`.np-it[data-id="${ultimoId}"] .np-it-abrir, .np-it[data-id="${ultimoId}"] button`) : null); if (devolver && alvo) alvo.focus(); origem = null; }); };
+  /* Rodapé em linha única com no máximo 3 controles: 1 primário, até 1 secundário e transbordo ⋯ (NPUI.pop) para ações extras ou destrutivas. */
+  const normalizarPe = (itens) => {
+    const lista = [].concat(itens || []).filter(Boolean);
+    const ehCtrl = (e) => e instanceof Element && (e.matches("button,a.np-btn") || e.classList?.contains("np-btn"));
+    const controles = lista.filter(ehCtrl);
+    if (controles.length <= 3) return lista;
+    const pri = controles.find(e => e.classList.contains("pri")) || controles[0];
+    const restantes = controles.filter(e => e !== pri);
+    const destrutiva = (e) => e.classList.contains("danger") || e.classList.contains("crit") || /excluir|remover|apagar|desativar/i.test(e.textContent || "");
+    const sec = restantes.find(e => !destrutiva(e)) || restantes[0];
+    const extras = restantes.filter(e => e !== sec);
+    const outrosNos = lista.filter(e => !ehCtrl(e) && !(e instanceof Element && e.classList?.contains("sp")));
+    const btnMais = el("button", {
+      type: "button",
+      class: "np-ib np-p-mais",
+      "aria-label": "Mais ações",
+      title: "Mais ações",
+      "aria-haspopup": "menu",
+      "aria-expanded": "false",
+      onclick: (ev) => {
+        const menuItens = extras.map(b => ({
+          label: (b.textContent || b.getAttribute("aria-label") || b.title || "Ação").trim(),
+          tom: destrutiva(b) ? "crit" : "",
+          disabled: !!b.disabled,
+          title: b.title || null,
+          onclick: () => b.click(),
+        }));
+        pop(ev.currentTarget, menuItens, { role: "menu", label: "Mais ações", alinhar: "dir", refoco: ev.currentTarget });
+      },
+    }, svgIco(I.pontos));
+    return [pri, sec, el("span", { class: "sp" }), ...outrosNos, btnMais].filter(Boolean);
+  };
   /* `pend` guarda sempre o último conteúdo pedido: abrir() aplica o DOM dentro de uma view transition (assíncrona) e atualizar()
      pode chegar antes disso — sem isto, o esqueleto do abrir() sobrescreveria os dados já carregados (corrida vista no CI) */
   let pend = { c: null, p: null };
   const abrir = ({ trilha: tr, titulo, corpo: c, pe: p, origem: o, id, foco }) => {
     aplicarModo(); const ja = aberto; aberto = true; if (o) origem = o; if (id != null) ultimoId = id; pend = { c, p: p || [] };
     const linhaTx = id != null ? obra.querySelector(`.np-it[data-id="${id}"] .tx`) : null; if (linhaTx && !ja) linhaTx.style.viewTransitionName = "np-titulo";
-    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...[].concat(pend.p || []).filter(Boolean)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
+    const fn = () => { if (linhaTx) linhaTx.style.viewTransitionName = ""; trilha.replaceChildren(...(Array.isArray(tr) ? tr : [tr]).filter(Boolean)); tit.textContent = titulo; corpo.replaceChildren(...[].concat(pend.c).filter(Boolean)); pe.replaceChildren(...normalizarPe(pend.p)); aside.hidden = false; aside.removeAttribute("inert"); obra.classList.add("np-aberta"); obra.querySelectorAll('.np-it[aria-current="true"]').forEach(i => i.removeAttribute("aria-current")); if (id != null) obra.querySelector(`.np-it[data-id="${id}"]`)?.setAttribute("aria-current", "true"); doc.body.classList.toggle("np-painel-cheia", aside.dataset.modo === "cheia"); corpo.scrollTop = 0; };
     (ja ? Promise.resolve(fn()) : vt(fn)).then(() => { if (linhaTx) linhaTx.style.viewTransitionName = ""; if (foco) setTimeout(foco, ms(60)); else if (!ja) setTimeout(() => btnX.focus(), ms(60)); });
   };
   btnX.onclick = () => fechar();
   aside.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.defaultPrevented) { if (doc.querySelector("#np-pop.on")) return; e.stopPropagation(); fechar(); } });
   matchMedia("(max-width:980px)").addEventListener("change", () => { if (aberto) aplicarModo(); }); matchMedia("(max-width:1179px)").addEventListener("change", () => { if (aberto) aplicarModo(); });
-  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...[].concat(p).filter(Boolean)); } } };
+  return { el: aside, corpo, pe, abrir, fechar, get aberto() { return aberto; }, atualizar: ({ corpo: c, pe: p }) => { if (c) { pend.c = c; corpo.replaceChildren(...[].concat(c).filter(Boolean)); } if (p) { pend.p = p; pe.replaceChildren(...normalizarPe(p)); } } };
 }
 
 /* ---------- props, passos, seções ---------- */
@@ -191,7 +223,8 @@ const traduzErroBD = (e) => { if (!e) return "Não foi possível salvar."; const
   if (/Failed to fetch|NetworkError|network|fetch|ECONN|offline|aborted/i.test(m)) return FORM_MSG.semConexaoDesc; // resultado desconhecido: o pedido pode ter chegado ao banco
   return m || "Não foi possível salvar."; };
 const detalheDe = (e) => { if (!e) return ""; if (/^NP_/.test(String(e.code || ""))) return ""; return [e.status ? "HTTP " + e.status : null, e.code ? "código " + e.code : null, e.message, e.detalhe].filter(Boolean).join(" · "); };
-const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, origem, aoFechar, rotuloSalvar = "Salvar" } = {}) => {
+const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, origem, aoFechar, rotuloSalvar, confirmar: rotConfirmar } = {}) => {
+  const txtSalvar = rotConfirmar || rotuloSalvar || "Salvar";
   if (typeof needDb === "function" && !needDb()) return null;
   const host = doc.querySelector("#modalHost"); if (!host) return null; host.replaceChildren();
   const app = doc.querySelector("#app"); const origemEl = origem || doc.activeElement;
@@ -202,7 +235,11 @@ const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, ori
   const grade = el("div", { class: "form np-f-campos" });
   const valorDe = (c) => c.el.type === "checkbox" ? c.el.checked : c.el.value; const inicial = new Map();
   const porId = {}; const erroEl = {}; const avisoEl = {}; const caixa = {}; let cruzados = new Set(); // campos marcados pela regra cruzada (validarTudo), reavaliados a cada digitação
-  for (const c of campos) { if (!c || !c.el) continue; porId[c.id] = c; c.el.id = c.id; const chk = c.el.type === "checkbox"; const lab = el("label", { for: c.id }, c.label, c.obrigatorio ? el("span", { class: "np-f-req", "aria-hidden": "true" }, " *") : (c.condicional || chk) ? null : el("span", { class: "np-f-opc" }, " (opcional)")); // condicional: obrigatório por regra cruzada (sem "(opcional)")
+  for (const c of campos) {
+    if (!c) continue;
+    if (c instanceof Element) { grade.append(c); continue; }
+    if (!c.el) continue;
+    porId[c.id] = c; c.el.id = c.id; const chk = c.el.type === "checkbox"; const lab = el("label", { for: c.id }, c.label, c.obrigatorio ? el("span", { class: "np-f-req", "aria-hidden": "true" }, " *") : (c.condicional || chk) ? null : el("span", { class: "np-f-opc" }, " (opcional)")); // condicional: obrigatório por regra cruzada (sem "(opcional)")
     const ajuda = c.ajuda ? el("div", { class: "help", id: c.id + "-h" }, c.ajuda) : null; erroEl[c.id] = el("p", { class: "np-f-erro", id: c.id + "-e", hidden: "" }); avisoEl[c.id] = el("p", { class: "np-f-aviso", id: c.id + "-a", hidden: "" });
     c.el.setAttribute("aria-describedby", [ajuda ? c.id + "-h" : null, c.id + "-e", c.id + "-a"].filter(Boolean).join(" ")); if (c.obrigatorio) c.el.setAttribute("aria-required", "true");
     caixa[c.id] = chk ? el("div", { class: "f np-f np-f-check" + (c.largo ? " full" : ""), "data-campo": c.id }, el("div", { class: "np-f-check-l" }, c.el, lab), ajuda, erroEl[c.id], avisoEl[c.id])
@@ -225,7 +262,7 @@ const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, ori
     return erros; };
   let concluido = false; // gravação principal feita com ressalva: nada mais é enviado; só "Fechar"
   const alterado = () => { if (concluido) return false; for (const c of campos) if (c && c.el && String(valorDe(c)) !== String(inicial.get(c.id))) return true; return false; };
-  const btnSalvar = el("button", { type: "submit", class: "btn primary np-f-salvar" }, rotuloSalvar); const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, "Cancelar");
+  const btnSalvar = el("button", { type: "submit", class: "btn primary np-f-salvar" }, txtSalvar); const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, "Cancelar");
   const btnExcluir = excluir ? el("button", { type: "button", class: "btn danger np-f-excluir" }, excluir.rotulo || "Excluir") : null;
   const confirmBox = el("div", { class: "np-f-confirm", role: "alertdialog", "aria-labelledby": uid + "-cf", hidden: "" });
   const acoes = el("div", { class: "actions np-f-acoes" }, btnExcluir, el("span", { class: "sp" }), btnCancelar, btnSalvar);
@@ -266,15 +303,17 @@ const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, ori
    .modal > .card (primeiro .card do host) > h2 … corpo … .actions (extra, Cancelar, Salvar = primeiro button.btn.primary) — quem renomeia ou
    remove o Salvar, acrescenta classe ao .card ou esvazia #modalHost (exclusões) continua funcionando; o encerramento só remove o próprio diálogo,
    nunca um formulário aberto em seguida. */
-const modalV3 = (title, body, onSave, extra) => {
+const modalV3 = (title, body, onSave, extra, opts = {}) => {
   if (typeof needDb === "function" && !needDb()) return;
   const host = doc.querySelector("#modalHost"); if (!host) return; host.replaceChildren();
   const app = doc.querySelector("#app"); const origemEl = doc.activeElement;
   const uid = "npm" + Math.random().toString(36).slice(2, 8); let enviando = false, fechado = false, sujo = false, confirmando = false, focoAntes = null;
   const btnX = el("button", { type: "button", class: "np-ib np-f-x", "aria-label": "Fechar (Esc)" }, svgIco(I.x));
   const geral = el("div", { class: "np-f-geral", role: "alert", tabindex: "-1", hidden: "" }); const vivo = el("div", { class: "np-vh", "aria-live": "polite" });
-  const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, "Cancelar");
-  const btnSalvar = el("button", { type: "button", class: "btn primary np-f-salvar" }, "Salvar");
+  const rotCancelar = opts?.cancelar || "Cancelar";
+  const rotSalvar = opts?.confirmar || opts?.rotuloSalvar || body?.dataset?.rotuloSalvar || "Salvar";
+  const btnCancelar = el("button", { type: "button", class: "btn np-f-cancelar" }, rotCancelar);
+  const btnSalvar = el("button", { type: "button", class: "btn " + (opts?.perigo ? "danger" : "primary") + " np-f-salvar" }, rotSalvar);
   const confirmBox = el("div", { class: "np-f-confirm", role: "alertdialog", "aria-labelledby": uid + "-cf", hidden: "" });
   const corpo = el("div", { class: "np-m-corpo" }, body);
   const acoes = el("div", { class: "actions np-f-acoes" }, extra || null, el("span", { class: "sp" }), btnCancelar, btnSalvar);
@@ -299,8 +338,26 @@ const modalV3 = (title, body, onSave, extra) => {
     const salvar = card.querySelector(".np-f-salvar"); if (!salvar) return; salvar.disabled = on; /* o módulo pode ter renomeado ("Enviar", "Importar"…) */
     if (on) { salvar.dataset.rotulo = salvar.textContent; salvar.textContent = FORM_MSG.salvando; vivo.textContent = FORM_MSG.salvando; } else if (salvar.dataset.rotulo) { salvar.textContent = salvar.dataset.rotulo; delete salvar.dataset.rotulo; } };
   const mostrarErro = (e) => { const msg = traduzErroBD(e); const det = (e && (e.code || e.status)) ? detalheDe(e) : ""; geral.replaceChildren(el("b", {}, msg));
-    if (det && det !== msg) geral.append(el("details", {}, el("summary", {}, "detalhes técnicos"), el("code", {}, String(det).slice(0, 400)))); geral.hidden = false; setTimeout(() => { try { geral.focus(); } catch (_) {} }, 0); };
-  const enviar = async () => { if (enviando || confirmando || fechado) return; geral.hidden = true; travar(true);
+    if (det && det !== msg) geral.append(el("details", {}, el("summary", {}, "detalhes técnicos"), el("code", {}, String(det).slice(0, 400)))); geral.hidden = false;
+    if (e && e.campo) { revelarCampo(e.campo); return; }
+    setTimeout(() => { try { geral.focus(); } catch (_) {} }, 0); };
+  const checarInvalidosEmMais = () => {
+    for (const det of corpo.querySelectorAll("details.np-f-mais")) {
+      if (det.open) continue;
+      for (const ctrl of det.querySelectorAll("input,select,textarea")) {
+        if (ctrl.disabled || ctrl.type === "hidden") continue;
+        if (typeof ctrl.checkValidity === "function" && !ctrl.checkValidity()) {
+          det.open = true;
+          try { ctrl.focus(); ctrl.reportValidity?.(); } catch (_) {}
+          return ctrl;
+        }
+      }
+    }
+    return null;
+  };
+  const enviar = async () => { if (enviando || confirmando || fechado) return; geral.hidden = true;
+    const inv = checarInvalidosEmMais(); if (inv) return;
+    travar(true);
     try { await onSave(); if (fechado) return; travar(false); restaurar(); } catch (e) { if (fechado) return; travar(false); mostrarErro(e); } };
   btnSalvar.onclick = (e) => { e.preventDefault(); enviar(); }; btnCancelar.onclick = tentarFechar; btnX.onclick = tentarFechar;
   fundo.addEventListener("mousedown", (e) => { if (e.target === fundo) tentarFechar(); });
@@ -315,5 +372,308 @@ const modalV3 = (title, body, onSave, extra) => {
   return { fechar: restaurar, el: card };
 };
 modalV3.ativo = () => doc.documentElement.classList.contains("np-casca-v3"); /* o desvio do modal() só vale com a casca V3.1 ligada */
-window.NPUI = { form, modalV3, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+
+/* ---------- Onda 4A · Organização editorial de formulários ---------- */
+const secaoForm = (titulo, descricao) => el("div", { class: "np-f-sec full" },
+  el("h3", { class: "np-f-sec-t" }, titulo),
+  descricao ? el("p", { class: "np-f-sec-d" }, descricao) : null
+);
+
+const maisCampos = (rotulo = "Mais opções", conteudo = [], { aberto = false, contador } = {}) => {
+  const corpo = el("div", { class: "np-f-mais-b form" });
+  for (const item of [].concat(conteudo || []).filter(Boolean)) corpo.append(item);
+  const badge = el("span", { class: "np-f-mais-c" });
+  const contarPreenchidos = () => {
+    let n = 0;
+    corpo.querySelectorAll("input,select,textarea").forEach((ctrl) => {
+      if (ctrl.type === "hidden" || ctrl.disabled) return;
+      if (ctrl.type === "checkbox" || ctrl.type === "radio") { if (ctrl.checked) n++; }
+      else if (String(ctrl.value || "").trim() !== "") n++;
+    });
+    return n;
+  };
+  const atualizarContador = () => {
+    if (contador == null) { badge.hidden = true; badge.textContent = ""; return; }
+    if (contador === "auto") {
+      const n = contarPreenchidos();
+      badge.textContent = n ? `(${n} ${n === 1 ? "preenchido" : "preenchidos"})` : "";
+      badge.hidden = !n;
+      return;
+    }
+    const txt = typeof contador === "function" ? contador() : contador;
+    if (typeof txt === "number") {
+      badge.textContent = txt ? `(${txt} ${txt === 1 ? "preenchido" : "preenchidos"})` : "";
+      badge.hidden = !txt;
+    } else {
+      badge.textContent = txt ? String(txt) : "";
+      badge.hidden = !txt;
+    }
+  };
+  atualizarContador();
+  if (contador === "auto" || typeof contador === "function") {
+    corpo.addEventListener("input", atualizarContador, true);
+    corpo.addEventListener("change", atualizarContador, true);
+  }
+  const sum = el("summary", { class: "np-f-mais-s" }, svgIco(I.chev, "np-ico np-f-mais-chev"), el("span", { class: "np-f-mais-l" }, rotulo), badge);
+  const det = el("details", { class: "np-f-mais full", open: aberto ? "" : null }, sum, corpo);
+  det.atualizarContador = atualizarContador;
+  return det;
+};
+
+/* Abre qualquer bloco NPUI.maisCampos pai ao ocorrer erro de validação em campo recolhido */
+const revelarCampo = (ctrl) => {
+  if (!ctrl) return false;
+  let aberto = false;
+  let p = ctrl.parentElement;
+  while (p) {
+    if (p.tagName === "DETAILS" && p.classList?.contains("np-f-mais")) {
+      if (!p.open) { p.open = true; aberto = true; }
+    }
+    p = p.parentElement;
+  }
+  setTimeout(() => {
+    try { ctrl.scrollIntoView?.({ block: "nearest" }); ctrl.focus?.(); } catch (_) {}
+  }, 0);
+  return aberto;
+};
+
+/* ---------- Onda 4A · Diálogos acessíveis V3.1 (confirmar + pedirTexto) com fallback V2 ---------- */
+const prenderIrmaos = (host, bg) => {
+  const presos = [];
+  for (const ch of [...host.children]) {
+    if (ch !== bg && !ch.hasAttribute("inert")) { ch.setAttribute("inert", ""); presos.push(ch); }
+  }
+  return () => { for (const ch of presos) ch.removeAttribute("inert"); };
+};
+
+/* Diálogo acessível de confirmação explícita (role="alertdialog") — retorna Promise<boolean> com .fechar e .el */
+const confirmar = ({ titulo = "Confirmar ação", mensagem = "", texto = "", detalhe = null, confirmar: rotConfirmar, rotuloSim, cancelar: rotCancelar, rotuloNao, perigo = false, onSim, origem } = {}) => {
+  const msg = mensagem || texto || "";
+  const lblSim = rotConfirmar || rotuloSim || "Confirmar";
+  const lblNao = rotCancelar || rotuloNao || "Cancelar";
+
+  if (!doc.documentElement.classList.contains("np-casca-v3")) {
+    const pV2 = (async () => {
+      const ok = window.confirm(msg || titulo);
+      if (ok && typeof onSim === "function") await onSim();
+      return !!ok;
+    })();
+    pV2.fechar = () => {};
+    pV2.el = null;
+    return pV2;
+  }
+
+  const host = doc.querySelector("#modalHost") || doc.body;
+  const app = doc.querySelector("#app");
+  const origemEl = origem || (doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null);
+  const uid = "np-cf-" + Math.random().toString(36).slice(2, 8);
+  let fechado = false, enviando = false, resolver = null;
+
+  const erroBox = el("div", { class: "np-f-geral", role: "alert", hidden: true, tabindex: -1 });
+  const btnNao = el("button", { type: "button", class: "np-btn" }, lblNao);
+  const btnSim = el("button", { type: "button", class: "np-btn " + (perigo ? "danger" : "pri") }, lblSim);
+  const btnX = el("button", { type: "button", class: "np-ib", "aria-label": "Fechar" }, svgIco(I.x));
+
+  const corpo = el("div", { class: "np-alert-b" });
+  if (msg) corpo.append(el("p", { id: uid + "-d", class: "np-confirm-txt" }, msg));
+  if (detalhe) corpo.append(typeof detalhe === "string" ? el("div", { class: "np-diff-meta" }, detalhe) : detalhe);
+  corpo.append(erroBox);
+
+  const dlg = el("div", {
+    class: "np-alert-dlg np-confirm-dlg",
+    role: "alertdialog",
+    "aria-modal": "true",
+    "aria-labelledby": uid + "-t",
+    ...(msg ? { "aria-describedby": uid + "-d" } : {})
+  },
+    el("div", { class: "np-alert-h" }, el("h2", { id: uid + "-t" }, titulo), btnX),
+    corpo,
+    el("div", { class: "np-alert-f" }, btnNao, btnSim)
+  );
+  const bg = el("div", { class: "np-alert-bg" }, dlg);
+
+  let soltarIrmaos = () => {};
+  const outroAberto = () => [...host.querySelectorAll('[role="dialog"],[role="alertdialog"]')].some((d) => d !== dlg);
+  const fechar = (resultado = false) => {
+    if (fechado) return;
+    fechado = true;
+    doc.removeEventListener("keydown", onKey, true);
+    if (bg.isConnected) bg.remove();
+    soltarIrmaos();
+    if (!outroAberto()) app?.removeAttribute("inert");
+    if (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") {
+      setTimeout(() => { try { origemEl.focus(); } catch (_) {} }, 0);
+    }
+    const r = resolver; resolver = null;
+    if (r) r(!!resultado);
+  };
+
+  const focaveis = () => [...dlg.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((n) => !n.disabled && !n.hidden && n.offsetParent !== null);
+  const onKey = (e) => {
+    if (!dlg.isConnected) return;
+    if (e.key === "Escape") { if (enviando) return; e.preventDefault(); e.stopPropagation(); fechar(false); return; }
+    if (e.key === "Tab") {
+      const fs = focaveis(); if (!fs.length) return;
+      const i = fs.indexOf(doc.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); fs[fs.length - 1].focus(); }
+      else if (!e.shiftKey && (i === fs.length - 1 || i === -1)) { e.preventDefault(); fs[0].focus(); }
+    }
+  };
+
+  const prom = new Promise((resolve) => { resolver = resolve; });
+
+  btnNao.onclick = () => { if (!enviando) fechar(false); };
+  btnX.onclick = () => { if (!enviando) fechar(false); };
+  bg.addEventListener("mousedown", (e) => { if (e.target === bg && !enviando) fechar(false); });
+  btnSim.onclick = async () => {
+    if (enviando || fechado) return;
+    if (typeof onSim !== "function") { fechar(true); return; }
+    erroBox.hidden = true;
+    enviando = true;
+    btnSim.disabled = true; btnNao.disabled = true; btnX.disabled = true;
+    const prevTxt = btnSim.textContent;
+    btnSim.textContent = "Aplicando…";
+    try {
+      await onSim();
+      if (!fechado) fechar(true);
+    } catch (e) {
+      enviando = false;
+      btnSim.disabled = false; btnNao.disabled = false; btnX.disabled = false;
+      btnSim.textContent = prevTxt;
+      erroBox.replaceChildren(el("b", {}, traduzErroBD(e)));
+      erroBox.hidden = false;
+      try { erroBox.focus(); } catch (_) {}
+    }
+  };
+
+  doc.addEventListener("keydown", onKey, true);
+  host.append(bg);
+  soltarIrmaos = prenderIrmaos(host, bg);
+  app?.setAttribute("inert", "");
+  setTimeout(() => { if (!fechado) (perigo ? btnNao : btnSim).focus(); }, 0);
+  prom.fechar = () => fechar(false);
+  prom.el = dlg;
+  return prom;
+};
+
+/* Diálogo acessível de entrada curta de texto (role="dialog") — retorna Promise<string | null> */
+const pedirTexto = ({ titulo = "Informar texto", mensagem = "", texto = "", rotulo = "", valorInicial = "", placeholder = "", obrigatorio = false, confirmar: rotConfirmar = "Confirmar", cancelar: rotCancelar = "Cancelar", multiline = false, validar = null, origem } = {}) => {
+  const msg = mensagem || texto || "";
+  if (!doc.documentElement.classList.contains("np-casca-v3")) {
+    const pV2 = Promise.resolve(window.prompt(msg || rotulo || titulo, valorInicial || ""));
+    pV2.fechar = () => {};
+    pV2.el = null;
+    return pV2;
+  }
+
+  const host = doc.querySelector("#modalHost") || doc.body;
+  const app = doc.querySelector("#app");
+  const origemEl = origem || (doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null);
+  const uid = "np-pr-" + Math.random().toString(36).slice(2, 8);
+  let fechado = false, resolver = null;
+
+  const btnNao = el("button", { type: "button", class: "np-btn" }, rotCancelar);
+  const btnSim = el("button", { type: "button", class: "np-btn pri" }, rotConfirmar);
+  const btnX = el("button", { type: "button", class: "np-ib", "aria-label": "Fechar" }, svgIco(I.x));
+  const inp = multiline
+    ? el("textarea", { id: uid + "-i", class: "np-prompt-inp", rows: "4", placeholder: placeholder || "" }, valorInicial || "")
+    : el("input", { id: uid + "-i", type: "text", class: "np-prompt-inp", value: valorInicial || "", placeholder: placeholder || "" });
+  const errEl = el("p", { id: uid + "-e", class: "np-prompt-err", role: "alert", hidden: true });
+  inp.setAttribute("aria-describedby", uid + "-e");
+  if (obrigatorio) inp.setAttribute("aria-required", "true");
+
+  const corpo = el("div", { class: "np-alert-b" });
+  if (msg) corpo.append(el("p", { id: uid + "-d", class: "np-confirm-txt" }, msg));
+  const campo = el("div", { class: "np-prompt-field" });
+  if (rotulo) campo.append(el("label", { for: uid + "-i", class: "np-prompt-lbl" }, rotulo, obrigatorio ? el("span", { class: "np-f-req", "aria-hidden": "true" }, " *") : null));
+  else inp.setAttribute("aria-label", titulo);
+  campo.append(inp, errEl);
+  corpo.append(campo);
+
+  const dlg = el("div", {
+    class: "np-alert-dlg np-prompt-dlg",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-labelledby": uid + "-t",
+    ...(msg ? { "aria-describedby": uid + "-d" } : {})
+  },
+    el("div", { class: "np-alert-h" }, el("h2", { id: uid + "-t" }, titulo), btnX),
+    corpo,
+    el("div", { class: "np-alert-f" }, btnNao, btnSim)
+  );
+  const bg = el("div", { class: "np-alert-bg" }, dlg);
+
+  let soltarIrmaos = () => {};
+  const outroAberto = () => [...host.querySelectorAll('[role="dialog"],[role="alertdialog"]')].some((d) => d !== dlg);
+  const fechar = (val) => {
+    if (fechado) return;
+    fechado = true;
+    doc.removeEventListener("keydown", onKey, true);
+    if (bg.isConnected) bg.remove();
+    soltarIrmaos();
+    if (!outroAberto()) app?.removeAttribute("inert");
+    if (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") {
+      setTimeout(() => { try { origemEl.focus(); } catch (_) {} }, 0);
+    }
+    const r = resolver; resolver = null;
+    if (r) r(val);
+  };
+
+  const setErro = (txt) => {
+    if (txt) { errEl.textContent = txt; errEl.hidden = false; inp.setAttribute("aria-invalid", "true"); }
+    else { errEl.textContent = ""; errEl.hidden = true; inp.removeAttribute("aria-invalid"); }
+  };
+
+  const enviar = () => {
+    const v = inp.value;
+    if (obrigatorio && !v.trim()) { setErro(FORM_MSG.obrigatorio); inp.focus(); return; }
+    if (typeof validar === "function") {
+      const msgErro = validar(v);
+      if (msgErro) { setErro(String(msgErro)); inp.focus(); return; }
+    }
+    setErro(null);
+    fechar(v);
+  };
+
+  inp.addEventListener("input", () => { if (inp.getAttribute("aria-invalid") === "true") setErro(null); });
+
+  const focaveis = () => [...dlg.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((n) => !n.disabled && !n.hidden && n.offsetParent !== null);
+  const onKey = (e) => {
+    if (!dlg.isConnected) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(null); return; }
+    if (e.key === "Tab") {
+      const fs = focaveis(); if (!fs.length) return;
+      const i = fs.indexOf(doc.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); fs[fs.length - 1].focus(); }
+      else if (!e.shiftKey && (i === fs.length - 1 || i === -1)) { e.preventDefault(); fs[0].focus(); }
+      return;
+    }
+    if (e.key === "Enter" && doc.activeElement === inp) {
+      if (!multiline || e.ctrlKey || e.metaKey) { e.preventDefault(); enviar(); }
+    }
+  };
+
+  const prom = new Promise((resolve) => { resolver = resolve; });
+
+  btnNao.onclick = () => fechar(null);
+  btnX.onclick = () => fechar(null);
+  bg.addEventListener("mousedown", (e) => { if (e.target === bg) fechar(null); });
+  btnSim.onclick = enviar;
+
+  doc.addEventListener("keydown", onKey, true);
+  host.append(bg);
+  soltarIrmaos = prenderIrmaos(host, bg);
+  app?.setAttribute("inert", "");
+  setTimeout(() => {
+    if (fechado) return;
+    inp.focus();
+    if (!multiline && valorInicial && typeof inp.select === "function") { try { inp.select(); } catch (_) {} }
+  }, 0);
+  prom.fechar = () => fechar(null);
+  prom.el = dlg;
+  return prom;
+};
+
+const ativo = () => doc.documentElement.classList.contains("np-casca-v3");
+window.NPUI = { ativo, form, modalV3, confirmar, pedirTexto, secaoForm, maisCampos, revelarCampo, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

@@ -124,7 +124,13 @@
     finally { E.rodando = false; renderEsp(); }
   }
   async function limpar() {
-    if (!confirm("Apagar TODOS os dados copiados no beta (clientes, leads, processos, tarefas…)? Os cadastros base e os logins do beta ficam.")) return;
+    const ok = await npConfirmar({
+      titulo: "Limpar dados do espelho beta?",
+      mensagem: "Todos os dados copiados no beta (clientes, leads, processos, tarefas…) serão apagados. Os cadastros base e os logins do beta permanecem.",
+      confirmar: "Limpar beta",
+      perigo: true
+    });
+    if (!ok) return;
     const { data, error } = await E.beta.rpc("espelho_limpar"); if (error) { toast(error.message); return; } toast("Beta limpo (" + data + ")"); E.log = []; renderEsp();
   }
 

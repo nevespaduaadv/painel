@@ -18,12 +18,71 @@ const invalidar=()=>{G.motivos=null;G.slas=null;G.medidas=null;G.wf=null;render(
 function formMotivo(m){
   const txt=inp("text",m?.motivo||"",{placeholder:"Ex.: Aguardando documentos do cliente"}),comp=check("Exige complemento escrito (ex.: “Outro”)",!!m?.exige_complemento),ativo=check("Ativo (aparece na lista)",m?m.ativo!==false:true),ordem=inp("number",m?.ordem??((G.motivos||[]).length+1)*10,{min:0});
   const body=el("div",{class:"form"},field("mt-txt","Motivo",txt),field("mt-ord","Ordem",ordem),el("div",{class:"f full"},comp.wrap),el("div",{class:"f full"},ativo.wrap));
-  const extra=m?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir este motivo? (os reagendamentos antigos continuam com o texto)"))return;const {error}=await SB.from("motivos_reagendamento").delete().eq("id",m.id);$("#modalHost").replaceChildren();if(error){toast(error.message);return}toast("Excluído");invalidar()}},"Excluir"):null;
+  const extra=m?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir motivo de reagendamento?",mensagem:`Excluir o motivo “${m.motivo}”? Os reagendamentos antigos continuam com o texto salvo.`,confirmar:"Excluir motivo",perigo:true,onSim:async()=>{const {error}=await SB.from("motivos_reagendamento").delete().eq("id",m.id);if(error){toast(error.message);throw error}$("#modalHost").replaceChildren();toast("Excluído");invalidar()}})}},"Excluir"):null;
   modal(m?"Editar motivo":"Novo motivo de reagendamento",body,async()=>{if(!txt.value.trim())throw new Error("Informe o motivo");const row={motivo:txt.value.trim(),exige_complemento:comp.input.checked,ativo:ativo.input.checked,ordem:+ordem.value||0};
     const q=m?SB.from("motivos_reagendamento").update(row).eq("id",m.id):SB.from("motivos_reagendamento").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar()},extra);
 }
+const cfgV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
+const C3={aba:"motivos"};
+function formMedida(m){
+  const nome=inp("text",m?.nome||"",{placeholder:"Ex.: Conta escrow"}),cod=inp("text",m?.codigo||"",{placeholder:"código curto, sem espaços (ex.: escrow)"}),desc=el("textarea",{rows:2},m?.descricao||""),ordem=inp("number",m?.ordem??((G.medidas||[]).length+1)*10),ativo=check("Ativa (aparece no cadastro dos clientes)",m?m.ativo!==false:true);if(m)cod.disabled=true;
+  const body=el("div",{class:"form"},field("md-nome","Medida",nome),field("md-cod","Código",cod),field("md-ord","Ordem",ordem),el("div",{class:"f full"},el("label",{},"Descrição (ajuda para a equipe)"),desc),el("div",{class:"f full"},ativo.wrap));
+  modal(m?"Editar medida":"Nova medida operacional",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),descricao:desc.value.trim()||null,ordem:+ordem.value||0,ativo:ativo.input.checked};if(!m){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_")}
+    const q=m?SB.from("medidas_operacionais").update(row).eq("id",m.id):SB.from("medidas_operacionais").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar();window.PP_PROTECAO?.invalidar?.()});
+}
+function formWf(w){
+  const nome=inp("text",w?.nome||"",{placeholder:"Ex.: Apelação"}),cod=inp("text",w?.codigo||"",{placeholder:"código curto (ex.: apelacao)"}),legais=inp("number",w?.dias_legais??15,{min:1}),cont=sel({uteis:"Dias úteis",corridos:"Dias corridos"},w?.tipo_contagem||"uteis"),internos=inp("number",w?.dias_internos??10,{min:1}),conf=inp("number",w?.confeccionar_offset??-5,{max:-1}),prot=inp("number",w?.protocolar_offset??-2,{max:0}),confe=inp("number",w?.conferir_offset??-1,{max:0}),custas=check("Tem custas (abre etapa “Recolher custas” em D-3)",!!w?.custas),dec=inp("text",w?.decisao_inicial||"",{placeholder:"Ex.: Analisar cabimento de apelação (vazio = sem etapa de análise)"}),ordem=inp("number",w?.ordem??((G.wf||[]).length+1)*10),ativo=check("Ativo (aparece ao tratar publicação)",w?w.ativo!==false:true);
+  if(w)cod.disabled=true;
+  const body=el("div",{class:"form"},field("wf-nome","Nome",nome),field("wf-cod","Código",cod),field("wf-leg","Prazo legal (dias)",legais),field("wf-cont","Contagem",cont),field("wf-int","Prazo interno (dias)",internos,"Referência para a equipe: 10 quando o legal é 15; 3 quando é 5."),field("wf-ord","Ordem",ordem),
+    field("wf-conf","Confeccionar (D)",conf,"Dias úteis antes do prazo legal. Padrão -5 (−3 nos prazos de 5 dias)."),field("wf-prot","Protocolar (D)",prot,"Meta interna de protocolo. Padrão -2."),field("wf-confe","Conferir protocolo (D)",confe,"Vai para a controladoria. Padrão -1."),
+    el("div",{class:"f full"},el("label",{},"Etapa de análise (opcional)"),dec,el("div",{class:"help"},"Se preenchido, abre antes da cadeia uma tarefa com este título (2 dias úteis após a publicação); ao concluí-la o sistema pergunta se cabe.")),el("div",{class:"f full"},custas.wrap),el("div",{class:"f full"},ativo.wrap));
+  const extra=w?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir tipo de prazo?",mensagem:`Excluir “${w.nome}”? As cadeias de tarefas já abertas continuam normalmente.`,confirmar:"Excluir tipo de prazo",perigo:true,onSim:async()=>{const {error}=await SB.from("workflows_prazo").delete().eq("codigo",w.codigo);if(error){toast(error.message);throw error}$("#modalHost").replaceChildren();toast("Excluído");invalidar()}})}},"Excluir"):null;
+  modal(w?"Editar tipo de prazo":"Novo tipo de prazo",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),dias_legais:+legais.value||15,tipo_contagem:cont.value,dias_internos:+internos.value||10,confeccionar_offset:Math.min(-1,+conf.value||-5),protocolar_offset:Math.min(0,+prot.value||-2),conferir_offset:Math.min(0,+confe.value||-1),custas:custas.input.checked,decisao_inicial:dec.value.trim()||null,ordem:+ordem.value||0,ativo:ativo.input.checked,updated_at:new Date().toISOString()};
+    if(!w){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");if(!row.codigo)throw new Error("Informe o código")}
+    const q=w?SB.from("workflows_prazo").update(row).eq("codigo",w.codigo):SB.from("workflows_prazo").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar()},extra);
+}
+function renderTelaV3(v){
+  v.classList.add("np-v3");
+  if(!pode()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"configurações"}])}),NPUI.vazio({titulo:"Acesso restrito",texto:"Configurações restritas à gestão e controladoria."}));return}
+  if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"carregando"}])}),NPUI.carregando(5));return}
+  const ctaCfg={motivos:["+ Motivo",()=>formMotivo()],medidas:["+ Medida",()=>formMedida()],wf:["+ Tipo de prazo",()=>formWf(null)]}[C3.aba];
+  const btnCta=NPUI.btn(ctaCfg[0],{variante:"pri",onclick:ctaCfg[1]});
+  const abas=[["motivos","Motivos de reagendamento"],["medidas","Medidas de proteção"],["wf","Tipos de prazo (cadeias)"]];
+  v.append(NPUI.toolbar({
+    resumo:NPUI.resumo([
+      {n:String((G.motivos||[]).filter(m=>m.ativo).length),label:"motivos"},
+      {n:String((G.medidas||[]).filter(m=>m.ativo).length),label:"medidas"},
+      {n:String((G.wf||[]).filter(w=>w.ativo).length),label:"cadeias"}
+    ]),
+    filtros:[NPUI.seg(abas,C3.aba,k=>{C3.aba=k;render()},"Seções de configurações")],
+    direita:[btnCta]
+  }));
+  const D=n=>n>0?"D+"+n:"D"+n;
+  if(C3.aba==="motivos"){
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Motivos de reagendamento"),el("div",{class:"desc"},"Ao alterar o prazo de uma tarefa, o colaborador escolhe um destes motivos. Gestão e controladoria recebem o aviso."))),
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Motivo"),el("th",{},"Complemento"),el("th",{},"Situação"),el("th",{class:"r"},""))),
+        el("tbody",{},G.motivos.length?G.motivos.map(m=>el("tr",{},el("td",{class:"np-num"},String(m.ordem)),el("td",{},m.motivo),el("td",{class:"np-ts-sub"},m.exige_complemento?"obrigatório":"opcional"),el("td",{},NPUI.marca(m.ativo?"ativo":"inativo",m.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formMotivo(m)})))):el("tr",{},el("td",{colspan:5,class:"np-ts-sub"},"Nenhum motivo cadastrado.")))))));
+  }else if(C3.aba==="medidas"){
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"desc"},"Checklist exibido em Cadastro → Proteção patrimonial e operacional de cada cliente PJ. Desativar esconde sem apagar o histórico."))),
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Medida"),el("th",{},"Descrição"),el("th",{},"Situação"),el("th",{class:"r"},""))),
+        el("tbody",{},(G.medidas||[]).length?G.medidas.map(m=>el("tr",{},el("td",{class:"np-num"},String(m.ordem)),el("td",{},el("b",{},m.nome),el("div",{class:"np-ts-sub"},m.codigo)),el("td",{class:"np-ts-sub"},m.descricao||"—"),el("td",{},NPUI.marca(m.ativo?"ativa":"inativa",m.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formMedida(m)})))):el("tr",{},el("td",{colspan:5,class:"np-ts-sub"},"Nenhuma medida cadastrada.")))))));
+  }else{
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de prazo (cadeias)"),el("div",{class:"desc"},"Ao tratar uma publicação com “Gerou prazo”, o tipo abre a cadeia completa em dias úteis a partir do prazo legal."))),
+      G.wfErro?NPUI.vazio({titulo:"Workflows indisponíveis",texto:G.wfErro}):
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Tipo"),el("th",{class:"r"},"Legal"),el("th",{class:"r"},"Interno"),el("th",{class:"r"},"Confec."),el("th",{},"Custas"),el("th",{class:"r"},"Protoc."),el("th",{class:"r"},"Conferir"),el("th",{},"Análise antes"),el("th",{},"Situação"),el("th",{class:"r"},""))),
+        el("tbody",{},(G.wf||[]).length?G.wf.map(w=>el("tr",{},el("td",{class:"np-num"},String(w.ordem)),el("td",{},el("b",{},w.nome),el("div",{class:"np-ts-sub"},w.codigo)),el("td",{class:"r"},w.dias_legais+" "+(w.tipo_contagem==="corridos"?"corr.":"úteis")),el("td",{class:"r"},String(w.dias_internos)),el("td",{class:"r"},D(w.confeccionar_offset)),el("td",{class:"np-num"},w.custas?"D-3":"—"),el("td",{class:"r"},D(w.protocolar_offset)),el("td",{class:"r"},D(w.conferir_offset)),el("td",{class:"np-ts-sub"},w.decisao_inicial||"—"),el("td",{},NPUI.marca(w.ativo?"ativo":"inativo",w.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formWf(w)})))):el("tr",{},el("td",{colspan:11,class:"np-ts-sub"},"Nenhum tipo cadastrado.")))))));
+  }
+}
 function renderTela(){
   const v=$("#view-config-gestao");if(!v)return;v.replaceChildren();
+  if(cfgV3()){renderTelaV3(v);return}
+  v.classList.remove("np-v3");
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Gestão"),el("h1",{},"Configurações"),el("div",{class:"sub"},"Regras que a gestão e a controladoria definem e a equipe usa no dia a dia: motivos de reagendamento, medidas de proteção e tipos de prazo (cadeias)."))));
   if(!pode()){v.append(el("div",{class:"note"},"Acesso restrito à gestão."));return}
   if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(el("div",{class:"note"},"Carregando…"));return}
@@ -32,23 +91,10 @@ function renderTela(){
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Motivo"),el("th",{},"Complemento"),el("th",{},"Situação"),el("th",{}))),
       el("tbody",{},G.motivos.length?G.motivos.map(m=>el("tr",{},el("td",{class:"num"},String(m.ordem)),el("td",{},m.motivo),el("td",{},m.exige_complemento?"obrigatório":"opcional"),el("td",{},el("span",{class:"pill "+(m.ativo?"g":"")},m.ativo?"Ativo":"Inativo")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formMotivo(m)},"Editar")))):el("tr",{},el("td",{colspan:5,class:"note"},"Nenhum motivo cadastrado.")))))));
   // medidas operacionais (proteção)
-  const formMedida=m=>{const nome=inp("text",m?.nome||"",{placeholder:"Ex.: Conta escrow"}),cod=inp("text",m?.codigo||"",{placeholder:"código curto, sem espaços (ex.: escrow)"}),desc=el("textarea",{rows:2},m?.descricao||""),ordem=inp("number",m?.ordem??((G.medidas||[]).length+1)*10),ativo=check("Ativa (aparece no cadastro dos clientes)",m?m.ativo!==false:true);if(m)cod.disabled=true;
-    const body=el("div",{class:"form"},field("md-nome","Medida",nome),field("md-cod","Código",cod),field("md-ord","Ordem",ordem),el("div",{class:"f full"},el("label",{},"Descrição (ajuda para a equipe)"),desc),el("div",{class:"f full"},ativo.wrap));
-    modal(m?"Editar medida":"Nova medida operacional",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),descricao:desc.value.trim()||null,ordem:+ordem.value||0,ativo:ativo.input.checked};if(!m){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_")}
-      const q=m?SB.from("medidas_operacionais").update(row).eq("id",m.id):SB.from("medidas_operacionais").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar();window.PP_PROTECAO?.invalidar?.()})};
   v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"note"},"Checklist que aparece em Cadastro → Proteção patrimonial e operacional de cada cliente PJ (escrow, gestora, CNPJ espelho…). Desativar esconde sem apagar o histórico.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formMedida()},"+ Medida"))),
     el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Medida"),el("th",{},"Descrição"),el("th",{},"Situação"),el("th",{}))),
       el("tbody",{},(G.medidas||[]).length?G.medidas.map(m=>el("tr",{},el("td",{class:"num"},String(m.ordem)),el("td",{},el("b",{},m.nome),el("div",{class:"note"},m.codigo)),el("td",{class:"note"},m.descricao||"—"),el("td",{},el("span",{class:"pill "+(m.ativo?"g":"")},m.ativo?"Ativa":"Inativa")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formMedida(m)},"Editar")))):el("tr",{},el("td",{colspan:5,class:"note"},"Nenhuma medida cadastrada (rode a migração 0092).")))))));
   // workflows de prazo fracionado (0102)
-  const formWf=w=>{const nome=inp("text",w?.nome||"",{placeholder:"Ex.: Apelação"}),cod=inp("text",w?.codigo||"",{placeholder:"código curto (ex.: apelacao)"}),legais=inp("number",w?.dias_legais??15,{min:1}),cont=sel({uteis:"Dias úteis",corridos:"Dias corridos"},w?.tipo_contagem||"uteis"),internos=inp("number",w?.dias_internos??10,{min:1}),conf=inp("number",w?.confeccionar_offset??-5,{max:-1}),prot=inp("number",w?.protocolar_offset??-2,{max:0}),confe=inp("number",w?.conferir_offset??-1,{max:0}),custas=check("Tem custas (abre etapa “Recolher custas” em D-3)",!!w?.custas),dec=inp("text",w?.decisao_inicial||"",{placeholder:"Ex.: Analisar cabimento de apelação (vazio = sem etapa de análise)"}),ordem=inp("number",w?.ordem??((G.wf||[]).length+1)*10),ativo=check("Ativo (aparece ao tratar publicação)",w?w.ativo!==false:true);
-    if(w)cod.disabled=true;
-    const body=el("div",{class:"form"},field("wf-nome","Nome",nome),field("wf-cod","Código",cod),field("wf-leg","Prazo legal (dias)",legais),field("wf-cont","Contagem",cont),field("wf-int","Prazo interno (dias)",internos,"Referência para a equipe: 10 quando o legal é 15; 3 quando é 5."),field("wf-ord","Ordem",ordem),
-      field("wf-conf","Confeccionar (D)",conf,"Dias úteis antes do prazo legal. Padrão -5 (−3 nos prazos de 5 dias)."),field("wf-prot","Protocolar (D)",prot,"Meta interna de protocolo. Padrão -2."),field("wf-confe","Conferir protocolo (D)",confe,"Vai para a controladoria. Padrão -1."),
-      el("div",{class:"f full"},el("label",{},"Etapa de análise (opcional)"),dec,el("div",{class:"help"},"Se preenchido, abre antes da cadeia uma tarefa com este título (2 dias úteis após a publicação); ao concluí-la o sistema pergunta se cabe.")),el("div",{class:"f full"},custas.wrap),el("div",{class:"f full"},ativo.wrap));
-    const extra=w?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir este tipo de prazo? (as cadeias já abertas continuam)"))return;const {error}=await SB.from("workflows_prazo").delete().eq("codigo",w.codigo);$("#modalHost").replaceChildren();if(error){toast(error.message);return}toast("Excluído");invalidar()}},"Excluir"):null;
-    modal(w?"Editar tipo de prazo":"Novo tipo de prazo",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),dias_legais:+legais.value||15,tipo_contagem:cont.value,dias_internos:+internos.value||10,confeccionar_offset:Math.min(-1,+conf.value||-5),protocolar_offset:Math.min(0,+prot.value||-2),conferir_offset:Math.min(0,+confe.value||-1),custas:custas.input.checked,decisao_inicial:dec.value.trim()||null,ordem:+ordem.value||0,ativo:ativo.input.checked,updated_at:new Date().toISOString()};
-      if(!w){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");if(!row.codigo)throw new Error("Informe o código")}
-      const q=w?SB.from("workflows_prazo").update(row).eq("codigo",w.codigo):SB.from("workflows_prazo").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar()},extra)};
   const D=n=>n>0?"D+"+n:"D"+n;
   v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Tipos de prazo (cadeias)"),el("div",{class:"note"},"Ao tratar uma publicação com “Gerou prazo”, escolher o tipo abre a cadeia de uma vez: Confeccionar → (Custas) → Protocolar → Conferir protocolo (controladoria). Datas em dias úteis a partir do prazo legal.")),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>formWf(null)},"+ Tipo de prazo"))),
     G.wfErro?el("div",{class:"note"},"Tabela de workflows ainda não existe no banco — rode a migração 0102."):

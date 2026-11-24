@@ -5,6 +5,8 @@
 const D={ok:false,carregando:false,prazos:[],tarefas:[],colab:[],eventos:[],leads:null,escopo:"minhas",cal:{ref:null,chave:null,agenda:[],carregando:false,dia:null},foco:{dia:null,modo:"dia"}};
 try{D.escopo=localStorage.getItem("pp-painel-escopo")||"minhas"}catch(_){}
 const meuColab=()=>D.colab.find(c=>c.perfil_id===PP.perfil?.id);
+/* contagem da lateral enquanto Tarefas ainda não foi aberta: mesmas tarefas minhas que vencem hoje, lidas dos prazos já carregados pela Home */
+window.PP_HOJE_CONT=()=>{const m=meuColab();return D.ok&&m?D.prazos.filter(z=>z.origem==="tarefa"&&z.responsavel_id===m.id&&z.faixa==="hoje").length:null};
 const fmtDT=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 async function carregar(){
   if(D.carregando)return;D.carregando=true;
@@ -249,14 +251,17 @@ function abrirPainelHojeV3(i,li){
   const pe=[NPUI.btn("Abrir na agenda",{variante:"pri",onclick:()=>window.PP_AGENDA?.ir(new Date(e.inicio),"dia")}),e.origem==="tarefa"&&e.tarefa_id?NPUI.btn("Abrir a tarefa",{onclick:()=>window.PP_TAREFAS?.abrir(e.tarefa_id)}):null,e.lead_id?NPUI.btn("Abrir o lead",{onclick:()=>{location.hash="#leads/"+e.lead_id}}):null,e.link&&e.origem==="google"?el("a",{class:"np-btn",href:e.link,target:"_blank",rel:"noopener"},"Abrir no Google"):null];
   H3.painel.abrir({id:H3.aberta,trilha:[el("span",{},"Hoje"),el("span",{},"Compromisso")],titulo:e.titulo,corpo:[props,desc],pe,origem:li?.querySelector(".np-it-abrir")||li});
 }
-function grupoHojeV3(id,titulo,lista,{tom,aberto=true,vazio,comDia=true}={}){
+function grupoHojeV3(id,titulo,lista,{tom,aberto=true,vazio,comDia=true,acao}={}){
   if(!lista.length&&!vazio)return null;
-  const itens=lista.length?lista.map(i=>linhaHojeV3(i,{comDia})):[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},vazio))];
+  // vazio no padrão do DS: o que aconteceu + a próxima ação, na própria linha
+  const itens=lista.length?lista.map(i=>linhaHojeV3(i,{comDia})):[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},el("span",{},vazio,acao?[" ",el("button",{type:"button",class:"lnk",onclick:acao.fn},acao.label)]:null)))];
   return NPUI.grupo({id,titulo,n:lista.length,tom,aberto:NPUI.pref.get("np-hoje-g-"+id,aberto?"1":"0")==="1",onToggle:ab=>NPUI.pref.set("np-hoje-g-"+id,ab?"1":"0"),itens});
 }
 function renderPainelV3(){
   const v=$("#view-painel");v.replaceChildren();v.classList.add("np-v3");H3.obra=null;H3.painel=null;
-  const nome=(PP.perfil?.nome||"").split(" ").slice(0,2).join(" ");const h=new Date().getHours(),sauda=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
+  // nome da saudação: o da ficha de colaborador; se o perfil só tem o identificador de login ("nome.sobrenome"), a saudação sai sem nome
+  const nomeBruto=String(meuColab()?.nome||PP.perfil?.nome||"").trim();const nome=/@/.test(nomeBruto)||(!/\s/.test(nomeBruto)&&/[._]/.test(nomeBruto))?"":nomeBruto.split(" ").slice(0,2).join(" ");
+  const h=new Date().getHours(),sauda=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
   const esc=PP.escopoTarefas?.()||{tudo:true};if(!esc.tudo&&!esc.nucleos)D.escopo="minhas";
   if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   const meu=meuColab();const hoje=isoD(hojeD());
@@ -269,7 +274,19 @@ function renderPainelV3(){
   const ini=(()=>{const x=new Date(D.cal.ref);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);return x})();carregarAgendaMes(ini,addDia(ini,42));
   const porDia=itensPorDia(prazos,meu);const ord=l=>[...l].sort((a,b)=>(a.atrasada?0:1)-(b.atrasada?0:1)||(a.fatal?0:1)-(b.fatal?0:1)||((a.hora||"99")<(b.hora||"99")?-1:1)||(a.dia<b.dia?-1:1));
   const evHoje=(porDia[hoje]||[]).filter(i=>i.k==="evento").length;
-  const resumo=NPUI.resumo([{n:fatais.length,label:"fatais em 7 dias",tom:fatais.length?"crit":"zero"},{n:atrasadas.length,label:"atrasadas",tom:atrasadas.length?"crit":"zero"},{n:(porDia[hoje]||[]).filter(i=>i.k==="prazo").length,label:"vencem hoje",tom:(porDia[hoje]||[]).some(i=>i.k==="prazo")?"att":"zero"},{n:evHoje,label:evHoje===1?"compromisso hoje":"compromissos hoje",tom:evHoje?"":"zero"},{n:tarefas.length,label:"abertas"}]);
+  // resumo: só o que existe. Uma fileira de zeros não é informação de trabalho; sem nada, uma frase calma no mesmo lugar.
+  const venHoje=(porDia[hoje]||[]).filter(i=>i.k==="prazo").length;
+  // faixa do dia (Figma de 18/11): o que pede ação HOJE, na ordem em que deve ser feito. "Fatais em 7 dias" e o total de abertas saíram daqui:
+  // continuam em Tarefas e prazos; publicações a analisar só entram quando a classificação ADVBox (0116) estiver em uso, para não somar o acervo antigo.
+  const nFatHoje=prazos.filter(z=>z.prazo_fatal&&z.faixa==="hoje").length,paraHoje=Math.max(0,venHoje-nFatHoje),nAv=window.PP_AVISOS?.naoLidos?.()||0;
+  const itensRes=[{n:nFatHoje,label:nFatHoje===1?"prazo fatal hoje":"prazos fatais hoje",tom:"crit"},{n:atrasadas.length,label:atrasadas.length===1?"atrasada":"atrasadas",tom:"crit"},{n:paraHoje,label:paraHoje===1?"tarefa para hoje":"tarefas para hoje",tom:"att"},{n:evHoje,label:evHoje===1?"compromisso hoje":"compromissos hoje",tom:""},{n:nAv,label:nAv===1?"aviso não lido":"avisos não lidos",tom:""}].filter(i=>i.n>0);
+  const resumo=itensRes.length?NPUI.resumo(itensRes):el("div",{class:"np-resumo np-resumo-calmo",role:"status","aria-live":"polite"},D.escopo==="equipe"?"Nada pendente na equipe":"Nada pendente para você");
+  // quem vê a equipe e está em "Minhas": o que a equipe tem de crítico aparece numa linha, com o caminho para ver
+  const podeEquipe=!!(esc.tudo||esc.nucleos);const daEquipe=z=>esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id);
+  const eqP=podeEquipe&&D.escopo==="minhas"?D.prazos.filter(daEquipe):[];// só o que está POR VIR (hoje e 7 dias): prazo vencido da equipe não entra nesta linha — ele aparece, com contexto, em "Equipe" e em Tarefas.
+  // Um total de atrasos de todo o escritório na abertura da Home lê-se como alarme pessoal, e hoje inclui registros em conciliação com o ADVBox.
+  const naoMeu=z=>!(meu&&z.responsavel_id===meu.id);const eqFat=eqP.filter(z=>naoMeu(z)&&z.prazo_fatal&&["hoje","d7"].includes(z.faixa)).length,eqHoje=eqP.filter(z=>naoMeu(z)&&z.faixa==="hoje").length;
+  const irEquipe=()=>{D.escopo="equipe";try{localStorage.setItem("pp-painel-escopo","equipe")}catch(_){}render()};
   const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
   if(esc.tudo||esc.nucleos){C({label:"Minhas",on:D.escopo==="minhas",grupo:"escopo",onclick:()=>{D.escopo="minhas";try{localStorage.setItem("pp-painel-escopo","minhas")}catch(_){}render()}});C({label:esc.tudo?"Equipe":"Jurídico",on:D.escopo==="equipe",grupo:"escopo",onclick:()=>{D.escopo="equipe";try{localStorage.setItem("pp-painel-escopo","equipe")}catch(_){}render()}})}
   const f=D.foco;const seg=NPUI.seg([["dia","Hoje"],["semana","Semana"],["mes","Mês"]],f.modo,k=>{f.modo=k;if(k==="dia")f.dia=hoje;NPUI.vt(()=>render())},"Período");
@@ -280,7 +297,10 @@ function renderPainelV3(){
   v.append(NPUI.toolbar({resumo,filtros:chips.length?chips:null,direita}));NPUI.reancorarPop();
   const obra=el("div",{class:"np-obra"});H3.obra=obra;const corpo=el("div",{class:"np-corpo"});
   // saudação + data (serifa) — substitui o cabeçalho da V2
-  corpo.append(el("div",{class:"np-hoje-h"},el("h1",{},`${sauda}${nome?", "+nome:""}`),el("span",{class:"np-hoje-d"},dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}))));
+  const nomeEq=esc.tudo?"equipe":"Jurídico";
+  const linhaEq=eqFat>0||eqHoje>0?el("p",{class:"np-hoje-eq"},esc.tudo?"Na equipe: ":"No Jurídico: ",[eqHoje>0?[el("b",{},String(eqHoje)),eqHoje===1?" prazo vence hoje":" prazos vencem hoje"]:null,eqFat>0&&eqHoje>0?" · ":null,eqFat>0?[el("b",{},String(eqFat)),eqFat===1?" fatal nos próximos 7 dias":" fatais nos próximos 7 dias"]:null].flat().filter(Boolean)," ",el("button",{type:"button",class:"lnk",onclick:irEquipe},esc.tudo?"Ver a equipe":"Ver o Jurídico")):null;
+  // saudação no topo da tela, acima da faixa (Figma de 18/11); a linha da equipe vai para o fim dos grupos
+  v.prepend(el("div",{class:"np-hoje-h np-hoje-topo"},el("h1",{},`${sauda}${nome?", "+nome:""}.`),el("span",{class:"np-hoje-d"},dsel.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase()))));
   // cronômetro rodando (Agora) — mesma leitura e as mesmas ações da V2
   if(!AG.ok)carregarAgora(meu);
   if(AG.cron){const t=D.tarefas.find(x=>x.id===AG.cron.tarefa_id);const rel=el("b",{class:"np-cron"},"00:00:00");const tick=()=>{const s0=Math.max(0,Math.floor((Date.now()-new Date(AG.cron.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s0/3600)).padStart(2,"0")}:${String(Math.floor(s0%3600/60)).padStart(2,"0")}:${String(s0%60).padStart(2,"0")}`};tick();clearInterval(AG.t);AG.t=setInterval(tick,1000);
@@ -298,10 +318,10 @@ function renderPainelV3(){
           // "meio-dia" é a META INTERNA da controladoria (protocolar no dia fatal até 12h e confirmar), não o horário de vencimento do prazo
           const acao=t&&!readOnly()?NPUI.btn("Confirmar protocolo",{variante:"pri",onclick:()=>window.PP_TAREFAS?.concluirComNota?.(t)}):z.origem==="processo"?NPUI.btn("Abrir cliente · Processos",{variante:"ghost",title:"Abre a ficha do cliente na aba Processos",onclick:()=>abrirItemDia(i)}):null;
           return NPUI.linha({id:"fatal:"+z.origem+":"+z.id,regua:"fatal",prazo:{curta:"hoje",rel:tarde?"meta interna 12h passou":"meta interna: até 12h",exata:"Vence hoje. Meta interna da controladoria: protocolar até 12h e confirmar (não é o horário legal de vencimento).",tom:"crit"},titulo:z.descricao,contexto:ctxV3([z.cliente_nome,z.origem==="processo"?"prazo processual":null]),direita:[NPUI.marca("fatal","crit"),z.origem==="processo"?NPUI.marca("processo"):null,NPUI.quem(z.responsavel_nome),acao],onOpen:()=>abrirItemDia(i),titleAbrir:z.origem==="tarefa"?"Abrir a tarefa":"Abrir a ficha do cliente (aba Processos)"})});
-        G.push(NPUI.grupo({id:"fatais",titulo:"Prazos fatais de hoje — rotina da controladoria: protocolar até 12h e confirmar"+(tarde?" (12h já passou)":""),n:fataisHoje.length,tom:"crit",aberto:true,itens}))}
+        G.push(NPUI.grupo({id:"fatais",titulo:"Prazos fatais de hoje — protocolar até 12h e confirmar"+(tarde?" (12h já passou)":""),n:fataisHoje.length,tom:"crit",aberto:true,itens}))}
       if(atrasados.length)G.push(grupoHojeV3("atrasados","Atrasados — resolver primeiro",ord(atrasados),{tom:"crit"}));
       const hojeSemFatais=(porDia[hoje]||[]).filter(i=>!(i.k==="prazo"&&fatalIds.has("prazo:"+i.z.origem+":"+i.z.id)));
-      G.push(grupoHojeV3("hoje","Para hoje",ord(hojeSemFatais),{vazio:fataisHoje.length?"Além dos prazos fatais, nada mais vence hoje.":"Nada vence hoje. Bom momento para adiantar a semana.",comDia:false}));
+      G.push(grupoHojeV3("hoje","Para hoje",ord(hojeSemFatais),{vazio:fataisHoje.length?"Além dos prazos fatais, nada mais vence hoje.":D.escopo==="minhas"?"Nada vence hoje para você.":"Nada vence hoje.",comDia:false,acao:{label:"Ver a semana",fn:()=>{f.modo="semana";NPUI.vt(()=>render())}}}));
       const prox=[1,2,3].map(n=>isoD(addDia(dsel,n))).flatMap(k=>porDia[k]||[]);G.push(grupoHojeV3("prox","Próximos 3 dias",ord(prox),{vazio:"Nada nos próximos três dias."}));
     }else G.push(grupoHojeV3("dia","Neste dia",ord(porDia[f.dia]||[]),{vazio:"Nada neste dia.",comDia:false}));
   }else if(f.modo==="semana"){
@@ -315,23 +335,28 @@ function renderPainelV3(){
     if(!dias.length)corpo.append(NPUI.vazio({titulo:"Nada marcado neste mês",texto:"Nenhum prazo ou compromisso no mês."}));
   }
   G.filter(Boolean).forEach(g=>corpo.append(g));
+  if(linhaEq)corpo.append(linhaEq);
   // atividade recente — por último, recolhida por padrão (mesmo filtro de setor da V2)
   const SETORES={"":"Todos",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",administrativo:"Administrativo"};const SETOR_DE={juridico:"juridico",acordos:"juridico",acompanhamento_pj:"juridico",comercial:"comercial",marketing:"marketing",administrativo:"administrativo",pos_vendas:"comercial",rh:"administrativo",socios:"administrativo"};
   const escAtv=PP.escopoTarefas?.()||{tudo:true};D.atvSetor=D.atvSetor??(()=>{try{return localStorage.getItem("pp-painel-atv")||""}catch(_){return ""}})();
   const atvOk=e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);if(escAtv.tudo)return !D.atvSetor||(t&&SETOR_DE[t.nucleo]===D.atvSetor);if(!t)return false;const minha=(meu&&t.responsavel_id===meu.id)||t.created_by===PP.perfil?.id||e.autor===PP.perfil?.id;return minha||(escAtv.nucleos||[]).includes(t.nucleo)};
   const eventosVis=D.eventos.filter(atvOk).slice(0,12);
   const itensAtv=eventosVis.map(e=>{const t=D.tarefas.find(x=>x.id===e.tarefa_id);const d=new Date(e.criado_em);const p=NPUI.prazoTxt(isoD(d),String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"));
-    const oque=(EVENTO[e.tipo]||e.tipo)+" "+(e.tipo==="prazo_alterado"?`${e.de||"—"} para ${e.para||"—"}`:e.tipo==="reatribuida"?`de ${e.de||"—"} para ${e.para||"—"}`:"");
-    return NPUI.linha({id:"atv:"+e.id,prazo:p,titulo:[el("b",{},e.autor_nome||"Alguém")," ",oque.trim()," ",t?el("span",{class:"np-atv-t"},t.titulo):""],contexto:e.nota?["“"+String(e.nota).slice(0,120)+"”"]:null,direita:[],onOpen:()=>{if(t)window.PP_TAREFAS?.abrir(t.id)},titleAbrir:t?"Abrir a tarefa":"Sem tarefa"})});
+    // frase inteira: quem · o que · em quê. Sem autor = rotina do sistema; tarefa fora do que está carregado = "uma tarefa" (nunca frase cortada)
+    const STV={aberta:"A fazer",em_andamento:"Fazendo",concluida:"Concluída",cancelada:"Cancelada"};const dePara=e.de||e.para?` de ${STV[e.de]||e.de||"—"} para ${STV[e.para]||e.para||"—"}`:"";
+    const oque=e.tipo==="prazo_alterado"?`adiou o prazo de ${e.de||"—"} para ${e.para||"—"}:`:e.tipo==="reatribuida"?`passou de ${e.de||"—"} para ${e.para||"—"}:`:e.tipo==="status"?`mudou o status${dePara}:`:(EVENTO[e.tipo]||e.tipo);
+    return NPUI.linha({id:"atv:"+e.id,prazo:p,titulo:[el("b",{},e.autor_nome||"Sistema")," ",oque.trim()," ",el("span",{class:"np-atv-t"+(t?"":" np-atv-s")},t?t.titulo:"uma tarefa fora da sua lista")],contexto:e.nota?["“"+String(e.nota).slice(0,120)+"”"]:null,direita:[],onOpen:()=>{if(t)window.PP_TAREFAS?.abrir(t.id)},titleAbrir:t?"Abrir a tarefa":"Tarefa fora da sua lista"})});
   const atvHead=escAtv.tudo?el("div",{class:"np-atv-f"},Object.entries(SETORES).map(([k,l])=>NPUI.chip({label:l,on:D.atvSetor===k,grupo:"setor",onclick:()=>{D.atvSetor=k;try{localStorage.setItem("pp-painel-atv",k)}catch(_){}render()}}))):null;
   const gAtv=NPUI.grupo({id:"atividade",titulo:"Atividade recente"+(escAtv.tudo?"":escAtv.nucleos?" · suas e do jurídico":" · só as suas"),n:eventosVis.length,aberto:NPUI.pref.get("np-hoje-g-atividade","0")==="1",onToggle:ab=>NPUI.pref.set("np-hoje-g-atividade",ab?"1":"0"),itens:itensAtv.length?itensAtv:[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Sem movimentação ainda."))]});
-  if(atvHead)gAtv.querySelector(".np-grp-c").prepend(atvHead);corpo.append(gAtv);
+  if(atvHead)gAtv.querySelector(".np-grp-c>ul").prepend(el("li",{class:"np-atv-fl"},atvHead));corpo.append(gAtv);
   const tot=Object.values(porDia).flat().length;corpo.append(NPUI.rodape(`${prazos.length} prazo${prazos.length===1?"":"s"} · ${tot} ${tot===1?"item":"itens"} no período carregado`,[["crit","fatal"],["late","atrasado"],["att","hoje"]]));
   obra.append(corpo);v.append(obra);
   H3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{H3.aberta=null}});
   if(H3.aberta){const [,id]=H3.aberta.split(":");const e=D.cal.agenda.find(x=>x.id===id);if(e){const i={k:"evento",e,atrasada:false};abrirPainelHojeV3(i,null)}else H3.aberta=null}
 }
-document.head.append(el("style",{},`html.np-casca-v3 .np-hoje-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:6px 0 10px}html.np-casca-v3 .np-hoje-h h1{font:500 var(--np-fs-6)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-hoje-d{font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-3)}
+document.head.append(el("style",{},`html.np-casca-v3 .np-hoje-topo{flex-direction:column;align-items:flex-start!important;row-gap:2px!important;padding:6px 0 10px!important}html.np-casca-v3 .np-hoje-topo h1{font-size:28px!important;line-height:36px!important}html.np-casca-v3 .np-corpo>p.np-hoje-eq{margin:14px 0 4px}@media (max-width:600px){html.np-casca-v3 .np-hoje-topo h1{font-size:24px!important;line-height:30px!important}}html.np-casca-v3 .np-hoje-h{display:flex;align-items:baseline;column-gap:14px;row-gap:4px;flex-wrap:wrap;padding:14px 0 14px}html.np-casca-v3 .np-hoje-h h1{font:500 var(--np-fs-7)/1.15 var(--np-display);margin:0;color:var(--np-text)}html.np-casca-v3 .np-hoje-d{font:400 var(--np-fs-2)/1.3 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .np-hoje-eq{flex:1 0 100%;margin:0;font:400 var(--np-fs-2)/1.45 var(--np-ui);color:var(--np-text-2)}html.np-casca-v3 .np-hoje-eq b{font:500 var(--np-fs-5)/1 var(--np-display);font-variant-numeric:tabular-nums;color:var(--np-text)}html.np-casca-v3 .np-hoje-eq b.crit{color:var(--np-crit)}html.np-casca-v3 .np-hoje-eq .lnk{margin-left:6px}
+html.np-casca-v3 .np-resumo-calmo{font:italic 400 var(--np-fs-5)/1.2 var(--np-display);color:var(--np-text-2)}html.np-casca-v3 .np-atv-fl{list-style:none}html.np-casca-v3 .np-atv-s{font-style:italic;color:var(--np-text-3)}html.np-casca-v3 .np-it-vazia .lnk{font-style:normal;margin-left:6px}
 html.np-casca-v3 .np-agora{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;border:1px solid var(--np-line);border-left:3px solid var(--np-ok);border-radius:var(--np-r);background:var(--np-surface)}html.np-casca-v3 .np-agora .np-cron{font:500 var(--np-fs-3)/1 var(--np-display);font-variant-numeric:tabular-nums}html.np-casca-v3 .np-agora .tx{font:500 var(--np-fs-2)/1.3 var(--np-ui);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:48ch}html.np-casca-v3 .np-agora .ctx{color:var(--np-text-3);font-size:var(--np-fs-1)}html.np-casca-v3 .np-agora-a{margin-left:auto;display:flex;gap:4px}
 html.np-casca-v3 .np-nav-per{display:inline-flex;align-items:center;gap:2px}html.np-casca-v3 .np-atv-f{display:flex;gap:4px;flex-wrap:wrap;padding:6px 10px 2px}html.np-casca-v3 .np-atv-t{color:var(--np-text-2);font-weight:400}html.np-casca-v3 .np-atv-t::before{content:"— "}
 html.np-casca-v3 .np-it-vazia{color:var(--np-text-3);cursor:default}html.np-casca-v3 .np-it-vazia .np-it-abrir{cursor:default;font-style:italic}html.np-casca-v3 .np-txt{white-space:pre-wrap;font:400 var(--np-fs-2)/1.5 var(--np-ui);margin:0}

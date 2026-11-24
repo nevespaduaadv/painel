@@ -29,7 +29,8 @@
     const TT = PUB.TIPOS_TAREFA_PUB || { prazo: "Cumprir prazo", manifestar: "Manifestar nos autos", recurso: "Analisar cabimento de recurso", audiencia: "Preparar audiência", cliente: "Comunicar o cliente", diligencia: "Diligência / providência" };
     const fmtD2 = (iso) => fmtDt(iso);
     // 1) leitura
-    const texto = el("div", { style: "white-space:pre-wrap;max-height:32vh;overflow:auto;font-size:13.5px;line-height:1.45;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2,transparent)" }, p.texto || "(sem texto)");
+    const limparTxt = (s, opts) => (typeof PUB.limparTexto === "function" ? PUB.limparTexto(s, opts) : String(s || ""));
+    const texto = el("div", { style: "white-space:pre-wrap;max-height:32vh;overflow:auto;font-size:13.5px;line-height:1.45;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2,transparent)" }, limparTxt(p.texto || p.resumo) || "(sem texto)");
     const cab = el("div", { class: "f full" }, el("div", { class: "note" }, [p.tribunal, p.orgao, p.tipo_comunicacao, p.tipo_documento, p.classe].filter(Boolean).join(" · ")),
       el("div", { style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:2px" }, el("span", { class: "num", style: "font-weight:700" }, p.numero_processo || "sem número"), p.cliente_nome ? el("span", {}, "Cliente: ", el("b", {}, p.cliente_nome)) : null, el("span", { class: "note" }, "disponibilizada em " + fmtD2(p.data_disponibilizacao) + " · tratar até " + fmtD2(p.prazo_tratamento)), p.link ? el("a", { href: p.link, target: "_blank", rel: "noopener", style: "color:var(--info);font-weight:600" }, "↗ abrir no tribunal") : null),
       (p.destinatarios || []).length ? el("div", { class: "note" }, "Partes: " + p.destinatarios.map((d) => d.nome + (d.polo ? ` (${d.polo})` : "")).join("; ")) : null, texto);
@@ -49,7 +50,7 @@
     // campos da tarefa (gerou prazo)
     const meu = colab.find((c) => c.perfil_id === PP.perfil?.id);
     const tipo = sel(TT, "prazo"), titulo = inp("text", "", { placeholder: "Ex.: Contestar — prazo de 15 dias" }), resp = sel(colOpts, ""), prazo = inp("date", ""), fatal = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }), pri = sel({ "1": "Alta", "2": "Normal", "3": "Baixa" }, "1");
-    const desc = el("textarea", { rows: 3 }, `Publicação de ${fmtD2(p.data_disponibilizacao)} · ${[p.tribunal, p.orgao, p.tipo_documento || p.tipo_comunicacao].filter(Boolean).join(" · ")}\nProcesso ${p.numero_processo || "s/ nº"}${p.cliente_nome ? " · " + p.cliente_nome : ""}\n\n${(p.resumo || "").slice(0, 400)}`);
+    const desc = el("textarea", { rows: 3 }, `Publicação de ${fmtD2(p.data_disponibilizacao)} · ${[p.tribunal, p.orgao, p.tipo_documento || p.tipo_comunicacao].filter(Boolean).join(" · ")}\nProcesso ${p.numero_processo || "s/ nº"}${p.cliente_nome ? " · " + p.cliente_nome : ""}\n\n${limparTxt(p.texto || p.resumo, { compacto: true }).slice(0, 400)}`);
     const sug = () => { if (!titulo.value.trim() || titulo.dataset.auto === "1") { titulo.value = `${TT[tipo.value]} — ${p.numero_processo || "publicação"}`; titulo.dataset.auto = "1"; } }; titulo.oninput = () => { titulo.dataset.auto = "0"; }; tipo.onchange = sug; sug();
     // Workflow de prazo fracionado (0102): escolhe o tipo → o sistema abre a cadeia Confeccionar → (Custas) → Protocolar → Conferir
     const WF = T.workflows || []; const wfSel = sel({ "": "Tarefa simples (sem cadeia)", ...Object.fromEntries(WF.map((w) => [w.codigo, w.nome + " · " + w.dias_legais + " dias"])) }, "");
@@ -137,8 +138,11 @@
     if (!st.ok) box.append(el("div", { class: "note" }, "Carregando…"));
     else if (!st.lista.length) box.append(el("div", { class: "note" }, "Nenhuma publicação direcionada a este processo."));
     else box.append(el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Data"), el("th", {}, "Tipo / órgão"), el("th", {}, "Resumo"), el("th", {}, "Providência"), el("th", {}, ""))),
-      el("tbody", {}, ...st.lista.map((x) => el("tr", {}, el("td", {}, fmtDt(x.data_disponibilizacao)), el("td", {}, el("div", {}, x.tipo_documento || x.tipo_comunicacao || "—"), el("div", { class: "note" }, x.orgao || x.tribunal || "")), el("td", { style: "max-width:360px" }, el("div", { class: "note", style: "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" }, x.resumo || "—")), el("td", {}, pillStatus(x)),
-        el("td", {}, el("div", { style: "display:flex;gap:4px" }, el("button", { class: "btn sm", onclick: () => window.PP_PUBLICACOES?.abrir?.(x) }, "Ler"), x.providencia ? el("button", { class: "btn sm", onclick: () => modalHistorico(x) }, "Histórico") : el("button", { class: "btn sm primary", onclick: () => modalTratar(x) }, "Tratar")))))))));
+      el("tbody", {}, ...st.lista.map((x) => {
+        const resTxt = (typeof window.PP_PUBLICACOES?.limparTexto === "function" ? window.PP_PUBLICACOES.limparTexto(x.texto || x.resumo, { compacto: true }) : String(x.resumo || "")).slice(0, 400);
+        return el("tr", {}, el("td", {}, fmtDt(x.data_disponibilizacao)), el("td", {}, el("div", {}, x.tipo_documento || x.tipo_comunicacao || "—"), el("div", { class: "note" }, x.orgao || x.tribunal || "")), el("td", { style: "max-width:360px" }, el("div", { class: "note", style: "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" }, resTxt || "—")), el("td", {}, pillStatus(x)),
+        el("td", {}, el("div", { style: "display:flex;gap:4px" }, el("button", { class: "btn sm", onclick: () => window.PP_PUBLICACOES?.abrir?.(x) }, "Ler"), x.providencia ? el("button", { class: "btn sm", onclick: () => modalHistorico(x) }, "Histórico") : el("button", { class: "btn sm primary", onclick: () => modalTratar(x) }, "Tratar"))));
+      })))));
     host.append(box);
   }
 
@@ -177,7 +181,7 @@
       });
       v.querySelectorAll("section.card.section").forEach((sec) => { if (!sec.querySelector("tbody tr")) sec.remove(); });
     }; }
-  window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso };
+  window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso, renderRelatorio, reabrir, limparAntigas };
   window.__PP_LOGIN?.then(() => { SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome").then(({ data }) => { T.colab = data || []; });
     SB.from("workflows_prazo").select("*").eq("ativo", true).order("ordem").then(({ data }) => { T.workflows = data || []; });
     SB.from("escritorio").select("dados").eq("id", "juridico").maybeSingle().then(({ data }) => { T.confereId = data?.dados?.conferencia_protocolo_id || null; }); });

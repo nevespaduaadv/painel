@@ -234,7 +234,7 @@
     });
     return box;
   }
-  const textoEvento = (e) => ({ aberta: `Conversa aberta na fila ${e.para || ""}`, assumida: `${e.para || "Alguém"} assumiu a conversa`, transferida: `Transferida de ${e.de || "fila"} para ${e.para || "fila"}${e.por_nome ? " por " + e.por_nome : ""}`, fila: `Movida da fila ${e.de || "—"} para ${e.para || "—"}${e.por_nome ? " por " + e.por_nome : ""}`, resolvida: `Resolvida${e.por_nome ? " por " + e.por_nome : ""}`, reaberta: "Reaberta: o contato escreveu de novo", vinculada: `Vinculada a ${e.para || "—"}`, status: `Status: ${STATUS[e.para]?.[0] || e.para}${e.por_nome ? " · " + e.por_nome : ""}` }[e.tipo] || e.tipo);
+  const textoEvento = (e) => ({ aberta: `Conversa aberta na fila ${e.para || ""}`, assumida: `${e.para || "Equipe"} assumiu a conversa`, transferida: `Transferida de ${e.de || "fila"} para ${e.para || "fila"}${e.por_nome ? " por " + e.por_nome : ""}`, fila: `Movida da fila ${e.de || "—"} para ${e.para || "—"}${e.por_nome ? " por " + e.por_nome : ""}`, resolvida: `Resolvida${e.por_nome ? " por " + e.por_nome : ""}`, reaberta: "Reaberta: o contato escreveu de novo", vinculada: `Vinculada a ${e.para || "—"}`, status: `Status: ${STATUS[e.para]?.[0] || e.para}${e.por_nome ? " · " + e.por_nome : ""}` }[e.tipo] || e.tipo);
   function menuRapidas(ta) {
     const conv = T.convs.find((x) => x.id === T.sel);
     const lista = T.rapidas.filter((r) => !r.fila_id || r.fila_id === conv?.fila_id);
