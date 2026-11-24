@@ -1621,3 +1621,8 @@ html.np-casca-v3 .np-ts-tempo-wrap input[type=time]{min-width:0;flex:1}
   html.np-casca-v3 .np-fc-grupo-btn,
   html.np-casca-v3 .np-fc-drive-link{transition:none}
 }
+
+/* Carteira simples (23/11): só a lista dos clientes, sem coluna de prazo nem régua */
+html.np-casca-v3 #np-carteira .np-it{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"texto dir"}
+html.np-casca-v3 #np-carteira .np-it-chk,html.np-casca-v3 #np-carteira .np-it-prazo{display:none}
+@media (max-width:600px){html.np-casca-v3 #np-carteira .np-it{grid-template-columns:minmax(0,1fr);grid-template-areas:"texto" "dir"}}
