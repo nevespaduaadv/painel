@@ -13,7 +13,7 @@
 // Sem SYNC_API_KEY a função responde "sem_credencial"; sem SYNC_WEBHOOK_SECRET todo webhook é recusado.
 // Escrita no fornecedor: SÓ criar monitor por CPF/CNPJ (rota /sync/monitores, administradora). Nada de tratar, ciência ou confirmar processos.
 // Deploy com "Verify JWT" desligado (o webhook não tem JWT); cada rota faz a própria autenticação.
-import { amostrar, clienteSync, criarMonitores, puxar, puxarCarteira, puxarDescobertos, receberWebhook, testarConexao } from "./adaptador.mjs";
+import { amostrar, clienteSync, criarMonitores, puxar, puxarCarteira, puxarDescobertos, puxarEncontrados, receberWebhook, testarConexao } from "./adaptador.mjs";
 
 type Dict = Record<string, unknown>;
 const env = (n: string) => Deno.env.get(n) ?? "";
@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
       const r = await puxar({ db, cliente, origem: "agendada" });
       const k = await puxarCarteira({ db, cliente, limite: 40 }).catch(() => ({ status: "erro" }));   // autos: capa, partes, movimentos, documentos e audiências
       const m = await puxarDescobertos({ db, cliente }).catch(() => ({ status: "erro" }));            // monitores por CPF/CNPJ dos clientes
-      return json(200, { status: r.status, resumo: r.resumo ?? null, carteira: k, monitores: m }, false);
+      const e = await puxarEncontrados({ db, cliente, limite: 40 }).catch(() => ({ status: "erro" }));   // processos do Sync fora da nossa base → fila da aba Monitoramento
+      return json(200, { status: r.status, resumo: r.resumo ?? null, carteira: k, monitores: m, encontrados: e }, false);
     }
     const p = await quem(req);
     if (!p) return json(401, { erro: "sem_login" });
@@ -87,6 +88,11 @@ Deno.serve(async (req) => {
       if (!p.admin) return json(403, { erro: "so_administradora" });
       const criar = await criarMonitores({ db, cliente, limite: 10 });   // em lotes: a tela repete enquanto houver restantes
       return json(200, { criar, descobertos: (criar.resumo?.restantes ?? 0) > 0 ? null : await puxarDescobertos({ db, cliente }) });
+    }
+    if (rota === "encontrados") {   // corpo {"avisar": false} na carga inicial: o estoque antigo não marca "nova movimentação"
+      if (!p.juridico) return json(403, { erro: "so_juridico" });
+      const corpo = await req.json().catch(() => ({})) as Dict;
+      return json(200, await puxarEncontrados({ db, cliente, limite: 40, avisar: corpo?.avisar !== false }));
     }
     if (rota === "descobertos") { if (!p.juridico) return json(403, { erro: "so_juridico" }); return json(200, await puxarDescobertos({ db, cliente })); }
     if (rota === "carteira") {   // retrato dos autos por processo; até 40 por chamada (a tela repete enquanto houver restantes)

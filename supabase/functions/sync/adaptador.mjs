@@ -442,3 +442,32 @@ export async function puxarDescobertos({ db, cliente, paralelo = 4 }) {
     return { status: r.erros ? "parcial" : "ok", resumo: r };
   } catch (e) { return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r }; }
 }
+
+
+// ---------- processos da carteira do Sync que NÃO estão cadastrados no sistema (aba Monitoramento) ----------
+// Monitor por CPF/CNPJ põe o processo direto na carteira do Sync. Aqui cada um deles é ligado ao cliente pelo documento de uma
+// parte e entra na fila de "encontrados". Nada é cadastrado sozinho: a equipe decide na tela.
+export async function puxarEncontrados({ db, cliente, limite = 40, paralelo = 4, itens = 200, maxPaginas = 10, avisar = true }) {
+  const { ativo } = await integracao(db); if (!ativo) return { status: "desligada" };
+  const r = { fora_da_base: 0, conhecidos: 0, novos: 0, sem_cliente: 0, erros: 0, restantes: 0 };
+  try {
+    const api = cliente(); const lista = [];
+    for (let pagina = 1; pagina <= maxPaginas; pagina++) { const { corpo } = await api.get("/v1/processos", { itens, pagina, bloqueados: false }); const lote = Array.isArray(corpo?.processos) ? corpo.processos : []; lista.push(...lote); if (lote.length < itens) break; }
+    const base = (await db.rpc("sync_carteira_estado")) || {}; const est = (await db.rpc("sync_encontrados_estado")) || {};
+    const conhecidos = new Set(est.conhecidos || []); const donos = est.documentos || {};
+    const pend = [];
+    for (const it of lista) { const k = soDig(it?.numero); if (k.length !== 20 || k in base) continue; r.fora_da_base++; if (conhecidos.has(k)) { r.conhecidos++; continue; } pend.push({ k, it }); }
+    const agora = pend.slice(0, Math.max(1, limite)); r.restantes = pend.length - agora.length; let i = 0;
+    const trabalhar = async () => { while (i < agora.length) { const { k, it } = agora[i++];
+      try { const { corpo: det } = await api.get("/v1/processos/" + k);
+        let doc = null; for (const x of det?.partes || []) { const d = soDig(x?.cpf_cnpj); if (d && donos[d]) { doc = d; break; } }
+        const mov = (Array.isArray(det?.movimentos) ? det.movimentos : []).map((m) => comoData(m?.data)).filter(Boolean).sort();
+        const res = await db.rpc("sync_encontrado_receber", { p: { numero: k, numero_mascara: det?.numero ?? it?.numero ?? null, cliente_id: doc ? donos[doc] : null, documento: doc, tribunal: det?.tribunal ?? it?.tribunal ?? null, classe: det?.classe ?? null,
+          assunto: det?.assunto ?? null, polo_ativo: det?.polo_ativo ?? null, polo_passivo: det?.polo_passivo ?? null, valor_causa: typeof det?.valor_causa === "number" && det.valor_causa > 0 ? det.valor_causa : null,
+          data_distribuicao: comoData(det?.data_distribuicao), ultimo_andamento: mov.length ? mov[mov.length - 1] : null }, p_avisar: avisar });
+        if (res === "novo") { r.novos++; if (!doc) r.sem_cliente++; } else if (res === "conhecido" || res === "ja_cadastrado") r.conhecidos++; else r.erros++;
+      } catch (e) { if (e instanceof ErroSync && ["autenticacao", "plano", "sem_credencial"].includes(e.categoria)) throw e; r.erros++; } } };
+    await Promise.all(Array.from({ length: Math.max(1, paralelo) }, trabalhar));
+    return { status: r.erros ? "parcial" : "ok", resumo: r };
+  } catch (e) { return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r }; }
+}

@@ -83,3 +83,10 @@ O adaptador usa nomes candidatos (ajustáveis em `integracoes.config.mapa`, sem 
 - Rota `/sync/monitores` (administradora): cria no Sync um monitor para cada documento de `monitoramentos.documentos` que ainda não tem (`POST /v1/monitores`), em lotes de 10. É a ÚNICA escrita do conector no fornecedor.
 - Rota `/sync/descobertos` e o agendamento: leem `/v1/monitores/{id}/descobertos` e gravam em `sync_monitores`.
 - **Comportamento observado em produção**: monitor por CPF/CNPJ não deixa os processos em "aguardando seleção" — eles entram direto na carteira do Sync e contam no limite do plano. Na criação dos 43 monitores a carteira foi de 276 para 382 (limite 800). Por isso `descobertos` voltou vazio; os processos novos aparecem como `fora_da_base` na carteira.
+
+## Encontrados e audiências automáticas (24/11/2026, migrações 0119 e 0119b)
+
+- `puxarEncontrados` (rota `/sync/encontrados` e agendamento): processos da carteira do Sync que não estão cadastrados no sistema entram em `sync_encontrados`, ligados ao cliente pelo CPF/CNPJ de uma parte ou, na falta, pelo nome do cliente no polo. Quem fica sem cliente é conferido de novo a cada execução.
+- A equipe decide na aba Monitoramento: `sync_encontrado_cadastrar` (cria o processo no cliente) ou `sync_encontrado_dispensar`.
+- Processo novo identificado marca o cliente como "nova movimentação" (não na carga inicial).
+- Audiência nova em `processo_sync` entra na Agenda do colaborador de `integracoes.config.agenda_audiencias_colaborador`.
