@@ -150,7 +150,7 @@ function formDivida(c,d){
   const body=el("div",{class:"form"},field("dv-banco","Banco",banco),field("dv-tipo","Tipo de dívida",tipo.wrap),field("dv-valor","Valor (R$)",valor),field("dv-atraso","Tempo de atraso (meses)",atraso),
     field("dv-av","Tem avalista?",av),field("dv-avn","Avalista",avN),field("dv-avc","CPF do avalista",avC),field("dv-avb","Avalista tem bens?",avB,"Se sim, o sistema abre uma linha em Bens (titular avalista) para você detalhar."),
     field("dv-gar","Tem garantia?",gar),field("dv-gard","Qual garantia",garD),field("dv-em","Contrato em mãos?",em),field("dv-proc","Tem processo?",proc),el("div",{class:"f full"},el("label",{},"Observações"),obs));
-  const extra=d.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirm("Excluir esta dívida do Raio-X?"))return;await excluirDivida(c.id,d.id);$("#modalHost").replaceChildren();toast("Excluída")}},"Excluir"):null;
+  const extra=d.id?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir dívida do Raio-X?",mensagem:`Excluir a dívida ${d.banco||""} de ${c.nome||"este cliente"} do Raio-X?`,confirmar:"Excluir dívida",perigo:true,onSim:async()=>{await excluirDivida(c.id,d.id);$("#modalHost").replaceChildren();toast("Excluída")}})}},"Excluir"):null;
   modal(d.id?"Editar dívida":"Incluir dívida",body,async()=>{
     if(!banco.value.trim())throw new Error("Informe o banco");
     await salvarDivida(c.id,d,{banco:banco.value,tipo:tipo.input.value,valor:valor.value,atraso_meses:atraso.value,avalista:av.value,avalista_nome:avN.value,avalista_cpf:avC.value,avalista_tem_bens:avB.value,garantia:gar.value,garantia_descricao:garD.value,contrato_em_maos:em.value,processo:proc.value,observacoes:obs.value});

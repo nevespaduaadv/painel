@@ -19,12 +19,14 @@ function campoMotivo(){
   return {wrap,valor,mostrar:v=>{wrap.style.display=v?"":"none"}};
 }
 function encaminharArea(t,depois){
+  if(tarefasV3())return;
   const area=sel(AREAS_TICKET,minhasAreas().includes("financeiro")?"socios":"financeiro");const motivo=el("textarea",{rows:3,placeholder:"O que você precisa que a área faça ou decida? Ex.: aprovar a proposta de 40% do Itaú; confirmar se o boleto de outubro foi pago."});const arq=el("input",{type:"file",multiple:""});
   const body=el("div",{class:"form"},field("tk-area","Encaminhar para a área",area),el("div",{class:"f full"},el("label",{},"O que você precisa (obrigatório)"),motivo,el("div",{class:"help"},"A tarefa fica marcada como “aguardando” essa área, com o tempo parado visível para todos. Quem atende a área recebe aviso no sino e responde aqui mesmo. Você continua responsável pela tarefa.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a minuta para aprovação)"),arq));
   modal("Abrir ticket: "+t.titulo,body,async()=>{if(!motivo.value.trim())throw new Error("Diga o que você precisa da área");const {error}=await SB.rpc("tarefa_encaminhar",{p_tarefa:t.id,p_area:area.value,p_motivo:motivo.value.trim()});if(error)throw new Error(error.message);if(arq.files.length)await comentar(t.id,"Anexo do ticket: "+[...arq.files].map(f=>f.name).join(", "),[...arq.files]);toast("Ticket aberto para "+AREAS_TICKET[area.value]);T.tickets=null;depois?.()});
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Abrir ticket";
 }
 function responderTicket(t,depois){
+  if(tarefasV3())return;
   const tk=ticketDe(t);const resp=el("textarea",{rows:3,placeholder:"Resposta/decisão da área. Ex.: aprovado até 45%; boleto pago em 30/10."});const arq=el("input",{type:"file",multiple:""});
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"Pedido de "+(tk?.aguardando_por_nome||"—")+" para "+(AREAS_TICKET[tk?.aguardando_area]||"")),el("div",{style:"white-space:pre-wrap;padding:8px 10px;background:var(--bg-soft,#f6f5f2);border-radius:8px"},tk?.aguardando_motivo||"")),el("div",{class:"f full"},el("label",{},"Resposta (obrigatório)"),resp,el("div",{class:"help"},"Libera a tarefa; quem pediu e o responsável recebem a resposta no sino e no histórico.")),el("div",{class:"f full"},el("label",{},"Anexar (ex.: a minuta corrigida)"),arq));
   modal("Responder ticket: "+t.titulo,body,async()=>{if(!resp.value.trim())throw new Error("Escreva a resposta");const {error}=await SB.rpc("tarefa_responder",{p_tarefa:t.id,p_resposta:resp.value.trim()});if(error)throw new Error(error.message);if(arq.files.length)await comentar(t.id,"Anexo da resposta: "+[...arq.files].map(f=>f.name).join(", "),[...arq.files]);toast("Ticket respondido");T.tickets=null;depois?.()});
@@ -76,7 +78,7 @@ const escopoOk=t=>{const e=PP.escopoTarefas?.()||{tudo:true};if(e.tudo)return tr
 function filtrar(lista,f){
   return lista.filter(t=>escopoOk(t)&&(f.status==="abertas"?t.status==="aberta"||t.status==="em_andamento":f.status==="todas"?true:t.status===f.status)
     &&(!f.resp||t.responsavel_id===f.resp)&&(!f.nucleo||t.nucleo===f.nucleo)&&(!f.cliente||t.cliente_id===f.cliente)&&(!f.fatais||t.prazo_fatal)&&(!f.atrasadas||t.faixa==="atrasada")&&(!f.semResp||!t.responsavel_id)
-    &&(!f.tickets||(f.tickets==="minhas"?(ticketDe(t)&&minhasAreas().includes(ticketDe(t).aguardando_area)):!!ticketDe(t))));
+    &&(tarefasV3()||!TICKETS_ATIVOS||!f.tickets||(f.tickets==="minhas"?(ticketDe(t)&&minhasAreas().includes(ticketDe(t).aguardando_area)):!!ticketDe(t))));
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
   const done=el("input",{type:"checkbox",title:"Concluir",style:"width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex:none;margin-top:3px"});done.checked=t.status==="concluida";
@@ -308,10 +310,10 @@ function openTarefa(t){
         el("button",{class:"btn",onclick:async()=>{try{await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel.value});toast("Tempo gravado — tarefa continua em andamento");cron=null;setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"⏸ Pausar"),
         btnFeito("btn primary"));
     }else{
-      trabalho.append(el("button",{class:"btn primary",onclick:async()=>{try{
-          if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);if(!confirm(`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Pausar lá e começar aqui?`))return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
+      trabalho.append(el("button",{class:"btn primary",onclick:async(e)=>{const btn=e.currentTarget;if(btn.disabled)return;btn.disabled=true;try{
+          if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);const ok=await npConfirmar({titulo:"Trocar tarefa em andamento?",mensagem:`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Deseja pausar lá (gravando o tempo atual) e iniciar aqui?`,confirmar:"Pausar e iniciar esta"});if(!ok)return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
           cron=await window.PP_TS.iniciarDireto(t);if(t.status==="aberta")await SB.from("tarefas").update({status:"em_andamento"}).eq("id",t.id);
-          toast("Cronômetro ligado");setTimeout(reabrirTela,200)}catch(e){toast(e.message)}}},"▶ Iniciar trabalho"),
+          toast("Cronômetro ligado");setTimeout(reabrirTela,200)}catch(err){toast(err.message)}finally{btn.disabled=false}}},"▶ Iniciar trabalho"),
         btnFeito("btn"),
         el("span",{class:"note"},t.status==="em_andamento"?"Em andamento (cronômetro pausado). Iniciar retoma a contagem.":"Iniciar liga o cronômetro e marca a tarefa como em andamento."));
     }
@@ -321,8 +323,8 @@ function openTarefa(t){
     aberta?trabalho:el("button",{class:"btn",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}},"Reabrir"),
     el("span",{class:"sp",style:"flex:1"}),
     aberta?el("button",{class:"btn sm",onclick:()=>passarPara(t,reabrirTela)},"→ Passar para…"):null,
-    aberta&&TICKETS_ATIVOS&&!ticketDe(t)?el("button",{class:"btn sm",title:"Precisa de uma decisão ou informação de outra área? Abra um ticket: a tarefa fica aguardando a área e o tempo parado aparece para todos.",onclick:()=>encaminharArea(t,reabrirTela)},"⇄ Ticket para área…"):null,
-    aberta&&ticketDe(t)?el("button",{class:"btn sm primary",onclick:()=>responderTicket(t,reabrirTela)},"Responder ticket ("+(AREAS_TICKET[ticketDe(t).aguardando_area]||"")+")"):null,
+    !tarefasV3()&&aberta&&TICKETS_ATIVOS&&!ticketDe(t)?el("button",{class:"btn sm",title:"Precisa de uma decisão ou informação de outra área? Abra um ticket: a tarefa fica aguardando a área e o tempo parado aparece para todos.",onclick:()=>encaminharArea(t,reabrirTela)},"⇄ Ticket para área…"):null,
+    !tarefasV3()&&aberta&&TICKETS_ATIVOS&&ticketDe(t)?el("button",{class:"btn sm primary",onclick:()=>responderTicket(t,reabrirTela)},"Responder ticket ("+(AREAS_TICKET[ticketDe(t).aguardando_area]||"")+")"):null,
     el("button",{class:"btn sm",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})},"+ Horas manuais"),
     t.cliente_id?el("button",{class:"btn sm",title:"Decisão, informação do cliente ou motivo de não fazer — vai para o dossiê do cliente, não fica preso na tarefa",onclick:()=>window.PP_CARTEIRA?.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico",pos_vendas:"estrategico"})[t.nucleo]||""})},"Registrar no cliente"):null,
     el("button",{class:"btn sm",onclick:()=>openTarefaForm(t)},"Editar"));
@@ -530,11 +532,10 @@ function contextoV3(t,{mostrarCliente=true}={}){
   return out;
 }
 function marcasV3(t){
-  const m=[];const tk=ticketDe(t);
+  const m=[];
   if(t.prioridade===1&&(t.status==="aberta"||t.status==="em_andamento"))m.push(NPUI.marca("alta","crit"));
   if(t.prazo_fatal&&(t.status==="aberta"||t.status==="em_andamento"))m.push(NPUI.marca("fatal","crit"));
-  if(tk){const d=diasAg(tk);m.push(NPUI.marca("aguardando "+(AREAS_TICKET[tk.aguardando_area]||tk.aguardando_area)+(d?` há ${d}d`:""),d>=5?"crit":d>=2?"att":"info"))}
-  else if(t.status==="em_andamento")m.push(NPUI.marca("fazendo","info"));
+  if(t.status==="em_andamento")m.push(NPUI.marca("fazendo","info"));
   if(t.status==="concluida")m.push(NPUI.marca("feita","ok"));if(t.status==="cancelada")m.push(NPUI.marca("cancelada"));
   if(t.nucleo==="acompanhamento_pj"&&t.cliente_id&&window.PP_ACOMP?.podeVer?.()===true){const mk=NPUI.marca("acomp");mk.title="Tarefa do núcleo Acompanhamento PJ";m.push(mk)} // Fase 4B · B3
   return m;
@@ -562,13 +563,10 @@ function listaV3(lista,opts){
     host.append(NPUI.grupo({id:k,titulo:l,n:ts.length,tom:FAIXA_TOM[k]||"",aberto:ab[k]!==false,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-tarefas-grupos",JSON.stringify(ab))},itens:ts.map(t=>linhaV3(t,opts))}))}
   return host;
 }
-/* quadro: as mesmas colunas e regras de movimento da V2 (4 colunas; "Aguardando área" só com tickets ativos, como na V2); arrastar + alternativa por teclado ("Mover para…") */
-const COLS_V3_TODAS=[["aberta","A fazer",t=>t.status==="aberta"&&!ticketDe(t)],["em_andamento","Fazendo",t=>t.status==="em_andamento"&&!ticketDe(t)],["aguardando","Aguardando área",t=>!!ticketDe(t)&&(t.status==="aberta"||t.status==="em_andamento")],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=addD(hojeISO(),-7)]];
-const COLS_V3=COLS_V3_TODAS.filter(c=>TICKETS_ATIVOS||c[0]!=="aguardando");
+/* quadro V3.1: 3 colunas (A fazer · Fazendo · Feitas 7 dias); arrastar + alternativa por teclado ("Mover para…") */
+const COLS_V3=[["aberta","A fazer",t=>t.status==="aberta"],["em_andamento","Fazendo",t=>t.status==="em_andamento"],["concluida","Feitas (7 dias)",t=>t.status==="concluida"&&(t.concluida_em||"").slice(0,10)>=addD(hojeISO(),-7)]];
 async function moverV3(t,k){
-  if(k==="aguardando"){if(!TICKETS_ATIVOS){toast("Tickets desativados");return}if(!ticketDe(t))encaminharArea(t,()=>{T.ok=false;carregar()});return}
   if(k==="concluida"){if(t.status!=="concluida")abrirPainelV3(t,{focoAndamento:true});return}
-  if(ticketDe(t)){toast("Responda o ticket antes de mover");return}
   if(t.status===k)return;const {error}=await SB.from("tarefas").update({status:k}).eq("id",t.id);if(error){toast(error.message);return}T.ok=false;carregar();
 }
 function quadroV3(lista){
@@ -584,7 +582,7 @@ function quadroV3(lista){
 }
 function cardV3(t){
   const p=NPUI.prazoTxt(t.prazo,t.hora);const r=reguaDe(t);
-  const mover=NPUI.ib("pontos","Mover "+t.titulo,(e)=>{e.stopPropagation();NPUI.pop(e.currentTarget,COLS_V3.map(([k,l])=>({label:l,atual:(k==="aguardando"?!!ticketDe(t):t.status===k&&!ticketDe(t)),disabled:(k==="aguardando"&&!TICKETS_ATIVOS)||readOnly(),onclick:()=>moverV3(t,k)})),{label:"Mover para"})});
+  const mover=NPUI.ib("pontos","Mover "+t.titulo,(e)=>{e.stopPropagation();NPUI.pop(e.currentTarget,COLS_V3.map(([k,l])=>({label:l,atual:t.status===k,disabled:readOnly(),onclick:()=>moverV3(t,k)})),{label:"Mover para"})});
   const c=el("div",{class:"np-cardq"+(r?" r-"+r:""),draggable:readOnly()?"false":"true",tabindex:"0",role:"button","aria-label":t.titulo,onclick:()=>abrirPainelV3(t,{origem:c}),onkeydown:e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();abrirPainelV3(t,{origem:c})}}},
     el("div",{class:"tx"},t.titulo),el("div",{class:"ctx"},[t.cliente_nome,t.responsavel_nome?NPUI.curto(t.responsavel_nome):null].filter(Boolean).join(" · ")),
     el("div",{class:"pe"},el("span",{class:"pz "+tomPrazo(t),title:t.prazo?p.exata+" · "+p.rel:"sem prazo"},t.prazo?p.curta+(p.hora?" "+p.hora:""):"sem prazo",t.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null),el("span",{style:"display:flex;gap:4px;align-items:center"},...marcasV3(t).filter(m=>!/fatal/.test(m.textContent)),mover)));
@@ -608,16 +606,14 @@ function filtrosV3(){
   if(meu&&podeResp)C({label:"Minhas",n:nMinhas,on:f.resp===meu.id,grupo:"attr",title:"Só as minhas (responsável = eu)",onclick:()=>{f.resp=f.resp===meu.id?"":meu.id;render()}});
   const nucs=Object.keys(NUCLEOS).filter(k=>T.tarefas.some(t=>escopoOk(t)&&t.nucleo===k));
   if(nucs.length){chips.push(NPUI.sepv());for(const k of nucs.slice(0,3))C({label:NUCLEOS[k],on:f.nucleo===k,grupo:"nucleo",onclick:()=>{f.nucleo=f.nucleo===k?"":k;render()}})}
-  /* "Mais filtros": todos os seletores da V2 (status completo, responsável, núcleo, cliente, tickets) — nenhuma combinação se perde */
-  const extras=[f.resp&&!(meu&&f.resp===meu.id),f.cliente,f.nucleo&&!nucs.slice(0,3).includes(f.nucleo),["aberta","em_andamento","cancelada"].includes(f.status),f.tickets].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Status detalhado, responsável, núcleo, cliente"+(TICKETS_ATIVOS?", tickets":""),onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+  /* "Mais filtros": seletores completos (status, responsável, núcleo, cliente) */
+  const extras=[f.resp&&!(meu&&f.resp===meu.id),f.cliente,f.nucleo&&!nucs.slice(0,3).includes(f.nucleo),["aberta","em_andamento","cancelada"].includes(f.status)].filter(Boolean).length;
+  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Status detalhado, responsável, núcleo, cliente",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
     const fStatus=sel({abertas:"A fazer e fazendo",aberta:"Só a fazer",em_andamento:"Só fazendo",concluida:"Feitas",cancelada:"Canceladas",todas:"Todas"},f.status),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes");
     const fResp=podeResp?selColab(f.resp,"Todos os responsáveis"):null;
-    const nTk=Object.keys(T.tickets||{}).length,nMeus=Object.values(T.tickets||{}).filter(x=>minhasAreas().includes(x.aguardando_area)).length;
-    const fTk=TICKETS_ATIVOS?sel({"":"Tickets: todos os estados",minhas:`Aguardando a minha área (${nMeus})`,todas:`Aguardando alguma área (${nTk})`},f.tickets||""):null;
-    fStatus.onchange=()=>{f.status=fStatus.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};if(fResp)fResp.onchange=()=>{f.resp=fResp.value;render()};if(fTk)fTk.onchange=()=>{f.tickets=fTk.value;render()};
+    fStatus.onchange=()=>{f.status=fStatus.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};if(fResp)fResp.onchange=()=>{f.resp=fResp.value;render()};
     const L=(l,c)=>el("div",{},el("label",{},l),c);
-    return [el("div",{class:"np-pop-form"},L("Status",fStatus),fResp?L("Responsável",fResp):null,L("Núcleo",fNuc),L("Cliente",fCli),fTk?L("Tickets",fTk):null,
+    return [el("div",{class:"np-pop-form"},L("Status",fStatus),fResp?L("Responsável",fResp):null,L("Núcleo",fNuc),L("Cliente",fCli),
       el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false};NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-tarefas .np-chipf[aria-haspopup="dialog"]')})});
   mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");mais.querySelector(".n")?.setAttribute("aria-label",extras+" filtros extras ativos");
   const fixos=[mais];
@@ -661,7 +657,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   const cliente=t.cliente_id?el("a",{href:"#clientes/"+encodeURIComponent(t.cliente_id),onclick:()=>V3.painel.fechar(false)},t.cliente_nome||t.cliente_id):"—";
   const props=NPUI.props([
     ["Prazo",t.prazo?[p.exata," ",el("span",{class:"np-marca "+tomPrazo(t)},p.rel),t.prazo_fatal?[" ",NPUI.marca("fatal","crit")]:null]:"sem prazo","serif"],
-    ["Estado",[STATUS[t.status]||t.status,ticketDe(t)?[" · ",...marcasV3(t).filter(m=>/aguardando/.test(m.textContent))]:null,t.prioridade===1?[" · ",NPUI.marca("prioridade alta","crit")]:null]],
+    ["Estado",[STATUS[t.status]||t.status,t.prioridade===1?[" · ",NPUI.marca("prioridade alta","crit")]:null]],
     ["Responsável",NPUI.quem(t.responsavel_nome)],["Cliente",cliente],["Núcleo",NUCLEOS[t.nucleo]||"—"],t.numero_cnj?["Processo",t.numero_cnj]:null,
     ["Tempo",horasFmt(t.horas_apontadas||0)],["Aberta",[t.criado_por_nome?"por "+t.criado_por_nome+" ":"",t.created_at?"em "+fmtDT(t.created_at):""].join("")||"—"]]);
   /* cadeia do prazo (mesma consulta da V2) */
@@ -710,8 +706,8 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
     if(c){const rel=el("b",{style:"font:500 18px/1 var(--np-display);font-variant-numeric:tabular-nums"},"00:00:00");const tick=()=>{const s=Math.max(0,Math.floor((Date.now()-new Date(c.inicio).getTime())/1000));rel.textContent=`${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};tick();V3.tick=setInterval(tick,1000);
       ativSel=sel({outro:"Atividade…"},"outro");window.PP_TS.atividades().then(as=>{ativSel.replaceChildren(...as.map(a=>el("option",{value:a.codigo},a.nome)));ativSel.value=as.some(a=>a.codigo===(c.tipo_atividade||""))?c.tipo_atividade:(as.find(a=>a.codigo==="outro")?"outro":as[0]?.codigo)});
       trabalho.append(NPUI.marca("trabalhando","info"),rel,el("span",{class:"np-rodape",style:"padding:0"},"desde "+fmtDT(c.inicio)),ativSel,NPUI.btn("Pausar",{onclick:async()=>{try{await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel.value});noPe("Tempo gravado");cron=null;setTimeout(reabrirTela,300)}catch(e){toast(e.message)}}}))}
-    else trabalho.append(NPUI.btn("Iniciar trabalho",{onclick:async()=>{try{if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);if(!confirm(`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Pausar lá e começar aqui?`))return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
-        cron=await window.PP_TS.iniciarDireto(t);if(t.status==="aberta")await SB.from("tarefas").update({status:"em_andamento"}).eq("id",t.id);noPe("Cronômetro ligado");setTimeout(reabrirTela,300)}catch(e){toast(e.message)}}}),el("span",{class:"np-rodape",style:"padding:0"},t.status==="em_andamento"?"Em andamento (cronômetro pausado)":"Iniciar liga o cronômetro e marca como em andamento"))};
+    else trabalho.append(NPUI.btn("Iniciar trabalho",{onclick:async(e)=>{const btn=e.currentTarget;if(btn.disabled)return;btn.disabled=true;try{if(cron&&cron.tarefa_id!==t.id){const outra=T.tarefas.find(x=>x.id===cron.tarefa_id);const ok=await npConfirmar({titulo:"Trocar tarefa em andamento?",mensagem:`Você já está trabalhando em "${outra?outra.titulo:"outra tarefa"}". Deseja pausar lá (gravando o tempo atual) e iniciar aqui?`,confirmar:"Pausar e iniciar esta"});if(!ok)return;await window.PP_TS.pararDireto({descricao:outra?.titulo||null})}
+        cron=await window.PP_TS.iniciarDireto(t);if(t.status==="aberta")await SB.from("tarefas").update({status:"em_andamento"}).eq("id",t.id);noPe("Cronômetro ligado");setTimeout(reabrirTela,300)}catch(err){toast(err.message)}finally{btn.disabled=false}}}),el("span",{class:"np-rodape",style:"padding:0"},t.status==="em_andamento"?"Em andamento (cronômetro pausado)":"Iniciar liga o cronômetro e marca como em andamento"))};
   if(window.PP_TS&&aberta)window.PP_TS.cronAtual().then(c=>{cron=c;desenharTrabalho()});
   const trab=aberta&&window.PP_TS?NPUI.secao("Trabalho",trabalho):null;
   /* rodapé: Concluir · Feito · Mais ações (passar, ticket, horas, dossiê, editar/reagendar, reabrir, abrir em janela) */
@@ -722,8 +718,6 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   const mais=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[
     aberta&&!readOnly()?{label:"Passar para…",onclick:()=>passarPara(t,reabrirTela)}:null,
     aberta&&!readOnly()?{label:"Editar / reagendar…",onclick:()=>openTarefaForm(t)}:null,
-    aberta&&!readOnly()&&TICKETS_ATIVOS&&!ticketDe(t)?{label:"Ticket para área…",onclick:()=>encaminharArea(t,reabrirTela)}:null,
-    aberta&&!readOnly()&&ticketDe(t)?{label:"Responder ticket ("+(AREAS_TICKET[ticketDe(t).aguardando_area]||"")+")",onclick:()=>responderTicket(t,reabrirTela)}:null,
     !readOnly()?{label:"Horas manuais…",onclick:()=>window.PP_TS?window.PP_TS.lancar({tarefa:t}):openHorasForm({tarefa:t})}:null,
     t.cliente_id&&!readOnly()&&window.PP_CARTEIRA?.registrar?{label:"Registrar no dossiê do cliente…",onclick:()=>window.PP_CARTEIRA.registrar(t.cliente_id,{processo_id:t.processo_id||null,contrato_id:t.contrato_id||null,frente:({juridico:"juridico",acordos:"negocial",acompanhamento_pj:"estrategico"})[t.nucleo]||null,tarefa:t})}:null,
     !aberta&&!readOnly()?{label:"Reabrir",onclick:async()=>{try{await mudarStatus(t,"aberta");toast("Tarefa reaberta");reabrirTela()}catch(e){toast(e.message)}}}:null,

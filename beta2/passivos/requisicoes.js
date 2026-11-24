@@ -49,7 +49,7 @@ async function decidir(r,status){
   });
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent=status==="aprovada"?"Aprovar":"Negar";
 }
-async function cancelar(r){if(!confirm("Cancelar esta requisição?"))return;const {error}=await SB.from("requisicoes").update({status:"cancelada"}).eq("id",r.id);if(error){toast(error.message);return}toast("Cancelada");invalidar()}
+async function cancelar(r){const ok=await npConfirmar({titulo:"Cancelar requisição?",mensagem:`A requisição de ${r.tipo_nome||TIPOS[r.tipo]||"solicitação"} (${periodo(r)}) será marcada como cancelada.`,confirmar:"Cancelar requisição",perigo:true});if(!ok)return;const {error}=await SB.from("requisicoes").update({status:"cancelada"}).eq("id",r.id);if(error){toast(error.message);return}toast("Cancelada");invalidar()}
 function linha(r,{gestor=false}={}){
   const [st,cls]=STATUS[r.status]||[r.status,""];const meu=meuColab();
   return el("div",{class:"row",style:"cursor:default;align-items:flex-start"},

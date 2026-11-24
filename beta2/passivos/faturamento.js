@@ -37,6 +37,7 @@
 
   // ---------- contratos ----------
   function formContrato(ch = {}) {
+    const v3 = fatV3();
     const cli = selCliente(ch.cliente_id); if (ch.id) cli.disabled = true;
     const tipo = sel(TIPO_CH, ch.tipo || "gestao_passivos"), sub = sel({ "": "—", contencioso: "Contencioso", consultivo: "Consultivo", misto: "Misto" }, ch.subtipo || ""), status = sel(Object.fromEntries(Object.entries(ST_CH).map(([k, v]) => [k, v[0]])), ch.status || "ativo");
     const resp = selColab(ch.responsavel_id, "— responsável —"), closer = selColab(ch.closer_id, "— closer —"), area = inp("text", ch.area || "", { placeholder: "Ex.: Bancário PJ" });
@@ -48,30 +49,47 @@
     const assin = inp("date", ch.assinado_em || ""), url = inp("url", ch.contrato_url || "", { placeholder: "Drive / ZapSign" }), obs = el("textarea", { rows: 2 }, ch.observacoes || "");
     const pasta = sel({ "": "— sem pasta —" }, ch.pasta_numero ? String(ch.pasta_numero) : ""); const carregarPastas = async () => { if (!cli.value) return; const { data } = await SB.from("v_pastas").select("numero,codigo,titulo,tipo,status").eq("cliente_id", cli.value).order("numero", { ascending: false }); pasta.replaceChildren(el("option", { value: "" }, "— sem pasta —"), ...(data || []).map((p) => el("option", { value: String(p.numero), selected: p.numero === ch.pasta_numero ? "" : null }, "Pasta " + (p.codigo || p.numero) + (p.titulo ? " — " + p.titulo : " (" + p.tipo + ")")))); }; cli.onchange = carregarPastas; carregarPastas();
     const calcTotal = () => { if (!total.dataset.manual) total.value = ((+entrada.value || 0) + (+parcelas.value || 0) * (+vparc.value || 0)).toFixed(2); }; entrada.oninput = parcelas.oninput = vparc.oninput = calcTotal; total.oninput = () => { total.dataset.manual = "1"; }; if (!ch.id) calcTotal();
-    const body = el("div", { class: "form" }, field("ch-cli", "Cliente", cli), field("ch-tipo", "Tipo", tipo), field("ch-sub", "Subtipo", sub), field("ch-st", "Status", status), field("ch-area", "Área", area), field("ch-pasta", "Pasta", pasta),
-      field("ch-resp", "Responsável", resp), field("ch-closer", "Closer (comissão)", closer), el("div", { class: "f full" }, field("ch-desc", "Objeto / serviço", desc)),
-      el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Honorários")),
-      field("ch-ent", "Entrada (R$)", entrada), field("ch-parc", "Parcelas (qtd)", parcelas), field("ch-vparc", "Valor da parcela (R$)", vparc), field("ch-vdia", "Vencimento", vdia), field("ch-mens", "Mensalidade (R$)", mens), field("ch-exito", "Êxito (%)", exito), field("ch-forma", "Forma de pagamento", forma), field("ch-total", "Valor total (R$)", total, "Entrada + parcelas; edite se for diferente."),
-      el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Horas e vigência")),
-      field("ch-horas", "Horas contratadas / mês", horas, "Para o timesheet (horas × contrato)."), field("ch-tab", "Tabela de R$/hora", tab), field("ch-vini", "Início da vigência", vini), field("ch-vfim", "Fim da vigência", vfim), el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, indet, "Prazo indeterminado")),
-      field("ch-ass", "Assinado em", assin), el("div", { class: "f full" }, field("ch-url", "Link do contrato", url)), el("div", { class: "f full" }, field("ch-obs", "Observações", obs)));
+    const indetWrap = el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, indet, "Prazo indeterminado"));
+    const body = v3
+      ? el("div", { class: "form" },
+        NPUI.secaoForm("Identificação"),
+        field("ch-cli", "Cliente", cli), field("ch-tipo", "Tipo", tipo), field("ch-st", "Status", status), field("ch-resp", "Responsável", resp),
+        el("div", { class: "f full" }, field("ch-desc", "Objeto / serviço", desc)),
+        NPUI.secaoForm("Condições financeiras"),
+        field("ch-ent", "Entrada (R$)", entrada), field("ch-parc", "Parcelas (qtd)", parcelas), field("ch-vparc", "Valor da parcela (R$)", vparc), field("ch-mens", "Mensalidade (R$)", mens), field("ch-exito", "Êxito (%)", exito), field("ch-total", "Valor total (R$)", total, "Entrada + parcelas; edite se for diferente."),
+        NPUI.secaoForm("Cobrança e vigência"),
+        field("ch-vdia", "Dia de vencimento", vdia), field("ch-forma", "Forma de pagamento", forma), field("ch-vini", "Início da vigência", vini), indetWrap,
+        NPUI.maisCampos("Mais detalhes do contrato", [
+          field("ch-sub", "Subtipo", sub), field("ch-area", "Área", area), field("ch-pasta", "Pasta", pasta), field("ch-closer", "Closer (comissão)", closer),
+          field("ch-horas", "Horas contratadas / mês", horas, "Para o timesheet (horas × contrato)."), field("ch-tab", "Tabela de R$/hora", tab),
+          field("ch-vfim", "Fim da vigência", vfim), field("ch-ass", "Assinado em", assin),
+          el("div", { class: "f full" }, field("ch-url", "Link do contrato", url)),
+          el("div", { class: "f full" }, field("ch-obs", "Observações", obs))
+        ], { contador: "auto" }))
+      : el("div", { class: "form" }, field("ch-cli", "Cliente", cli), field("ch-tipo", "Tipo", tipo), field("ch-sub", "Subtipo", sub), field("ch-st", "Status", status), field("ch-area", "Área", area), field("ch-pasta", "Pasta", pasta),
+        field("ch-resp", "Responsável", resp), field("ch-closer", "Closer (comissão)", closer), el("div", { class: "f full" }, field("ch-desc", "Objeto / serviço", desc)),
+        el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Honorários")),
+        field("ch-ent", "Entrada (R$)", entrada), field("ch-parc", "Parcelas (qtd)", parcelas), field("ch-vparc", "Valor da parcela (R$)", vparc), field("ch-vdia", "Vencimento", vdia), field("ch-mens", "Mensalidade (R$)", mens), field("ch-exito", "Êxito (%)", exito), field("ch-forma", "Forma de pagamento", forma), field("ch-total", "Valor total (R$)", total, "Entrada + parcelas; edite se for diferente."),
+        el("div", { class: "f full", style: "border-top:1px dashed var(--line);padding-top:8px" }, el("div", { class: "eyebrow" }, "Horas e vigência")),
+        field("ch-horas", "Horas contratadas / mês", horas, "Para o timesheet (horas × contrato)."), field("ch-tab", "Tabela de R$/hora", tab), field("ch-vini", "Início da vigência", vini), field("ch-vfim", "Fim da vigência", vfim), indetWrap,
+        field("ch-ass", "Assinado em", assin), el("div", { class: "f full" }, field("ch-url", "Link do contrato", url)), el("div", { class: "f full" }, field("ch-obs", "Observações", obs)));
     modal(ch.id ? "Contrato " + ch.codigo : "Novo contrato de honorários", body, async () => {
-      if (!cli.value) throw new Error("Escolha o cliente");
+      if (!cli.value) { const e = new Error("Escolha o cliente"); e.campo = cli; throw e; }
       const row = { cliente_id: cli.value, tipo: tipo.value, subtipo: sub.value || null, status: status.value, area: area.value.trim() || null, pasta_numero: pasta.value ? +pasta.value : null, responsavel_id: resp.value || null, closer_id: closer.value || null, descricao_servico: desc.value.trim() || null,
         entrada: entrada.value === "" ? null : +entrada.value, parcelas: parcelas.value === "" ? null : +parcelas.value, valor_parcela: vparc.value === "" ? null : +vparc.value, vencimento_dia: vdia.value ? +vdia.value : null, mensalidade: mens.value === "" ? null : +mens.value, exito_pct: exito.value === "" ? null : +exito.value, forma_pagamento: forma.value.trim() || null, valor_total: total.value === "" ? null : +total.value,
         horas_contratadas_mes: horas.value === "" ? null : +horas.value, tabela_hora_id: tab.value || null, vigencia_inicio: vini.value || null, vigencia_fim: vfim.value || null, indeterminado: indet.checked, assinado_em: assin.value || null, contrato_url: url.value.trim() || null, observacoes: obs.value.trim() || null };
       const { error } = ch.id ? await SB.from("contratos_honorarios").update(row).eq("id", ch.id) : await SB.from("contratos_honorarios").insert(row); if (error) throw new Error(error.message);
       toast("Contrato salvo"); inval(); carregar();
-    });
+    }, null, { confirmar: ch.id ? "Salvar contrato" : "Criar contrato" });
   }
   function modalAditivo(ch) {
     const data = inp("date", new Date().toISOString().slice(0, 10)), desc = inp("text", "", { placeholder: "Ex.: inclusão de novo contrato bancário; reajuste de mensalidade" }), delta = inp("number", "", { step: "0.01", placeholder: "± R$" }), vfim = inp("date", ""), url = inp("url", "", { placeholder: "Link do aditivo" });
     modal("Aditivo — " + ch.codigo, el("div", { class: "form" }, field("ad-d", "Data", data), el("div", { class: "f full" }, field("ad-desc", "Descrição", desc)), field("ad-v", "Variação de valor (R$)", delta), field("ad-f", "Nova vigência final", vfim), el("div", { class: "f full" }, field("ad-u", "Link", url))), async () => {
-      if (!desc.value.trim()) throw new Error("Descreva o aditivo");
+      if (!desc.value.trim()) { const e = new Error("Descreva o aditivo"); e.campo = desc; throw e; }
       const { error } = await SB.from("contratos_honorarios_aditivos").insert({ contrato_id: ch.id, data: data.value, descricao: desc.value.trim(), valor_delta: delta.value === "" ? null : +delta.value, nova_vigencia_fim: vfim.value || null, url: url.value.trim() || null }); if (error) throw new Error(error.message);
       const upd = {}; if (delta.value !== "" && ch.valor_total != null) upd.valor_total = +ch.valor_total + +delta.value; if (vfim.value) { upd.vigencia_fim = vfim.value; upd.indeterminado = false; } if (Object.keys(upd).length) await SB.from("contratos_honorarios").update(upd).eq("id", ch.id);
       toast("Aditivo registrado"); inval(); carregar();
-    });
+    }, null, { confirmar: "Registrar aditivo" });
   }
   function fichaContrato(ch, host) {
     if (!F.aditivos[ch.id]) { F.aditivos[ch.id] = { ok: false, lista: [] }; SB.from("contratos_honorarios_aditivos").select("*").eq("contrato_id", ch.id).order("data").then(({ data }) => { F.aditivos[ch.id] = { ok: true, lista: data || [] }; render(); }); }
@@ -101,42 +119,90 @@
 
   // ---------- solicitações ----------
   function formSF(pre = {}) {
+    const v3 = fatV3();
     const cli = selCliente(pre.cliente_id); const chSel = sel({ "": "— contrato —" }, ""), proc = sel({ "": "— processo —" }, ""), pasta = sel({ "": "— pasta —" }, "");
     const tipo = sel(TIPO_SF, pre.tipo || "parcela"), desc = inp("text", pre.descricao || "", { placeholder: "Aparece no boleto. Ex.: Honorários — parcela 3/10" }), valor = inp("number", pre.valor_total ?? "", { step: "0.01", min: "0.01" }), qtd = inp("number", "1", { min: 1, max: 120 }), venc = inp("date", ""), forma = sel(FORMA, "UNDEFINED"), nf = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); nf.checked = true;
     const area = inp("text", pre.area || "", { placeholder: "Ex.: Bancário PJ" }), obs = el("textarea", { rows: 2 }, "");
     const rateioBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" }); const linhas = [];
-    const addLinha = (r = {}) => { const c = selColab(r.colaborador_id, "— colaborador —"), papel = sel({ closer: "Closer", sdr: "SDR", advogado: "Advogado", indicacao: "Indicação", outro: "Outro" }, r.papel || "outro"), pct = inp("number", r.pct ?? "", { step: "0.5", min: 0, max: 100, style: "width:90px", placeholder: "%" }); const row = el("div", { style: "display:flex;gap:6px;align-items:center" }, c, papel, pct, el("button", { class: "btn sm", onclick: () => { row.remove(); linhas.splice(linhas.indexOf(l), 1); } }, "×")); const l = { c, papel, pct }; linhas.push(l); rateioBox.append(row); };
+    let blocoMaisSF = null;
+    const addLinha = (r = {}) => { const c = selColab(r.colaborador_id, "— colaborador —"), papel = sel({ closer: "Closer", sdr: "SDR", advogado: "Advogado", indicacao: "Indicação", outro: "Outro" }, r.papel || "outro"), pct = inp("number", r.pct ?? "", { step: "0.5", min: 0, max: 100, style: "width:90px", placeholder: "%" }); const row = el("div", { style: "display:flex;gap:6px;align-items:center" }, c, papel, pct, el("button", { class: "btn sm", type: "button", onclick: () => { row.remove(); linhas.splice(linhas.indexOf(l), 1); blocoMaisSF?.atualizarContador?.(); } }, "×")); const l = { c, papel, pct }; linhas.push(l); rateioBox.append(row); blocoMaisSF?.atualizarContador?.(); };
     const hint = el("div", { class: "note" }); const calc = () => { const v = +valor.value || 0, n = +qtd.value || 1; hint.textContent = n > 1 && v ? `${n} parcelas de ${R$(v / n)} a cada mês a partir do vencimento` : v ? "Cobrança única de " + R$(v) : ""; }; valor.oninput = qtd.oninput = calc;
     const recarregar = async () => { const cid = cli.value; const chs = F.ch.filter((c) => c.cliente_id === cid && !["cancelado"].includes(c.status)); chSel.replaceChildren(el("option", { value: "" }, chs.length ? "— contrato —" : "— sem contrato cadastrado —"), ...chs.map((c) => el("option", { value: c.id, selected: c.id === pre.contrato_id || (chs.length === 1 && !pre.contrato_id) ? "" : null }, c.codigo + " · " + (TIPO_CH[c.tipo] || c.tipo))));
       const [ps, pa] = await Promise.all([cid ? SB.from("processos").select("id,numero_cnj,tipo_acao,pasta_numero").eq("cliente_id", cid).order("numero_cnj") : { data: [] }, cid ? SB.from("v_pastas").select("numero,codigo,titulo").eq("cliente_id", cid).order("numero", { ascending: false }) : { data: [] }]);
-      proc.replaceChildren(el("option", { value: "" }, "— processo —"), ...(ps.data || []).map((p) => el("option", { value: p.id, selected: p.id === pre.processo_id ? "" : null }, p.numero_cnj || p.tipo_acao || "(sem número)"))); pasta.replaceChildren(el("option", { value: "" }, "— pasta —"), ...(pa.data || []).map((p) => el("option", { value: String(p.numero), selected: p.numero === pre.pasta_numero ? "" : null }, "Pasta " + (p.codigo || p.numero) + (p.titulo ? " — " + p.titulo : "")))); sugerir(); };
+      proc.replaceChildren(el("option", { value: "" }, "— processo —"), ...(ps.data || []).map((p) => el("option", { value: p.id, selected: p.id === pre.processo_id ? "" : null }, p.numero_cnj || p.tipo_acao || "(sem número)"))); pasta.replaceChildren(el("option", { value: "" }, "— pasta —"), ...(pa.data || []).map((p) => el("option", { value: String(p.numero), selected: p.numero === pre.pasta_numero ? "" : null }, "Pasta " + (p.codigo || p.numero) + (p.titulo ? " — " + p.titulo : "")))); sugerir(); blocoMaisSF?.atualizarContador?.(); };
     const sugerir = () => { const c = F.ch.find((x) => x.id === chSel.value); if (!c) return; if (tipo.value === "entrada" && c.entrada) { valor.value = c.entrada; qtd.value = 1; } if (tipo.value === "parcela" && c.valor_parcela) { valor.value = c.valor_parcela; } if (tipo.value === "mensalidade" && c.mensalidade) { valor.value = c.mensalidade; qtd.value = 1; } if (!desc.value) desc.value = (TIPO_SF[tipo.value] || "") + " — honorários"; if (tipo.value === "entrada" && c.closer_id && !linhas.length) addLinha({ colaborador_id: c.closer_id, papel: "closer", pct: 8 }); calc(); };
-    cli.onchange = recarregar; chSel.onchange = sugerir; tipo.onchange = sugerir; recarregar();
-    const body = el("div", { class: "form" }, field("sf-cli", "Cliente", cli), field("sf-ch", "Contrato de honorários", chSel), field("sf-tipo", "Tipo", tipo), field("sf-area", "Área", area), field("sf-proc", "Processo (opcional)", proc), field("sf-pasta", "Pasta (opcional)", pasta),
-      el("div", { class: "f full" }, field("sf-desc", "Descrição do serviço / cobrança", desc)), field("sf-val", "Valor total (R$)", valor), field("sf-qtd", "Parcelas", qtd, hint), field("sf-venc", "Vencimento (1ª parcela)", venc), field("sf-forma", "Forma", forma),
-      el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, nf, "Emitir nota fiscal")),
-      el("div", { class: "f full" }, el("label", {}, "Participação / comissões (sobre o valor desta solicitação)"), rateioBox, el("div", { class: "actions", style: "justify-content:flex-start;margin-top:4px" }, el("button", { class: "btn sm", onclick: () => addLinha() }, "+ Pessoa")), el("div", { class: "note" }, "Closer: 8% sobre a entrada, previsto automaticamente. A comissão só é liberada quando a cobrança é paga.")),
-      el("div", { class: "f full" }, field("sf-obs", "Observações para o financeiro", obs)));
+    cli.onchange = recarregar; chSel.onchange = sugerir; tipo.onchange = sugerir;
+    const nfWrap = el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, nf, "Emitir nota fiscal"));
+    const rateioWrap = el("div", { class: "f full" }, el("label", {}, "Participação / comissões (sobre o valor desta solicitação)"), rateioBox, el("div", { class: "actions", style: "justify-content:flex-start;margin-top:4px" }, el("button", { class: "btn sm", type: "button", onclick: () => addLinha() }, "+ Pessoa")), el("div", { class: "note" }, "Closer: 8% sobre a entrada, previsto automaticamente. A comissão só é liberada quando a cobrança é paga."));
+    let body;
+    if (v3) {
+      blocoMaisSF = NPUI.maisCampos("Vínculos, comissões e observações", [
+        field("sf-area", "Área", area), field("sf-proc", "Processo (opcional)", proc), field("sf-pasta", "Pasta (opcional)", pasta),
+        rateioWrap,
+        el("div", { class: "f full" }, field("sf-obs", "Observações para o financeiro", obs))
+      ], { contador: "auto" });
+      body = el("div", { class: "form" },
+        NPUI.secaoForm("Identificação"),
+        field("sf-cli", "Cliente", cli), field("sf-ch", "Contrato de honorários", chSel), field("sf-tipo", "Tipo", tipo),
+        el("div", { class: "f full" }, field("sf-desc", "Descrição do serviço / cobrança", desc)),
+        NPUI.secaoForm("Condições financeiras e cobrança"),
+        field("sf-val", "Valor total (R$)", valor), field("sf-qtd", "Parcelas", qtd, hint), field("sf-venc", "Vencimento (1ª parcela)", venc), field("sf-forma", "Forma", forma), nfWrap,
+        blocoMaisSF
+      );
+    } else {
+      body = el("div", { class: "form" }, field("sf-cli", "Cliente", cli), field("sf-ch", "Contrato de honorários", chSel), field("sf-tipo", "Tipo", tipo), field("sf-area", "Área", area), field("sf-proc", "Processo (opcional)", proc), field("sf-pasta", "Pasta (opcional)", pasta),
+        el("div", { class: "f full" }, field("sf-desc", "Descrição do serviço / cobrança", desc)), field("sf-val", "Valor total (R$)", valor), field("sf-qtd", "Parcelas", qtd, hint), field("sf-venc", "Vencimento (1ª parcela)", venc), field("sf-forma", "Forma", forma),
+        nfWrap, rateioWrap,
+        el("div", { class: "f full" }, field("sf-obs", "Observações para o financeiro", obs)));
+    }
+    recarregar();
     modal("Solicitação de faturamento", body, async () => {
-      if (!cli.value) throw new Error("Escolha o cliente"); if (!desc.value.trim()) throw new Error("Descreva a cobrança"); if (!(+valor.value > 0)) throw new Error("Informe o valor"); if (!venc.value) throw new Error("Informe o vencimento");
+      if (!cli.value) { const e = new Error("Escolha o cliente"); e.campo = cli; throw e; }
+      if (!desc.value.trim()) { const e = new Error("Descreva a cobrança"); e.campo = desc; throw e; }
+      if (!(+valor.value > 0)) { const e = new Error("Informe o valor"); e.campo = valor; throw e; }
+      if (!venc.value) { const e = new Error("Informe o vencimento"); e.campo = venc; throw e; }
       const rateio = linhas.filter((l) => l.c.value && +l.pct.value > 0).map((l) => ({ colaborador_id: l.c.value, papel: l.papel.value, pct: +l.pct.value }));
       const row = { cliente_id: cli.value, contrato_id: chSel.value || null, processo_id: proc.value || null, pasta_numero: pasta.value ? +pasta.value : null, tipo: tipo.value, area: area.value.trim() || null, descricao: desc.value.trim(), valor_total: +valor.value, qtd_parcelas: +qtd.value || 1, vencimento_inicial: venc.value, forma: forma.value, emitir_nf: nf.checked, rateio, observacoes: obs.value.trim() || null };
       const { error } = await SB.from("solicitacoes_faturamento").insert(row); if (error) throw new Error(error.message);
       toast("Solicitação enviada ao financeiro"); inval(); carregar();
-    });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Enviar solicitação";
+    }, null, { confirmar: "Enviar solicitação" });
+    if (!v3) { const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Enviar solicitação"; }
   }
   async function decidir(s, autorizar) {
+    const v3 = fatV3();
     const motivo = inp("text", "", { placeholder: autorizar ? "Opcional" : "Obrigatório — o solicitante é avisado" });
     modal((autorizar ? "Autorizar " : "Não autorizar ") + s.codigo, el("div", { class: "form" }, el("div", { class: "f full note" }, `${s.cliente_nome} · ${TIPO_SF[s.tipo]} · ${R$(s.valor_total)} em ${s.qtd_parcelas}× a partir de ${fmt(s.vencimento_inicial)}`), el("div", { class: "f full" }, field("dc-m", "Motivo / observação", motivo))), async () => {
-      if (!autorizar && !motivo.value.trim()) throw new Error("Informe o motivo");
+      if (!autorizar && !motivo.value.trim()) { const e = new Error("Informe o motivo"); e.campo = motivo; throw e; }
       const { error } = await SB.rpc("sf_autorizar", { p_id: s.id, p_autorizar: autorizar, p_motivo: motivo.value.trim() || null }); if (error) throw new Error(error.message);
       toast(autorizar ? "Autorizada — parcelas geradas" : "Não autorizada"); inval(); carregar();
-    });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = autorizar ? "Autorizar" : "Recusar";
+    }, null, { confirmar: autorizar ? "Autorizar" : "Recusar" });
+    if (!v3) { const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = autorizar ? "Autorizar" : "Recusar"; }
   }
-  async function faturar(s) { if (!confirm(`Faturar ${s.codigo}: gera ${s.qtd_parcelas} cobrança(s) no painel para ${s.cliente_nome}. A emissão do boleto/Pix no Asaas é feita depois, na tela Cobranças. Continuar?`)) return; const { data, error } = await SB.rpc("sf_faturar", { p_id: s.id }); if (error) toast(error.message); else { toast(`${data} cobrança(s) criada(s)`); inval(); carregar(); } }
-  async function cancelar(s) { const m = prompt("Motivo do cancelamento:"); if (m == null) return; const { error } = await SB.rpc("sf_cancelar", { p_id: s.id, p_motivo: m || null }); if (error) toast(error.message); else { toast("Cancelada"); inval(); carregar(); } }
+  async function faturar(s) {
+    await npConfirmar({
+      titulo: `Faturar ${s.codigo}?`,
+      mensagem: `Gera ${s.qtd_parcelas} cobrança(s) no painel para ${s.cliente_nome} (${R$(s.valor_total)}). A emissão do boleto/Pix no Asaas é feita depois, na tela Cobranças.`,
+      confirmar: "Faturar e gerar cobranças",
+      onSim: async () => {
+        const { data, error } = await SB.rpc("sf_faturar", { p_id: s.id });
+        if (error) { toast(error.message); throw error; }
+        toast(`${data} cobrança(s) criada(s)`); inval(); carregar();
+      }
+    });
+  }
+  async function cancelar(s) {
+    const m = await npPedirTexto({
+      titulo: `Cancelar solicitação ${s.codigo}`,
+      mensagem: `${s.cliente_nome} · ${R$(s.valor_total)}`,
+      rotulo: "Motivo do cancelamento",
+      placeholder: "Descreva o motivo (opcional)",
+      multiline: true,
+      confirmar: "Cancelar solicitação"
+    });
+    if (m == null) return;
+    const { error } = await SB.rpc("sf_cancelar", { p_id: s.id, p_motivo: m.trim() || null });
+    if (error) toast(error.message); else { toast("Cancelada"); inval(); carregar(); }
+  }
   function detalheSF(s) {
     if (!F.parcelas[s.id]) { F.parcelas[s.id] = { ok: false, lista: [] }; SB.from("sf_parcelas").select("*, cobranca:cobrancas(status,valor_pago,pago_em,link_fatura)").eq("sf_id", s.id).order("n").then(({ data }) => { F.parcelas[s.id] = { ok: true, lista: data || [] }; const h = $("#modalHost .sf-parc"); if (h) h.replaceChildren(tabParc(s)); }); }
     const tabParc = (s2) => { const p = F.parcelas[s2.id]; if (!p.ok) return el("div", { class: "note" }, "Carregando…"); if (!p.lista.length) return el("div", { class: "note" }, "Parcelas são geradas na autorização."); return el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "#"), el("th", { class: "r" }, "Valor"), el("th", {}, "Vencimento"), el("th", {}, "Cobrança"))), el("tbody", {}, ...p.lista.map((x) => el("tr", {}, el("td", {}, String(x.n)), el("td", { class: "r num" }, R$(x.valor)), el("td", {}, fmt(x.vencimento)), el("td", {}, x.cobranca ? el("span", {}, el("span", { class: "pill " + (x.cobranca.status === "paga" ? "e1" : x.cobranca.status === "atrasada" ? "e3" : "g") }, x.cobranca.status), x.cobranca.pago_em ? " " + fmt(x.cobranca.pago_em) : "", x.cobranca.link_fatura ? el("a", { href: x.cobranca.link_fatura, target: "_blank", rel: "noopener", style: "margin-left:6px" }, "↗") : null) : el("span", { class: "note" }, "não faturada"))))))); };
@@ -174,7 +240,7 @@
     const rows = [...porMes.values()].sort((a, b) => b.mes.localeCompare(a.mes) || a.nome.localeCompare(b.nome));
     v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, fin ? "Comissões por colaborador e mês" : "Minhas comissões"), el("span", { class: "note" }, "Liberada = a cobrança correspondente foi paga. Paga = o escritório pagou a comissão.")),
       el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Mês"), el("th", {}, "Colaborador"), el("th", { class: "r" }, "Prevista"), el("th", { class: "r" }, "Liberada"), el("th", { class: "r" }, "Paga"), el("th", {}, ""))),
-        el("tbody", {}, ...(rows.length ? rows.map((g) => el("tr", {}, el("td", {}, g.mes), el("td", {}, g.nome), el("td", { class: "r num" }, R$(g.prevista)), el("td", { class: "r num", style: g.liberada ? "font-weight:600" : "" }, R$(g.liberada)), el("td", { class: "r num" }, R$(g.paga)), el("td", {}, fin && g.liberada ? el("button", { class: "btn sm", onclick: async () => { const d = prompt("Data do pagamento (AAAA-MM-DD):", new Date().toISOString().slice(0, 10)); if (!d) return; const ids = g.itens.filter((c) => c.status === "liberada").map((c) => c.id); const { error } = await SB.from("comissoes").update({ status: "paga", paga_em: d }).in("id", ids); if (error) toast(error.message); else { toast("Marcadas como pagas"); inval(); carregar(); } } }, "Marcar pagas") : null))) : [el("tr", {}, el("td", { colspan: 6, class: "note" }, "Nenhuma comissão."))]))))));
+        el("tbody", {}, ...(rows.length ? rows.map((g) => el("tr", {}, el("td", {}, g.mes), el("td", {}, g.nome), el("td", { class: "r num" }, R$(g.prevista)), el("td", { class: "r num", style: g.liberada ? "font-weight:600" : "" }, R$(g.liberada)), el("td", { class: "r num" }, R$(g.paga)), el("td", {}, fin && g.liberada ? el("button", { class: "btn sm", onclick: async (e) => { const b = e.currentTarget; const d = await npPedirTexto({ titulo: "Marcar comissões como pagas", mensagem: `${g.nome} · ${g.mes} · ${R$(g.liberada)} liberado(s).`, rotulo: "Data do pagamento (AAAA-MM-DD)", valorInicial: new Date().toISOString().slice(0, 10), placeholder: "AAAA-MM-DD", obrigatorio: true, validar: (v) => /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? null : "Informe a data no formato AAAA-MM-DD.", confirmar: "Confirmar pagamento" }); if (!d) return; b.disabled = true; try { const ids = g.itens.filter((c) => c.status === "liberada").map((c) => c.id); const { error } = await SB.from("comissoes").update({ status: "paga", paga_em: d.trim() }).in("id", ids); if (error) toast(error.message); else { toast("Marcadas como pagas"); inval(); carregar(); } } finally { b.disabled = false; } } }, "Marcar pagas") : null))) : [el("tr", {}, el("td", { colspan: 6, class: "note" }, "Nenhuma comissão."))]))))));
     const L = F.com.filter((c) => c.status !== "cancelada").slice(0, 300);
     v.append(el("div", { class: "card section" }, el("h2", {}, "Lançamentos"), el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Quem"), el("th", {}, "SF / cliente"), el("th", {}, "Papel"), el("th", { class: "r" }, "%"), el("th", { class: "r" }, "Base"), el("th", { class: "r" }, "Valor"), el("th", {}, "Pago em"), el("th", {}, "Status"))),
       el("tbody", {}, ...(L.length ? L.map((c) => el("tr", {}, el("td", {}, c.colaborador_nome), el("td", {}, c.sf_codigo || "—", el("div", { class: "note" }, c.cliente_nome || "")), el("td", {}, c.papel), el("td", { class: "r num" }, c.pct + "%"), el("td", { class: "r num" }, R$(c.base)), el("td", { class: "r num" }, R$(c.valor)), el("td", {}, c.pago_em ? fmt(c.pago_em) : c.paga_em ? fmt(c.paga_em) : "—"), el("td", {}, pill(ST_COM, c.status)))) : [el("tr", {}, el("td", { colspan: 8, class: "note" }, "Nenhum."))]))))));

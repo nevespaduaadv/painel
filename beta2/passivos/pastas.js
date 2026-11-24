@@ -24,6 +24,8 @@
   async function carregarRel(pid) { const { data } = await SB.from("v_processo_relacoes").select("*").eq("processo_id", pid).order("created_at"); PA.rel[pid] = data || []; PA.relDe = pid; render(); }
   const faltando = (row) => PA.campos.filter((c) => c.obrigatorio && (row[c.campo] == null || String(row[c.campo]).trim() === "")).map((c) => c.rotulo);
 
+  const paV3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+
   // ---------- campos extras do formulário de processo (chamado por carteira.js) ----------
   function camposForm(p, c) {
     const area = sel({ "": "— escolha —", ...Object.fromEntries(PA.areas.filter((a) => a.ativa || a.nome === p.area).map((a) => [a.nome, a.nome])) }, p.area || "");
@@ -31,17 +33,45 @@
     const risco = sel({ "": "—", alto: "Alto", medio: "Médio", baixo: "Baixo" }, p.grau_risco || "");
     const relevante = el("input", { type: "checkbox", checked: p.relevante ? "" : null }), sigiloso = el("input", { type: "checkbox", checked: p.sigiloso ? "" : null });
     // pasta: nova (automática) ou a mesma de outro processo do cliente
-    const outros = (window.PP_CARTEIRA?.processosDoCliente?.(c?.id) || []).filter((x) => x.id !== p.id && x.pasta_numero);
-    const pastaOpts = { "": p.id ? pastaTxt(p) + " (atual)" : "Nova pasta (número automático)" };
-    for (const x of outros) pastaOpts[String(x.pasta_numero)] = pastaTxt(x) + " — mesma de " + (x.numero_cnj || x.tipo_acao || "processo");
-    const pasta = sel(pastaOpts, "");
-    if (c?.id) pastasDoCliente(c.id).then((ps) => { for (const x of ps) if (x.status === "ativa" && !pastaOpts[String(x.numero)] && x.numero !== p.pasta_numero) pasta.append(el("option", { value: String(x.numero) }, pastaTxt(x) + " — " + (x.titulo || TIPOS_PASTA[x.tipo] || "pasta") + (+x.qtd_processos ? "" : " (sem processo)"))); });
+    const pasta = sel({}, "");
+    const atualizarCliente = (cid) => {
+      const atual = pasta.value;
+      const pastaOpts = { "": p.id ? pastaTxt(p) + " (atual)" : "Nova pasta (número automático)" };
+      const outros = (window.PP_CARTEIRA?.processosDoCliente?.(cid) || []).filter((x) => x.id !== p.id && x.pasta_numero);
+      for (const x of outros) pastaOpts[String(x.pasta_numero)] = pastaTxt(x) + " — mesma de " + (x.numero_cnj || x.tipo_acao || "processo");
+      pasta.replaceChildren(...Object.entries(pastaOpts).map(([k, v]) => el("option", { value: k }, v)));
+      if (atual && pastaOpts[atual]) pasta.value = atual;
+      if (cid) {
+        pastasDoCliente(cid).then((ps) => {
+          for (const x of ps) {
+            if (x.status === "ativa" && !pastaOpts[String(x.numero)] && x.numero !== p.pasta_numero) {
+              pastaOpts[String(x.numero)] = true;
+              pasta.append(el("option", { value: String(x.numero) }, pastaTxt(x) + " — " + (x.titulo || TIPOS_PASTA[x.tipo] || "pasta") + (+x.qtd_processos ? "" : " (sem processo)")));
+            }
+          }
+        });
+      }
+    };
+    atualizarCliente(c?.id || "");
+    const fArea = field("p-area", "Área", area);
+    const fDist = field("p-dist", "Data de distribuição", dist);
+    const fRito = field("p-rito", "Rito", rito);
+    const fAssunto = field("p-assunto", "Assunto", assunto);
+    const fAdvc = field("p-advc", "Advogado da parte contrária", advc);
+    const fRisco = field("p-risco", "Grau de risco (interno)", risco);
+    const pastaField = field("p-pasta", "Pasta", pasta, p.id ? "Processos relacionados (cumprimento, recurso…) ficam na mesma pasta do originário." : "Deixe em “Nova pasta” para um processo independente.");
+    const fFlags = el("div", { class: "f", style: "display:flex;gap:16px;align-items:center" }, el("label", { class: "switch" }, relevante, " Processo relevante"), el("label", { class: "switch" }, sigiloso, " Sigiloso"));
+    const extraFields = [fArea, fDist, fRito, fAssunto, fAdvc, fRisco, fFlags];
     const wrap = el("div", { class: "form", style: "grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;margin-top:4px" },
-      field("p-area", "Área", area), field("p-dist", "Data de distribuição", dist), field("p-rito", "Rito", rito), field("p-assunto", "Assunto", assunto),
-      field("p-advc", "Advogado da parte contrária", advc), field("p-risco", "Grau de risco (interno)", risco),
-      field("p-pasta", "Pasta", pasta, p.id ? "Processos relacionados (cumprimento, recurso…) ficam na mesma pasta do originário." : "Deixe em “Nova pasta” para um processo independente."),
-      el("div", { class: "f", style: "display:flex;gap:16px;align-items:center" }, el("label", { class: "switch" }, relevante, " Processo relevante"), el("label", { class: "switch" }, sigiloso, " Sigiloso")));
-    return { wrap, valores: () => ({ area: area.value || null, data_distribuicao: dist.value || null, rito: rito.value.trim() || null, assunto: assunto.value.trim() || null, advogado_contrario: advc.value.trim() || null, grau_risco: risco.value || null, relevante: relevante.checked, sigiloso: sigiloso.checked, ...(pasta.value ? { pasta_numero: +pasta.value } : {}) }) };
+      fArea, fDist, fRito, fAssunto, fAdvc, fRisco, pastaField, fFlags);
+    return {
+      wrap,
+      pastaField,
+      pastaSelect: pasta,
+      extraFields,
+      atualizarCliente,
+      valores: () => ({ area: area.value || null, data_distribuicao: dist.value || null, rito: rito.value.trim() || null, assunto: assunto.value.trim() || null, advogado_contrario: advc.value.trim() || null, grau_risco: risco.value || null, relevante: relevante.checked, sigiloso: sigiloso.checked, ...(pasta.value ? { pasta_numero: +pasta.value } : {}) })
+    };
   }
   function validar(row) {
     const f = faltando(row);
@@ -53,6 +83,61 @@
     if (PA.relDe !== p.id && !PA.rel[p.id]) carregarRel(p.id);
     const rel = PA.rel[p.id] || [];
     const falta = p.campos_faltando || faltando(p);
+    if (paV3()) {
+      const sec = el("section", { class: "np-pf-sec" },
+        el("div", { class: "np-pf-pasta-res" },
+          el("div", { style: "display:flex;flex-direction:column;gap:4px" },
+            el("div", { style: "display:flex;align-items:center;gap:8px;flex-wrap:wrap" },
+              el("h3", { style: "margin:0;font:600 15px/1.2 var(--np-ui);color:var(--np-ink)" }, pastaTxt(p)),
+              p.pasta_titulo ? el("span", { class: "np-ts-sub" }, "· " + p.pasta_titulo) : null,
+              falta.length
+                ? NPUI.marca("Cadastro incompleto: " + falta.join(", "), "att")
+                : NPUI.marca("Cadastro completo", "ok")
+            ),
+            el("div", { class: "np-ts-sub" }, [p.area ? "Área: " + p.area : null, p.data_distribuicao ? "Distribuído em " + fmt(p.data_distribuicao) : null, p.rito ? "Rito: " + p.rito : null, p.relevante ? "Relevante" : null, p.sigiloso ? "Sigiloso" : null].filter(Boolean).join(" · ") || "Sem metadados adicionais de pasta.")
+          ),
+          el("div", { class: "edit-only" },
+            NPUI.btn("Relacionar processo…", { onclick: () => modalRelacionar(p, recarregar) })
+          )
+        ),
+        el("div", { class: "np-pf-sec-h", style: "margin-top:4px" },
+          el("h3", {}, `Processos relacionados (${rel.length})`)
+        ),
+        rel.length
+          ? el("div", { class: "np-lista" }, ...rel.map((r) => NPUI.linha({
+              id: "pf-rel-" + r.id,
+              regua: r.sentido === "derivado" ? "info" : "",
+              prazo: { texto: (r.sentido === "derivado" ? "↳ " : "↰ ") + (TIPOS_REL[r.tipo] || r.tipo), tom: "" },
+              titulo: r.numero_cnj || r.tipo_acao || "(sem número)",
+              contexto: [r.tipo_acao || null, r.fase || null, pastaTxt(r), r.sentido === "originario" ? "este processo deriva dele" : null, r.observacao || null].filter(Boolean).join(" · "),
+              direita: [
+                NPUI.btn("Abrir", { variante: "ghost", onclick: (ev) => { ev.stopPropagation(); window.PP_PROCESSOS?.abrir?.(r.relacionado_id); } }),
+                NPUI.btn("Desfazer", { variante: "ghost", onclick: (ev) => {
+                  ev.stopPropagation();
+                  npConfirmar({
+                    titulo: "Desfazer relacionamento entre processos?",
+                    mensagem: `Desvincular ${r.numero_cnj || r.tipo_acao || "este processo"}? A pasta do processo não muda.`,
+                    confirmar: "Desfazer vínculo",
+                    perigo: true,
+                    onSim: async () => {
+                      const { error } = await SB.from("processo_relacoes").delete().eq("id", r.id);
+                      if (error) throw error;
+                      delete PA.rel[p.id]; recarregar?.(); carregarRel(p.id);
+                    }
+                  });
+                } })
+              ],
+              onOpen: () => window.PP_PROCESSOS?.abrir?.(r.relacionado_id)
+            })))
+          : el("div", { class: "np-ts-sub" }, "Nenhum processo relacionado. Use “Relacionar processo…” para vincular cumprimento de sentença, recurso, embargos ou incidentes.")
+      );
+      if (window.PP_PUB_TRAT?.secaoProcesso && !opts.semPublicacoes) {
+        const wrap = el("div", { style: "display:contents" }, sec);
+        window.PP_PUB_TRAT.secaoProcesso(p, wrap);
+        return wrap;
+      }
+      return sec;
+    }
     const box = el("div", { class: "card", style: "padding:12px 14px;display:flex;flex-direction:column;gap:8px" },
       el("div", { class: "section-h" }, el("div", {}, el("div", { class: "eyebrow" }, "Arquivo"), el("h3", { style: "font-size:16px" }, pastaTxt(p), p.pasta_titulo ? el("span", { class: "note" }, " · " + p.pasta_titulo) : null)),
         el("div", { class: "actions edit-only" }, el("button", { class: "btn sm", onclick: () => modalRelacionar(p, recarregar) }, "Relacionar processo…"))),
@@ -62,7 +147,7 @@
       rel.length ? el("ul", { class: "tl" }, rel.map((r) => el("li", {}, el("div", { class: "d" }, (r.sentido === "derivado" ? "↳ " : "↰ ") + (TIPOS_REL[r.tipo] || r.tipo) + (r.sentido === "originario" ? " (este é derivado dele)" : "")),
         el("div", {}, el("a", { href: "#processos/" + r.relacionado_id, onclick: (ev) => { ev.preventDefault(); window.PP_PROCESSOS?.abrir(r.relacionado_id); } }, r.numero_cnj || r.tipo_acao || "(sem número)"), el("span", { class: "note" }, " · " + [r.tipo_acao, r.fase, pastaTxt(r)].filter(Boolean).join(" · "))),
         r.observacao ? el("div", { class: "note" }, r.observacao) : null,
-        el("div", { class: "actions edit-only", style: "justify-content:flex-start;margin-top:2px" }, el("button", { class: "btn sm", onclick: async () => { if (!confirm("Desfazer este relacionamento? (a pasta não muda)")) return; await SB.from("processo_relacoes").delete().eq("id", r.id); delete PA.rel[p.id]; recarregar?.(); carregarRel(p.id); } }, "Desfazer"))))) : el("div", { class: "note" }, "Nenhum. Use “Relacionar processo…” para vincular cumprimento de sentença, recurso, embargos etc."));
+        el("div", { class: "actions edit-only", style: "justify-content:flex-start;margin-top:2px" }, el("button", { class: "btn sm", onclick: () => { npConfirmar({ titulo: "Desfazer relacionamento entre processos?", mensagem: `Desvincular ${r.numero_cnj || r.tipo_acao || "este processo"}? A pasta do processo não muda.`, confirmar: "Desfazer vínculo", perigo: true, onSim: async () => { const { error } = await SB.from("processo_relacoes").delete().eq("id", r.id); if (error) throw error; delete PA.rel[p.id]; recarregar?.(); carregarRel(p.id); } }); } }, "Desfazer"))))) : el("div", { class: "note" }, "Nenhum. Use “Relacionar processo…” para vincular cumprimento de sentença, recurso, embargos etc."));
     if (window.PP_PUB_TRAT?.secaoProcesso && !opts.semPublicacoes) { const wrap = el("div", { style: "display:contents" }, box); window.PP_PUB_TRAT.secaoProcesso(p, wrap); return wrap; }
     return box;
   }
@@ -83,7 +168,7 @@
         const { error } = await SB.rpc("processo_relacionar", { p_principal: principal, p_relacionado: derivado, p_tipo: tipo.value, p_mesma_pasta: mesma.checked, p_obs: obs.value.trim() || null });
         if (error) throw new Error(error.message);
         toast("Processos relacionados"); delete PA.rel[p.id]; delete PA.rel[escolhido]; PA.pastasOk = false; window.PP_PROCESSOS?.recarregar?.(); recarregar?.();
-      });
+      }, null, { confirmar: "Relacionar processo" });
   }
 
   // ---------- pastas do cliente (card no topo da sub-aba Processos do cliente) ----------
@@ -99,8 +184,7 @@
       const { data, error } = await SB.rpc("pasta_abrir", { p_cliente: c.id, p_titulo: titulo.value.trim() || null, p_tipo: tipo.value, p_descricao: descr.value.trim() || null }); if (error) throw new Error(error.message);
       const ids = caixas.filter((x) => x.i.checked).map((x) => x.k.id); if (ids.length) { const { error: e2 } = await SB.rpc("pasta_vincular_contratos", { p_pasta: data.numero, p_contratos: ids }); if (e2) throw new Error(e2.message); for (const k of ks) if (ids.includes(k.id)) k.pasta_numero = data.numero; }
       toast("Pasta " + (data.codigo || data.numero) + " aberta"); PA.pastasOk = false; delete PA.porCliente[c.id]; render();
-    });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Abrir pasta";
+    }, null, { confirmar: "Abrir pasta" });
   }
   function modalContratosPasta(c, pa) {
     const ks = (S.contratos || []).filter((k) => k.clienteId === c.id); if (!ks.length) { toast("Este cliente não tem contratos cadastrados"); return; }
@@ -111,7 +195,7 @@
       if (sai.length) { const { error } = await SB.rpc("pasta_vincular_contratos", { p_pasta: null, p_contratos: sai }); if (error) throw new Error(error.message); }
       for (const x of caixas) x.k.pasta_numero = x.i.checked ? pa.numero : (sai.includes(x.k.id) ? null : x.k.pasta_numero);
       toast("Contratos atualizados"); PA.pastasOk = false; delete PA.porCliente[c.id]; render();
-    });
+    }, null, { confirmar: "Salvar contratos" });
   }
   function cardPastasCliente(c) {
     const box = el("div", { class: "card", style: "padding:12px 14px;display:flex;flex-direction:column;gap:6px" });
@@ -154,7 +238,7 @@
     modal(pastaTxt(p), el("div", { class: "form" }, field("pa-t", "Título", titulo), field("pa-tp", "Tipo", tipo), el("div", { class: "f full" }, field("pa-d", "Descrição", descr)), field("pa-s", "Status", status), field("pa-e", "Encerrada em", enc), field("pa-te", "Tipo de encerramento", tipoEnc), field("pa-c", "Localização física", caixa), field("pa-o", "Observações", obs)), async () => {
       const { error } = await SB.from("pastas").update({ titulo: titulo.value.trim() || null, tipo: tipo.value, descricao: descr.value.trim() || null, status: status.value, encerrada_em: status.value === "encerrada" ? (enc.value || new Date().toISOString().slice(0, 10)) : null, tipo_encerramento: tipoEnc.value.trim() || null, caixa_arquivo: caixa.value.trim() || null, observacoes: obs.value.trim() || null, updated_at: new Date().toISOString() }).eq("numero", p.numero);
       if (error) throw new Error(error.message); toast("Pasta salva"); PA.pastasOk = false; delete PA.porCliente[p.cliente_id]; carregarPastas();
-    });
+    }, null, { confirmar: "Salvar pasta" });
   }
   function renderConfig(v) {
     const campos = el("div", { class: "card section" }, el("h2", {}, "Campos obrigatórios do processo"), el("div", { class: "note" }, "Os campos marcados bloqueiam o salvamento do processo quando vazios e aparecem como “cadastro incompleto” na lista e no relatório."),

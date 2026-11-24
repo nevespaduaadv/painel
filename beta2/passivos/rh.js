@@ -118,7 +118,7 @@ function renderPDI(v,c){
   v.append(sec);
   const regs=el("section",{class:v3?"np-rh-sec":"card section"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("h2",{},"Acompanhamento (1:1, feedbacks, avaliações)"),el("div",{class:"actions"},admin()?el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openRegForm(c)},"+ Registro"):null)));
   if(!R.reg.length)regs.append(el("div",{class:v3?"np-ts-sub":"note"},"Nenhum registro."));
-  for(const r of R.reg)regs.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(r.data)+" · "+(REG[r.tipo]||r.tipo)+(r.pdi_id?" · meta: "+(R.pdi.find(p=>p.id===r.pdi_id)?.titulo||""):"")+(admin()&&!r.visivel_colaborador?" · só sócias":"")),el("div",{style:"white-space:pre-wrap"},r.texto),admin()?el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir este registro?"))return;await SB.from("pdi_registros").delete().eq("id",r.id);carregar(c.id)}},"Excluir"):null));
+  for(const r of R.reg)regs.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(r.data)+" · "+(REG[r.tipo]||r.tipo)+(r.pdi_id?" · meta: "+(R.pdi.find(p=>p.id===r.pdi_id)?.titulo||""):"")+(admin()&&!r.visivel_colaborador?" · só sócias":"")),el("div",{style:"white-space:pre-wrap"},r.texto),admin()?el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:()=>{npConfirmar({titulo:"Excluir registro de acompanhamento?",mensagem:`Remover o registro de ${REG[r.tipo]||r.tipo} (${fmtD(r.data)}) de ${c.nome}?`,confirmar:"Excluir registro",perigo:true,onSim:async()=>{const {error}=await SB.from("pdi_registros").delete().eq("id",r.id);if(error)throw error;carregar(c.id)}})}},"Excluir"):null));
   v.append(regs);
 }
 function openPdiForm(c,m){
@@ -127,18 +127,18 @@ function openPdiForm(c,m){
   const progL=el("span",{class:"num"},(m.progresso||0)+"%");prog.oninput=()=>progL.textContent=prog.value+"%";
   if(!souAdmin){tit.disabled=true;desc.disabled=true;prazo.disabled=true}
   const body=el("div",{class:"form"},field("pdi-tit","Meta",tit),field("pdi-prazo","Prazo",prazo),field("pdi-st","Situação",st),el("div",{class:"f"},el("label",{},"Progresso"),el("div",{style:"display:flex;gap:10px;align-items:center"},prog,progL)),field("pdi-desc","Descrição",desc));
-  const extra=m.id&&souAdmin?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir esta meta?"))return;await SB.from("pdi").delete().eq("id",m.id);$("#modalHost").replaceChildren();carregar(c.id)}},"Excluir"):null;
+  const extra=m.id&&souAdmin?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir meta do PDI?",mensagem:`Remover a meta “${m.titulo||"selecionada"}” de ${c.nome}?`,confirmar:"Excluir meta",perigo:true,onSim:async()=>{const {error}=await SB.from("pdi").delete().eq("id",m.id);if(error)throw error;$("#modalHost").replaceChildren();carregar(c.id)}})}} ,"Excluir"):null;
   modal(m.id?(souAdmin?"Editar meta":"Atualizar progresso"):"Nova meta",body,async()=>{
-    if(!tit.value.trim())throw new Error("Informe a meta");
+    if(!tit.value.trim()){const e=new Error("Informe a meta");e.campo=tit;throw e}
     const row=souAdmin?{colaborador_id:c.id,titulo:tit.value.trim(),descricao:desc.value.trim()||null,prazo:prazo.value||null,status:st.value,progresso:+prog.value}:{status:st.value,progresso:+prog.value};
     const {error}=m.id?await SB.from("pdi").update(row).eq("id",m.id):await SB.from("pdi").insert(row);if(error)throw error;
     toast("PDI salvo");carregar(c.id);window.PP_EQUIPE?.recarregar();
-  },extra);
+  },extra,{confirmar:m.id?(souAdmin?"Salvar meta":"Atualizar progresso"):"Criar meta"});
 }
 function openRegForm(c){
   const tipo=sel(REG,"one_on_one"),data=inp("date",new Date().toISOString().slice(0,10)),meta=sel({"":"— geral —",...Object.fromEntries(R.pdi.map(p=>[p.id,p.titulo]))},""),texto=el("textarea",{rows:"5",placeholder:"O que foi conversado, combinados, próximos passos"}),vis=el("input",{type:"checkbox",style:"width:16px;height:16px;accent-color:var(--gold)"});vis.checked=true;
   const body=el("div",{class:"form"},field("rg-tipo","Tipo",tipo),field("rg-data","Data",data),field("rg-meta","Meta relacionada",meta),field("rg-txt","Registro",texto),el("div",{class:"f full"},el("label",{style:"display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px"},vis,"Visível para o(a) colaborador(a)")));
-  modal("Novo registro",body,async()=>{if(!texto.value.trim())throw new Error("Escreva o registro");const {error}=await SB.from("pdi_registros").insert({colaborador_id:c.id,pdi_id:meta.value||null,tipo:tipo.value,data:data.value,texto:texto.value.trim(),visivel_colaborador:vis.checked});if(error)throw error;toast("Registro salvo");carregar(c.id)});
+  modal("Novo registro",body,async()=>{if(!texto.value.trim()){const e=new Error("Escreva o registro");e.campo=texto;throw e}const {error}=await SB.from("pdi_registros").insert({colaborador_id:c.id,pdi_id:meta.value||null,tipo:tipo.value,data:data.value,texto:texto.value.trim(),visivel_colaborador:vis.checked});if(error)throw error;toast("Registro salvo");carregar(c.id)},null,{confirmar:"Salvar registro"});
 }
 function renderRH(v,c){
   const r=R.rh||{};const v3=rhV3();
@@ -152,25 +152,45 @@ function renderRH(v,c){
 function openRHForm(c,r){
   const f={cpf:inp("text",r.cpf||""),rg:inp("text",r.rg||""),pis:inp("text",r.pis||""),estado_civil:inp("text",r.estado_civil||""),endereco:inp("text",r.endereco||""),contato_emergencia:inp("text",r.contato_emergencia||"",{placeholder:"Nome · telefone"}),vinculo:sel({"":"—",...VINCULO},r.vinculo||""),jornada:inp("text",r.jornada||"",{placeholder:"44h, 30h…"}),salario:inp("number",r.salario??"",{step:"0.01",min:0}),beneficios:inp("text",r.beneficios||"",{placeholder:"VR, VT, plano…"}),cnpj_pj:inp("text",r.cnpj_pj||""),razao_social_pj:inp("text",r.razao_social_pj||""),banco_pix:inp("text",r.banco_pix||""),observacoes:el("textarea",{rows:"3"},r.observacoes||"")};
   const docs=Array.isArray(r.documentos)?[...r.documentos]:[];const lista=el("div",{});
-  const rl=()=>{lista.replaceChildren(...docs.map((d,i)=>el("div",{style:"display:flex;gap:6px;align-items:center;margin:2px 0"},el("span",{style:"flex:1"},d.titulo||d.url),el("button",{class:"btn sm",onclick:()=>{docs.splice(i,1);rl()}},"×"))))};rl();
+  let blocoDocs=null;
+  const rl=()=>{lista.replaceChildren(...docs.map((d,i)=>el("div",{style:"display:flex;gap:6px;align-items:center;margin:2px 0"},el("span",{style:"flex:1"},d.titulo||d.url),el("button",{class:"btn sm",type:"button",onclick:()=>{docs.splice(i,1);rl();blocoDocs?.atualizarContador?.()}},"×"))))};rl();
   const dt=inp("text","",{placeholder:"Título (ex.: Contrato de trabalho)"}),du=inp("url","",{placeholder:"https://drive.google.com/…"});
-  const body=el("div",{class:"form"},field("rh-vinc","Vínculo",f.vinculo),field("rh-sal","Salário (R$)",f.salario),field("rh-jor","Jornada",f.jornada),field("rh-ben","Benefícios",f.beneficios),field("rh-cpf","CPF",f.cpf),field("rh-rg","RG",f.rg),field("rh-pis","PIS",f.pis),field("rh-ec","Estado civil",f.estado_civil),field("rh-end","Endereço",f.endereco),field("rh-em","Contato de emergência",f.contato_emergencia),field("rh-pix","Banco / PIX",f.banco_pix),field("rh-cnpj","CNPJ (PJ)",f.cnpj_pj),field("rh-rs","Razão social (PJ)",f.razao_social_pj),field("rh-obs","Observações",f.observacoes),
-    el("div",{class:"f full"},el("label",{},"Documentos (links)"),lista,el("div",{style:"display:flex;gap:6px;margin-top:4px"},dt,du,el("button",{class:"btn sm",onclick:()=>{if(!du.value.trim())return;docs.push({titulo:dt.value.trim()||du.value.trim(),url:du.value.trim()});dt.value="";du.value="";rl()}},"Adicionar"))));
+  const docsWrap=el("div",{class:"f full"},el("label",{},"Documentos (links)"),lista,el("div",{style:"display:flex;gap:6px;margin-top:4px"},dt,du,el("button",{class:"btn sm",type:"button",onclick:()=>{if(!du.value.trim())return;docs.push({titulo:dt.value.trim()||du.value.trim(),url:du.value.trim()});dt.value="";du.value="";rl();blocoDocs?.atualizarContador?.()}},"Adicionar")));
+  const v3=rhV3();
+  let body;
+  if(v3){
+    blocoDocs=NPUI.maisCampos("Documentos e dados bancários",[
+      field("rh-rg","RG",f.rg),field("rh-pis","PIS",f.pis),
+      field("rh-pix","Banco / PIX",f.banco_pix),
+      field("rh-cnpj","CNPJ (PJ)",f.cnpj_pj),field("rh-rs","Razão social (PJ)",f.razao_social_pj),
+      docsWrap,
+      field("rh-obs","Observações",f.observacoes)
+    ],{contador:"auto"});
+    body=el("div",{class:"form"},
+      NPUI.secaoForm("Vínculo e remuneração"),
+      field("rh-vinc","Vínculo",f.vinculo),field("rh-sal","Salário (R$)",f.salario),field("rh-jor","Jornada",f.jornada),field("rh-ben","Benefícios",f.beneficios),
+      NPUI.secaoForm("Dados pessoais"),
+      field("rh-cpf","CPF",f.cpf),field("rh-ec","Estado civil",f.estado_civil),field("rh-end","Endereço",f.endereco),field("rh-em","Contato de emergência",f.contato_emergencia),
+      blocoDocs
+    );
+  }else{
+    body=el("div",{class:"form"},field("rh-vinc","Vínculo",f.vinculo),field("rh-sal","Salário (R$)",f.salario),field("rh-jor","Jornada",f.jornada),field("rh-ben","Benefícios",f.beneficios),field("rh-cpf","CPF",f.cpf),field("rh-rg","RG",f.rg),field("rh-pis","PIS",f.pis),field("rh-ec","Estado civil",f.estado_civil),field("rh-end","Endereço",f.endereco),field("rh-em","Contato de emergência",f.contato_emergencia),field("rh-pix","Banco / PIX",f.banco_pix),field("rh-cnpj","CNPJ (PJ)",f.cnpj_pj),field("rh-rs","Razão social (PJ)",f.razao_social_pj),field("rh-obs","Observações",f.observacoes),docsWrap);
+  }
   modal("Dados de RH — "+c.nome,body,async()=>{
     const row={colaborador_id:c.id,documentos:docs};for(const [k,i] of Object.entries(f))row[k]=k==="salario"?(i.value===""?null:+i.value):(i.value.trim()||null);
     const {error}=await SB.from("colaboradores_rh").upsert(row,{onConflict:"colaborador_id"});if(error)throw error;toast("Dados de RH salvos");carregar(c.id);
-  });
+  },null,{confirmar:"Salvar dados de RH"});
 }
 function renderHist(v,c){
   const v3=rhV3();
   const sec=el("section",{class:v3?"np-rh-sec":"card section"},el("div",{class:v3?"np-rh-sec-h":"section-h"},el("h2",{},"Histórico"),el("div",{class:"actions"},el("button",{class:v3?"np-btn pri":"btn sm primary",onclick:()=>openHistForm(c)},"+ Registro"))));
   if(!R.hist.length)sec.append(el("div",{class:v3?"np-ts-sub":"note"},"Nada registrado. Admissão, reajustes, promoções, férias, feedbacks formais, advertências."));
-  for(const h of R.hist)sec.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(h.data)+" · "+(HIST[h.tipo]||h.tipo)+(h.valor!=null?" · "+brl(h.valor):"")),h.descricao?el("div",{style:"white-space:pre-wrap"},h.descricao):null,el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:async()=>{if(!confirm("Excluir?"))return;await SB.from("colaboradores_historico").delete().eq("id",h.id);carregar(c.id)}},"Excluir")));
+  for(const h of R.hist)sec.append(el("div",{class:"rh-reg"},el("div",{class:"s np-num"},fmtD(h.data)+" · "+(HIST[h.tipo]||h.tipo)+(h.valor!=null?" · "+brl(h.valor):"")),h.descricao?el("div",{style:"white-space:pre-wrap"},h.descricao):null,el("button",{class:v3?"np-btn ghost":"btn sm",style:"margin-top:4px",onclick:()=>{npConfirmar({titulo:"Excluir registro do histórico?",mensagem:`Remover o evento de ${HIST[h.tipo]||h.tipo} (${fmtD(h.data)}) do histórico de ${c.nome}?`,confirmar:"Excluir registro",perigo:true,onSim:async()=>{const {error}=await SB.from("colaboradores_historico").delete().eq("id",h.id);if(error)throw error;carregar(c.id)}})}},"Excluir")));
   v.append(sec);
 }
 function openHistForm(c){
   const tipo=sel(HIST,"feedback"),data=inp("date",new Date().toISOString().slice(0,10)),valor=inp("number","",{step:"0.01",placeholder:"novo salário, se reajuste"}),desc=el("textarea",{rows:"4"});
-  modal("Novo registro no histórico",el("div",{class:"form"},field("h-tipo","Tipo",tipo),field("h-data","Data",data),field("h-val","Valor (R$)",valor),field("h-desc","Descrição",desc)),async()=>{const {error}=await SB.from("colaboradores_historico").insert({colaborador_id:c.id,tipo:tipo.value,data:data.value,valor:valor.value?+valor.value:null,descricao:desc.value.trim()||null});if(error)throw error;toast("Registrado");carregar(c.id)});
+  modal("Novo registro no histórico",el("div",{class:"form"},field("h-tipo","Tipo",tipo),field("h-data","Data",data),field("h-val","Valor (R$)",valor),field("h-desc","Descrição",desc)),async()=>{const {error}=await SB.from("colaboradores_historico").insert({colaborador_id:c.id,tipo:tipo.value,data:data.value,valor:valor.value?+valor.value:null,descricao:desc.value.trim()||null});if(error)throw error;toast("Registrado");carregar(c.id)},null,{confirmar:"Registrar no histórico"});
 }
 
 /* ---------- aniversariantes (na tela Equipe) ---------- */
