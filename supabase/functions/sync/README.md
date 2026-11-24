@@ -77,3 +77,9 @@ O adaptador usa nomes candidatos (ajustáveis em `integracoes.config.mapa`, sem 
 - A capa só preenche campo vazio do processo (vara, comarca, valor da causa, assunto, distribuição, tribunal, tipo de ação, parte contrária, advogado contrário, polo).
 - Processo do Sync que não está cadastrado no sistema é só contado (`fora_da_base`).
 - Até 40 processos por chamada; a tela repete enquanto houver restantes.
+
+## Monitores por CPF/CNPJ dos clientes (24/11/2026, migração 0118)
+
+- Rota `/sync/monitores` (administradora): cria no Sync um monitor para cada documento de `monitoramentos.documentos` que ainda não tem (`POST /v1/monitores`), em lotes de 10. É a ÚNICA escrita do conector no fornecedor.
+- Rota `/sync/descobertos` e o agendamento: leem `/v1/monitores/{id}/descobertos` e gravam em `sync_monitores`.
+- **Comportamento observado em produção**: monitor por CPF/CNPJ não deixa os processos em "aguardando seleção" — eles entram direto na carteira do Sync e contam no limite do plano. Na criação dos 43 monitores a carteira foi de 276 para 382 (limite 800). Por isso `descobertos` voltou vazio; os processos novos aparecem como `fora_da_base` na carteira.
