@@ -142,7 +142,8 @@ function grupoHojeAvV3(){
 }
 
 {const _r=render;render=function(){_r();const v=$("#view-avisos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="avisos")S.tab="clientes";v.hidden=S.tab!=="avisos";if(S.tab==="avisos"){if(avisosV3())renderAvisosV3();else{v.classList.remove("np-v3");renderAvisos()}}
-  if(S.tab==="painel"&&eq){const vp=$("#view-painel");if(avisosV3()){const old=vp?.querySelector(".np-hoje-avisos");if(old)old.remove();const g=grupoHojeAvV3();const corpo=vp?.querySelector(".np-corpo");const ancora=corpo?.querySelector(".np-hoje-h");if(g&&corpo){const ag=corpo.querySelector(".np-agora");if(ag)ag.after(g);else if(ancora)ancora.after(g);else corpo.prepend(g)}}else{const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}}
-window.PP_AVISOS={invalidar,v3:avisosV3};
+  if(S.tab==="painel"&&eq){const vp=$("#view-painel");if(avisosV3()){const old=vp?.querySelector(".np-hoje-avisos");if(old)old.remove();const g=grupoHojeAvV3();const corpo=vp?.querySelector(".np-corpo");const ancora=corpo?.querySelector(".np-hoje-h");if(g&&corpo){const fat=corpo.querySelector('.np-grp[data-g="fatais"]'),ag=corpo.querySelector(".np-agora");/* Figma de 18/11: prazo fatal de hoje vem antes do aviso */if(fat)fat.after(g);else if(ag)ag.after(g);else if(ancora)ancora.after(g);else corpo.prepend(g)}}else{const old=vp?.querySelector(".av-painel");if(old)old.remove();const c=cardPainel();const head=vp?.querySelector(".head");if(c&&head)head.after(c)}}}}
+window.PP_AVISOS={invalidar,v3:avisosV3,naoLidos:()=>AV.ok?AV.lista.filter(a=>!a.lida).length:null};
+(window.__NP_CONT=window.__NP_CONT||{}).avisos={fn:()=>window.PP_AVISOS.naoLidos(),rotulo:n=>n===1?"1 aviso não lido":n+" avisos não lidos"};
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){SB.channel("avisos").on("postgres_changes",{event:"*",schema:"public",table:"avisos"},()=>invalidar()).subscribe()}});
 })();

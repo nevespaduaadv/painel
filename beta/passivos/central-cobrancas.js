@@ -275,16 +275,18 @@
     acoes.append(el("button", { class: "btn", onclick: close }, "Fechar"));
     host.append(el("div", { class: "modal", onclick: (e) => { if (e.target.classList.contains("modal")) close(); } }, el("div", { class: "card", role: "dialog", style: "max-width:900px;width:min(900px,96vw)" }, el("h2", {}, `${etapa} · ${et?.titulo || "Etapa"} — descritivo do dia`), body, acoes)));
   }
-  function exportMensagens() {
+  function exportMensagens(comoV3) {
     const meses = [...new Set([mesAtual(), ...C.disparos.map((d) => (d.data || "").slice(0, 7))])].filter(Boolean).sort().reverse();
     const s = sel(Object.fromEntries(meses.map((m) => [m, fmtMes(m)])), mesAtual()); const inc = el("input", { type: "checkbox" });
-    return el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, el("span", { class: "note" }, "Exportar mensagens por cliente:"), s, el("label", { class: "note" }, inc, " incluir quem ficou de fora e falhas"), el("button", { class: "btn sm", onclick: () => {
+    const exportar = () => {
       const linhas = [];
       for (const d of C.disparos.filter((d) => (d.data || "").slice(0, 7) === s.value)) { const et = C.etapas.find((e) => e.codigo === d.etapa); for (const x of d.enviados || []) linhas.push([x.cliente, fmtD(d.data), x.hora || "", d.etapa, et?.titulo || "", x.parcela || "", x.vencimento || "", "Enviada", "", d.origem, (x.mensagem || "").replace(/\n/g, " ")]); if (inc.checked) for (const x of d.nao_enviados || []) linhas.push([x.cliente, fmtD(d.data), "", d.etapa, et?.titulo || "", x.parcela || "", x.vencimento || "", x.falha ? "Falhou" : "Não enviada (regra)", x.motivo || "", d.origem, ""]); }
       if (!linhas.length) { toast("Nenhuma mensagem registrada no mês"); return; }
       linhas.sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
       baixarCSV(linhas, ["Cliente", "Data", "Hora", "Etapa", "Nome da etapa", "Parcela", "Vencimento", "Situação", "Motivo", "Origem", "Mensagem"], `mensagens_regua_${s.value}.csv`);
-    } }, "Exportar (.csv)"));
+    };
+    if (comoV3) { s.id = "cc3-exp-mes"; inc.id = "cc3-exp-inc"; return el("div", { class: "np-rm-exp np-cc-cli" }, el("label", { for: "cc3-exp-mes" }, "Mês"), s, el("label", { class: "np-cc-chk", for: "cc3-exp-inc" }, inc, " incluir quem ficou de fora e as falhas"), NPUI.btn("Exportar mensagens (.csv)", { onclick: exportar })); }
+    return el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, el("span", { class: "note" }, "Exportar mensagens por cliente:"), s, el("label", { class: "note" }, inc, " incluir quem ficou de fora e falhas"), el("button", { class: "btn sm", onclick: exportar }, "Exportar (.csv)"));
   }
 
   // ----- RÉGUA -----
@@ -403,18 +405,21 @@
   const S0 = S;
   function barraSub() {
     const SUBS = [["asaas", "Cobranças (Asaas)"], ["central", "Central de Cobranças"], ["clientes", "Clientes (Asaas)"], ["conta", "Conta Asaas · Parâmetros"]];
-    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS, S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
+    // V3.1 (19/11): a Central de Cobranças foi retirada da navegação por decisão das sócias — o Controle Financeiro a substitui. A integração com o Asaas continua (cobranças, clientes, conta).
+    if (document.documentElement.classList.contains("np-casca-v3") && window.NPUI) { const g = NPUI.seg(SUBS.filter(([k]) => k !== "central"), S0.finSub || "asaas", (k) => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); }, "Área do Financeiro"); const w = el("div", { class: "np-fin-sub" }, g); return w; }
     return el("div", { class: "tabs", style: "margin-bottom:10px" }, SUBS.map(([k, t]) => el("button", { class: "tab", "aria-selected": String((S0.finSub || "asaas") === k), onclick: () => { S0.finSub = k; try { localStorage.setItem("pp-fin-sub", k); } catch (_) {} render(); } }, t)));
   }
   try { S0.finSub = localStorage.getItem("pp-fin-sub") || "asaas"; } catch (_) { S0.finSub = "asaas"; }
-  { const _r = render; render = function () { _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } if (!(S0.finSub === "central" && v3())) vf.prepend(barraSub()); }; }
+  const semCentral = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
+  if (semCentral() && S0.finSub === "central") S0.finSub = "asaas";
+  { const _r = render; render = function () { if (semCentral() && S0.finSub === "central") { S0.finSub = "asaas"; try { localStorage.setItem("pp-fin-sub", "asaas"); } catch (_) {} } _r(); const vf = $("#view-financeiro"); if (!vf || S0.tab !== "financeiro" || !podeFin()) return; if (S0.finSub === "central") { renderCentral(); } else if (S0.finSub === "clientes") { renderClientesAsaas(vf); } else if (S0.finSub === "conta") { renderConta(vf); } if (!(S0.finSub === "central" && v3())) vf.prepend(barraSub()); }; }
   // ---------- V10 · Clientes (Asaas) e Conta/Parâmetros em V3.1 — mesmos dados e mesmas ações da V2 ----------
   const v3 = () => document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI;
   const W3 = { aberta: null, painel: null, f: "" };
   // ---------- V10 · Central de Cobranças em V3.1 — moldura e "Ações de hoje". Mesmos dados e as mesmas funções do banco da V2.
   //            As outras sete vistas continuam na apresentação anterior, dentro da moldura nova. Nada aqui liga régua nem envia mensagem. ----------
   const Z3 = { aberta: null, painel: null, form: false, confirma: null };
-  const ABAS_C = [["hoje", "Ações de hoje"], ["disparos", "Disparos da régua"], ["regua", "Régua"], ["negociados", "Negociados"], ["historico", "Histórico por cliente"], ["cadencia", "Registros de contato"], ["resumo", "Resumo"], ["dashboard", "Dashboard"]];
+  const ABAS_C = [["hoje", "Ações de hoje"], ["disparos", "Disparos da régua"], ["regua", "Régua"], ["negociados", "Negociados"], ["historico", "Histórico por cliente"], ["cadencia", "Registros de contato"], ["resumo", "Resumo do mês"]]; // "Resumo" e "Dashboard" viraram uma visão só (18/11): mesmos cálculos, sem repetição
   const TOM_D = { RECUPERADO: "ok", NAO_RESPONDE: "crit", VERIFICAR_AMANHA: "", NEGOCIOU: "info", SEM_ACORDO: "crit" };
   function centralV3(v) {
     v.classList.add("np-v3"); v.replaceChildren(barraSub()); Z3.painel = null;
@@ -430,13 +435,16 @@
     v.append(NPUI.toolbar({ resumo: NPUI.resumo([{ n: pre.length ? `${feitos}/${pre.length}` : 0, label: "lembretes de hoje enviados", tom: pre.length && feitos < pre.length ? "att" : "zero" }, { n: fila.length, label: fila.length === 1 ? "vencida a contatar hoje" : "vencidas a contatar hoje", tom: fila.length ? "crit" : "zero" }, { n: R$(soma(fila)), label: "nessa fila" }, { n: mon.length, label: "sem resposta" }, { n: neg.length, label: neg.length === 1 ? "negociação" : "negociações" }]),
       direita: [q, NPUI.btn("Atualizar", { onclick: invalidar })] }), abas());
     v.append(el("p", { class: "np-nota np-cc-escopo" }, `${fmtMes(cur)}` + (carry ? ` + ${carry} parcela(s) negociada(s) de meses anteriores sem pagamento` : "") + (prox ? ` + ${prox} parcela(s) do próximo mês já na régua` : "") + `. Base: cobranças do Asaas. Hoje é ${fmtD(HOJE)}.`));
-    if (C.aba !== "hoje") {
+    if (C.aba === "dashboard") C.aba = "resumo"; // atalho antigo
+    const V3ABAS = ["hoje", "disparos", "regua", "negociados", "historico", "cadencia", "resumo"]; // vistas já na linguagem V3.1; as demais ainda abrem na apresentação anterior
+    if (!V3ABAS.includes(C.aba)) {
       const monthLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur), scoped = new Set(rows.map((r) => r.c.id)), viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
       const host = el("div", { class: "np-legado" }); v.append(host);
       if (C.aba === "disparos") renderDisparos(host, all); else if (C.aba === "regua") renderRegua(host, rows); else if (C.aba === "negociados") renderNegociados(host, all); else if (C.aba === "historico") renderHistorico(host, all); else if (C.aba === "cadencia") renderLog(host, viewLog); else if (C.aba === "resumo") renderResumo(host, rows, monthLog); else renderDashboard(host, rows, all, monthLog);
       return; }
     const fb = (r) => busca(r.c.cliente_nome), obra = el("div", { class: "np-obra" }), corpo = el("div", { class: "np-corpo" });
-    const ctx = (r) => [r.c.parcela_txt, r.c.descricao && r.c.descricao !== r.c.parcela_txt ? r.c.descricao : null].filter(Boolean).join(" · ");
+    // parcela e descrição costumam dizer a mesma coisa ("2 de 3" e "Parcela 2 de 3."): mostra uma só, a mais completa, sem ponto final
+    const ctx = (r) => { const p = String(r.c.parcela_txt || "").trim(), d = String(r.c.descricao || "").trim().replace(/\.$/, ""); if (!d) return p; if (!p || d.toLowerCase().includes(p.toLowerCase())) return d; return p + " · " + d; };
     const tarefasM = (r) => (r.c.tarefas || []).length ? NPUI.marca((r.c.tarefas || []).length === 1 ? "1 tarefa" : (r.c.tarefas || []).length + " tarefas", (r.c.tarefas || []).some((x) => x.prazo && x.prazo < HOJE) ? "crit" : "") : null;
     const linhaPre = (r) => NPUI.linha({ id: String(r.c.id), atual: Z3.aberta === r.c.id, riscado: !!r.c.check_hoje, prazo: NPUI.prazoTxt(r.c.venc_ef), titulo: r.c.cliente_nome, contexto: ctx(r),
       check: { checked: !!r.c.check_hoje, title: "Lembrete enviado", onChange: async (cb) => { const { error } = cb.checked ? await SB.from("cobranca_checks").insert({ data: HOJE, cobranca_id: r.c.id }) : await SB.from("cobranca_checks").delete().eq("data", HOJE).eq("cobranca_id", r.c.id); if (error) { toast(error.message); cb.checked = !cb.checked; return; } r.c.check_hoje = cb.checked; renderCentral(); } },
@@ -470,9 +478,190 @@
       if (r.cad.status === "NEGOCIOU" || r.cad.status === "MONITORANDO") pe.push(NPUI.btn("Reabrir para a fila de hoje", { variante: "ghost", onclick: () => rpc("cobranca_registrar_contato", { p_cobranca: c.id, p_desfecho: "VERIFICAR_AMANHA", p_observacao: "Reaberto manualmente", p_data: addDias(HOJE, -1) }, "Cliente reaberto para a fila de hoje.") }));
       if (venc && !Z3.form && r.cad.status !== "NEGOCIOU") pe.unshift(NPUI.btn("Registrar contato", { variante: "pri", cls: "np-pri-local", onclick: () => { Z3.form = true; abrir(r); } }));
       pe.push(NPUI.btn("Criar tarefa", { variante: "ghost", onclick: () => formTarefa(r) }), reg(), NPUI.btn("Histórico do cliente", { variante: "ghost", onclick: () => { C.aba = "historico"; C.histCli = c.chave_cliente; renderCentral(); } }));
+      // baixa manual (existia na Régua antiga): por último e discreta, em dois passos — a baixa oficial vem do Asaas
+      if (!c.paga && r.cad.status !== "NEGOCIOU" && C.aba === "regua") pe.push(Z3.confirma === c.id ? NPUI.btn("Confirmar: está paga", { variante: "pri", cls: "np-pri-local", onclick: () => { Z3.confirma = null; rpc("cobranca_marcar_paga", { p_cobranca: c.id }, "Cobrança marcada como paga."); } }) : NPUI.btn("Registrar baixa manual", { variante: "ghost", onclick: () => { Z3.confirma = c.id; abrir(r); } }));
       Z3.painel.abrir({ trilha: [el("span", {}, "Cobrança"), el("span", { class: "sep" }), el("span", {}, r.info.stage && r.info.stage !== "—" ? r.info.stage : r.info.situacao)], titulo: c.cliente_nome, id: String(c.id), origem, corpo: [props, Z3.form ? formV3(r) : null].filter(Boolean), pe });
     }
     const grupos = [];
+    if (C.aba === "negociados") {
+      // Negociados: três situações que mudam sozinhas (pagou no Asaas = cumprida; passou da data = não cumpriu). Agrupar pela situação dispensa filtro.
+      const neg0 = all.filter((r) => r.c.vencimento_negociado || r.c.valor_negociado || r.c.negociada).filter(fb).map((r) => ({ r, sit: r.c.paga ? "cumprida" : r.c.venc_ef < HOJE ? "descumprida" : "a_vencer", n: C.hist.find((h) => h.cobranca_id === r.c.id && h.desfecho === "NEGOCIOU") })).sort((a, b) => (a.r.c.venc_ef || "").localeCompare(b.r.c.venc_ef || ""));
+      const vAc = (x) => +x.r.c.valor_negociado || +x.r.c.valor || 0, tot = (l) => R$(l.reduce((a, x) => a + vAc(x), 0));
+      const linhaN = (x) => { const { r, sit, n } = x; return NPUI.linha({ id: String(r.c.id), regua: sit === "descumprida" ? "late" : null, atual: Z3.aberta === r.c.id, riscado: sit === "cumprida", prazo: { ...NPUI.prazoTxt(r.c.venc_ef), tom: sit === "descumprida" ? "late" : "" }, titulo: r.c.cliente_nome,
+        contexto: [ctx(r), r.c.vencimento_negociado && r.c.vencimento ? "vencia em " + fmtD(r.c.vencimento) : null, n ? "negociado em " + fmtD(n.data) + (n.por ? " por " + n.por : "") : null, n?.retorno || n?.observacao || null].filter(Boolean).join(" · "),
+        direita: [sit === "descumprida" ? NPUI.marca("não cumpriu", "crit") : sit === "cumprida" ? NPUI.marca("pagou", "ok") : null, r.c.valor_negociado && +r.c.valor_negociado !== +r.c.valor ? NPUI.marca("de " + R$(r.c.valor), "") : null, el("span", { class: "np-valor" }, R$(vAc(x)))], titleAbrir: "Abrir a cobrança", onOpen: (li) => abrir(r, li.querySelector(".np-it-abrir")) }); };
+      const des = neg0.filter((x) => x.sit === "descumprida"), agu = neg0.filter((x) => x.sit === "a_vencer"), cum = neg0.filter((x) => x.sit === "cumprida");
+      if (des.length) grupos.push(NPUI.grupo({ id: "cn-des", titulo: "Não cumpriu — voltou à fila de cobrança · " + tot(des), n: des.length, tom: "crit", itens: des.map(linhaN) }));
+      if (agu.length) grupos.push(NPUI.grupo({ id: "cn-agu", titulo: "Aguardando a data combinada · " + tot(agu), n: agu.length, itens: agu.map(linhaN) }));
+      if (cum.length) grupos.push(NPUI.grupo({ id: "cn-cum", titulo: "Pagou · " + tot(cum), n: cum.length, aberto: false, itens: cum.map(linhaN) }));
+      if (!grupos.length) corpo.append(NPUI.vazio(C.busca ? { titulo: "Nenhuma negociação com esse nome", texto: "Confira a busca.", acao: "Limpar a busca", onAcao: () => { C.busca = ""; renderCentral(); } } : { titulo: "Nenhuma negociação registrada", texto: "Uma cobrança entra aqui quando o contato é registrado com o desfecho \"Negociou\"." }));
+      else corpo.append(...grupos, NPUI.rodape(`${neg0.length} negociação(ões) · ${des.length} não cumprida(s) · ${agu.length} aguardando · ${cum.length} paga(s)`, [["late", "passou da data combinada sem pagar"]]), el("p", { class: "np-nota np-cc-regra" }, "A situação muda sozinha: paga no Asaas vira \"pagou\"; passou da data combinada sem pagar vira \"não cumpriu\" e a cobrança volta à fila de hoje."));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
+      if (Z3.aberta) { const r = all.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
+      return; }
+    if (C.aba === "disparos") {
+      // Disparos da régua: as etapas, a prévia de hoje e o histórico. NADA é enviado desta lista: gerar a prévia só monta a relação de quem receberia;
+      // o envio exige a aprovação no descritivo do dia (mesmas funções do banco: regua_preparar, regua_aprovar, regua_cancelar).
+      const TOM_S = { aguardando_aprovacao: "att", em_andamento: "info", concluida: "ok", falhou: "crit", cancelada: "", sem_clientes: "", solicitado: "" };
+      const dow = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][parseISO(HOJE).getDay()], ativas = C.etapas.filter((e) => e.ativa), admin = PP.perfil?.papel === "admin";
+      const abrirEt = (et, origem) => {
+        Z3.aberta = "et:" + et.codigo; if (!Z3.painel) return; const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
+        const podeGerar = !!et.mensagem && (!hoje || !["em_andamento", "concluida", "aguardando_aprovacao"].includes(hoje.status));
+        const props = NPUI.props([["Quando", et.descricao || null], ["Hoje", hoje ? [NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || ""), ` · ${(hoje.enviados || []).length} enviada(s) · ${(hoje.nao_enviados || []).length} fora ou com falha` + (hoje.status === "aguardando_aprovacao" ? ` · ${(hoje.aptos || []).length} apto(s)` : "")] : "ainda não gerada hoje"],
+          ["Prévia de hoje", prev.length ? `${prev.length} cobrança(s)` + (fora ? ` · ${fora} devem ficar de fora pelas regras` : "") + " — " + prev.slice(0, 5).map((r) => r.c.cliente_nome).join(", ") + (prev.length > 5 ? ` e mais ${prev.length - 5}` : "") : "nenhuma cobrança nesta etapa hoje"],
+          ["Prévia automática", et.automatica ? "ligada: dias úteis, 8h55 (não envia sem aprovação)" : "desligada: só pelo botão"]].filter((x) => x[1] != null));
+        let corpoMsg;
+        if (C.edit === et.codigo) { const ta = el("textarea", { rows: "9", id: "cc3-msg" }, et.mensagem || ""); const erro = el("p", { class: "np-cc-erro", role: "alert", hidden: "" });
+          corpoMsg = NPUI.secao("Mensagem da etapa", el("div", { class: "np-cc-form" }, el("div", { class: "np-cc-f" }, el("label", { for: "cc3-msg" }, "Texto enviado ao cliente"), ta, el("span", { class: "aj" }, "Campos: {parcela} {link} {vencimento} {valor} {quando}. *texto* fica em negrito no WhatsApp.")), erro,
+            el("div", { class: "np-cc-ac" }, NPUI.btn("Salvar mensagem", { variante: "pri", cls: "np-pri-local", onclick: async () => { const { error } = await SB.from("regua_etapas").update({ mensagem: ta.value.replace(/\r\n/g, "\n").trim() || null, atualizado_em: new Date().toISOString(), atualizado_por: PP.perfil?.id }).eq("codigo", et.codigo); if (error) { erro.textContent = error.message; erro.hidden = false; return; } toast("Mensagem salva"); C.edit = null; invalidar(); } }), NPUI.btn("Cancelar", { variante: "ghost", onclick: () => { C.edit = null; abrirEt(et); } }))));
+        } else corpoMsg = NPUI.secao("Mensagem da etapa", et.mensagem ? el("p", { class: "np-cc-msg" }, et.mensagem) : el("p", { class: "np-cc-aviso" }, "Mensagem ainda não cadastrada. A prévia fica liberada depois que ela for salva."));
+        const pe = [];
+        if (hoje?.status === "aguardando_aprovacao") pe.push(NPUI.btn(`Revisar e aprovar (${(hoje.aptos || []).length})`, { variante: "pri", cls: "np-pri-local", onclick: () => abrirDetalhe(et.codigo, HOJE) }));
+        else { const b = NPUI.btn("Gerar a prévia de hoje", { variante: "pri", cls: "np-pri-local", onclick: async () => { if (!confirm(`Gerar a prévia da etapa ${et.codigo} para hoje? Nada é enviado antes da sua aprovação.`)) return; const { data, error } = await SB.rpc("regua_preparar", { p_etapa: et.codigo, p_data: HOJE }); if (error) { toast(error.message); return; } toast(data.status === "sem_clientes" ? "Nenhuma cobrança se encaixa hoje." : `${(data.aptos || []).length} cliente(s) aguardando sua aprovação.`); await carregar(); if (data.status !== "sem_clientes") abrirDetalhe(et.codigo, HOJE); } }); if (!podeGerar) { b.disabled = true; b.title = !et.mensagem ? "Cadastre a mensagem primeiro" : "A etapa já foi gerada hoje"; } pe.push(b); }
+        if (C.edit !== et.codigo) pe.push(NPUI.btn(et.mensagem ? "Editar mensagem" : "Cadastrar mensagem", { variante: "ghost", onclick: () => { C.edit = et.codigo; abrirEt(et); } }));
+        pe.push(NPUI.btn("Ver o descritivo do dia", { variante: "ghost", onclick: () => abrirDetalhe(et.codigo, HOJE) }));
+        if (admin) pe.push(NPUI.btn(et.automatica ? "Desligar a prévia automática" : "Ligar a prévia automática (8h55)", { variante: "ghost", onclick: async () => { const novo = !et.automatica; if (!confirm(novo ? `Ligar a prévia automática da etapa ${et.codigo} nos dias úteis, às 8h55? A prévia continua exigindo aprovação para enviar.` : `Desligar a prévia automática da etapa ${et.codigo}?`)) return; const { error } = await SB.from("regua_etapas").update({ automatica: novo }).eq("codigo", et.codigo); if (error) { toast(error.message); return; } toast(novo ? "Prévia automática nos dias úteis (8h55)" : "Só manual"); invalidar(); } }));
+        if (et.personalizada) pe.push(NPUI.btn("Remover a cadência", { variante: "ghost", onclick: async () => { if (!confirm(`Remover a cadência ${et.codigo}? O histórico de disparos continua guardado.`)) return; const { error } = await SB.from("regua_etapas").delete().eq("codigo", et.codigo); if (error) { toast(error.message); return; } toast("Cadência removida"); Z3.aberta = null; invalidar(); } }));
+        Z3.painel.abrir({ trilha: [el("span", {}, "Etapa da régua"), el("span", { class: "sep" }), el("span", {}, et.codigo)], titulo: et.titulo, id: "et:" + et.codigo, origem, corpo: [props, corpoMsg], pe });
+      };
+      const linhaEt = (et) => { const hoje = C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo), prev = previa(et, all), fora = prev.filter((r) => regraPrevista(et, r, all)).length;
+        return NPUI.linha({ id: "et:" + et.codigo, regua: hoje?.status === "aguardando_aprovacao" ? "att" : null, atual: Z3.aberta === "et:" + et.codigo, prazo: { curta: et.codigo, rel: "", exata: et.descricao || et.codigo }, titulo: et.titulo,
+          contexto: [prev.length ? (prev.length - fora ? `hoje: ${prev.length - fora} cliente(s) receberia(m)` : "hoje: ninguém receberia") + (fora ? ` · ${fora} fora pelas regras` : "") : "nenhuma cobrança nesta etapa hoje", et.mensagem ? null : "sem mensagem cadastrada: não gera prévia"].filter(Boolean).join(" · "),
+          direita: [et.personalizada ? NPUI.marca("personalizada", "") : null, et.automatica ? NPUI.marca("prévia automática 8h55", "info") : null, hoje ? NPUI.marca((DISP_ST[hoje.status] || [hoje.status])[0].toLowerCase(), TOM_S[hoje.status] || "") : null], titleAbrir: "Abrir a etapa", onOpen: (li) => abrirEt(et, li.querySelector(".np-it-abrir")) }); };
+      // O que exige intervenção vem primeiro e em grupo próprio; a explicação longa fica recolhida.
+      const stHoje = (et) => C.disparos.find((d) => d.data === HOJE && d.etapa === et.codigo)?.status, pend = ativas.filter((et) => ["aguardando_aprovacao", "falhou"].includes(stHoje(et))), semMsg = ativas.filter((et) => !et.mensagem), autoOn = ativas.filter((et) => et.automatica);
+      corpo.append(el("div", { class: "np-cc-sit" }, NPUI.resumo([{ n: pend.length, label: pend.length === 1 ? "prévia aguardando a sua decisão" : "prévias aguardando a sua decisão", tom: pend.length ? "att" : "zero" }, semMsg.length ? { n: semMsg.length, label: semMsg.length === 1 ? "etapa sem mensagem cadastrada" : "etapas sem mensagem cadastrada" } : null, { n: autoOn.length, label: autoOn.length ? "com prévia automática ligada (" + autoOn.map((e) => e.codigo).join(", ") + ")" : "com prévia automática ligada", tom: autoOn.length ? "" : "zero" }]),
+        NPUI.btn(C.nova ? "Fechar a nova cadência" : "Nova cadência", { onclick: () => { C.nova = !C.nova; renderCentral(); } })));
+      corpo.append(el("p", { class: "np-nota np-cc-regra" }, "Nenhuma mensagem sai desta tela sem aprovação: gerar a prévia só monta a lista de quem receberia."), el("details", { class: "np-rm-def" }, el("summary", {}, "Como a régua funciona"), el("p", { class: "np-nota" }, `Hoje é ${fmtD(HOJE)}, ${dow}. Cada etapa gera uma prévia de quem recebe e de quem fica de fora pelas regras. O envio só acontece depois da aprovação, pelo ChatGuru, em horário comercial. Às sextas, D-5, D-2 e D-0 incluem os vencimentos do fim de semana; às segundas, D+1 inclui o que venceu de sexta a domingo. A prévia automática das 8h55 apenas prepara a lista; a aprovação continua manual.`)));
+      if (C.nova) corpo.append(el("div", { class: "np-cc-nova" }, formNovaCadencia()));
+      if (!ativas.length) corpo.append(NPUI.vazio({ titulo: "Nenhuma etapa ativa na régua", texto: "Crie uma cadência para definir quando e o que enviar." }));
+      else { const resto = ativas.filter((et) => !pend.includes(et));
+        if (pend.length) corpo.append(NPUI.grupo({ id: "cd-pend", titulo: "Aguardando a sua decisão", n: pend.length, tom: "att", itens: pend.map(linhaEt) }));
+        if (resto.length) corpo.append(NPUI.grupo({ id: "cd-et", titulo: pend.length ? "Demais etapas" : "Etapas da régua", n: resto.length, itens: resto.map(linhaEt) })); }
+      const linhaD = (d) => { const et = C.etapas.find((e) => e.codigo === d.etapa); return NPUI.linha({ id: "dp:" + d.id, prazo: NPUI.prazoTxt(d.data), titulo: d.etapa + (et ? " · " + et.titulo : ""),
+        contexto: [d.origem === "agendada" ? "prévia automática" : d.origem === "migracao" ? "Central antiga" : "gerada pelo botão", d.motivo].filter(Boolean).join(" · "),
+        direita: [NPUI.marca((DISP_ST[d.status] || [d.status])[0].toLowerCase(), TOM_S[d.status] || ""), el("span", { class: "np-valor" }, `${(d.enviados || []).length} enviada(s) · ${(d.nao_enviados || []).length} fora`)], titleAbrir: "Ver o descritivo do dia", onOpen: () => abrirDetalhe(d.etapa, d.data) }); };
+      if (C.disparos.length) corpo.append(NPUI.grupo({ id: "cd-hist", titulo: "Histórico de disparos", n: C.disparos.length, aberto: true, itens: C.disparos.slice(0, 60).map(linhaD) }), NPUI.rodape(C.disparos.length > 60 ? `60 de ${C.disparos.length} disparos (os mais recentes)` : `${C.disparos.length} disparo(s)`, [["att", "aguardando aprovação"]]));
+      else corpo.append(el("p", { class: "np-nota np-cc-regra" }, "Nenhum disparo registrado ainda."));
+      corpo.append(NPUI.secao("Exportar mensagens por cliente", exportMensagens(true)));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Etapa da régua", onClose: () => { Z3.aberta = null; C.edit = null; } });
+      if (typeof Z3.aberta === "string" && Z3.aberta.startsWith("et:")) { const et = ativas.find((e) => "et:" + e.codigo === Z3.aberta); if (et) abrirEt(et); else Z3.aberta = null; }
+      return; }
+    if (C.aba === "resumo") {
+      // Resumo do mês: os mesmos cálculos do Resumo e do Dashboard antigos, numa leitura só — indicadores, comparação, recuperação, quem exige atenção, exportação.
+      // Cada número diz o período e o conceito; recebido, vencido, a vencer, negociado e recuperado NUNCA entram no mesmo total.
+      const prev = mesAnterior(), monthLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur), rec = monthLog.filter((l) => l.desfecho === "RECUPERADO");
+      const doMes = rows.filter((r) => r.c.venc_ef.slice(0, 7) === cur), vencMes = doMes.filter((r) => !r.c.paga && r.c.venc_ef < HOJE), aVencer = doMes.filter((r) => !r.c.paga && r.c.venc_ef >= HOJE), pagasMes = doMes.filter((r) => r.c.paga), carryL = rows.filter(isCarry);
+      const abertoV = soma(vencMes), base = abertoV + soma(pagasMes), pct = base > 0 ? abertoV / base * 100 : 0, recV = rec.reduce((a, l) => a + (+l.valor || 0), 0);
+      const ind = (n, rot, nota, tom) => el("div", { class: "np-rm-i" }, el("b", { class: tom || "" }, n), el("span", { class: "rot" }, rot), nota ? el("span", { class: "nota" }, nota) : null);
+      // Hierarquia (rodada de 18/11, 21h): primeiro o que decide — quanto do mês já venceu sem pagamento —, depois o que já entrou e o que falta vencer.
+      // A recuperação tem base diferente (registros de contato, pela data do registro) e por isso fica em seção própria, menor, com a ressalva.
+      corpo.append(NPUI.secao(`Cobranças com vencimento em ${fmtMes(cur).toLowerCase()}`, el("div", { class: "np-rm-ind" },
+        ind(R$(abertoV), "vencido e não pago", `${vencMes.length} parcela(s) com vencimento até ontem`, vencMes.length ? "crit" : ""),
+        ind(R$(soma(pagasMes)), "já pago", `${pagasMes.length} cobrança(s) do mês com baixa confirmada pelo Asaas`, "ok"),
+        ind(R$(soma(aVencer)), "a vencer até o fim do mês", `${aVencer.length} parcela(s), de hoje em diante`)),
+        el("p", { class: "np-nota np-rm-frase" }, base > 0 ? `Do que já venceu neste mês (${R$(base)}), ${pct.toFixed(1).replace(".", ",")}% está em aberto.` : "Nenhuma cobrança do mês venceu ainda.")));
+      corpo.append(NPUI.secao(`Recuperação · contatos registrados em ${fmtMes(cur).toLowerCase()}`, el("div", { class: "np-rm-ind np-rm-sec" },
+        ind(R$(recV), "recuperado", `${rec.length} registro(s) de contato com desfecho Recuperado`),
+        ind(R$(soma(carryL)), "negociado em meses anteriores, ainda sem pagamento", `${carryL.length} parcela(s); não entra no vencido do mês`, carryL.length ? "att" : "")),
+        el("details", { class: "np-rm-def" }, el("summary", {}, "Como cada número é calculado"), NPUI.props([
+          ["Vencido e não pago", "Soma das cobranças com vencimento neste mês, anterior a hoje, sem pagamento confirmado."],
+          ["Já pago", "Soma das cobranças com vencimento neste mês já quitadas no Asaas. Conta pelo mês do vencimento, não pela data em que o dinheiro entrou."],
+          ["A vencer", "Soma das cobranças deste mês com vencimento de hoje em diante, ainda não pagas."],
+          ["% em aberto", "Vencido e não pago dividido por (já pago + vencido e não pago)."],
+          ["Recuperado", "Soma do valor das cobranças cujo contato foi registrado neste mês com o desfecho Recuperado. Conta pela data do registro, feito pela equipe; pode incluir parcelas vencidas em meses anteriores. Por isso não se soma nem se compara com \"já pago\"."],
+          ["Negociado de meses anteriores", "Parcelas de outros meses com nova data combinada e ainda sem pagamento. Ficam fora do vencido deste mês."]]))));
+      // comparação com o mês anterior: duas frases dizem o mesmo que os dois gráficos de barras antigos, com a variação
+      const prevAb = all.filter((r) => r.c.venc_ef.slice(0, 7) === prev && !r.c.paga), prevV = soma(prevAb), uniq = (arr) => new Set(arr.map((r) => r.c.chave_cliente)).size;
+      const varia = (o, n, f) => { const d = n - o; if (d === 0) return NPUI.marca("igual", ""); const p = o > 0 ? Math.abs(d / o * 100).toFixed(1).replace(".", ",") + "%" : null; return NPUI.marca(`${d < 0 ? "↓" : "↑"} ${p ? p + " · " : ""}${d < 0 ? "−" : "+"}${f(Math.abs(d))}`, d < 0 ? "ok" : "crit"); };
+      const cmp = (rot, a, b, f) => el("p", { class: "np-rm-cmp" }, el("span", { class: "rot" }, rot), el("span", {}, nomeMes(prev).toLowerCase() + " "), el("b", {}, f(a)), el("span", { class: "seta", "aria-hidden": "true" }, "→"), el("span", {}, nomeMes(cur).toLowerCase() + ", até " + fmtDM(HOJE) + " "), el("b", {}, f(b)), varia(a, b, f));
+      corpo.append(NPUI.secao(`Comparação com ${nomeMes(prev).toLowerCase()}`, cmp("Vencido e não pago", prevV, abertoV, R$), cmp("Clientes inadimplentes", uniq(prevAb), uniq(vencMes), (x) => String(Math.round(x))),
+        el("p", { class: "np-nota" }, `Parcelas vencidas e não pagas de cada mês, pelo vencimento. ${fmtMes(prev)} é calculado ao vivo a partir das cobranças do Asaas; o mês atual ainda está em curso. Na virada do mês, esta visão passa sozinha para o mês novo.`)));
+      // recuperação: desfechos dos contatos do mês e posição das cobranças em aberto na régua
+      const cont = Object.fromEntries(Object.keys(DESF).map((d) => [d, monthLog.filter((l) => l.desfecho === d).length])), maxD = Math.max(1, ...Object.values(cont));
+      const etapasR = C.etapas.filter((e) => e.ativa).sort((a, b) => b.dias - a.dias), conhe = new Set([...etapasR.map((e) => e.codigo), "—", "fora"]), outrasR = [...new Set(ab.map((r) => r.info.stage).filter((k) => !conhe.has(k)))].sort();
+      const posicao = [...etapasR.map((e) => [e.codigo, etapaLabel(e)]), ...outrasR.map((k) => [k, ab.find((r) => r.info.stage === k).info.etapa || k]), ["—", "Sem ação hoje"], ["fora", "Retiradas da régua"]].map(([k, l]) => [l, ab.filter((r) => r.info.stage === k)]).filter((x) => x[1].length);
+      corpo.append(el("div", { class: "np-rm-duas" },
+        NPUI.secao(`Desfechos dos contatos · ${monthLog.length} registro(s) no mês`, el("ul", { class: "np-rm-tab" }, Object.entries(DESF).map(([d, [t]]) => el("li", {}, el("span", { class: "rot" }, t), el("span", { class: "barra", "aria-hidden": "true" }, el("i", { style: `width:${Math.round(cont[d] / maxD * 100)}%` })), el("b", {}, String(cont[d])))))),
+        NPUI.secao("Posição na régua hoje · cobranças em aberto", el("ul", { class: "np-rm-tab np-rm-pos" }, posicao.map(([l, it]) => el("li", {}, el("span", { class: "rot" }, l), el("span", { class: "qt" }, String(it.length)), el("b", {}, R$(soma(it))))), el("li", { class: "tot" }, el("span", { class: "rot" }, "Total em aberto (vencidas + a vencer)"), el("span", { class: "qt" }, String(ab.length)), el("b", {}, R$(soma(ab))))))));
+      // quem exige atenção: clientes com parcela vencida e não paga, ou negociação de mês anterior sem pagamento (mesmo critério da lista antiga)
+      const alvo = rows.filter((r) => !r.c.paga && (isCarry(r) || r.c.venc_ef < HOJE)), byCli = {};
+      for (const r of alvo) { const g = byCli[r.c.chave_cliente] = byCli[r.c.chave_cliente] || { nome: r.c.cliente_nome, parcelas: [], valor: 0, carry: false }; g.parcelas.push(r); g.valor += +r.c.valor || 0; if (isCarry(r)) g.carry = true; }
+      const cliA = Object.values(byCli).map((g) => { g.parcelas.sort((a, b) => a.info.F - b.info.F); g.ref = g.parcelas[0]; g.atraso = g.ref.info.F < 0 ? -g.ref.info.F : null; g.status = g.ref.cad.status; g.last = g.parcelas.map((r) => r.cad.last).filter(Boolean).sort((a, b) => b.data.localeCompare(a.data))[0] || null; return g; });
+      const TOM_C = { FILA_HOJE: "crit", MONITORANDO: "att", NEGOCIOU: "info", CONTATADA_HOJE: "ok" }, passaC = (g, k) => k === "todas" || (k === "CARRY" ? g.carry : g.status === k);
+      const baseC = cliA.filter((g) => busca(g.nome)), listaC = baseC.filter((g) => passaC(g, C.listaF)).sort((a, b) => b.valor - a.valor);
+      const chC = (k, label) => NPUI.chip({ label, n: baseC.filter((g) => passaC(g, k)).length, on: C.listaF === k, grupo: "attr", onclick: () => { C.listaF = C.listaF === k && k !== "todas" ? "todas" : k; renderCentral(); } });
+      const linhaC = (g) => NPUI.linha({ id: String(g.ref.c.id), regua: g.atraso != null ? "late" : null, atual: Z3.aberta === g.ref.c.id, prazo: { ...NPUI.prazoTxt(g.ref.c.venc_ef), tom: g.atraso != null ? "late" : "" }, titulo: g.nome,
+        contexto: [g.parcelas.length === 1 ? "1 parcela" : g.parcelas.length + " parcelas", g.ref.info.etapa, g.last ? "último contato " + fmtD(g.last.data) + (g.last.observacao ? " · " + g.last.observacao : "") : "nunca contatado"].filter(Boolean).join(" · "),
+        direita: [NPUI.marca((CAD[g.status] || [g.status])[0].toLowerCase(), TOM_C[g.status] || ""), g.carry ? NPUI.marca("negociação de mês anterior", "att") : null, el("span", { class: "np-valor" }, R$(g.valor))], titleAbrir: "Abrir a cobrança mais antiga deste cliente", onOpen: (li) => abrir(g.ref, li.querySelector(".np-it-abrir")) });
+      const nrC = cliA.filter((g) => g.status === "MONITORANDO");
+      corpo.append(NPUI.secao("Clientes que exigem atenção", NPUI.resumo([{ n: cliA.length, label: cliA.length === 1 ? "cliente inadimplente" : "clientes inadimplentes", tom: cliA.length ? "crit" : "zero" }, { n: R$(cliA.reduce((a, g) => a + g.valor, 0)), label: `em aberto, em ${alvo.length} parcela(s)` }, { n: nrC.length, label: "não respondem", tom: nrC.length ? "att" : "zero" }, { n: cliA.filter((g) => g.carry).length, label: "com negociação de mês anterior" }]),
+        el("div", { class: "np-filtros np-cc-fl", role: "group", "aria-label": "Filtrar clientes por situação" }, chC("todas", "Todos"), chC("FILA_HOJE", "Na fila"), chC("MONITORANDO", "Não responde"), chC("NEGOCIOU", "Negociou"), chC("CONTATADA_HOJE", "Contatado hoje"), chC("CARRY", "Meses anteriores"))));
+      if (!listaC.length) corpo.append(NPUI.vazio(C.busca || C.listaF !== "todas" ? { titulo: "Nenhum cliente com esse filtro", texto: "Confira a busca e a situação escolhida.", acao: "Limpar filtros", onAcao: () => { C.busca = ""; C.listaF = "todas"; renderCentral(); } } : { titulo: "Nenhum cliente inadimplente", texto: "Não há parcela vencida sem pagamento nem negociação anterior pendente." }));
+      else corpo.append(NPUI.grupo({ id: "rm-cli", titulo: "Do maior valor em aberto para o menor", n: listaC.length, itens: listaC.map(linhaC) }), el("p", { class: "np-nota np-cc-regra" }, "Entra quem tem parcela vencida e não paga, ou negociação de mês anterior ainda sem pagamento. Sai sozinho quando o Asaas confirma o pagamento."));
+      // exportação: os mesmos dois arquivos de antes
+      const fc = inp("text", "", { placeholder: "Nome do cliente (opcional)" }); fc.id = "cc3-exp"; fc.className = "np-busca-inline";
+      const expCob = () => { const f = fc.value.trim().toLowerCase(); baixarCSV(C.rows.filter((c) => !f || (c.cliente_nome || "").toLowerCase().includes(f)).map((c) => { const i = stageInfo(c); return [c.cliente_nome, numBR(c.valor), c.descricao || "", c.venc_ef.slice(0, 7), fmtD(c.venc_ef), i.situacao, i.etapa, c.paga ? "Sim" : "Não"]; }), ["Cliente", "Valor", "Descrição", "Mês", "Vencimento", "Situação", "Estágio", "Paga"], "cobrancas.csv"); };
+      const expHist = () => { const f = fc.value.trim().toLowerCase(); baixarCSV(C.log.filter((l) => !f || (l.cliente_nome || "").toLowerCase().includes(f)).map((l) => [fmtD(l.data), l.cliente_nome || "", numBR(l.valor), DESF[l.desfecho][0], l.proxima_acao || "", l.observacao || "", l.registrado_por_nome || ""]), ["Data", "Cliente", "Valor", "Desfecho", "Próxima ação", "Observação", "Registrado por"], "historico_cadencia.csv"); };
+      corpo.append(NPUI.secao("Exportar", el("p", { class: "np-nota" }, "Arquivos .csv com a base carregada (cobranças em aberto de qualquer mês e pagas desde o mês anterior) ou com o histórico de contatos."), el("div", { class: "np-rm-exp" }, el("label", { for: "cc3-exp", class: "np-sr" }, "Filtrar a exportação por cliente"), fc, NPUI.btn("Exportar cobranças (.csv)", { onclick: expCob }), NPUI.btn("Exportar histórico de contatos (.csv)", { onclick: expHist }))));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
+      if (Z3.aberta) { const r = rows.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
+      return; }
+    if (C.aba === "regua") {
+      // Régua: onde está cada cobrança em aberto, etapa por etapa (da mais atrasada para a mais nova). As pagas ficam num grupo fechado.
+      const fl = (k, label, n, title) => NPUI.chip({ label, n, on: C.reguaF === k, grupo: "attr", title, onclick: () => { C.reguaF = C.reguaF === k ? "todas" : k; renderCentral(); } });
+      const passa = (r) => fb(r) && (C.reguaF === "todas" || C.reguaF === "Paga" || (C.reguaF === "comTarefa" ? (r.c.tarefas_abertas || 0) > 0 : C.reguaF === "manual" ? r.info.manual : r.info.situacao === C.reguaF));
+      const abF = ab.filter(passa).sort((a, b) => a.c.venc_ef.localeCompare(b.c.venc_ef)), pagas = rows.filter((r) => r.c.paga && fb(r));
+      const nSit = (k) => ab.filter((r) => fb(r) && r.info.situacao === k).length;
+      corpo.append(el("div", { class: "np-filtros np-cc-fl", role: "group", "aria-label": "Filtrar a régua" }, fl("Vencida", "Vencidas", nSit("Vencida")), fl("Aguardando", "Aguardando vencimento", nSit("Aguardando")), fl("comTarefa", "Com tarefa", ab.filter((r) => fb(r) && (r.c.tarefas_abertas || 0) > 0).length), fl("manual", "Fixadas ou retiradas", ab.filter((r) => fb(r) && r.info.manual).length, "Cobranças movidas à mão na régua")));
+      const linhaR = (r) => NPUI.linha({ id: String(r.c.id), regua: !r.c.paga && r.info.situacao === "Vencida" ? "late" : null, atual: Z3.aberta === r.c.id, riscado: !!r.c.paga, prazo: { ...NPUI.prazoTxt(r.c.venc_ef), tom: !r.c.paga && r.info.F < 0 ? "late" : "" }, titulo: r.c.cliente_nome,
+        contexto: [ctx(r), r.c.vencimento_negociado && r.c.vencimento ? "negociado · vencia em " + fmtD(r.c.vencimento) : null].filter(Boolean).join(" · "),
+        direita: [r.c.paga ? NPUI.marca("paga", "ok") : null, !r.c.paga && r.c.regua_parada ? NPUI.marca("fora da régua", "att") : !r.c.paga && r.c.regua_etapa_manual ? NPUI.marca("fixada " + r.c.regua_etapa_manual, "att") : null, tarefasM(r), el("span", { class: "np-valor" }, R$(r.c.valor))], titleAbrir: "Abrir a cobrança", onOpen: (li) => abrir(r, li.querySelector(".np-it-abrir")) });
+      const etapasA = C.etapas.filter((e) => e.ativa).sort((a, b) => b.dias - a.dias), gruposR = [];
+      // toda cobrança em aberto aparece em algum grupo: etapas ativas, depois etapas que só existem nos dados (fixadas à mão ou padrão), "sem ação hoje" e "retiradas"
+      const conhecidas = new Set([...etapasA.map((e) => e.codigo), "—", "fora"]), outras = [...new Set(abF.map((r) => r.info.stage).filter((k) => !conhecidas.has(k)))].sort();
+      if (C.reguaF !== "Paga") for (const [k, rot] of [...etapasA.map((e) => [e.codigo, etapaLabel(e)]), ...outras.map((k) => [k, abF.find((r) => r.info.stage === k).info.etapa || k]), ["—", "Sem ação hoje"], ["fora", "Retiradas da régua"]]) { const its = abF.filter((r) => r.info.stage === k); if (its.length) gruposR.push([k === "—" ? 8e9 : k === "fora" ? 8.5e9 : Math.min(...its.map((r) => r.info.F ?? 0)), NPUI.grupo({ id: "cr-" + k, titulo: rot + " · " + R$(soma(its)), n: its.length, tom: its.some((r) => r.info.situacao === "Vencida") ? "crit" : null, aberto: k !== "—" || !abF.some((r) => r.info.stage !== "—"), itens: its.map(linhaR) })]); }
+      if (pagas.length && (C.reguaF === "todas" || C.reguaF === "Paga")) gruposR.push([9e9, NPUI.grupo({ id: "cr-pagas", titulo: "Pagas · " + R$(soma(pagas)), n: pagas.length, aberto: C.reguaF === "Paga", itens: pagas.map(linhaR) })]);
+      grupos.push(...gruposR.sort((a, b) => a[0] - b[0]).map((x) => x[1]));
+      if (!grupos.length) corpo.append(NPUI.vazio(C.busca || C.reguaF !== "todas" ? { titulo: "Nenhuma cobrança com esse filtro", texto: "Confira a busca e o filtro escolhido.", acao: "Limpar filtros", onAcao: () => { C.busca = ""; C.reguaF = "todas"; renderCentral(); } } : { titulo: "Nenhuma cobrança na régua", texto: "Não há cobrança em aberto no período." }));
+      else corpo.append(...grupos, NPUI.rodape(`${abF.length} em aberto · ${pagas.length} paga(s)`, [["late", "vencida"]]), el("p", { class: "np-nota np-cc-regra" }, "Abra a cobrança para movê-la na régua, criar uma tarefa ou registrar a baixa manual. A baixa oficial continua vindo do Asaas. Etapas, dias e mensagens são editados em Disparos da régua."));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Detalhe da cobrança", onClose: () => { Z3.aberta = null; Z3.form = false; Z3.confirma = null; } });
+      if (Z3.aberta) { const r = rows.find((x) => x.c.id === Z3.aberta); if (r) abrir(r); else { Z3.aberta = null; Z3.form = false; } }
+      return; }
+    if (C.aba === "historico") {
+      // Histórico por cliente: tudo o que foi feito na cobrança de UM cliente, mês a mês (contatos manuais, mensagens da régua, negociações)
+      const cli = {}; for (const r of all) { const g = cli[r.c.chave_cliente] = cli[r.c.chave_cliente] || { chave: r.c.chave_cliente, nome: r.c.cliente_nome, aberto: 0, n: 0 }; if (!r.c.paga) { g.aberto += +r.c.valor || 0; g.n++; } }
+      for (const h of C.hist) if (!cli[h.chave_cliente]) cli[h.chave_cliente] = { chave: h.chave_cliente, nome: h.cliente_nome, aberto: 0, n: 0 };
+      const lst = Object.values(cli).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+      const s = sel(Object.fromEntries([["", "Escolher cliente…"], ...lst.map((c) => [c.chave, `${c.nome}${c.n ? ` · ${c.n} em aberto (${R$(c.aberto)})` : ""}`])]), C.histCli || ""); s.id = "cc3-hist-cli"; s.onchange = () => { C.histCli = s.value; Z3.aberta = null; renderCentral(); };
+      corpo.append(el("div", { class: "np-cc-fl np-cc-cli" }, el("label", { for: "cc3-hist-cli" }, "Cliente"), s));
+      if (!C.histCli || !cli[C.histCli]) { corpo.append(NPUI.vazio({ titulo: "Escolha um cliente", texto: "Você verá, mês a mês, cada ação de cobrança (manual ou automática), o retorno dado e as negociações." })); obra.append(corpo); v.append(obra); return; }
+      const hist = C.hist.filter((h) => h.chave_cliente === C.histCli), cobs = all.filter((r) => r.c.chave_cliente === C.histCli), abc = cobs.filter((r) => !r.c.paga);
+      const manual = (h) => h.tipo === "contato" && h.origem !== "regua" && h.origem !== "tarefa";
+      corpo.append(NPUI.resumo([{ n: abc.length, label: abc.length === 1 ? "cobrança em aberto" : "cobranças em aberto", tom: abc.length ? "att" : "zero" }, { n: R$(soma(abc)), label: "em aberto" }, { n: hist.filter(manual).length, label: "contatos manuais" }, { n: hist.filter((h) => h.tipo === "regua").length, label: "mensagens da régua" }, { n: hist.filter((h) => h.desfecho === "NEGOCIOU").length, label: "negociações" }]));
+      const verH = (h, origem) => { Z3.aberta = "h:" + h.id; Z3.painel.abrir({ trilha: [el("span", {}, "Histórico"), el("span", { class: "sep" }), el("span", {}, cli[C.histCli].nome)], titulo: h.acao || h.proxima_acao || "Ação de cobrança", id: "h:" + h.id, origem,
+        corpo: [NPUI.props([["Data", fmtD(h.data)], ["Origem", h.tipo === "regua" ? "Mensagem automática da régua" : MEIOS[h.meio] || h.meio || null], ["Etapa", h.etapa || null], ["Desfecho", manual(h) && h.desfecho ? NPUI.marca((DESF[h.desfecho] || [h.desfecho])[0].toLowerCase(), TOM_D[h.desfecho] || "") : null], ["Cobrança", [h.parcela_txt || h.descricao, R$(h.valor), h.venc_ef ? "venc. " + fmtD(h.venc_ef) : null].filter(Boolean).join(" · ")], ["Retorno do cliente", h.retorno || null], ["Negociado", h.nova_data || h.valor_negociado ? [h.nova_data ? "nova data " + fmtD(h.nova_data) : null, h.valor_negociado ? "valor " + R$(h.valor_negociado) : null].filter(Boolean).join(" · ") : null], [h.tipo === "regua" ? "Mensagem enviada" : "Observação", h.observacao ? el("span", { class: "np-cc-msg" }, h.observacao) : null], ["Registrado por", h.por || null]].filter((x) => x[1] != null))], pe: [] }); };
+      const linhaH = (h) => NPUI.linha({ id: "h:" + h.id, atual: Z3.aberta === "h:" + h.id, prazo: NPUI.prazoTxt(h.data), titulo: h.acao || h.proxima_acao || "Ação de cobrança",
+        contexto: [h.parcela_txt || h.descricao, h.retorno ? "retorno: " + h.retorno : null, h.nova_data ? "nova data " + fmtD(h.nova_data) : null, h.tipo !== "regua" ? h.observacao : null, "por " + (h.por || "não identificado")].filter(Boolean).join(" · "),
+        direita: [h.tipo === "regua" ? NPUI.marca("régua", "") : null, h.etapa ? NPUI.marca(h.etapa, "") : null, manual(h) && h.desfecho ? NPUI.marca((DESF[h.desfecho] || [h.desfecho])[0].toLowerCase(), TOM_D[h.desfecho] || "") : null, el("span", { class: "np-valor" }, R$(h.valor))], titleAbrir: "Ver o registro completo", onOpen: (li) => verH(h, li.querySelector(".np-it-abrir")) });
+      const porMes = {}; for (const h of hist) (porMes[(h.data || "").slice(0, 7)] = porMes[(h.data || "").slice(0, 7)] || []).push(h);
+      const meses = Object.keys(porMes).sort().reverse();
+      if (!meses.length) corpo.append(NPUI.vazio({ titulo: "Nenhuma ação de cobrança registrada", texto: "Este cliente ainda não teve contato nem mensagem da régua." }));
+      else corpo.append(...meses.map((m, i) => NPUI.grupo({ id: "ch-" + m, titulo: fmtMes(m), n: porMes[m].length, aberto: i < 2, itens: porMes[m].sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(linhaH) })), NPUI.rodape(`${hist.length} ação(ões) em ${meses.length} mês(es)`, []));
+      obra.append(corpo); v.append(obra); Z3.painel = NPUI.painel({ obra, label: "Registro de cobrança", onClose: () => { Z3.aberta = null; } });
+      return; }
+    if (C.aba === "cadencia") {
+      // Registros de contato: o diário do mês, do mais recente para o mais antigo, com filtro por desfecho
+      const scoped = new Set(rows.map((r) => r.c.id)), viewLog = C.log.filter((l) => (l.data || "").slice(0, 7) === cur || scoped.has(l.cobranca_id));
+      const base = viewLog.filter((l) => busca(l.cliente_nome)), lista = base.filter((l) => C.logF === "todas" || l.desfecho === C.logF).sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+      const chipD = (k, label) => NPUI.chip({ label, n: k === "todas" ? base.length : base.filter((l) => l.desfecho === k).length, on: C.logF === k, grupo: "attr", onclick: () => { C.logF = C.logF === k && k !== "todas" ? "todas" : k; renderCentral(); } });
+      corpo.append(el("div", { class: "np-filtros np-cc-fl", role: "group", "aria-label": "Filtrar por desfecho" }, chipD("todas", "Todos"), ...Object.entries(DESF).map(([k, [t]]) => chipD(k, t))));
+      const linhaL = (l) => { const r = all.find((x) => x.c.id === l.cobranca_id); return NPUI.linha({ id: "log:" + (l.id || l.data + l.cobranca_id), prazo: NPUI.prazoTxt(l.data), titulo: l.cliente_nome || "Cliente não identificado",
+        contexto: [l.proxima_acao, l.observacao, "por " + (l.registrado_por_nome || (l.origem === "migracao" ? "Central antiga" : "não identificado"))].filter(Boolean).join(" · "),
+        direita: [NPUI.marca(DESF[l.desfecho][0].toLowerCase(), TOM_D[l.desfecho]), el("span", { class: "np-valor" }, R$(l.valor))], titleAbrir: r ? "Ver o histórico do cliente" : "Registro sem cobrança em aberto", onOpen: () => { if (r) { C.aba = "historico"; C.histCli = r.c.chave_cliente; renderCentral(); } } }); };
+      if (!lista.length) corpo.append(NPUI.vazio(C.busca || C.logF !== "todas" ? { titulo: "Nenhum registro com esse filtro", texto: "Confira a busca e o desfecho escolhido.", acao: "Limpar filtros", onAcao: () => { C.busca = ""; C.logF = "todas"; renderCentral(); } } : { titulo: "Nenhum contato registrado neste mês", texto: "Os contatos registrados em \"Ações de hoje\" aparecem aqui." }));
+      else corpo.append(NPUI.grupo({ id: "cl-reg", titulo: "Contatos registrados", n: lista.length, itens: lista.slice(0, 500).map(linhaL) }), NPUI.rodape(lista.length > 500 ? `500 de ${lista.length} registros (os mais recentes)` : `${lista.length} registro(s)`, []));
+      obra.append(corpo); v.append(obra); return; }
     for (const [k, rot] of [["D-5", "Lembrete D-5 · relatório mensal"], ["D-2", "Lembrete D-2 · aviso de vencimento"], ["D-0", "Lembrete D-0 · vence hoje"]]) { const its = pre.filter((r) => r.info.stage === k && fb(r)); if (its.length) grupos.push(NPUI.grupo({ id: "cc-" + k, titulo: rot, n: `${its.filter((r) => r.c.check_hoje).length}/${its.length}`, itens: its.map(linhaPre) })); }
     const filaF = fila.filter(fb), monF = mon.filter(fb), negF = neg.filter(fb);
     if (filaF.length) grupos.push(NPUI.grupo({ id: "cc-fila", titulo: "Vencidas — contatar hoje", n: filaF.length, tom: "crit", itens: filaF.map((r) => linhaV(r, "late")) }));
@@ -508,7 +697,7 @@
       W3.painel.abrir({ trilha: [el("span", {}, "Cliente no Asaas")], titulo: c.nome || c.asaas_id, id: String(c.asaas_id), origem,
         corpo: [NPUI.props([["Ficha no sistema", c.cliente_id ? el("a", { href: "#clientes/" + encodeURIComponent(c.cliente_id), onclick: (e) => { e.preventDefault(); S.tab = "clientes"; S.sel = c.cliente_id; S.sub = "financeiro"; render(); } }, cli?.nome || c.cliente_id) : NPUI.marca("sem vínculo", "att")],
           ["CPF/CNPJ", c.cpf_cnpj || null], ["Telefone", c.telefone || null], ["E-mail", c.email || null], ["Em aberto", ab.length ? `${ab.length} · ${R$(soma(ab))}` : "nenhuma", "serif"], ["Vencidas", venc.length ? [String(venc.length), " ", NPUI.marca(R$(soma(venc)), "crit")] : "nenhuma"], ["Pagas", String(pagas)], ["Asaas", c.asaas_id]].filter((x) => x[1] != null))],
-        pe: [el("a", { class: "np-btn", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas"), NPUI.btn("Histórico de cobrança", { variante: "ghost", onclick: () => { C.aba = "historico"; C.histCli = c.asaas_id; S0.finSub = "central"; render(); } })] }); };
+        pe: [el("a", { class: "np-btn", href: `https://www.asaas.com/customerAccount/show/${c.asaas_id}`, target: "_blank", rel: "noopener" }, "Abrir no Asaas")] }); };
     if (!linhas.length) corpo.append(NPUI.vazio(!todas.length ? { titulo: "Nenhum cliente do Asaas", texto: "A lista vem da sincronização diária com o Asaas." } : { titulo: "Nada com esses filtros", texto: "Tire um filtro ou limpe a busca.", acao: "Limpar", onAcao: () => { W3.f = ""; C.asaasQ = ""; render(); } }));
     else { const LIM = 500, mostra = linhas.slice(0, LIM);
       for (const [k, l, tom, fn] of [["venc", "Com cobrança vencida", "crit", (x) => x.venc.length], ["ab", "Com cobrança em aberto", "", (x) => !x.venc.length && x.ab.length], ["sem", "Sem cobrança em aberto", "", (x) => !x.ab.length]]) { const its = mostra.filter(fn); if (its.length) corpo.append(NPUI.grupo({ id: "asc-" + k, titulo: l, n: its.length, tom, aberto: k !== "sem", itens: its.map(linha) })); }
