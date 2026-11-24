@@ -112,11 +112,8 @@
     const txt = await f.text(); try { const j = JSON.parse(txt); if (!j || typeof j !== "object" || !Object.keys(j).length) throw new Error("vazio"); } catch (e) { toast("Arquivo não é um JSON válido da extração: " + e.message); return; }
     const m = /advbox-pj-\d{4}-\d{2}-\d{2}/.exec(f.name); const chave = m ? m[0] : ("advbox-pj-" + new Date().toISOString().slice(0, 10));
     if (A.lotes.includes(chave)) {
-      if (advV3() && window.NPUI?.confirmar) {
-        NPUI.confirmar({ titulo: "Substituir lote existente?", texto: `Já existe o lote ${chave}. Deseja substituí-lo pelo arquivo enviado?`, rotuloSim: "Substituir lote", perigo: true, onSim: () => depositarLote(chave, txt) });
-        return;
-      }
-      if (!confirm(`Já existe o lote ${chave}. Substituir pelo arquivo?`)) return;
+      npConfirmar({ titulo: "Substituir lote existente?", mensagem: `Já existe o lote ${chave}. Deseja substituí-lo pelo arquivo enviado?`, confirmar: "Substituir lote", perigo: true, onSim: () => depositarLote(chave, txt) });
+      return;
     }
     await depositarLote(chave, txt);
   }
@@ -214,7 +211,7 @@
     v.append(el("div", { class: "card section" }, el("h2", {}, "Clientes do ADVBox → clientes do sistema"), el("div", { class: "note" }, "Confira o casamento automático. Quem ficar em “ignorar” não entra. Clientes que ainda não existem no sistema precisam ser cadastrados antes (Clientes → + Cliente) e depois escolhidos aqui."),
       el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "No ADVBox"), el("th", {}, "Processos"), el("th", {}, "No sistema"), el("th", { class: "r" }, "A fazer"), el("th", { class: "r" }, "Feitas"), el("th", { class: "r" }, "Registros"), el("th", { class: "r" }, "Etapas"))),
         el("tbody", {}, ...nomes.map((n) => { const pc = p.porCliente[n]; const s = sel(opts, A.mapa[n] || ""); s.onchange = () => { A.mapa[n] = s.value; A.prev = prever(); render(); }; return el("tr", { style: A.mapa[n] ? "" : "background:var(--gold-soft)" }, el("td", {}, el("b", {}, n), el("div", { class: "note" }, pc.lids + " pasta(s)")), el("td", { class: "note" }, pc.nums.join(", ") || "sem nº"), el("td", {}, s), el("td", { class: "r num" }, String(pc.tar)), el("td", { class: "r num" }, String(pc.feitas)), el("td", { class: "r num" }, String(pc.reg)), el("td", { class: "r num" }, String(pc.etapas))); }))))));
-    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Prévia"), el("button", { class: "btn primary", disabled: A.rodando ? "" : null, onclick: () => { if (confirm(`Importar agora? ${p.processosNovos.length} processo(s), ${p.tar} tarefa(s) abertas, ${p.feitas} concluídas, ${p.reg} registro(s), ${p.etapas} mudança(s) de etapa e ${p.fechar.length} tarefa(s) a fechar.`)) importar(); } }, A.rodando ? "Importando…" : "Importar")),
+    v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Prévia"), el("button", { class: "btn primary", disabled: A.rodando ? "" : null, onclick: () => { npConfirmar({ titulo: "Confirmar importação do ADVBox?", mensagem: `Importar agora? ${p.processosNovos.length} processo(s), ${p.tar} tarefa(s) abertas, ${p.feitas} concluídas, ${p.reg} registro(s), ${p.etapas} mudança(s) de etapa e ${p.fechar.length} tarefa(s) a fechar.`, confirmar: "Executar importação", onSim: () => importar() }); } }, A.rodando ? "Importando…" : "Importar")),
       el("div", { class: "kpis" }, ...[["Processos novos", p.processosNovos.length], ["Tarefas a fazer", p.tar], ["Tarefas feitas (retroativas)", p.feitas], ["Registros no dossiê", p.reg], ["Mudanças de etapa", p.etapas], ["A fechar (já fechadas no ADVBox)", p.fechar.length], ["Já importados (pulam)", p.jaImportado], ["Sem cliente (pulam)", p.semCliente], ["Ignorados (editados/excluídos)", p.ign]].map(([l, n]) => el("div", { class: "card kpi" }, el("div", { class: "l" }, l), el("div", { class: "v" }, String(n))))),
       p.processosNovos.length ? el("div", { class: "note", style: "margin-top:8px" }, "Processos a criar: " + p.processosNovos.map((x) => x.num + " (" + x.cliente.split(" ").slice(0, 2).join(" ") + ")").join(" · ")) : null,
       A.log.length ? el("pre", { style: "margin-top:10px;font-size:12px;white-space:pre-wrap" }, A.log.join("\n")) : null));

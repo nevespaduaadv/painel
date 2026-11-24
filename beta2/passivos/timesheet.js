@@ -53,35 +53,60 @@
   // ---------- lançamento ----------
   function lancar({ ap, tarefa, data } = {}) {
     if (!H.ok) { carregarBase().then(() => lancar({ ap, tarefa, data })); return; }
+    const v3 = tsV3();
     const a = ap || {}; const m = meu();
     const colab = admin() ? selColab(a.colaborador_id || H.sem.colab || m?.id) : null;
-    const dt = inp("date", a.data || data || hoje()), ini = inp("time", a.inicio ? a.inicio.slice(0, 5) : ""), fim = inp("time", a.fim ? a.fim.slice(0, 5) : ""), hr = inp("number", a.horas || "", { step: "0.05", min: "0.05", max: 24 });
+    const dt = inp("date", a.data || data || hoje()), ini = inp("time", a.inicio ? a.inicio.slice(0, 5) : ""), fim = inp("time", a.fim ? a.fim.slice(0, 5) : ""), hr = inp("number", a.horas || "", { step: "0.05", min: "0.05", max: 24, placeholder: "Ex.: 1,5 (1h30)" });
     const cli = selCliente(a.cliente_id || tarefa?.cliente_id), tar = sel({ "": "— sem tarefa —" }, ""), proc = sel({ "": "— sem processo —" }, ""), ativ = selAtiv(a.tipo_atividade || (tarefa ? "outro" : "outro"));
     const cobr = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); cobr.checked = a.id ? !!a.cobravel : (H.ativ.find((x) => x.codigo === ativ.value)?.cobravel_padrao ?? true);
     ativ.onchange = () => { if (!a.id) cobr.checked = H.ativ.find((x) => x.codigo === ativ.value)?.cobravel_padrao ?? true; };
     const desc = inp("text", a.descricao || tarefa?.titulo || "", { placeholder: "O que foi feito (aparece no relatório ao cliente)" });
     const fre = sel({ "": "— automática (pela tarefa / processo) —", estrategico: "Estratégico / Consultivo", juridico: "Jurídico / Contencioso", negocial: "Negocial / Acordos" }, a.frente || "");
     const calc = () => { if (ini.value && fim.value) { const [h1, m1] = ini.value.split(":").map(Number), [h2, m2] = fim.value.split(":").map(Number); let mins = (h2 * 60 + m2) - (h1 * 60 + m1); if (mins > 0) hr.value = (Math.round(mins / 3) / 20).toFixed(2); } }; ini.onchange = fim.onchange = calc;
+    let blocoMaisTS = null;
     const vincular = () => { const cid = cli.value; const selT = a.tarefa_id || tarefa?.id; const ts = (window.PP_TAREFAS?.lista?.() || []).filter((t) => (!cid || t.cliente_id === cid) && (t.status === "aberta" || t.status === "em_andamento" || t.id === selT));
       tar.replaceChildren(el("option", { value: "" }, "— sem tarefa —"), ...ts.map((t) => el("option", { value: t.id, selected: t.id === selT ? "" : null }, t.titulo)));
-      const selP = a.processo_id || tarefa?.processo_id; proc.replaceChildren(el("option", { value: "" }, "— sem processo —"), ...H.procs.filter((p) => !cid || p.cliente_id === cid || p.id === selP).map((p) => el("option", { value: p.id, selected: p.id === selP ? "" : null }, (p.numero_cnj || "s/ nº") + (p.tipo_acao ? " · " + p.tipo_acao : "")))); };
+      const selP = a.processo_id || tarefa?.processo_id; proc.replaceChildren(el("option", { value: "" }, "— sem processo —"), ...H.procs.filter((p) => !cid || p.cliente_id === cid || p.id === selP).map((p) => el("option", { value: p.id, selected: p.id === selP ? "" : null }, (p.numero_cnj || "s/ nº") + (p.tipo_acao ? " · " + p.tipo_acao : "")))); blocoMaisTS?.atualizarContador?.(); };
     cli.onchange = vincular; vincular();
-    const body = el("div", { class: "form" }, colab ? field("h-colab", "Colaborador", colab) : null, field("h-data", "Data", dt),
-      el("div", { class: "f" }, el("label", {}, "Início → fim (opcional)"), el("div", { style: "display:flex;gap:6px;align-items:center" }, ini, el("span", { class: "note" }, "→"), fim)),
-      field("h-hr", "Horas", hr, "Preenche sozinho com início/fim. Frações: 0,5 = 30 min; 1,25 = 1h15."),
-      field("h-ativ", "Atividade", ativ), el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, cobr, "Cobrável (entra no relatório ao cliente)")),
-      field("h-cli", "Cliente", cli), field("h-proc", "Processo", proc), field("h-tar", "Tarefa", tar), field("h-fre", "Frente de trabalho", fre, "Em que divisão do serviço ao cliente essa hora entra. Vazio = o sistema deduz."), el("div", { class: "f full" }, field("h-desc", "Descrição", desc)),
-      a.obs_gestor && a.status === "correcao" ? el("div", { class: "f full", style: "color:var(--crit)" }, "Gestor pediu correção: " + a.obs_gestor) : null);
-    const extra = a.id ? el("button", { class: "btn danger", onclick: async () => { if (!confirmInline(body, "Excluir este lançamento?")) return; const { error } = await SB.from("apontamentos_horas").delete().eq("id", a.id); $("#modalHost").replaceChildren(); toast(error ? "Não foi possível excluir" : "Excluído"); inval(); render(); } }, "Excluir") : null;
+    const horarioWrap = el("div", { class: "f" }, el("label", {}, "Início → fim (opcional)"), el("div", { class: v3 ? "np-ts-tempo-wrap" : "", style: v3 ? "" : "display:flex;gap:6px;align-items:center" }, ini, el("span", { class: "note" }, "→"), fim));
+    const cobrWrap = el("div", { class: "f", style: "justify-content:center" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, cobr, "Cobrável (entra no relatório ao cliente)"));
+    let body;
+    if (v3) {
+      blocoMaisTS = NPUI.maisCampos("Mais detalhes do lançamento", [
+        field("h-proc", "Processo", proc),
+        field("h-data", "Data", dt),
+        horarioWrap,
+        field("h-ativ", "Atividade", ativ),
+        cobrWrap,
+        field("h-tar", "Tarefa", tar),
+        field("h-fre", "Frente de trabalho", fre, "Vazio = o sistema deduz pela tarefa/processo."),
+        colab ? field("h-colab", "Colaborador", colab) : null
+      ].filter(Boolean), { contador: "auto" });
+      body = el("div", { class: "form" },
+        a.obs_gestor && a.status === "correcao" ? el("div", { class: "f full", style: "color:var(--np-crit)" }, "Gestor pediu correção: " + a.obs_gestor) : null,
+        field("h-cli", "Cliente", cli),
+        field("h-hr", "Tempo (horas)", hr, "Frações: 0,5 = 30 min · 1,25 = 1h15."),
+        el("div", { class: "f full" }, field("h-desc", "Descrição", desc)),
+        blocoMaisTS
+      );
+    } else {
+      body = el("div", { class: "form" }, colab ? field("h-colab", "Colaborador", colab) : null, field("h-data", "Data", dt),
+        horarioWrap,
+        field("h-hr", "Horas", hr, "Preenche sozinho com início/fim. Frações: 0,5 = 30 min; 1,25 = 1h15."),
+        field("h-ativ", "Atividade", ativ), cobrWrap,
+        field("h-cli", "Cliente", cli), field("h-proc", "Processo", proc), field("h-tar", "Tarefa", tar), field("h-fre", "Frente de trabalho", fre, "Em que divisão do serviço ao cliente essa hora entra. Vazio = o sistema deduz."), el("div", { class: "f full" }, field("h-desc", "Descrição", desc)),
+        a.obs_gestor && a.status === "correcao" ? el("div", { class: "f full", style: "color:var(--crit)" }, "Gestor pediu correção: " + a.obs_gestor) : null);
+    }
+    const extra = a.id ? el("button", { class: "btn danger", onclick: () => { npConfirmar({ titulo: "Excluir lançamento de horas?", mensagem: `Remover o lançamento de ${hFmt(a.horas)} em ${fmt(a.data)}?`, confirmar: "Excluir lançamento", perigo: true, onSim: async () => { const { error } = await SB.from("apontamentos_horas").delete().eq("id", a.id); $("#modalHost").replaceChildren(); toast(error ? "Não foi possível excluir" : "Excluído"); inval(); render(); } }); } }, "Excluir") : null;
     modal(a.id ? "Editar lançamento" : "Lançar horas", body, async () => {
       const cid = colab ? colab.value : (a.colaborador_id || m?.id);
-      if (!cid) throw new Error("Seu usuário não está vinculado a um colaborador. Peça ao administrador para salvar seu perfil na aba Usuários.");
-      if (!(+hr.value > 0)) throw new Error("Informe as horas (ou início e fim)");
+      if (!cid) { const e = new Error("Seu usuário não está vinculado a um colaborador. Peça ao administrador para salvar seu perfil na aba Usuários."); if (colab) e.campo = colab; throw e; }
+      if (!(+hr.value > 0)) { const e = new Error("Informe as horas (ou início e fim)"); e.campo = hr; throw e; }
       const row = { colaborador_id: cid, data: dt.value, horas: +hr.value, inicio: ini.value || null, fim: fim.value || null, cliente_id: cli.value || null, tarefa_id: tar.value || null, processo_id: proc.value || null, tipo_atividade: ativ.value, cobravel: cobr.checked, descricao: desc.value.trim() || null, frente: fre.value || null };
       const { error } = a.id ? await SB.from("apontamentos_horas").update(row).eq("id", a.id) : await SB.from("apontamentos_horas").insert(row);
       if (error) throw new Error(error.code === "42501" ? "Você só pode lançar horas em seu próprio nome" : error.message || "Não foi possível salvar");
       toast("Horas lançadas"); inval(); render();
-    }, extra);
+    }, extra, { confirmar: a.id ? "Salvar lançamento" : "Lançar horas" });
   }
 
   // ---------- cronômetro ----------
@@ -94,19 +119,25 @@
       return el("div", { class: "card", style: "padding:12px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-color:var(--gold)" }, el("span", { class: "pill e2" }, "● rodando"), t,
         el("span", { class: "note" }, [c.cliente_id ? S.clientes.find((x) => x.id === c.cliente_id)?.nome : null, ativNome(c.tipo_atividade)].filter(Boolean).join(" · ")), desc,
         el("button", { class: "btn primary", onclick: async () => { const { error } = await SB.rpc("ts_cronometro_parar", { p_descricao: desc.value.trim() || null, p_descartar: false }); if (error) { toast(error.message); return; } clearInterval(H.cronT); H.cron = null; toast("Horas gravadas"); inval(); render(); } }, "■ Parar e gravar"),
-        el("button", { class: "btn", onclick: async () => { if (!confirm("Descartar o tempo deste cronômetro?")) return; await SB.rpc("ts_cronometro_parar", { p_descartar: true }); clearInterval(H.cronT); H.cron = null; render(); } }, "Descartar"));
+        el("button", { class: "btn", onclick: () => { npConfirmar({ titulo: "Descartar cronômetro?", mensagem: "O tempo decorrido neste cronômetro será descartado sem gerar apontamento de horas.", confirmar: "Descartar tempo", perigo: true, onSim: async () => { const { error } = await SB.rpc("ts_cronometro_parar", { p_descartar: true }); if (error) throw error; clearInterval(H.cronT); H.cron = null; render(); } }); } }, "Descartar"));
     }
     return el("div", { class: "card", style: "padding:12px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, el("b", {}, "Cronômetro"), el("span", { class: "note" }, "Inicie ao começar uma atividade; ao parar, o lançamento é criado com início e fim."), el("button", { class: "btn", onclick: () => iniciarCron() }, "▶ Iniciar"));
   }
   function iniciarCron({ tarefa } = {}) {
+    const v3 = tsV3();
     const cli = selCliente(tarefa?.cliente_id), ativ = selAtiv("outro"), desc = inp("text", tarefa?.titulo || "", { placeholder: "Opcional" }), proc = sel({ "": "— sem processo —" }, ""), tar = sel({ "": "— sem tarefa —" }, "");
     const vincular = () => { const cid = cli.value; proc.replaceChildren(el("option", { value: "" }, "— sem processo —"), ...H.procs.filter((p) => !cid || p.cliente_id === cid).map((p) => el("option", { value: p.id, selected: p.id === tarefa?.processo_id ? "" : null }, p.numero_cnj || "s/ nº")));
       const ts = (window.PP_TAREFAS?.lista?.() || []).filter((t) => (!cid || t.cliente_id === cid) && (t.status === "aberta" || t.status === "em_andamento")); tar.replaceChildren(el("option", { value: "" }, "— sem tarefa —"), ...ts.map((t) => el("option", { value: t.id, selected: t.id === tarefa?.id ? "" : null }, t.titulo))); }; cli.onchange = vincular; vincular();
-    modal("Iniciar cronômetro", el("div", { class: "form" }, field("c-cli", "Cliente", cli), field("c-ativ", "Atividade", ativ), field("c-proc", "Processo", proc), field("c-tar", "Tarefa", tar), el("div", { class: "f full" }, field("c-desc", "Descrição", desc))), async () => {
+    const body = v3
+      ? el("div", { class: "form" },
+        field("c-cli", "Cliente", cli), field("c-ativ", "Atividade", ativ), el("div", { class: "f full" }, field("c-desc", "Descrição", desc)),
+        NPUI.maisCampos("Processo e tarefa", [field("c-proc", "Processo", proc), field("c-tar", "Tarefa", tar)], { contador: "auto" }))
+      : el("div", { class: "form" }, field("c-cli", "Cliente", cli), field("c-ativ", "Atividade", ativ), field("c-proc", "Processo", proc), field("c-tar", "Tarefa", tar), el("div", { class: "f full" }, field("c-desc", "Descrição", desc)));
+    modal("Iniciar cronômetro", body, async () => {
       const { data, error } = await SB.rpc("ts_cronometro_iniciar", { p_cliente: cli.value || null, p_tarefa: tar.value || null, p_processo: proc.value || null, p_atividade: ativ.value, p_descricao: desc.value.trim() || null }); if (error) throw new Error(error.message);
       H.cron = data; S.tab = "horas"; H.aba = "semana"; render();
-    });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Iniciar";
+    }, null, { confirmar: "Iniciar cronômetro" });
+    if (!v3) { const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Iniciar"; }
   }
 
   // ---------- Minha semana ----------
@@ -198,7 +229,7 @@
     const body = el("div", { class: "form" }, field("rc-cli", "Cliente", cli), field("rc-ini", "De", ini), field("rc-fim", "Até", fim), el("div", { class: "f full note" }, "Entram só os lançamentos cobráveis. Abre em uma nova aba pronta para imprimir / salvar em PDF."),
       el("div", { class: "f" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, mostrarQuem, "Mostrar quem executou")), el("div", { class: "f" }, el("label", { style: "display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);cursor:pointer;min-height:38px" }, mostrarValor, "Mostrar valor por hora e total")));
     modal("Relatório de horas para o cliente", body, async () => {
-      if (!cli.value) throw new Error("Escolha o cliente");
+      if (!cli.value) { const e = new Error("Escolha o cliente"); e.campo = cli; throw e; }
       const { data, error } = await SB.from("v_apontamentos").select("*").eq("cliente_id", cli.value).eq("cobravel", true).gte("data", ini.value).lte("data", fim.value).order("data").order("inicio", { nullsFirst: true }); if (error) throw new Error(error.message);
       const L = data || []; if (!L.length) throw new Error("Sem lançamentos cobráveis nesse período");
       const c = S.clientes.find((x) => x.id === cli.value); const tot = L.reduce((x, a) => x + +a.horas, 0), val = L.reduce((x, a) => x + +a.valor, 0);
@@ -219,8 +250,8 @@
         <div class=rod>Horas registradas no sistema interno do escritório. ${mostrarValor.checked ? "Valores calculados pela tabela de honorários por hora vinculada ao contrato." : ""}</div>
         <script>setTimeout(()=>window.print(),400)</script></body></html>`;
       const w = window.open("", "_blank"); if (!w) throw new Error("O navegador bloqueou a janela — permita pop-ups para este site"); w.document.write(html); w.document.close();
-    });
-    const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Gerar";
+    }, null, { confirmar: "Gerar relatório" });
+    if (!tsV3()) { const btn = $("#modalHost button.btn.primary"); if (btn) btn.textContent = "Gerar"; }
   }
 
   // relatório imprimível do(s) colaborador(es): resumo, por cliente, por atividade, lançamentos
@@ -255,7 +286,7 @@
     const todos = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); todos.onchange = () => { if (todos.checked) A.lista.forEach((a) => A.sel.add(a.id)); else A.sel.clear(); render(); };
     v.append(el("div", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Lançamentos a aprovar"), el("span", { class: "note" }, `${A.lista.length} pendente(s) · ${A.sel.size} marcado(s)`)),
       el("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px" }, fc, obs, el("button", { class: "btn sm primary", onclick: () => agir("aprovado") }, "✓ Aprovar marcados"), el("button", { class: "btn sm", onclick: () => agir("correcao") }, "↩ Devolver para correção"),
-        el("button", { class: "btn sm", style: "margin-left:auto", title: "Aprova de uma vez todos os lançamentos pendentes até o fim do mês passado (rotina mensal)", onclick: async () => { const d = new Date(); d.setDate(0); const lim = iso(d); const ids = A.lista.filter((a) => a.status === "pendente" && a.data <= lim).map((a) => a.id); if (!ids.length) { toast("Nada pendente até " + fmt(lim)); return; } if (!confirm(`Aprovar ${ids.length} lançamento(s) pendente(s) até ${fmt(lim)}?`)) return; const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: "aprovado", p_obs: null }); if (error) toast(error.message); else { toast(`${data} aprovado(s)`); inval(); render(); } } }, "Aprovar o mês fechado")),
+        el("button", { class: "btn sm", style: "margin-left:auto", title: "Aprova de uma vez todos os lançamentos pendentes até o fim do mês passado (rotina mensal)", onclick: () => { const d = new Date(); d.setDate(0); const lim = iso(d); const ids = A.lista.filter((a) => a.status === "pendente" && a.data <= lim).map((a) => a.id); if (!ids.length) { toast("Nada pendente até " + fmt(lim)); return; } npConfirmar({ titulo: "Aprovar mês fechado?", mensagem: `Aprovar ${ids.length} lançamento(s) pendente(s) até ${fmt(lim)}?`, confirmar: `Aprovar ${ids.length} lançamento(s)`, onSim: async () => { const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: "aprovado", p_obs: null }); if (error) { toast(error.message); throw error; } toast(`${data} aprovado(s)`); inval(); render(); } }); } }, "Aprovar o mês fechado")),
       el("div", { class: "note", style: "margin:-4px 0 8px" }, "Rotina sugerida: uma vez por mês, revise o que está estranho, devolva para correção e clique em “Aprovar o mês fechado”. Lançamentos devolvidos voltam para a fila quando corrigidos."),
       !A.ok ? el("div", { class: "note" }, "Carregando…") : el("div", { class: "tbl" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, todos), el("th", {}, "Data"), el("th", {}, "Colaborador"), el("th", {}, "Cliente"), el("th", {}, "Atividade"), el("th", {}, "Descrição"), el("th", { class: "r" }, "Horas"), el("th", {}, "Cobrável"), el("th", {}, "Status"))),
         el("tbody", {}, ...(A.lista.length ? A.lista.map((a) => { const c = el("input", { type: "checkbox", style: "width:16px;height:16px;margin:0;accent-color:var(--gold)" }); c.checked = A.sel.has(a.id); c.onchange = () => { if (c.checked) A.sel.add(a.id); else A.sel.delete(a.id); };
@@ -317,10 +348,12 @@
           if (error) { toast(error.message); return; }
           clearInterval(H.cronT); H.cron = null; toast("Horas gravadas"); inval(); render();
         } }),
-        NPUI.btn("Descartar", { variante: "ghost", onclick: async () => {
-          if (!confirm("Descartar o tempo deste cronômetro?")) return;
-          await SB.rpc("ts_cronometro_parar", { p_descartar: true });
-          clearInterval(H.cronT); H.cron = null; render();
+        NPUI.btn("Descartar", { variante: "ghost", onclick: () => {
+          npConfirmar({ titulo: "Descartar cronômetro?", mensagem: "O tempo decorrido neste cronômetro será descartado sem gerar apontamento de horas.", confirmar: "Descartar tempo", perigo: true, onSim: async () => {
+            const { error } = await SB.rpc("ts_cronometro_parar", { p_descartar: true });
+            if (error) throw error;
+            clearInterval(H.cronT); H.cron = null; render();
+          } });
         } })
       );
     }
@@ -442,13 +475,15 @@
       fc, obs,
       NPUI.btn("Aprovar marcados", { variante: "pri", onclick: () => agir("aprovado") }),
       NPUI.btn("Devolver", { onclick: () => agir("correcao") }),
-      NPUI.btn("Aprovar mês fechado", { variante: "ghost", onclick: async () => {
+      NPUI.btn("Aprovar mês fechado", { variante: "ghost", onclick: () => {
         const d = new Date(); d.setDate(0); const lim = iso(d);
         const ids = A.lista.filter((a) => a.status === "pendente" && a.data <= lim).map((a) => a.id);
         if (!ids.length) { toast("Nada pendente até " + fmt(lim)); return; }
-        if (!confirm(`Aprovar ${ids.length} lançamento(s) pendente(s) até ${fmt(lim)}?`)) return;
-        const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: "aprovado", p_obs: null });
-        if (error) toast(error.message); else { toast(`${data} aprovado(s)`); inval(); render(); }
+        npConfirmar({ titulo: "Aprovar mês fechado?", mensagem: `Aprovar ${ids.length} lançamento(s) pendente(s) até ${fmt(lim)}?`, confirmar: `Aprovar ${ids.length} lançamento(s)`, onSim: async () => {
+          const { data, error } = await SB.rpc("ts_aprovar", { p_ids: ids, p_status: "aprovado", p_obs: null });
+          if (error) { toast(error.message); throw error; }
+          toast(`${data} aprovado(s)`); inval(); render();
+        } });
       } })
     ));
     if (!A.ok) { v.append(NPUI.carregando(5)); return; }

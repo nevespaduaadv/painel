@@ -68,14 +68,26 @@ function openFluxoForm(c){
         res=sel({"":"—",...RESERVA},c.projeto_reserva||""),reg=sel({"":"—",...REGUA},c.regua||""),srv=sel({"":"—",...SERVICO},c.servico||""),tip=el("textarea",{placeholder:"Ex.: 3 créditos rurais Sicredi CPF; 1 capital de giro Sicoob CNPJ…"},c.tipos_dividas||""),
         onb=colabSel(c.responsavel_onboarding_id,"— responsável pelo onboarding —"),url=inp("url",c.notion_url||"",{placeholder:"https://www.notion.so/…"}),
         dir=sel({"":"— ainda não direcionado —",...DIRECIONAMENTO},c.direcionamento||""),regok=tri(c.registrato_ok);
-  const body=el("div",{class:"form"},field("fl-et","Etapa do fluxo PJ",et,"Só avance quando a etapa anterior estiver 100% cumprida."),field("fl-st","Status",st),field("fl-div","Tem dívida em atraso?",div,"Sim → abre automaticamente o acompanhamento no setor de acordos."),field("fl-adi","Honorários em dia?",adi),field("fl-pro","Possui processos ajuizados?",pro),
-    field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip),
-    field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),field("fl-dir","Direcionamento",dir,"Ao escolher, o sistema abre a tarefa no núcleo certo (Acordos e/ou Jurídico PJ) e garante a negociação. Só muda de novo se você alterar."));
+  const v3=negV3();
+  const body=v3
+    ?el("div",{class:"form"},
+      NPUI.secaoForm("Etapa e direcionamento"),
+      field("fl-et","Etapa do fluxo PJ",et,"Só avance quando a etapa anterior estiver 100% cumprida."),field("fl-st","Status",st),
+      field("fl-dir","Direcionamento",dir,"Ao escolher, o sistema abre a tarefa no núcleo certo e garante a negociação."),field("fl-srv","Serviço",srv),
+      field("fl-div","Tem dívida em atraso?",div,"Sim → abre acompanhamento no setor de acordos."),field("fl-adi","Honorários em dia?",adi),
+      NPUI.maisCampos("Reserva, régua e onboarding",[
+        field("fl-pro","Possui processos ajuizados?",pro),field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),
+        field("fl-res","Projeto de reserva",res,"Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: 3d · Prata: 20d · Ouro: 45d."),
+        field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip)
+      ],{contador:"auto"}))
+    :el("div",{class:"form"},field("fl-et","Etapa do fluxo PJ",et,"Só avance quando a etapa anterior estiver 100% cumprida."),field("fl-st","Status",st),field("fl-div","Tem dívida em atraso?",div,"Sim → abre automaticamente o acompanhamento no setor de acordos."),field("fl-adi","Honorários em dia?",adi),field("fl-pro","Possui processos ajuizados?",pro),
+      field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip),
+      field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),field("fl-dir","Direcionamento",dir,"Ao escolher, o sistema abre a tarefa no núcleo certo (Acordos e/ou Jurídico PJ) e garante a negociação. Só muda de novo se você alterar."));
   modal("Fluxo do cliente PJ",body,async()=>{
     const cols={etapa_fluxo:et.value===""?null:+et.value,status:st.value,tem_divida_atraso:triVal(div),adimplente:triVal(adi),possui_processos:triVal(pro),projeto_reserva:res.value||null,regua:reg.value||null,servico:srv.value||null,tipos_dividas:tip.value.trim()||null,responsavel_onboarding_id:onb.value||null,notion_url:url.value.trim()||null,registrato_ok:triVal(regok),direcionamento:dir.value||null};
     const {error}=await SB.from("clientes").update(cols).eq("id",c.id);if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Fluxo salvo");notificar("clientes");recarregar();
-  });
+  },null,{confirmar:"Salvar fluxo"});
 }
 
 /* ---------- Ficha: card do onboarding (0052) ---------- */
@@ -98,8 +110,8 @@ function cardOnboarding(c){
     const acts=el("div",{class:"actions edit-only",style:"display:flex;gap:6px;flex-wrap:wrap"},
       el("button",{class:"btn sm",onclick:()=>{navigator.clipboard?.writeText(link);toast("Link do formulário copiado")}},"Copiar link do formulário"),
       el("button",{class:"btn sm",onclick:()=>{navigator.clipboard?.writeText(link+"#agendar");toast("Link da agenda copiado")}},"Copiar link da agenda"),
-      !o.entrada_ok?el("button",{class:"btn sm primary",onclick:async()=>{if(!window.confirm("Confirmar que a entrada foi paga e liberar o agendamento da R1? "+(o.formulario_em?"O cliente recebe o link da agenda por WhatsApp agora.":"Quando o cliente responder o formulário, já recebe o link da agenda."))) return;const {data,error}=await SB.rpc("onboarding_liberar_agenda",{p_cliente:c.id,p_origem:"manual"});if(error){toast("Não foi possível liberar");return}toast(data?.enviado?"Entrada confirmada — link da agenda enviado":"Entrada confirmada");recarregarFicha()}},"Confirmar entrada e liberar R1"):null,
-      el("button",{class:"btn sm primary",onclick:async()=>{if(!window.confirm(o.onboarding_enviado_em?"Reenviar as boas-vindas com o link do formulário agora?":"Enviar as boas-vindas com o link do formulário agora?"))return;const {error}=await SB.rpc("onboarding_enviar_boas_vindas",{p_cliente:c.id,p_em:new Date().toISOString()});if(error){toast("Não foi possível enfileirar");return}toast("Mensagem agendada para envio");recarregarFicha()}},o.onboarding_enviado_em?"Reenviar boas-vindas":"Enviar boas-vindas"),
+      !o.entrada_ok?el("button",{class:"btn sm primary",onclick:()=>{npConfirmar({titulo:"Confirmar entrada e liberar R1?",mensagem:`Confirmar que a entrada de ${c.nome||"este cliente"} foi paga e liberar o agendamento da R1? `+(o.formulario_em?"O cliente recebe o link da agenda por WhatsApp agora.":"Quando o cliente responder o formulário, já recebe o link da agenda."),confirmar:"Confirmar entrada",onSim:async()=>{const {data,error}=await SB.rpc("onboarding_liberar_agenda",{p_cliente:c.id,p_origem:"manual"});if(error){toast("Não foi possível liberar");throw error}toast(data?.enviado?"Entrada confirmada — link da agenda enviado":"Entrada confirmada");recarregarFicha()}})}},"Confirmar entrada e liberar R1"):null,
+      el("button",{class:"btn sm primary",onclick:()=>{npConfirmar({titulo:o.onboarding_enviado_em?"Reenviar boas-vindas?":"Enviar boas-vindas?",mensagem:(o.onboarding_enviado_em?"Reenviar":"Enviar")+` as boas-vindas com o link do formulário de mapeamento via WhatsApp para ${c.nome||"este cliente"} agora?`,confirmar:o.onboarding_enviado_em?"Reenviar boas-vindas":"Enviar boas-vindas",perigo:true,onSim:async()=>{const {error}=await SB.rpc("onboarding_enviar_boas_vindas",{p_cliente:c.id,p_em:new Date().toISOString()});if(error){toast("Não foi possível enfileirar");throw error}toast("Mensagem agendada para envio");recarregarFicha()}})}},o.onboarding_enviado_em?"Reenviar boas-vindas":"Enviar boas-vindas"),
       o.respostas?el("button",{class:"btn sm",onclick:()=>{const body=el("div",{},Object.entries(ONB_PERG).filter(([k])=>o.respostas[k]).map(([k,l])=>el("div",{class:"kv",style:"margin-bottom:8px"},el("div",{class:"k"},l),el("div",{class:"v",style:"white-space:pre-wrap"},String(o.respostas[k])))));
         modal("Formulário de mapeamento — respostas do cliente",body,async()=>{await SB.from("onboarding_respostas").update({conferido_em:new Date().toISOString()}).eq("cliente_id",c.id).is("conferido_em",null);toast("Marcado como conferido");recarregarFicha()})}},"Ver respostas"+(o.conferido_em?"":" · conferir")):null);
     card.replaceChildren(card.firstChild,kvs,msgs.length?el("div",{style:"display:grid;gap:4px"},el("div",{class:"k"},"Mensagens WhatsApp"),...msgs):el("div",{class:"note"},"Nenhuma mensagem na fila."),acts);
@@ -164,6 +176,7 @@ function renderNegCliente(c,host){
   host.append(mon);
 }
 const kv=(k,v)=>el("div",{class:"kv"},el("div",{class:"k"},k),el("div",{class:"v"},v==null||v===""?el("span",{class:"note"},"—"):v));
+const NEG_ETAPAS_FECHAMENTO=new Set(["minuta","formalizado","pagamento_pendente","concluido"]);
 function openNegForm(c,n){
   const fixo=c||(n.cliente_id?{id:n.cliente_id}:null);
   const cli=sel({"":"— cliente —",...Object.fromEntries([...S.clientes].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"")).map(x=>[x.id,x.nome]))},fixo?fixo.id:"");if(fixo)cli.disabled=true;
@@ -173,24 +186,65 @@ function openNegForm(c,n){
         vc=inp("number",n.valor_cobrado||"",{step:"100"}),va=inp("number",n.valor_acordo||"",{step:"100"}),alc=inp("number",n.alcada_autorizada||"",{step:"100"}),da=inp("date",n.data_acordo||""),pz=inp("date",n.prazo||""),
         ag=inp("text",n.aguardando||"",{placeholder:"Ex.: comprovante de quitação, retorno do banco"}),pp=el("textarea",{placeholder:"Próximo passo concreto e quem faz."},n.proximo_passo||""),obs=el("textarea",{},n.observacoes||"");
   const konSel=()=>{const ks=S.contratos.filter(k=>k.clienteId===cli.value);return sel({"":"— sem vínculo com contrato —",...Object.fromEntries(ks.map(k=>[k.id,shortName(k)]))},n.contrato_id||"")};
-  let kon=konSel();const konWrap=el("div",{},kon);cli.onchange=()=>{kon=konSel();konWrap.replaceChildren(kon)};
-  kon.onchange=()=>{const k=S.contratos.find(x=>x.id===kon.value);if(k&&!banco.value)banco.value=k.banco||"";if(k&&!vc.value&&k.saldoAtual)vc.value=k.saldoAtual};
-  const pex=inp("number",n.percentual_exito??"",{step:"1",min:"0",max:"100",placeholder:"ex.: 20"}),alcHint=el("div",{class:"note"});
-  const calcAlc=()=>{const vc=+vc_.value||0,va=+va_.value||0,p=+pex.value||0,a=+alc.value||0;if(!va){alcHint.textContent="Alçada = quanto o cliente pode desembolsar no total: valor do acordo + honorários de êxito.";return}
-    const ex=p&&vc>va?(vc-va)*p/100:0,tot=va+ex;alcHint.textContent=`Desembolso total do cliente: ${BRL(tot)} (acordo ${BRL(va)}${ex?` + êxito ${BRL(ex)}`:""})`+(a?tot>a?` · ACIMA da alçada em ${BRL(tot-a)}`:` · dentro da alçada (sobra ${BRL(a-tot)})`:"");alcHint.style.color=a&&tot>a?"var(--crit)":"";};
-  const vc_=vc,va_=va;[vc,va,alc,pex].forEach(i=>i.oninput=calcAlc);setTimeout(calcAlc,0);
-  const body=el("div",{class:"form"},field("ng-cli","Cliente",cli),el("div",{class:"f"},el("label",{},"Contrato relacionado"),konWrap),field("ng-tit","Título",tit),el("div",{class:"f"},el("label",{for:"ng-banco"},"Banco"),el("div",{},Object.assign(banco,{id:"ng-banco"}),bdl)),
-    field("ng-et","Etapa",et),field("ng-temp","Temperatura",temp),el("div",{class:"f"},el("label",{for:"ng-sit"},"Situação processual"),el("div",{},Object.assign(sit,{id:"ng-sit"}),sdl)),field("ng-npr","Nº do processo",npr),field("ng-resp","Responsável",resp),field("ng-adv","Escritório adverso / contato",adv),
-    field("ng-vc","Valor cobrado (R$)",vc),field("ng-va","Valor do acordo (R$)",va),field("ng-pex","Honorários de êxito (%)",pex,"Sobre a economia obtida (cobrado − acordo)."),el("div",{class:"f"},el("label",{for:"ng-alc"},"Alçada autorizada pelo cliente (R$)"),el("div",{},Object.assign(alc,{id:"ng-alc"}),alcHint)),field("ng-da","Data do acordo",da),field("ng-pz","Prazo",pz),field("ng-ag","Aguardando",ag),field("ng-pp","Próximo passo",pp),field("ng-obs","Observações",obs));
-  const extra=n.id?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir esta negociação?"))return;await SB.from("negociacoes").delete().eq("id",n.id);$("#modalHost").replaceChildren();toast("Negociação excluída");recarregar()}},"Excluir"):null;
+  let kon=konSel();
+  const wireKon=()=>{kon.onchange=()=>{const k=S.contratos.find(x=>x.id===kon.value);if(k&&!banco.value)banco.value=k.banco||"";if(k&&!vc.value&&k.saldoAtual)vc.value=k.saldoAtual;calcAlc()}};
+  const konWrap=el("div",{},kon);cli.onchange=()=>{kon=konSel();wireKon();konWrap.replaceChildren(kon)};
+  const v3=negV3();
+  const pex=inp("number",n.percentual_exito??"",{step:"1",min:"0",max:"100",placeholder:"ex.: 20"}),alcHint=el("div",{class:v3?"np-neg-calc-hint":"note"});
+  const calcAlc=()=>{const vcN=+vc.value||0,vaN=+va.value||0,p=+pex.value||0,a=+alc.value||0;if(!vaN){alcHint.textContent="Alçada = quanto o cliente pode desembolsar no total: valor do acordo + honorários de êxito.";alcHint.classList.remove("crit");alcHint.style.color="";return}
+    const ex=p&&vcN>vaN?(vcN-vaN)*p/100:0,tot=vaN+ex;alcHint.textContent=`Desembolso total do cliente: ${BRL(tot)} (acordo ${BRL(vaN)}${ex?` + êxito ${BRL(ex)}`:""})`+(a?tot>a?` · ACIMA da alçada em ${BRL(tot-a)}`:` · dentro da alçada (sobra ${BRL(a-tot)})`:"");
+    if(v3)alcHint.classList.toggle("crit",!!(a&&tot>a));else alcHint.style.color=a&&tot>a?"var(--crit)":"";};
+  wireKon();[vc,va,alc,pex].forEach(i=>i.oninput=calcAlc);setTimeout(calcAlc,0);
+
+  let body;
+  if(v3){
+    const temDadosFech=!!(n.valor_acordo||n.percentual_exito!=null||n.alcada_autorizada||n.data_acordo);
+    const blocoFech=NPUI.maisCampos("Dados de acordo e êxito",[
+      field("ng-va","Valor do acordo (R$)",va),
+      field("ng-pex","Honorários de êxito (%)",pex,"Sobre a economia obtida (cobrado − acordo)."),
+      el("div",{class:"f"},el("label",{for:"ng-alc"},"Alçada autorizada pelo cliente (R$)"),el("div",{},Object.assign(alc,{id:"ng-alc"}),alcHint)),
+      field("ng-da","Data do acordo",da)
+    ],{aberto:NEG_ETAPAS_FECHAMENTO.has(et.value)||temDadosFech,contador:"auto"});
+    blocoFech.dataset.negFechamento="1";
+    et.onchange=()=>{
+      if(NEG_ETAPAS_FECHAMENTO.has(et.value))blocoFech.open=true;
+      else if(!va.value&&!pex.value&&!alc.value&&!da.value)blocoFech.open=false;
+    };
+    const blocoMais=NPUI.maisCampos("Mais detalhes da negociação",[
+      field("ng-tit","Título personalizado",tit,"Se vazio, monta automaticamente: Cliente | Banco."),
+      field("ng-temp","Temperatura",temp),
+      el("div",{class:"f"},el("label",{for:"ng-sit"},"Situação processual"),el("div",{},Object.assign(sit,{id:"ng-sit"}),sdl)),
+      field("ng-npr","Nº do processo",npr),
+      field("ng-adv","Escritório adverso / contato",adv),
+      field("ng-pz","Prazo",pz),
+      field("ng-ag","Aguardando",ag),
+      field("ng-obs","Observações",obs)
+    ],{contador:"auto"});
+    body=el("div",{class:"form"},
+      field("ng-cli","Cliente",cli),
+      el("div",{class:"f"},el("label",{for:"ng-banco"},"Banco / credor"),el("div",{},Object.assign(banco,{id:"ng-banco"}),bdl)),
+      el("div",{class:"f"},el("label",{},"Contrato relacionado"),konWrap),
+      field("ng-vc","Valor cobrado (R$)",vc),
+      field("ng-et","Etapa",et),
+      field("ng-resp","Responsável",resp),
+      field("ng-pp","Próximo passo",pp),
+      blocoFech,
+      blocoMais
+    );
+  }else{
+    body=el("div",{class:"form"},field("ng-cli","Cliente",cli),el("div",{class:"f"},el("label",{},"Contrato relacionado"),konWrap),field("ng-tit","Título",tit),el("div",{class:"f"},el("label",{for:"ng-banco"},"Banco"),el("div",{},Object.assign(banco,{id:"ng-banco"}),bdl)),
+      field("ng-et","Etapa",et),field("ng-temp","Temperatura",temp),el("div",{class:"f"},el("label",{for:"ng-sit"},"Situação processual"),el("div",{},Object.assign(sit,{id:"ng-sit"}),sdl)),field("ng-npr","Nº do processo",npr),field("ng-resp","Responsável",resp),field("ng-adv","Escritório adverso / contato",adv),
+      field("ng-vc","Valor cobrado (R$)",vc),field("ng-va","Valor do acordo (R$)",va),field("ng-pex","Honorários de êxito (%)",pex,"Sobre a economia obtida (cobrado − acordo)."),el("div",{class:"f"},el("label",{for:"ng-alc"},"Alçada autorizada pelo cliente (R$)"),el("div",{},Object.assign(alc,{id:"ng-alc"}),alcHint)),field("ng-da","Data do acordo",da),field("ng-pz","Prazo",pz),field("ng-ag","Aguardando",ag),field("ng-pp","Próximo passo",pp),field("ng-obs","Observações",obs));
+  }
+  const extra=n.id?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir negociação?",mensagem:`Remover a negociação “${n.titulo||n.banco||"selecionada"}” permanentemente?`,confirmar:"Excluir negociação",perigo:true,onSim:async()=>{const {error}=await SB.from("negociacoes").delete().eq("id",n.id);if(error)throw error;$("#modalHost").replaceChildren();toast("Negociação excluída");recarregar()}})}} ,"Excluir"):null;
   modal(n.id?"Editar negociação":"Nova negociação",body,async()=>{
-    if(!cli.value)throw new Error("Escolha o cliente");
+    if(!cli.value){const e=new Error("Escolha o cliente");e.campo=cli;throw e}
     const titulo=tit.value.trim()||[nomeCli(cli.value),banco.value.trim()].filter(Boolean).join(" | ");
     const row={cliente_id:cli.value,contrato_id:kon.value||null,titulo,banco:banco.value.trim()||null,etapa:et.value,temperatura:temp.value||null,situacao_processual:sit.value.trim()||null,numero_processo:npr.value.trim()||null,responsavel_id:resp.value||null,adverso_contato:adv.value.trim()||null,
       valor_cobrado:vc.value===""?null:+vc.value,valor_acordo:va.value===""?null:+va.value,alcada_autorizada:alc.value===""?null:+alc.value,percentual_exito:pex.value===""?null:+pex.value,data_acordo:da.value||null,prazo:pz.value||null,aguardando:ag.value.trim()||null,proximo_passo:pp.value.trim()||null,observacoes:obs.value.trim()||null};
     const {error}=n.id?await SB.from("negociacoes").update(row).eq("id",n.id):await SB.from("negociacoes").insert(row);if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Negociação salva");recarregar();
-  },extra);
+  },extra,{confirmar:n.id?"Salvar negociação":"Criar negociação"});
 }
 
 /* ---------- Monitoramento ---------- */
@@ -331,12 +385,18 @@ function renderMonitoramento(){
 function openMonForm(cid,m){
   const st=sel(MON_STATUS,m.status||"em_monitoramento"),docs=el("textarea",{placeholder:"Um CPF/CNPJ por linha (empresa, sócios, avalistas)."},(m.documentos||[]).join("\n")),tp=tri(m.tem_processo),fc=tri(m.foi_citado),tg=tri(m.tem_garantia),av=sel({"":"—",...AVAL},m.avalistas||""),
         ult=inp("date",m.ultima_checagem||""),prox=inp("date",m.proxima_checagem||""),resp=colabSel(m.responsavel_id,"— responsável —"),obs=el("textarea",{},m.observacoes||"");
-  const body=el("div",{class:"form"},el("div",{class:"f full note"},"Cliente: "+nomeCli(cid)),field("mo-st","Status",st),field("mo-resp","Responsável",resp),field("mo-tp","Tem processo?",tp),field("mo-fc","Foi citado?",fc),field("mo-tg","Tem garantia?",tg),field("mo-av","Avalistas",av),field("mo-ult","Última checagem",ult),field("mo-prox","Próxima checagem",prox),field("mo-docs","Documentos monitorados",docs),field("mo-obs","Observações",obs));
+  const v3=negV3();
+  const body=v3
+    ?el("div",{class:"form"},
+      el("div",{class:"f full note"},"Cliente: "+nomeCli(cid)),
+      field("mo-st","Status",st),field("mo-resp","Responsável",resp),field("mo-ult","Última checagem",ult),field("mo-prox","Próxima checagem",prox),field("mo-docs","Documentos monitorados",docs),
+      NPUI.maisCampos("Situação processual e observações",[field("mo-tp","Tem processo?",tp),field("mo-fc","Foi citado?",fc),field("mo-tg","Tem garantia?",tg),field("mo-av","Avalistas",av),field("mo-obs","Observações",obs)],{contador:"auto"}))
+    :el("div",{class:"form"},el("div",{class:"f full note"},"Cliente: "+nomeCli(cid)),field("mo-st","Status",st),field("mo-resp","Responsável",resp),field("mo-tp","Tem processo?",tp),field("mo-fc","Foi citado?",fc),field("mo-tg","Tem garantia?",tg),field("mo-av","Avalistas",av),field("mo-ult","Última checagem",ult),field("mo-prox","Próxima checagem",prox),field("mo-docs","Documentos monitorados",docs),field("mo-obs","Observações",obs));
   modal(m.id?"Editar monitoramento":"Iniciar monitoramento",body,async()=>{
     const row={cliente_id:cid,status:st.value,documentos:docs.value.split("\n").map(s=>s.trim()).filter(Boolean),tem_processo:triVal(tp),foi_citado:triVal(fc),tem_garantia:triVal(tg),avalistas:av.value||null,ultima_checagem:ult.value||null,proxima_checagem:prox.value||null,responsavel_id:resp.value||null,observacoes:obs.value.trim()||null};
     const {error}=await SB.from("monitoramentos").upsert(row,{onConflict:"cliente_id"});if(error)throw new Error("Não foi possível salvar: "+(error.message||""));
     toast("Monitoramento salvo");recarregar();
-  });
+  },null,{confirmar:m.id?"Salvar monitoramento":"Iniciar monitoramento"});
 }
 
 /* ====================================================================================================================

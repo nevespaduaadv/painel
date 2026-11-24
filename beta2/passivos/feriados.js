@@ -36,11 +36,7 @@ function formFeriado(f={}){
     if(error)throw new Error(/duplicate|unique/i.test(error.message)?"Já existe um feriado igual nessa data":error.message);
     toast("Feriado salvo");await salvo();
   },f.id&&ehAdmin()?el("button",{class:"btn danger",onclick:()=>{
-    if(feV3()&&NPUI.confirmar){
-      NPUI.confirmar({titulo:"Excluir feriado?",texto:`Remover “${f.nome}” (${fmtBR(f.data)})? A contagem de prazos processuais será recalculada.`,rotuloSim:"Excluir feriado",perigo:true,onSim:execExcluir});
-      return;
-    }
-    if(!confirm("Excluir este feriado?"))return;execExcluir().catch(()=>{});
+    npConfirmar({titulo:"Excluir feriado?",mensagem:`Remover “${f.nome}” (${fmtBR(f.data)})? A contagem de prazos processuais será recalculada.`,confirmar:"Excluir feriado",perigo:true,onSim:execExcluir});
   }},"Excluir"):null);
 }
 function formSusp(s={}){
@@ -54,11 +50,7 @@ function formSusp(s={}){
     const q=s.id?SB.from("suspensoes_prazo").update(reg).eq("id",s.id):SB.from("suspensoes_prazo").insert(reg);const {error}=await q;if(error)throw new Error(error.message);
     toast("Suspensão salva");await salvo();
   },s.id&&ehAdmin()?el("button",{class:"btn danger",onclick:()=>{
-    if(feV3()&&NPUI.confirmar){
-      NPUI.confirmar({titulo:"Excluir suspensão de prazo?",texto:`Remover “${s.motivo}” (${fmtBR(s.inicio)} → ${fmtBR(s.fim)})? A contagem de prazos processuais será recalculada.`,rotuloSim:"Excluir suspensão",perigo:true,onSim:execExcluir});
-      return;
-    }
-    if(!confirm("Excluir esta suspensão?"))return;execExcluir().catch(()=>{});
+    npConfirmar({titulo:"Excluir suspensão de prazo?",mensagem:`Remover “${s.motivo}” (${fmtBR(s.inicio)} → ${fmtBR(s.fim)})? A contagem de prazos processuais será recalculada.`,confirmar:"Excluir suspensão",perigo:true,onSim:execExcluir});
   }},"Excluir"):null);
 }
 

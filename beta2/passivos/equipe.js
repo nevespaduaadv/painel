@@ -247,18 +247,34 @@ function openColabForm(c={}){
   if(c.perfil_id&&!opcoesPerfil[c.perfil_id])opcoesPerfil[c.perfil_id]=c.login_email||"(usuário vinculado)";
   const perfil=sel(opcoesPerfil,c.perfil_id||"");
   const ro=!souAdmin;if(ro){for(const i of [cargo,nuc,adm,desl,oab,resp,perfil,ativo.input,pontoChk.input,jorn])i.disabled=true}
-  const body=el("div",{class:"form"},field("co-nome","Nome",nome),field("co-cargo","Cargo",cargo),field("co-nuc","Núcleo",nuc),field("co-frente","Frente (gestão de passivos)",frente,"Responsável padrão desta frente nos clientes. Exceções por cliente no Dossiê."),field("co-adm","Data de admissão",adm),field("co-desl","Data de desligamento",desl),
-    field("co-email","E-mail",email),field("co-tel","Telefone",tel),field("co-zap","WhatsApp",zap,"Usado só se o canal do resumo for WhatsApp."),field("co-discord","Discord (ID do usuário)",discord,"No Discord: Configurações → Avançado → Modo desenvolvedor; depois clique com o direito no nome → Copiar ID do usuário."),field("co-canal","Canal do resumo diário",canal),resumo.wrap,field("co-gcal","Agenda Google (e-mail)",gcal,"Conta Workspace do escritório. Gmail pessoal só funciona se a agenda for compartilhada com a conta de serviço do painel."),gsync.wrap,field("co-oab","OAB",oab),field("co-apelido","Apelido",apelido),field("co-nasc","Nascimento",nasc,"Só dia e mês aparecem para a equipe (aniversariantes)."),field("co-cidade","Cidade",cidade),field("co-linkedin","LinkedIn",linkedin),field("co-bio","Sobre",bio),field("co-perfil","Usuário do sistema",perfil,souAdmin?"Só aparecem usuários da equipe ainda sem colaborador. Crie o usuário no Supabase e defina o perfil na aba Usuários.":null),ativo.wrap,pontoChk.wrap,field("co-jorn","Jornada diária (horas, para o ponto)",jorn),field("co-resp","Responsabilidades",resp));
-  const extra=(c.id&&souAdmin)?el("button",{class:"btn danger",onclick:async()=>{if(!confirmInline(body,"Excluir este colaborador? Horas e tarefas dele perdem o vínculo."))return;const {error}=await SB.from("colaboradores").delete().eq("id",c.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível excluir (há registros vinculados? prefira inativar)":"Colaborador excluído");E.ok=false;garantir()}},"Excluir"):null;
+  const v3=equipeV3();
+  const body=v3
+    ?el("div",{class:"form"},
+      NPUI.secaoForm("Dados pessoais"),
+      field("co-nome","Nome",nome),field("co-apelido","Apelido",apelido),field("co-email","E-mail",email),field("co-tel","Telefone",tel),field("co-zap","WhatsApp",zap,"Usado só se o canal do resumo for WhatsApp."),
+      NPUI.secaoForm("Vínculo e atuação"),
+      field("co-cargo","Cargo",cargo),field("co-nuc","Núcleo",nuc),field("co-frente","Frente (gestão de passivos)",frente,"Responsável padrão desta frente nos clientes."),field("co-adm","Data de admissão",adm),field("co-oab","OAB",oab),
+      field("co-perfil","Usuário do sistema",perfil,souAdmin?"Só aparecem usuários da equipe ainda sem colaborador.":null),ativo.wrap,
+      NPUI.maisCampos("Agenda, notificações, ponto e perfil",[
+        field("co-canal","Canal do resumo diário",canal),resumo.wrap,
+        field("co-discord","Discord (ID do usuário)",discord,"Configurações → Avançado → Modo desenvolvedor → Copiar ID."),
+        field("co-gcal","Agenda Google (e-mail)",gcal,"Vazio = usa o e-mail principal."),gsync.wrap,
+        pontoChk.wrap,field("co-jorn","Jornada diária (horas)",jorn),field("co-desl","Data de desligamento",desl),
+        field("co-nasc","Nascimento",nasc,"Só dia e mês aparecem para a equipe."),field("co-cidade","Cidade",cidade),field("co-linkedin","LinkedIn",linkedin),
+        field("co-bio","Sobre",bio),field("co-resp","Responsabilidades",resp)
+      ],{contador:"auto"}))
+    :el("div",{class:"form"},field("co-nome","Nome",nome),field("co-cargo","Cargo",cargo),field("co-nuc","Núcleo",nuc),field("co-frente","Frente (gestão de passivos)",frente,"Responsável padrão desta frente nos clientes. Exceções por cliente no Dossiê."),field("co-adm","Data de admissão",adm),field("co-desl","Data de desligamento",desl),
+      field("co-email","E-mail",email),field("co-tel","Telefone",tel),field("co-zap","WhatsApp",zap,"Usado só se o canal do resumo for WhatsApp."),field("co-discord","Discord (ID do usuário)",discord,"No Discord: Configurações → Avançado → Modo desenvolvedor; depois clique com o direito no nome → Copiar ID do usuário."),field("co-canal","Canal do resumo diário",canal),resumo.wrap,field("co-gcal","Agenda Google (e-mail)",gcal,"Conta Workspace do escritório. Gmail pessoal só funciona se a agenda for compartilhada com a conta de serviço do painel."),gsync.wrap,field("co-oab","OAB",oab),field("co-apelido","Apelido",apelido),field("co-nasc","Nascimento",nasc,"Só dia e mês aparecem para a equipe (aniversariantes)."),field("co-cidade","Cidade",cidade),field("co-linkedin","LinkedIn",linkedin),field("co-bio","Sobre",bio),field("co-perfil","Usuário do sistema",perfil,souAdmin?"Só aparecem usuários da equipe ainda sem colaborador. Crie o usuário no Supabase e defina o perfil na aba Usuários.":null),ativo.wrap,pontoChk.wrap,field("co-jorn","Jornada diária (horas, para o ponto)",jorn),field("co-resp","Responsabilidades",resp));
+  const extra=(c.id&&souAdmin)?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir colaborador?",mensagem:`Remover ${c.nome||"este colaborador"}? Horas e tarefas vinculadas perdem o vínculo (prefira inativar).`,confirmar:"Excluir colaborador",perigo:true,onSim:async()=>{const {error}=await SB.from("colaboradores").delete().eq("id",c.id);$("#modalHost").replaceChildren();toast(error?"Não foi possível excluir (há registros vinculados? prefira inativar)":"Colaborador excluído");E.ok=false;garantir()}})}} ,"Excluir"):null;
   modal(c.id?"Editar colaborador":"Novo colaborador",body,async()=>{
-    if(!nome.value.trim())throw new Error("Informe o nome");
+    if(!nome.value.trim()){const e=new Error("Informe o nome");e.campo=nome;throw e}
     const basicos={apelido:apelido.value.trim()||null,data_nascimento:nasc.value||null,cidade:cidade.value.trim()||null,linkedin:linkedin.value.trim()||null,bio:bio.value.trim()||null};
     const row=ro?{nome:nome.value.trim(),email:email.value.trim()||null,telefone:tel.value.trim()||null,whatsapp:zap.value.trim()||null,discord_user_id:discord.value.trim()||null,canal_resumo:canal.value,resumo_diario:resumo.input.checked,google_calendar_id:gcal.value.trim()||null,agenda_sync:gsync.input.checked,...basicos}
       :{...basicos,nome:nome.value.trim(),cargo:cargo.value.trim()||null,nucleo:nuc.value||null,frente:frente.value||null,data_admissao:adm.value||null,data_desligamento:desl.value||null,email:email.value.trim()||null,telefone:tel.value.trim()||null,whatsapp:zap.value.trim()||null,discord_user_id:discord.value.trim()||null,canal_resumo:canal.value,resumo_diario:resumo.input.checked,google_calendar_id:gcal.value.trim()||null,agenda_sync:gsync.input.checked,oab:oab.value.trim()||null,responsabilidades:resp.value.trim()||null,perfil_id:perfil.value||null,ativo:ativo.input.checked&&!desl.value,registra_ponto:pontoChk.input.checked,jornada_minutos:jorn.value?Math.round(+jorn.value*60):null};
     const {error}=c.id?await SB.from("colaboradores").update(row).eq("id",c.id):await SB.from("colaboradores").insert(row);
     if(error)throw new Error(error.code==="23505"?"Este usuário já está vinculado a outro colaborador":"Não foi possível salvar");
     toast("Colaborador salvo");E.ok=false;garantir();window.PP_RH?.invalidar();
-  },extra);
+  },extra,{confirmar:c.id?"Salvar colaborador":"Cadastrar colaborador"});
 }
 window.PP_EQUIPE={openColabForm,get lista(){return E.lista},recarregar(){E.ok=false;garantir()},NUCLEOS};
 

@@ -60,19 +60,13 @@ function excluirArtigo(a){
     if(error){toast("Só o administrador exclui");throw error;}
     toast("Artigo excluído");K.sel=null;K.art=null;K.editando=false;K.ok=false;await carregar();
   };
-  if(kbV3()&&NPUI.confirmar){
-    NPUI.confirmar({
-      titulo:"Excluir artigo da base?",
-      texto:`O artigo "${a.titulo||"Sem título"}" e todas as suas versões anteriores serão removidos permanentemente.`,
-      rotuloSim:"Excluir artigo",
-      rotuloNao:"Cancelar",
-      perigo:true,
-      onSim:executar
-    });
-    return;
-  }
-  if(!confirm("Excluir este artigo e todas as versões?"))return;
-  executar().catch(()=>{});
+  npConfirmar({
+    titulo:"Excluir artigo da base?",
+    mensagem:`O artigo "${a.titulo||"Sem título"}" e todas as suas versões anteriores serão removidos permanentemente.`,
+    confirmar:"Excluir artigo",
+    perigo:true,
+    onSim:executar
+  }).catch(()=>{});
 }
 
 function renderConhecimentoV3(v){

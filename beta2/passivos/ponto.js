@@ -33,20 +33,26 @@ function cardPainel(){
   const dia=PT.dias.find(d=>d.dia===hojeISO());
   const status=ultimo===""?"Entrada ainda não registrada hoje.":ultimo==="saida"?"Jornada de hoje encerrada.":ultimo==="saida_intervalo"?"Em intervalo.":"Trabalhando.";
   const total=PT.dias.reduce((s,d)=>s+(+d.minutos||0),0),saldo=PT.dias.reduce((s,d)=>s+(+d.saldo_min||0),0);
+  const confirmarBatida=(tipo,comHora)=>npConfirmar({
+    titulo:`Registrar ${TIPO[tipo]}?`,
+    mensagem:`Registrar “${TIPO[tipo]}” agora${comHora?` (${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})})`:""}?`,
+    confirmar:`Registrar ${TIPO[tipo].toLowerCase()}`,
+    onSim:()=>bater(tipo)
+  });
   if(pontoV3()){
-    const outros=Object.keys(TIPO).filter(t=>t!==prox).map(t=>({label:TIPO[t],onclick:()=>{if(window.confirm(`Registrar "${TIPO[t]}" agora?`))bater(t)}}));
+    const outros=Object.keys(TIPO).filter(t=>t!==prox).map(t=>({label:TIPO[t],onclick:()=>{confirmarBatida(t,false)}}));
     const btnMais=NPUI.btn("Outra marcação ▾",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,outros,{label:"Outra marcação",alinhar:"dir"})});
     return el("section",{class:"np-ponto-bar pt-painel"},
       el("div",{class:"info"},
         el("b",{},"Meu ponto · ",status),
         el("span",{},(meus.length?"Hoje: "+meus.map(p=>`${hm(p.momento)} ${TIPO[p.tipo]}`).join(" · "):"Sem marcações hoje")+(dia?` · ${horas(dia.minutos)} trabalhadas`:"")+` · Mês: ${horas(total)} · saldo ${horas(saldo)}`)),
       el("div",{class:"acoes"},
-        NPUI.btn(TIPO[prox],{variante:"pri",onclick:()=>{if(window.confirm(`Registrar "${TIPO[prox]}" agora (${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})})?`))bater(prox)}}),
+        NPUI.btn(TIPO[prox],{variante:"pri",onclick:()=>{confirmarBatida(prox,true)}}),
         btnMais,
         NPUI.btn("Espelho",{variante:"ghost",onclick:()=>irPara("ponto")})));
   }
-  const btn=el("button",{class:"btn primary",style:"font-size:15px;padding:12px 22px",onclick:()=>{if(window.confirm(`Registrar "${TIPO[prox]}" agora (${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})})?`))bater(prox)}},"⏱ "+TIPO[prox]);
-  const outros=Object.keys(TIPO).filter(t=>t!==prox).map(t=>el("button",{class:"btn sm",onclick:()=>{if(window.confirm(`Registrar "${TIPO[t]}" agora?`))bater(t)}},TIPO[t]));
+  const btn=el("button",{class:"btn primary",style:"font-size:15px;padding:12px 22px",onclick:()=>{confirmarBatida(prox,true)}},"⏱ "+TIPO[prox]);
+  const outros=Object.keys(TIPO).filter(t=>t!==prox).map(t=>el("button",{class:"btn sm",onclick:()=>{confirmarBatida(t,false)}},TIPO[t]));
   return el("section",{class:"card section pt-painel"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Meu ponto"),el("div",{class:"note"},status)),el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>irPara("ponto")},"Espelho do mês"))),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"},btn,el("div",{class:"note"},"Outra marcação: "),...outros),
     el("div",{class:"note",style:"margin-top:8px"},meus.length?"Hoje: "+meus.map(p=>`${hm(p.momento)} ${TIPO[p.tipo]}`).join(" · "):"Sem marcações hoje.",dia?` · ${horas(dia.minutos)} trabalhadas`:""),
@@ -139,7 +145,7 @@ async function ajustar(d){
   const lista=el("div",{style:"display:grid;gap:6px"});
   for(const p of (ps||[])){const t=inp("time",new Date(p.momento).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));const tp=sel(TIPO,p.tipo);
     lista.append(el("div",{style:"display:flex;gap:6px;align-items:center"},tp,t,el("button",{class:"btn sm",onclick:async()=>{const {error}=await SB.from("pontos").update({tipo:tp.value,momento:new Date(d.dia+"T"+t.value+":00-03:00").toISOString(),ajustado_por:PP.perfil.id,ajustado_em:new Date().toISOString()}).eq("id",p.id);toast(error?"Não foi possível":"Ajustado");PT.ok=false;render()}},"Salvar"),
-      el("button",{class:"btn sm danger",onclick:async()=>{if(!window.confirm("Excluir esta marcação?"))return;await SB.from("pontos").delete().eq("id",p.id);toast("Excluída");$("#modalHost").replaceChildren();PT.ok=false;render()}},"×"),p.ajustado_em?el("span",{class:"note"},"ajustada"):null))}
+      el("button",{class:"btn sm danger",onclick:()=>{npConfirmar({titulo:"Excluir marcação de ponto?",mensagem:`Remover a marcação de ${TIPO[p.tipo]||p.tipo} (${hm(p.momento)}) de ${d.colaborador_nome}?`,confirmar:"Excluir marcação",perigo:true,onSim:async()=>{const {error}=await SB.from("pontos").delete().eq("id",p.id);if(error)throw error;toast("Excluída");$("#modalHost").replaceChildren();PT.ok=false;render()}})}},"×"),p.ajustado_em?el("span",{class:"note"},"ajustada"):null))}
   const nt=sel(TIPO,"entrada"),nh=inp("time","09:00"),obs=inp("text","",{placeholder:"motivo (ex.: esqueceu de bater)"});
   const body=el("div",{},el("div",{class:"note",style:"margin-bottom:8px"},`${d.colaborador_nome} — ${fmtD(parseD(d.dia))}`),lista,el("div",{class:"form",style:"margin-top:12px"},field("pt-nt","Incluir marcação",nt),field("pt-nh","Hora",nh),field("pt-obs","Observação",obs)));
   modal("Ajustar ponto",body,async()=>{const {error}=await SB.from("pontos").insert({colaborador_id:d.colaborador_id,tipo:nt.value,momento:new Date(d.dia+"T"+nh.value+":00-03:00").toISOString(),origem:"ajuste",obs:obs.value.trim()||null,ajustado_por:PP.perfil.id,ajustado_em:new Date().toISOString()});if(error)throw new Error(error.message);toast("Marcação incluída");PT.ok=false;render()});
