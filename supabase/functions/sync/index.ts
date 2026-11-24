@@ -3,6 +3,7 @@
 //   /sync/webhook   ← fornecedor. Sem JWT; vale a assinatura HMAC-SHA256 (cabeçalho X-Webhook-Signature) com SYNC_WEBHOOK_SECRET.
 //                     DESLIGADA por padrão: só responde com SYNC_WEBHOOK_ATIVO=1 (a ligar depois de confirmado, em teste real, o formato da assinatura).
 //   /sync/agendado  ← pg_cron (Bearer do token das automações, conferido por automacoes_token_valido): mesma consulta do /puxar, sem pessoa.
+//   /sync/carteira  ← painel (JWT de quem é do Jurídico): atualiza o retrato dos autos (capa, partes, movimentos, documentos, audiências) de até 40 processos.
 //   /sync/puxar     ← painel (JWT de quem é do Jurídico ou administradora): consulta as intimações e os prazos da janela configurada.
 //   /sync/testar    ← painel (JWT da administradora): confere a chave com GET /v1/conta. Funciona com a integração desligada.
 //   /sync/amostra   ← painel (JWT da administradora): consulta até 5 registros e devolve só os nomes e tipos dos campos, para
@@ -12,7 +13,7 @@
 // Sem SYNC_API_KEY a função responde "sem_credencial"; sem SYNC_WEBHOOK_SECRET todo webhook é recusado.
 // Só leitura no fornecedor: esta função não chama nenhuma rota de escrita do Sync (tratar, ciência, monitorar, importar).
 // Deploy com "Verify JWT" desligado (o webhook não tem JWT); cada rota faz a própria autenticação.
-import { amostrar, clienteSync, puxar, receberWebhook, testarConexao } from "./adaptador.mjs";
+import { amostrar, clienteSync, puxar, puxarCarteira, receberWebhook, testarConexao } from "./adaptador.mjs";
 
 type Dict = Record<string, unknown>;
 const env = (n: string) => Deno.env.get(n) ?? "";
@@ -74,12 +75,17 @@ Deno.serve(async (req) => {
       const v = await rpcComo(SERVICE, SERVICE, "automacoes_token_valido", { token: tk }).catch(() => false);
       if (v !== true) return json(401, { erro: "token" }, false);
       const r = await puxar({ db, cliente, origem: "agendada" });
-      return json(200, { status: r.status, resumo: r.resumo ?? null }, false);
+      const k = await puxarCarteira({ db, cliente, limite: 40 }).catch(() => ({ status: "erro" }));   // autos: capa, partes, movimentos, documentos e audiências
+      return json(200, { status: r.status, resumo: r.resumo ?? null, carteira: k }, false);
     }
     const p = await quem(req);
     if (!p) return json(401, { erro: "sem_login" });
     if (rota === "testar") { if (!p.admin) return json(403, { erro: "so_administradora" }); return json(200, await testarConexao({ db, cliente })); }
     if (rota === "amostra") { if (!p.admin) return json(403, { erro: "so_administradora" }); return json(200, await amostrar({ db, cliente })); }   // só a forma das respostas, sem conteúdo
+    if (rota === "carteira") {   // retrato dos autos por processo; até 40 por chamada (a tela repete enquanto houver restantes)
+      if (!p.juridico) return json(403, { erro: "so_juridico" });
+      return json(200, await puxarCarteira({ db, cliente, limite: 40 }));
+    }
     if (rota === "puxar") { if (!p.juridico) return json(403, { erro: "so_juridico" }); const r = await puxar({ db, cliente, origem: "manual", por: p.id }); return json(200, { status: r.status, resumo: r.resumo ?? null, categoria: r.categoria ?? null }); }
     return json(404, { erro: "rota" });
   } catch (_e) {

@@ -314,3 +314,74 @@ export async function receberWebhook({ db, cliente, corpoBruto, assinatura, segr
   await db.rpc("sync_evento_concluir", { p_id: ev.id, p_status: r.status === "erro" ? "erro" : "processado", p_resultado: { execucao: r.execucao, resumo: r.resumo || {} }, p_erro: r.status === "erro" ? r.categoria : null });
   return { http: r.status === "erro" ? 202 : 200, status: r.status === "erro" ? "aceito_com_falha" : "processado", resumo: r.resumo };
 }
+
+
+// ---------- carteira: o que o Sync lê DOS AUTOS de cada processo (capa, partes, movimentos, documentos, audiências) ----------
+// Um retrato por processo, gravado por sync_receber_processo. Não cria andamento, tarefa nem aviso; a capa só preenche campo vazio.
+const NOSSO = /neves\s+de\s+p[aá]dua|488\.?803/i;   // advogado do escritório: diz de que lado estamos
+const curto = (v, n) => (v === undefined || v === null ? null : String(v).slice(0, n));
+export function mapearProcesso(det, audExtra = []) {
+  if (!det || typeof det !== "object") return null;
+  const numero = String(det.numero ?? "").replace(/\D/g, ""); if (numero.length !== 20) return null;
+  const ladoAtivo = NOSSO.test(String(det.advogados_ativo ?? "")), ladoPassivo = NOSSO.test(String(det.advogados_passivo ?? ""));
+  const polo = ladoAtivo && !ladoPassivo ? "ativo" : ladoPassivo && !ladoAtivo ? "passivo" : null;
+  const movimentos = (Array.isArray(det.movimentos) ? det.movimentos : []).map((m) => ({ data: comoData(m?.data), descricao: curto(m?.descricao, 600), grau: m?.grau ?? null })).filter((m) => m.data || m.descricao);
+  const documentos = (Array.isArray(det.documentos) ? det.documentos : []).map((d) => ({ id: d?.id ?? null, tipo: curto(d?.tipo, 80), nome: curto(d?.nome, 200), data: comoData(d?.data_juntada), lido: d?.tem_markdown === true, grau: d?.grau ?? null }));
+  const partes = (Array.isArray(det.partes) ? det.partes : []).map((x) => ({ polo: x?.polo ?? null, nome: curto(x?.nome, 200), documento: x?.sigiloso ? null : curto(x?.cpf_cnpj, 20), tipo: x?.tipo_pessoa ?? null, advogados: curto(x?.advogados, 400) }));
+  const audBrutas = [...(Array.isArray(det.audiencias) ? det.audiencias : []), ...audExtra];
+  const audiencias = []; for (const a of audBrutas) { const data = a?.data_audiencia ?? a?.data ?? a?.inicio ?? null; if (!data) continue;
+    const item = { data: String(data), descricao: curto(a?.descricao ?? a?.tipo ?? "Audiência", 300) }; if (!audiencias.some((x) => x.data === item.data)) audiencias.push(item); }
+  const datasMov = movimentos.map((m) => m.data).filter(Boolean).sort();
+  return {
+    numero, polo,
+    capa: { tribunal: det.tribunal ?? null, orgao_julgador: det.orgao_julgador ?? null, comarca: det.comarca ?? null, classe: det.classe ?? null, assunto: det.assunto ?? null,
+      valor_causa: typeof det.valor_causa === "number" ? det.valor_causa : null, data_distribuicao: comoData(det.data_distribuicao), grau: det.grau ?? null, sistema: det.sistema ?? null,
+      polo_ativo: curto(det.polo_ativo, 300), polo_passivo: curto(det.polo_passivo, 300), advogados_ativo: curto(det.advogados_ativo, 400), advogados_passivo: curto(det.advogados_passivo, 400),
+      segredo_justica: det.segredo_justica === true, segredo_sem_acesso: det.segredo_sem_acesso ?? null, baixado: det.baixado === true },
+    parte_contraria: polo === "ativo" ? curto(det.polo_passivo, 300) : polo === "passivo" ? curto(det.polo_ativo, 300) : null,
+    advogado_contrario: polo === "ativo" ? curto(det.advogados_passivo, 300) : polo === "passivo" ? curto(det.advogados_ativo, 300) : null,
+    partes, movimentos, documentos, audiencias,
+    ultima_decisao: comoData(det.ultima_decisao), ultimo_andamento: datasMov.length ? datasMov[datasMov.length - 1] : null,
+    sincronizado_fonte: det.ultima_sincronizacao ?? null,
+  };
+}
+
+// Busca a lista da carteira e atualiza, por vez, até `limite` processos cujo retrato está desatualizado (ou não existe).
+// Processo do Sync que não está cadastrado no sistema é só contado (fora_da_base): nada é criado.
+export async function puxarCarteira({ db, cliente, limite = 40, paralelo = 4, itens = 200, maxPaginas = 10 }) {
+  const { ativo, config } = await integracao(db);
+  if (!ativo) return { status: "desligada" };
+  if (config.contrato_confirmado !== true) return { status: "aguardando_contrato" };
+  const r = { na_carteira: 0, fora_da_base: 0, em_dia: 0, atualizados: 0, capas_preenchidas: 0, erros: 0, restantes: 0 };
+  try {
+    const api = cliente(); const lista = [];
+    for (let pagina = 1; pagina <= maxPaginas; pagina++) {
+      const { corpo } = await api.get("/v1/processos", { itens, pagina, bloqueados: false });
+      const lote = Array.isArray(corpo?.processos) ? corpo.processos : []; lista.push(...lote); if (lote.length < itens) break;
+    }
+    r.na_carteira = lista.length;
+    const estado = (await db.rpc("sync_carteira_estado")) || {};
+    const audPor = new Map();
+    try { const { corpo } = await api.get("/v1/dashboard"); for (const a of corpo?.audiencias?.proximas || []) { const k = String(a?.processo ?? "").replace(/\D/g, ""); if (k) audPor.set(k, [...(audPor.get(k) || []), a]); } } catch { /* sem o painel, seguem só as audiências do detalhe */ }
+    const pend = [];
+    for (const it of lista) {
+      const k = String(it?.numero ?? "").replace(/\D/g, ""); if (k.length !== 20) continue;
+      if (!(k in estado)) { r.fora_da_base++; continue; }
+      const nosso = estado[k] ? Date.parse(estado[k]) : 0, deles = it?.ultima_sincronizacao ? Date.parse(it.ultima_sincronizacao) : 0;
+      if (nosso && deles && deles <= nosso && !audPor.has(k)) { r.em_dia++; continue; }
+      pend.push({ k, deles });
+    }
+    pend.sort((a, b) => a.deles - b.deles);
+    const agora = pend.slice(0, Math.max(1, limite)); r.restantes = pend.length - agora.length;
+    let i = 0;
+    const trabalhar = async () => { while (i < agora.length) { const { k } = agora[i++];
+      try { const { corpo } = await api.get("/v1/processos/" + k); const item = mapearProcesso(corpo, audPor.get(k) || []);
+        if (!item) { r.erros++; continue; }
+        const res = await db.rpc("sync_receber_processo", { p: item }); if (res === "ok" || res === "ok_capa") { r.atualizados++; if (res === "ok_capa") r.capas_preenchidas++; } else r.erros++;
+      } catch (e) { if (e instanceof ErroSync && ["credencial", "plano", "sem_credencial"].includes(e.categoria)) throw e; r.erros++; } } };
+    await Promise.all(Array.from({ length: Math.max(1, paralelo) }, trabalhar));
+    return { status: r.erros ? "parcial" : "ok", resumo: r };
+  } catch (e) {
+    return { status: "erro", categoria: e instanceof ErroSync ? e.categoria : "interno", resumo: r };
+  }
+}

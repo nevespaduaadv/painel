@@ -185,7 +185,10 @@ function fontesPub(){
       if(j.status==="desligada"){toast("A integração está desligada.");return}
       if(j.status==="aguardando_contrato"){toast("A integração ainda não foi liberada para trazer publicações.");return}
       toast(j.status==="erro"?"A sincronização falhou"+(j.categoria?" ("+j.categoria+")":""):`Sincronizado: ${z.novas||0} nova(s), ${z.prazos_sugeridos||0} prazo(s) sugerido(s)`+(j.status==="parcial"?" (parcial)":""));
-      NPUI.fecharPop();await recarregar()});
+      NPUI.fecharPop();await recarregar();
+      /* autos (capa, partes, movimentos, documentos, audiências): em lotes, até acabar ou o servidor parar de avançar */
+      try{let voltas=0,tot=0;for(;;){const k=await chamar("carteira");const zz=k.resumo||{};tot+=zz.atualizados||0;if(k.status==="erro"||!(zz.restantes>0)||!(zz.atualizados>0)||++voltas>=12)break}
+        if(tot){toast(`Autos atualizados em ${tot} processo(s)`);window.PP_PROCESSO_SYNC?.invalidar?.();window.PP_PROCESSOS?.recarregar?.()}}catch(_){}});
     const alternar=e=>{const btn=e.currentTarget,ligar=!y.ativo;NPUI.confirmar({titulo:ligar?"Ligar a integração com o Sync?":"Desligar a integração com o Sync?",
       texto:ligar?"O sistema volta a buscar intimações e prazos sugeridos no AtendeDireito Sync.":"O sistema para de buscar no Sync. O que já foi trazido continua no sistema.",rotuloSim:ligar?"Ligar":"Desligar",origem:btn,
       onSim:async()=>{const {error}=await SB.rpc("sync_definir",{p_ativo:ligar,p_config:null});if(error){toast("Não foi possível alterar: "+(error.message||""));return}toast(ligar?"Integração ligada":"Integração desligada");NPUI.fecharPop();await carregarSync();render()}})};
