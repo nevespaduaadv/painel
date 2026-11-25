@@ -6,7 +6,9 @@ const N={lista:[],ok:false,aberto:false};
 let btn=null,badge=null,pop=null;
 const fmt=v=>{const d=new Date(v),h=(Date.now()-d)/36e5;if(h<1)return`${Math.max(1,Math.round(h*60))} min`;if(h<24)return`${Math.round(h)} h`;return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})};
 async function carregar(){
-  const {data,error}=await SB.from("notificacoes").select("*").order("criado_em",{ascending:false}).limit(30);
+  // Comercial e Atendimento saíram do sistema jurídico (25/11/2026): os avisos dessas áreas (links #atendimento, #leads,
+  // #comercial, #automacoes) não entram no sino nem na contagem. Continuam gravados no banco, para o CRM.
+  const {data,error}=await SB.from("notificacoes").select("*").or("link.is.null,and(link.not.like.#atendimento*,link.not.like.#leads*,link.not.like.#comercial*,link.not.like.#automacoes*)").order("criado_em",{ascending:false}).limit(30);
   if(error){console.warn("notificacoes",error);return}
   N.lista=data||[];N.ok=true;pintar();
 }
@@ -73,7 +75,7 @@ function montar(){
 function tempoReal(){
   const ch=SB.channel("notificacoes");
   let t=null;
-  ch.on("postgres_changes",{event:"*",schema:"public",table:"notificacoes"},()=>{clearTimeout(t);t=setTimeout(carregar,300)});
+  ch.on("postgres_changes",{event:"*",schema:"public",table:"notificacoes"},(p)=>{if(/^#(atendimento|leads|comercial|automacoes)/.test(p?.new?.link||""))return;clearTimeout(t);t=setTimeout(carregar,300)});
   ch.subscribe();
 }
 window.PP_NOTIF={montar,carregar,lista:()=>N.lista};
