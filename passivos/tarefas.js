@@ -40,28 +40,64 @@ const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${Str
 const addD=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return iso(d)};
 const horasFmt=h=>{h=+h||0;const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm?`${hh}h${String(mm).padStart(2,"0")}`:`${hh}h`};
 
-const T={tarefas:[],colab:[],processos:[],ok:false,carregando:false,f:{status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false},
+const JANELA_DIAS=30; // fechadas (feitas/canceladas) mais antigas que isto só vêm sob pedido: "Carregar anteriores" ou a aba Tarefas do cliente
+const SEM_RESP="__sem"; // valor do seletor "Ver tarefas de": tarefas sem responsável
+const T={tarefas:[],colab:[],processos:[],ok:false,carregando:false,antigas:new Set(),cliOk:new Set(),respIni:false,f:{status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false},
          ap:{data:hojeISO(),colab:null,semana:null,lista:[],periodoIni:null,periodoFim:null,rel:null,pont:[]}};
 
 /* ---------- Dados ---------- */
 async function carregar(){
   if(T.carregando)return;T.carregando=true;
   try{
-    /* v_tarefas vem em páginas de 1000: a API corta a resposta em 1000 linhas e, sem isso, a tela mostrava só as mais antigas
-       (com o histórico trazido do ADVBox, as tarefas abertas ficavam de fora). */
-    const todasTarefas=async()=>{let out=[];for(let i=0;;i+=1000){const {data,error}=await SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}).order("id").range(i,i+999);if(error)return {data:null,error};out=out.concat(data||[]);if((data||[]).length<1000)break}return {data:out,error:null}};
+    /* Carga leve: todas as abertas + as fechadas dos últimos JANELA_DIAS dias (feita: pela data de conclusão; cancelada: pela última
+       alteração). O histórico mais antigo fica no banco e só vem quando alguém pede. Em páginas de 1000 (limite da API). */
+    const desde=addD(hojeISO(),-JANELA_DIAS)+"T00:00:00-03:00";
+    const todasTarefas=async()=>{const [a,f]=await Promise.all([
+        npTodas(()=>SB.from("v_tarefas").select("*").in("status",["aberta","em_andamento"]).order("prazo",{ascending:true,nullsFirst:false}).order("id")),
+        npTodas(()=>SB.from("v_tarefas").select("*").or(`and(status.eq.concluida,concluida_em.gte.${desde}),and(status.eq.cancelada,updated_at.gte.${desde})`).order("id"))]);
+      if(a.error||f.error)return {data:null,error:a.error||f.error};return {data:[...new Map(a.data.concat(f.data).map(l=>[l.id,l])).values()],error:null}};
     const [t,c,p,tk,mo]=await Promise.all([todasTarefas(),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),npTodas(()=>SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria").order("id")),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
     if(t.error)throw t.error;
-    T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;T.erro=null;
+    T.tarefas=t.data;T.antigas=new Set();T.cliOk=new Set();T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;T.erro=null;
+    // primeira carga: quem pode ver tarefas de outros começa vendo só as próprias (o seletor "Ver tarefas de" troca a pessoa)
+    if(!T.respIni){T.respIni=true;const e=PP.escopoTarefas?.()||{tudo:true},m=meuColab();if((e.tudo||e.nucleos)&&m&&!T.f.resp&&!T.f.cliente)T.f.resp=m.id}
   }catch(e){console.warn("tarefas",e);T.erro=String(e.message||e);toast("Não foi possível carregar as tarefas")}
   finally{T.carregando=false}
   render();
 }
 function garantir(){if(!T.ok&&!T.carregando)carregar();return T.ok}
+const juntar=linhas=>{const m=new Map(T.tarefas.map(t=>[t.id,t]));for(const l of linhas||[])m.set(l.id,l);T.tarefas=[...m.values()]};
+const filtroPadrao=()=>{const e=PP.escopoTarefas?.()||{tudo:true},m=meuColab();return {status:"abertas",resp:(e.tudo||e.nucleos)&&m?m.id:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false}};
+/* histórico anterior à janela, sob pedido: de uma pessoa (seletor), das sem responsável ou de todos ("") */
+const chaveAntigas=resp=>resp||"*";
+const antigasOk=resp=>T.antigas.has("*")||T.antigas.has(chaveAntigas(resp));
+async function carregarAnteriores(resp){
+  const desde=addD(hojeISO(),-JANELA_DIAS)+"T00:00:00-03:00";
+  const {data,error}=await npTodas(()=>{let q=SB.from("v_tarefas").select("*").or(`and(status.eq.concluida,or(concluida_em.lt.${desde},concluida_em.is.null)),and(status.eq.cancelada,updated_at.lt.${desde})`);
+    if(resp===SEM_RESP)q=q.is("responsavel_id",null);else if(resp)q=q.eq("responsavel_id",resp);return q.order("id")});
+  if(error){toast("Não foi possível carregar as tarefas anteriores");return false}
+  juntar(data);T.antigas.add(chaveAntigas(resp));return true;
+}
+/* aba Tarefas do cliente: traz as fechadas daquele cliente (uma vez por carga) */
+async function carregarCliente(cid){
+  if(!cid||T.cliOk.has(cid)||T.antigas.has("*"))return;T.cliOk.add(cid);
+  const {data,error}=await npTodas(()=>SB.from("v_tarefas").select("*").eq("cliente_id",cid).in("status",["concluida","cancelada"]).order("id"));
+  if(error){T.cliOk.delete(cid);return}
+  if((data||[]).some(l=>!T.tarefas.some(t=>t.id===l.id))){juntar(data);render()}
+}
+/* tempo real: em vez de recarregar tudo, busca só as linhas que mudaram */
+const rtIds=new Set();
+async function aplicarMudancas(){
+  const ids=[...rtIds];rtIds.clear();if(!ids.length||!T.ok)return;
+  if(ids.length>80){T.ok=false;garantir();return}
+  const {data,error}=await SB.from("v_tarefas").select("*").in("id",ids);
+  if(error){T.ok=false;garantir();return}
+  const vivos=new Set((data||[]).map(l=>l.id));T.tarefas=T.tarefas.filter(t=>!ids.includes(t.id)||vivos.has(t.id));juntar(data);render();
+}
 let rtT=null;
 function tempoReal(){
   const ch=SB.channel("tarefas");
-  ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},()=>{clearTimeout(rtT);rtT=setTimeout(()=>{T.ok=false;garantir()},400)});
+  ch.on("postgres_changes",{event:"*",schema:"public",table:"tarefas"},(p)=>{const id=p?.new?.id||p?.old?.id;clearTimeout(rtT);if(!id||!T.ok){rtT=setTimeout(()=>{T.ok=false;garantir()},400);return}rtIds.add(id);rtT=setTimeout(aplicarMudancas,400)});
   ch.on("postgres_changes",{event:"*",schema:"public",table:"apontamentos_horas"},()=>{clearTimeout(rtT);rtT=setTimeout(()=>{T.ok=false;if(S.tab==="horas")carregarHoras();else garantir()},400)});
   ch.subscribe();
 }
@@ -78,9 +114,10 @@ function csv(nome,linhas,colunas){
 
 /* ---------- Lista de tarefas ---------- */
 const escopoOk=t=>{const e=PP.escopoTarefas?.()||{tudo:true};if(e.tudo)return true;const meu=T.colab.find(c=>c.perfil_id===PP.perfil?.id);const minha=(meu&&t.responsavel_id===meu.id)||t.created_by===PP.perfil?.id;return minha||(e.nucleos||[]).includes(t.nucleo)};
+const respOk=(t,resp)=>!resp||(resp===SEM_RESP?!t.responsavel_id:t.responsavel_id===resp);
 function filtrar(lista,f){
   return lista.filter(t=>escopoOk(t)&&(f.status==="abertas"?t.status==="aberta"||t.status==="em_andamento":f.status==="todas"?true:t.status===f.status)
-    &&(!f.resp||t.responsavel_id===f.resp)&&(!f.nucleo||t.nucleo===f.nucleo)&&(!f.cliente||t.cliente_id===f.cliente)&&(!f.fatais||t.prazo_fatal)&&(!f.atrasadas||t.faixa==="atrasada")&&(!f.semResp||!t.responsavel_id)
+    &&respOk(t,f.resp)&&(!f.nucleo||t.nucleo===f.nucleo)&&(!f.cliente||t.cliente_id===f.cliente)&&(!f.fatais||t.prazo_fatal)&&(!f.atrasadas||t.faixa==="atrasada")&&(!f.semResp||!t.responsavel_id)
     &&(tarefasV3()||!TICKETS_ATIVOS||!f.tickets||(f.tickets==="minhas"?(ticketDe(t)&&minhasAreas().includes(ticketDe(t).aguardando_area)):!!ticketDe(t))));
 }
 function linhaTarefa(t,{mostrarCliente=true}={}){
@@ -156,6 +193,7 @@ document.head.append(el("style",{},`.kb{display:grid;grid-template-columns:repea
 function renderTarefasCliente(c,host){
   host.append(el("div",{class:"section-h"},el("h2",{},"Tarefas"),el("div",{class:"actions"},el("button",{class:"btn sm primary",onclick:()=>openTarefaForm({cliente_id:c.id})},"+ Tarefa"))));
   if(!garantir()){host.append(el("div",{class:"note"},"Carregando…"));return}
+  carregarCliente(c.id); // fechadas antigas deste cliente (fora da janela da tela geral)
   const ts=T.tarefas.filter(t=>t.cliente_id===c.id);
   const abertas=ts.filter(t=>t.status==="aberta"||t.status==="em_andamento");
   host.append(el("div",{class:"note"},`${abertas.length} aberta${abertas.length===1?"":"s"} · ${ts.length-abertas.length} fechada${ts.length-abertas.length===1?"":"s"}`));
@@ -560,7 +598,7 @@ function listaV3(lista,opts){
   /* feitas há pouco (nesta sessão) continuam visíveis como faixa "feita · Reabrir" mesmo quando o filtro é "abertas" — inclusive quando era a última da lista */
   const agora=Date.now();let recentes=0;for(const [id,r] of V3.recem){if(agora-r.quando>10*60000){V3.recem.delete(id);continue}const t=T.tarefas.find(x=>x.id===id);if(!t||t.status!=="concluida"){V3.recem.delete(id);continue}
     if(!lista.some(x=>x.id===id)){recentes++;const li=el("li",{class:"np-it np-it-feita","data-id":id,role:"status"});NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(id);toast("Tarefa reaberta");T.ok=false;carregar()}catch(e){toast(e.message)}}});host.append(el("ul",{class:"np-lst",role:"list",style:"border-top:0"},li))}}
-  if(!grupos.length){host.append(NPUI.vazio({titulo:recentes?"Tudo feito por aqui":"Nada com esses filtros",texto:recentes?"Não sobrou nada aberto com esses filtros.":"Tire um filtro ou crie uma tarefa nova.",acao:"Limpar filtros",onAcao:()=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false};render()}}));return host}
+  if(!grupos.length){host.append(NPUI.vazio({titulo:recentes?"Tudo feito por aqui":"Nada com esses filtros",texto:recentes?"Não sobrou nada aberto com esses filtros.":"Tire um filtro ou crie uma tarefa nova.",acao:"Limpar filtros",onAcao:()=>{T.f=filtroPadrao();render()}}));return host}
   const ab=gruposV3();
   for(const [k,l] of grupos){const ts=lista.filter(t=>t.faixa===k).sort((a,b)=>(a.prazo||"9999").localeCompare(b.prazo||"9999")||a.prioridade-b.prioridade);
     host.append(NPUI.grupo({id:k,titulo:l,n:ts.length,tom:FAIXA_TOM[k]||"",aberto:ab[k]!==false,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-tarefas-grupos",JSON.stringify(ab))},itens:ts.map(t=>linhaV3(t,opts))}))}
@@ -597,29 +635,39 @@ function filtrosV3(){
   const f=T.f;const meu=meuColab();const escT=PP.escopoTarefas?.()||{tudo:true};const podeResp=escT.tudo||escT.nucleos;
   const chips=[];const C=(o)=>{const c=NPUI.chip(o);chips.push(c);return c};
   const esc=(k,l)=>C({label:l,on:f.status===k,grupo:"status",onclick:()=>{f.status=k;render()}});
-  const abertas=T.tarefas.filter(t=>escopoOk(t)&&(t.status==="aberta"||t.status==="em_andamento"));
-  const nFat=abertas.filter(t=>t.prazo_fatal).length,nCad=abertas.filter(t=>t.cadeia_id).length,nMinhas=meu?abertas.filter(t=>t.responsavel_id===meu.id).length:0;
+  const abertasEsc=T.tarefas.filter(t=>escopoOk(t)&&(t.status==="aberta"||t.status==="em_andamento"));
+  const abertas=abertasEsc.filter(t=>respOk(t,f.resp));
+  const nFat=abertas.filter(t=>t.prazo_fatal).length,nCad=abertas.filter(t=>t.cadeia_id).length;
   esc("abertas","Abertas");esc("concluida","Feitas");esc("todas","Todas");
   chips.push(NPUI.sepv());
   C({label:"Fatais",n:nFat,on:!!f.fatais,grupo:"attr",onclick:()=>{f.fatais=!f.fatais;render()}}).classList.add("crit");
-  const nAtr=abertas.filter(t=>t.faixa==="atrasada").length,nSem=abertas.filter(t=>!t.responsavel_id).length;
+  const nAtr=abertas.filter(t=>t.faixa==="atrasada").length;
   C({label:"Atrasadas",n:nAtr,on:!!f.atrasadas,grupo:"attr",title:"Só as que já passaram do prazo",onclick:()=>{f.atrasadas=!f.atrasadas;render()}});
-  if(podeResp&&(nSem||f.semResp))C({label:"Sem responsável",n:nSem,on:!!f.semResp,grupo:"attr",title:"Tarefas abertas que ninguém assumiu",onclick:()=>{f.semResp=!f.semResp;render()}});
   C({label:"Cadeias",n:nCad,on:!!f.cadeias,grupo:"attr",title:"Só etapas de cadeia de prazo",onclick:()=>{f.cadeias=!f.cadeias;render()}});
-  if(meu&&podeResp)C({label:"Minhas",n:nMinhas,on:f.resp===meu.id,grupo:"attr",title:"Só as minhas (responsável = eu)",onclick:()=>{f.resp=f.resp===meu.id?"":meu.id;render()}});
-  const nucs=Object.keys(NUCLEOS).filter(k=>T.tarefas.some(t=>escopoOk(t)&&t.nucleo===k));
+  const nucs=Object.keys(NUCLEOS).filter(k=>abertas.some(t=>t.nucleo===k)||f.nucleo===k);
   if(nucs.length){chips.push(NPUI.sepv());for(const k of nucs.slice(0,3))C({label:NUCLEOS[k],on:f.nucleo===k,grupo:"nucleo",onclick:()=>{f.nucleo=f.nucleo===k?"":k;render()}})}
   /* "Mais filtros": seletores completos (status, responsável, núcleo, cliente) */
-  const extras=[f.resp&&!(meu&&f.resp===meu.id),f.cliente,f.nucleo&&!nucs.slice(0,3).includes(f.nucleo),["aberta","em_andamento","cancelada"].includes(f.status)].filter(Boolean).length;
-  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Status detalhado, responsável, núcleo, cliente",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
+  const extras=[f.cliente,f.nucleo&&!nucs.slice(0,3).includes(f.nucleo),["aberta","em_andamento","cancelada"].includes(f.status)].filter(Boolean).length;
+  const mais=NPUI.chip({label:"Mais filtros",n:extras?`(${extras})`:null,on:extras>0,title:"Status detalhado, núcleo, cliente",onclick:(e)=>NPUI.pop(e.currentTarget,()=>{
     const fStatus=sel({abertas:"A fazer e fazendo",aberta:"Só a fazer",em_andamento:"Só fazendo",concluida:"Feitas",cancelada:"Canceladas",todas:"Todas"},f.status),fNuc=sel({"":"Todos os núcleos",...NUCLEOS},f.nucleo),fCli=selCliente(f.cliente,"Todos os clientes");
-    const fResp=podeResp?selColab(f.resp,"Todos os responsáveis"):null;
-    fStatus.onchange=()=>{f.status=fStatus.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};if(fResp)fResp.onchange=()=>{f.resp=fResp.value;render()};
+    fStatus.onchange=()=>{f.status=fStatus.value;render()};fNuc.onchange=()=>{f.nucleo=fNuc.value;render()};fCli.onchange=()=>{f.cliente=fCli.value;render()};
     const L=(l,c)=>el("div",{},el("label",{},l),c);
-    return [el("div",{class:"np-pop-form"},L("Status",fStatus),fResp?L("Responsável",fResp):null,L("Núcleo",fNuc),L("Cliente",fCli),
-      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false};NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-tarefas .np-chipf[aria-haspopup="dialog"]')})});
+    return [el("div",{class:"np-pop-form"},L("Status",fStatus),L("Núcleo",fNuc),L("Cliente",fCli),
+      el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{T.f=filtroPadrao();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-tarefas .np-chipf[aria-haspopup="dialog"]')})});
   mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");mais.querySelector(".n")?.setAttribute("aria-label",extras+" filtros extras ativos");
   const fixos=[mais];
+  /* "Ver tarefas de": a tela abre nas tarefas de quem está logado; quem tem permissão escolhe outra pessoa (uma por vez).
+     A visão de toda a equipe fica em Gestão → Visão geral. "" (todos) só aparece quando outro lugar do sistema pediu um filtro assim. */
+  if(podeResp&&meu){
+    const nDe=id=>abertasEsc.filter(t=>respOk(t,id)).length,nSem=nDe(SEM_RESP);
+    const ops={[meu.id]:`Minhas tarefas (${nDe(meu.id)})`};
+    if(nSem||f.resp===SEM_RESP)ops[SEM_RESP]=`Sem responsável (${nSem})`;
+    for(const c of T.colab)if(c.id!==meu.id&&(c.ativo!==false||c.id===f.resp||nDe(c.id)))ops[c.id]=`${c.nome} (${nDe(c.id)})`;
+    if(!f.resp)ops[""]="Toda a equipe (filtro aplicado)";
+    const sv=sel(ops,f.resp||"");sv.setAttribute("aria-label","Ver tarefas de");sv.setAttribute("data-np-ver-de","1");sv.title="Ver tarefas de";sv.style.maxWidth="230px";
+    sv.onchange=()=>{f.resp=sv.value;render()};
+    fixos.unshift(el("label",{class:"np-rodape",style:"display:inline-flex;align-items:center;gap:6px;padding:0 2px"},el("span",{},"Ver tarefas de"),sv));
+  }
   if(!escT.tudo&&!escT.nucleos)fixos.push(el("span",{class:"np-rodape",style:"padding:0 6px",title:"Escopo definido pela gestão"},"Só as suas"));
   return {chips,fixos};
 }
@@ -628,10 +676,10 @@ function filtrarV3(lista,f){return filtrar(lista,f).filter(t=>!f.cadeias||!!t.ca
 function renderTarefasV3(){
   const v=$("#view-tarefas");v.replaceChildren();v.classList.add("np-v3");V3.obra=null;V3.painel=null;clearInterval(V3.tick);
   /* abertura pedida por id (deep link / PP_TAREFAS.abrir): vira a tarefa aberta e é montada UMA vez no fim, junto com a reabertura silenciosa — evita a corrida entre o painel anterior (view transition) e o novo (Fase 4B) */
-  if(T.abrir&&T.ok){const t=T.tarefas.find(x=>x.id===T.abrir);T.abrir=null;if(t)V3.aberta=t.id;else toast("Tarefa não encontrada")}
+  if(T.abrir&&T.ok){const id=T.abrir;const t=T.tarefas.find(x=>x.id===id);T.abrir=null;if(t)V3.aberta=t.id;else SB.from("v_tarefas").select("*").eq("id",id).maybeSingle().then(({data})=>{if(data){juntar([data]);V3.aberta=id;render()}else toast("Tarefa não encontrada")})}
   if(!garantir()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   const f=T.f;if(f.cadeias==null)f.cadeias=false;
-  const abertas=T.tarefas.filter(t=>escopoOk(t)&&(t.status==="aberta"||t.status==="em_andamento"));
+  const abertas=T.tarefas.filter(t=>escopoOk(t)&&respOk(t,f.resp)&&(t.status==="aberta"||t.status==="em_andamento"));
   const n=k=>abertas.filter(t=>t.faixa===k).length;const fat=abertas.filter(t=>t.prazo_fatal&&["atrasada","hoje","d7"].includes(t.faixa)).length;
   // ordem do Figma (18/11): primeiro o que já passou, depois o fatal de hoje, o dia e a semana
   const fatHoje=abertas.filter(t=>t.prazo_fatal&&t.faixa==="hoje").length;
@@ -643,6 +691,11 @@ function renderTarefasV3(){
   const obra=el("div",{class:"np-obra"});V3.obra=obra;
   const corpo=vista==="quadro"?el("div",{class:"np-corpo"},quadroV3(filtrarV3(T.tarefas,{...f,status:"todas"}))):listaV3(filtrarV3(T.tarefas,f));
   const lista=filtrarV3(T.tarefas,f);const ab2=lista.filter(t=>t.status==="aberta"||t.status==="em_andamento").length;
+  /* Feitas / Canceladas / Todas: a tela traz só os últimos JANELA_DIAS dias; o resto vem com um clique, só da pessoa em tela */
+  if(vista!=="quadro"&&["concluida","cancelada","todas"].includes(f.status)&&!antigasOk(f.resp)){
+    const b=NPUI.btn("Carregar anteriores",{onclick:async(e)=>{const bt=e.currentTarget;bt.disabled=true;bt.textContent="Carregando…";await carregarAnteriores(f.resp);render()}});b.setAttribute("data-np-anteriores","1");
+    corpo.append(el("div",{class:"np-rodape",style:"display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 4px"},el("span",{},`Mostrando as feitas e canceladas dos últimos ${JANELA_DIAS} dias.`),b));
+  }
   corpo.append(NPUI.rodape(`${lista.length} tarefa${lista.length===1?"":"s"} com estes filtros · ${ab2} aberta${ab2===1?"":"s"}`,[["crit","fatal"],["late","atrasada"],["att","vence hoje"]]));
   obra.append(corpo);v.append(obra);
   V3.painel=NPUI.painel({obra,label:"Detalhe da tarefa",onClose:()=>{V3.aberta=null;clearInterval(V3.tick)}});
@@ -738,7 +791,7 @@ document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;b
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={minhasHoje:()=>{const m=meuColab();return T.ok&&m?T.tarefas.filter(t=>t.responsavel_id===m.id&&(t.status==="aberta"||t.status==="em_andamento")&&t.faixa==="hoje").length:null},lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
+window.PP_TAREFAS={minhasHoje:()=>{const m=meuColab();return T.ok&&m?T.tarefas.filter(t=>t.responsavel_id===m.id&&(t.status==="aberta"||t.status==="em_andamento")&&t.faixa==="hoje").length:null},lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.respIni=true;T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
   /* ---- contrato público (Fase 4B) ---- */
   estado:()=>({carregado:T.ok,carregando:!!T.carregando,erro:T.erro||null,vazio:T.ok&&!T.tarefas.length}),
   // null = ainda não carregado; [] = carregado e vazio. Filtra só por campos existentes (cliente_id, nucleo, status); nenhuma relação inferida.

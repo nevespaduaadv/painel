@@ -35,6 +35,7 @@ const TAREFAS = [
   tarefa({ t: 'Organizar pasta de modelos', r: 'col-ana', n: 'administrativo', dias: null }),
   tarefa({ t: 'Enviar boleto de novembro', c: 'c1', r: 'col-ana', n: 'administrativo', dias: -2, s: 'concluida' }),
   tarefa({ t: 'Agendar reunião com o Banco Delta', c: 'c2', r: 'col-maria', n: 'acordos', dias: 5, s: 'cancelada' }),
+  Object.assign(tarefa({ t: 'Parecer antigo já entregue', c: 'c1', r: 'col-ana', dias: -90, s: 'concluida' }), { concluida_em: new Date(Date.now() - 90 * 86400000).toISOString() }),
 ];
 /* ticket (só com tickets=true): a tarefa 'Montar planilha de passivos' aguarda o Financeiro */
 const TICKET = { id: '00000000-0000-4000-8000-000000000007', aguardando_area: 'financeiro', aguardando_por_nome: 'Ana Teste', aguardando_motivo: 'Preciso do extrato consolidado', aguardando_desde: new Date(Date.now() - 86400000).toISOString(), sla_dias: 3, sla_situacao: 'no_prazo' };
@@ -42,7 +43,7 @@ const PERFIS = { admin: { id: 'u-admin', nome: 'Ana Teste', papel: 'admin', aces
 const EVENTOS = (tid) => { const t = TAREFAS.find(x => x.id === tid); const ev = [{ id: 'ev1-' + tid, tarefa_id: tid, tipo: 'criada', autor_nome: 'Maria Eulália Teste', para: 'Caio Teste', criado_em: '2026-11-01T14:10:00Z' }]; if (!t?.cadeia_id) ev.push({ id: 'ev2-' + tid, tarefa_id: tid, tipo: 'comentario', autor_nome: 'Caio Teste', nota: 'Minuta pronta; falta a guia.', criado_em: '2026-11-05T09:30:00Z' }); return ev; };
 const sessao = (perfil) => ({ access_token: 'lab', refresh_token: 'lab', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user: { id: perfil.id, email: perfil.id + '@lab.exemplo', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } });
 
-async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', reduz = false, touch = false, extraLS = {}, tickets = false } = {}) {
+async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, tema = 'light', reduz = false, touch = false, extraLS = {}, tickets = false, minhas = false } = {}) {
   const P = PERFIS[perfil]; const s = sessao(P); const escritas = []; const erros = []; const sim = { falharPatch: false };
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: tema, hasTouch: touch || w < 900, isMobile: touch, reducedMotion: reduz ? 'reduce' : 'no-preference' });
   await ctx.addInitScript(({ s, ref, casca, tema, extraLS }) => { try { if (!sessionStorage.getItem('lab')) { localStorage.clear(); localStorage.setItem(`sb-${ref}-auth-token`, JSON.stringify(s)); localStorage.setItem('np-casca', casca === 'v3' ? 'v3' : 'v2'); localStorage.setItem('pp-tema', tema); localStorage.setItem('pp-tab', 'tarefas'); for (const [k, v] of Object.entries(extraLS)) localStorage.setItem(k, v); sessionStorage.setItem('lab', '1'); } } catch (_) {} }, { s, ref: REF, casca, tema, extraLS });
@@ -60,7 +61,13 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
     if (p.startsWith('/realtime/')) return rota.abort(); if (p.startsWith('/rest/v1/rpc/')) return json(m === 'POST' ? [] : null);
     if (p.startsWith('/rest/v1/perfis')) return json(unico ? P : [P]);
     if (p.startsWith('/rest/v1/clientes')) return json(CLIENTES, 200, { 'content-range': `0-${CLIENTES.length - 1}/${CLIENTES.length}` });
-    if (p.startsWith('/rest/v1/v_tarefas')) { const cad = u.searchParams.get('cadeia_id'); const lista = cad ? TAREFAS.filter(t => t.cadeia_id === cad.replace('eq.', '')) : TAREFAS; return json(lista); }
+    if (p.startsWith('/rest/v1/v_tarefas')) { const q = u.searchParams; const cad = q.get('cadeia_id'); let lista = cad ? TAREFAS.filter(t => t.cadeia_id === cad.replace('eq.', '')) : TAREFAS.slice();
+      const st = q.get('status'); if (st) { const vs = st.replace(/^in\.\(|\)$|^eq\./g, '').split(','); lista = lista.filter(t => vs.includes(t.status)); }
+      const or = q.get('or'); if (or) { const fech = (t) => t.status === 'concluida' || t.status === 'cancelada'; const antiga = (t) => !!t.concluida_em && Date.now() - new Date(t.concluida_em) > 30 * 86400000; lista = lista.filter(t => fech(t) && (/concluida_em\.lt/.test(or) ? antiga(t) : !antiga(t))); }
+      const ids = q.get('id'); if (ids && /^in\./.test(ids)) { const vs = ids.replace(/^in\.\(|\)$/g, '').split(',').map(x => x.replace(/"/g, '')); lista = lista.filter(t => vs.includes(t.id)); } else if (ids && /^eq\./.test(ids)) lista = lista.filter(t => t.id === ids.slice(3));
+      const cli = q.get('cliente_id'); if (cli) lista = lista.filter(t => t.cliente_id === cli.replace('eq.', ''));
+      const rp = q.get('responsavel_id'); if (rp) lista = lista.filter(t => rp === 'is.null' ? !t.responsavel_id : t.responsavel_id === rp.replace('eq.', ''));
+      return json(unico ? (lista[0] || null) : lista); }
     if (p.startsWith('/rest/v1/colaboradores')) { const pid = (u.searchParams.get('perfil_id') || '').replace('eq.', ''); const lista = pid ? COLAB.filter(x => x.perfil_id === pid) : COLAB; if (unico) return lista[0] ? json(lista[0]) : json({ message: 'nenhum', code: 'PGRST116' }, 406); return json(lista); }
     if (p.startsWith('/rest/v1/processos')) return json([{ id: 'p1', cliente_id: 'c1', numero_cnj: '0000001-11.2026.8.26.0196', parte_contraria: 'Banco Sigma' }]);
     if (p.startsWith('/rest/v1/v_tickets')) return json(tickets ? [TICKET] : []);
@@ -73,6 +80,8 @@ async function contexto(b, { perfil = 'admin', casca = 'v3', w = 1440, h = 900, 
   await pg.goto(BASE + '/index.html#tarefas', { waitUntil: 'load' });
   await pg.waitForFunction(() => typeof PP !== 'undefined' && PP.perfil && document.querySelector('#login')?.hidden && window.PP_TAREFAS && window.PP_TAREFAS.lista().length > 0 && !document.querySelector('#view-tarefas')?.hidden, null, { timeout: 20000 });
   await pg.waitForTimeout(600);
+  // a tela abre nas tarefas de quem está logado; os cenários abaixo foram escritos sobre a lista da equipe, então pedem esse filtro (como faz um link vindo de outra tela)
+  if (!minhas) { await pg.evaluate(() => window.PP_TAREFAS.filtro({})); await pg.waitForTimeout(150); }
   return { ctx, pg, erros, escritas, perfil: P, sim };
 }
 
@@ -201,26 +210,26 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
   rel.push('4. filtros (chips e "Mais filtros" alteram o mesmo estado da V2)');
   { const { ctx, pg } = await contexto(b, { perfil: 'admin', casca: 'v3' });
     const chips = await pg.evaluate(() => [...document.querySelectorAll('#view-tarefas .np-chipf')].map(c => c.textContent.replace(/\d+$/, '').trim()));
-    if (['Abertas', 'Feitas', 'Todas', 'Fatais', 'Cadeias', 'Minhas', 'Mais filtros'].every(x => chips.includes(x))) ok(`chips: ${chips.join(' · ')}`); else falha('chips: ' + JSON.stringify(chips));
+    if (['Abertas', 'Feitas', 'Todas', 'Fatais', 'Cadeias', 'Mais filtros'].every(x => chips.includes(x)) && !chips.includes('Minhas') && !chips.includes('Sem responsável')) ok(`chips: ${chips.join(' · ')}`); else falha('chips: ' + JSON.stringify(chips));
     await pg.click('#view-tarefas .np-chipf:has-text("Fatais")'); await pg.waitForTimeout(200);
     const f1 = await pg.evaluate(() => ({ f: window.PP_TAREFAS.filtroAtual(), n: document.querySelectorAll('#view-tarefas .np-it').length, esperado: window.PP_TAREFAS.lista().filter(t => (t.status === 'aberta' || t.status === 'em_andamento') && t.prazo_fatal).length }));
     if (f1.f.fatais === true && f1.n === f1.esperado) ok(`chip Fatais → T.f.fatais=true, ${f1.n} linhas (= filtro da V2)`); else falha('fatais: ' + JSON.stringify(f1));
-    await pg.click('#view-tarefas .np-chipf:has-text("Fatais")'); await pg.click('#view-tarefas .np-chipf:has-text("Minhas")'); await pg.waitForTimeout(200);
+    await pg.click('#view-tarefas .np-chipf:has-text("Fatais")'); await pg.selectOption('#view-tarefas [data-np-ver-de]', 'col-ana'); await pg.waitForTimeout(200);
     const f2 = await pg.evaluate(() => ({ resp: window.PP_TAREFAS.filtroAtual().resp, n: document.querySelectorAll('#view-tarefas .np-it').length }));
-    if (f2.resp === 'col-ana' && f2.n === 4) ok('chip Minhas → T.f.resp = meu colaborador (4 tarefas abertas)'); else falha('minhas: ' + JSON.stringify(f2));
-    await pg.click('#view-tarefas .np-chipf:has-text("Minhas")');
+    if (f2.resp === 'col-ana' && f2.n === 4) ok('seletor "Ver tarefas de" → T.f.resp = meu colaborador (4 tarefas abertas)'); else falha('minhas: ' + JSON.stringify(f2));
+    await pg.evaluate(() => window.PP_TAREFAS.filtro({})); await pg.waitForTimeout(150);
     await pg.click('#view-tarefas .np-chipf:has-text("Mais filtros")'); await pg.waitForTimeout(250);
     const mf = await pg.evaluate(() => ({ role: document.querySelector('#np-pop')?.getAttribute('role'), labels: [...document.querySelectorAll('#np-pop label')].map(l => l.textContent), statusOpts: [...document.querySelectorAll('#np-pop select')][0]?.options.length, focoDentro: !!document.activeElement.closest('#np-pop') }));
-    if (mf.role === 'dialog' && ['Status', 'Responsável', 'Núcleo', 'Cliente'].every(x => mf.labels.includes(x)) && mf.statusOpts === 6 && mf.focoDentro) ok(`Mais filtros (dialog): ${mf.labels.join(', ')}; status com as 6 opções da V2`); else falha('mais filtros: ' + JSON.stringify(mf));
+    if (mf.role === 'dialog' && ['Status', 'Núcleo', 'Cliente'].every(x => mf.labels.includes(x)) && !mf.labels.includes('Responsável') && mf.statusOpts === 6 && mf.focoDentro) ok(`Mais filtros (dialog): ${mf.labels.join(', ')}; status com as 6 opções da V2`); else falha('mais filtros: ' + JSON.stringify(mf));
     await pg.selectOption('#np-pop select >> nth=0', 'em_andamento'); await pg.waitForTimeout(250);
     const f3 = await pg.evaluate(() => ({ st: window.PP_TAREFAS.filtroAtual().status, n: document.querySelectorAll('#view-tarefas .np-it').length, extras: document.querySelector('#view-tarefas .np-chipf:has(.n)[aria-pressed="true"]')?.textContent }));
     if (f3.st === 'em_andamento' && f3.n === 1) ok('status "Só fazendo" pelo popover → T.f.status=em_andamento, 1 linha'); else falha('status: ' + JSON.stringify(f3));
     // mudanças consecutivas: o popover continua aberto, ancorado no chip novo, com foco dentro e resultados corretos
     const esperado = (f) => pg.evaluate((f) => window.PP_TAREFAS.lista().filter(t => (f.status === 'abertas' ? (t.status === 'aberta' || t.status === 'em_andamento') : f.status === 'todas' ? true : t.status === f.status) && (!f.resp || t.responsavel_id === f.resp) && (!f.nucleo || t.nucleo === f.nucleo) && (!f.cliente || t.cliente_id === f.cliente)).length, f);
-    const passos = [['select >> nth=1', 'col-caio', { status: 'em_andamento', resp: 'col-caio' }], ['select >> nth=0', 'todas', { status: 'todas', resp: 'col-caio' }], ['select >> nth=2', 'juridico', { status: 'todas', resp: 'col-caio', nucleo: 'juridico' }], ['select >> nth=3', 'c1', { status: 'todas', resp: 'col-caio', nucleo: 'juridico', cliente: 'c1' }]];
+    const passos = [['select >> nth=0', 'todas', { status: 'todas' }], ['select >> nth=1', 'juridico', { status: 'todas', nucleo: 'juridico' }], ['select >> nth=2', 'c1', { status: 'todas', nucleo: 'juridico', cliente: 'c1' }]];
     const seqOk = [];
     for (const [sel, val, f] of passos) { await pg.selectOption('#np-pop ' + sel, val); await pg.waitForTimeout(250); const st = await pg.evaluate(() => ({ pop: !!document.querySelector('#np-pop'), focoDentro: !!document.activeElement.closest('#np-pop'), ancora: document.querySelector('#view-tarefas .np-chipf[aria-haspopup="dialog"]')?.getAttribute('aria-expanded'), n: document.querySelectorAll('#view-tarefas .np-it:not(.np-it-feita)').length, f: window.PP_TAREFAS.filtroAtual(), popLeft: parseFloat(document.querySelector('#np-pop').style.left), chipRight: document.querySelector('#view-tarefas .np-chipf[aria-haspopup="dialog"]').getBoundingClientRect().right })); const esp = await esperado(f); seqOk.push({ sel, val, ok: st.pop && st.focoDentro && st.ancora === 'true' && st.n === esp && st.f.status === f.status && (st.f.resp || '') === (f.resp || '') && (st.f.nucleo || '') === (f.nucleo || '') && (st.f.cliente || '') === (f.cliente || ''), n: st.n, esp, st }); }
-    if (seqOk.every(x => x.ok)) ok(`Mais filtros: 4 mudanças consecutivas (responsável → status → núcleo → cliente) com popover aberto, foco dentro, chip reancorado (aria-expanded) e contagens corretas (${seqOk.map(x => x.n).join('/')})`); else falha('ciclo Mais filtros: ' + JSON.stringify(seqOk.filter(x => !x.ok).map(x => ({ sel: x.sel, n: x.n, esp: x.esp, st: { pop: x.st.pop, foco: x.st.focoDentro, ancora: x.st.ancora, f: x.st.f } }))));
+    if (seqOk.every(x => x.ok)) ok(`Mais filtros: 3 mudanças consecutivas (status → núcleo → cliente; o responsável saiu para o seletor "Ver tarefas de") com popover aberto, foco dentro, chip reancorado (aria-expanded) e contagens corretas (${seqOk.map(x => x.n).join('/')})`); else falha('ciclo Mais filtros: ' + JSON.stringify(seqOk.filter(x => !x.ok).map(x => ({ sel: x.sel, n: x.n, esp: x.esp, st: { pop: x.st.pop, foco: x.st.focoDentro, ancora: x.st.ancora, f: x.st.f } }))));
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(150); const pf = await pg.evaluate(() => ({ pop: !!document.querySelector('#np-pop'), foco: document.activeElement.textContent.trim().slice(0, 12) })); if (!pf.pop && /Mais filtros/.test(pf.foco)) ok('Esc fecha o popover e devolve o foco ao chip (mesmo após re-render)'); else falha('esc popover: ' + JSON.stringify(pf));
     await ctx.close(); }
   // ---------- 5. quadro ----------
@@ -228,7 +237,7 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
   { const { ctx, pg, escritas } = await contexto(b, { perfil: 'admin', casca: 'v3' });
     await pg.click(':is(#view-tarefas, #np-barra-vista) .np-seg button:has-text("Quadro")'); await pg.waitForTimeout(500);
     const q = await pg.evaluate(() => ({ cols: [...document.querySelectorAll('.np-colq h3 > span:first-child')].map(s => s.textContent), ns: [...document.querySelectorAll('.np-colq h3 .n')].map(s => +s.textContent), cards: document.querySelectorAll('.np-cardq').length, reguas: document.querySelectorAll('.np-cardq[class*="r-"]').length, por: document.querySelector('.np-colq h3 .por')?.textContent, vista: localStorage.getItem('np-tarefas-vista'), legado: localStorage.getItem('pp-tarefas-vista') }));
-    const L = TAREFAS; const esperado = [L.filter(t => t.status === 'aberta').length, L.filter(t => t.status === 'em_andamento').length, L.filter(t => t.status === 'concluida').length];
+    const L = TAREFAS; const esperado = [L.filter(t => t.status === 'aberta').length, L.filter(t => t.status === 'em_andamento').length, L.filter(t => t.status === 'concluida' && Date.now() - new Date(t.concluida_em) < 8 * 86400000).length];
     if (JSON.stringify(q.cols) === JSON.stringify(['A fazer', 'Fazendo', 'Feitas (7 dias)']) && JSON.stringify(q.ns) === JSON.stringify(esperado) && q.reguas >= 3 && q.vista === 'quadro' && q.legado === 'kanban') ok(`quadro: colunas ${q.cols.join(' · ')} com ${q.ns.join('/')} cartões (= colunas e regras da V2 com tickets desativados); ${q.reguas} cartões com régua; contagem por responsável "${q.por}"; preferência gravada (e a legada pp-tarefas-vista=kanban)`); else falha('quadro: ' + JSON.stringify({ q, esperado }));
     await pg.click('.np-colq[data-st="aberta"] .np-cardq .np-ib'); await pg.waitForTimeout(250);
     const mv = await pg.evaluate(() => [...document.querySelectorAll('#np-pop [role="menuitem"]')].map(b => b.textContent.trim() + (b.disabled ? ' (desab.)' : '') + (b.classList.contains('atual') ? ' (atual)' : '')));
@@ -377,6 +386,28 @@ const idsVisiveis = (pg) => pg.evaluate(() => { const vis = (e) => { for (let x 
     for (const [w, h] of [[375, 812], [768, 1024], [1024, 768]]) { const c3 = await contexto(b, { perfil: 'admin', casca: 'v2', w, h }); await c3.pg.screenshot({ path: path.join(OUT, `v2-light-${w}-lista.png`) }); await c3.ctx.close(); }
     for (const w of [375, 768, 1024, 1440]) { const c5 = await contexto(b, { perfil: 'admin', casca: 'v2', w, h: w === 375 ? 812 : w === 768 ? 1024 : w === 1024 ? 768 : 900, tema: 'dark' }); await c5.pg.screenshot({ path: path.join(OUT, `v2-dark-${w}-lista.png`) }); await c5.ctx.close(); }
     const c4 = await contexto(b, { perfil: 'admin', casca: 'v3', reduz: true }); const rm = await c4.pg.evaluate(() => getComputedStyle(document.querySelector('.np-grp-c')).transitionDuration); if (parseFloat(rm) < 0.01) ok('prefers-reduced-motion: grupos sem transição (' + rm + ')'); else falha('reduced motion: ' + rm); await c4.ctx.close(); }
+  // ---------- carga leve e "minhas" por padrão ----------
+  rel.push('carga leve (30 dias) e tela abrindo nas próprias tarefas');
+  { const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', minhas: true });
+    const a = await pg.evaluate(() => { const L = window.PP_TAREFAS.lista(); const sv = document.querySelector('#view-tarefas [data-np-ver-de]'); return { resp: window.PP_TAREFAS.filtroAtual().resp, linhas: document.querySelectorAll('#view-tarefas .np-it').length, minhasAb: L.filter(t => t.responsavel_id === 'col-ana' && (t.status === 'aberta' || t.status === 'em_andamento')).length, antigaCarregada: L.some(t => t.titulo === 'Parecer antigo já entregue'), ops: sv ? [...sv.options].map(o => o.textContent) : null, resumo: document.querySelector('#view-tarefas .np-resumo')?.textContent.replace(/\s+/g, ' ') }; });
+    if (a.resp === 'col-ana' && a.linhas === a.minhasAb && a.linhas > 0) ok(`admin abre vendo só as suas (${a.linhas} abertas); resumo: ${a.resumo}`); else falha('padrão minhas: ' + JSON.stringify(a));
+    if (a.ops && /^Minhas tarefas \(\d+\)$/.test(a.ops[0]) && a.ops.some(o => /^Caio Teste \(\d+\)$/.test(o)) && !a.ops.some(o => /Toda a equipe/.test(o))) ok('seletor "Ver tarefas de": ' + a.ops.join(' · ')); else falha('seletor: ' + JSON.stringify(a.ops));
+    if (!a.antigaCarregada) ok('fechada há 90 dias não vem na carga inicial'); else falha('tarefa antiga veio na carga inicial');
+    await pg.selectOption('#view-tarefas [data-np-ver-de]', 'col-caio'); await pg.waitForTimeout(200);
+    const c = await pg.evaluate(() => ({ resp: window.PP_TAREFAS.filtroAtual().resp, linhas: document.querySelectorAll('#view-tarefas .np-it').length, esperado: window.PP_TAREFAS.lista().filter(t => t.responsavel_id === 'col-caio' && (t.status === 'aberta' || t.status === 'em_andamento')).length }));
+    if (c.resp === 'col-caio' && c.linhas === c.esperado && c.linhas > 0) ok(`trocar a pessoa mostra as tarefas dela (${c.linhas})`); else falha('trocar pessoa: ' + JSON.stringify(c));
+    await pg.selectOption('#view-tarefas [data-np-ver-de]', 'col-ana'); await pg.click('#view-tarefas .np-chipf:has-text("Feitas")'); await pg.waitForTimeout(250);
+    const f = await pg.evaluate(() => ({ botao: !!document.querySelector('#view-tarefas [data-np-anteriores]'), aviso: document.querySelector('#view-tarefas [data-np-anteriores]')?.parentElement.textContent }));
+    if (f.botao && /últimos 30 dias/.test(f.aviso)) ok('Feitas: aviso da janela e botão "Carregar anteriores"'); else falha('feitas: ' + JSON.stringify(f));
+    await pg.click('#view-tarefas [data-np-anteriores]'); await pg.waitForTimeout(500);
+    const g = await pg.evaluate(() => ({ botao: !!document.querySelector('#view-tarefas [data-np-anteriores]'), antiga: window.PP_TAREFAS.lista().some(t => t.titulo === 'Parecer antigo já entregue') }));
+    if (!g.botao && g.antiga) ok('Carregar anteriores traz o histórico da pessoa e o botão some'); else falha('anteriores: ' + JSON.stringify(g));
+    if (!erros.length) ok('sem erros de página'); else falha('erros: ' + JSON.stringify(erros));
+    await ctx.close(); }
+  { const { ctx, pg } = await contexto(b, { perfil: 'juridico', casca: 'v3', minhas: true });
+    const j = await pg.evaluate(() => ({ seletor: !!document.querySelector('#view-tarefas [data-np-ver-de]'), resp: window.PP_TAREFAS.filtroAtual().resp, so: document.querySelector('#view-tarefas .np-toolbar')?.textContent.includes('Só as suas') }));
+    if (!j.seletor && j.resp === '' && j.so) ok('perfil sem permissão de equipe: sem seletor, continua em "Só as suas"'); else falha('perfil comum: ' + JSON.stringify(j));
+    await ctx.close(); }
   await b.close(); srv.close();
   const txt = rel.join('\n') + '\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.'); console.log(txt); fs.writeFileSync(path.join(OUT, 'relatorio.txt'), txt); process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
