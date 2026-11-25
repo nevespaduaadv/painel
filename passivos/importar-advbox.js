@@ -21,8 +21,8 @@
   async function abrirLote() {
     const { data, error } = await SB.from("importacao_bruta").select("parte,dados").eq("origem", "advbox").eq("chave", A.chave).order("parte"); if (error) { toast(error.message); return; }
     const txt = (data || []).map((r) => r.dados).join(""); try { A.bruto = JSON.parse(txt); } catch (e) { toast("JSON inválido: " + e.message); return; }
-    const [c, t, e, p] = await Promise.all([SB.from("colaboradores").select("id,nome,ativo"), SB.from("tarefas").select("id,descricao,status").like("descricao", "%(ADVBox #%"), SB.from("entradas_timeline").select("id_externo").like("id_externo", "advbox:%"), SB.from("processos").select("id,numero_cnj,cliente_id,id_externo")]);
-    const [tv, ev] = await Promise.all([SB.from("tarefas").select("id,cliente_id,titulo,prazo,status").like("descricao", "%(importado do ADVBox)"), SB.from("entradas_timeline").select("cliente_id").like("id_externo", "advbox:%:tl:%")]);
+    const [c, t, e, p] = await Promise.all([SB.from("colaboradores").select("id,nome,ativo"), npTodas(() => SB.from("tarefas").select("id,descricao,status").like("descricao", "%(ADVBox #%").order("id")), npTodas(() => SB.from("entradas_timeline").select("id_externo").like("id_externo", "advbox:%").order("id_externo")), npTodas(() => SB.from("processos").select("id,numero_cnj,cliente_id,id_externo").order("id"))]);
+    const [tv, ev] = await Promise.all([npTodas(() => SB.from("tarefas").select("id,cliente_id,titulo,prazo,status").like("descricao", "%(importado do ADVBox)").order("id")), npTodas(() => SB.from("entradas_timeline").select("cliente_id").like("id_externo", "advbox:%:tl:%").order("id"))]);
     A.colab = c.data || []; A.existentes = { tar: new Set((t.data || []).map((x) => /\(ADVBox #(\d+)\)/.exec(x.descricao || "")?.[1]).filter(Boolean)), tl: new Set((e.data || []).map((x) => x.id_externo)), proc: p.data || [],
       velhasTar: new Set((tv.data || []).map((x) => x.cliente_id + "|" + norm(x.titulo) + "|" + (x.prazo || ""))), velhosCli: new Set((ev.data || []).map((x) => x.cliente_id)),
       // tarefas ainda abertas no sistema que vieram do ADVBox: por id (#) e pela chave antiga (cliente|título|prazo)

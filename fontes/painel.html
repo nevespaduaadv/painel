@@ -735,7 +735,7 @@ function renderMain(){
   if(!readOnly())m.append(breadcrumb(c));
   m.append(el("div",{class:"head"},
     el("div",{},el("div",{class:"eyebrow"},c.cidade||c.segmento?[c.segmento,c.cidade&&(c.cidade+(c.uf?"/"+c.uf:""))].filter(Boolean).join(" · "):"Cliente"),el("h1",{class:"display"},c.nome),el("div",{class:"sub"},[c.cnpj?`${c.tipo_pessoa==="PF"?"CPF":"CNPJ"} ${fmtDoc(c.cnpj)}`:null,c.responsavel?`Responsável: ${c.responsavel}`:null,`Atualizado em ${fmtD(hoje())}`].filter(Boolean).join(" · "))),
-    el("div",{class:"actions edit-only"},(window.PP_MOD&&window.PP_MOD.acoesCliente)?window.PP_MOD.acoesCliente(c):null,el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
+    el("div",{class:"actions edit-only"},(window.PP_MOD&&window.PP_MOD.acoesCliente)?window.PP_MOD.acoesCliente(c):null,el("button",{class:"btn sm",onclick:()=>openClientForm(c)},"Editar cliente"),c.tipo_pessoa==="PF"&&!ks.length?null:el("button",{class:"btn sm primary",onclick:()=>openContractForm({clienteId:c.id})},"+ Contrato"))));
 
   /* Sub-abas da página do cliente. Timeline e Processos são fornecidos pelo módulo da carteira (window.PP_MOD) quando conectado ao Supabase. */
   const MOD=window.PP_MOD||{};const cnt=MOD.contagens?MOD.contagens(c):{};

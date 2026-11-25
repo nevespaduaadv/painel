@@ -21,6 +21,31 @@
     try { const { error } = await fn(); if (error) throw error; toast(okMsg); M.ok = false; await carregar(); window.PP_PROCESSOS?.recarregar?.(); }
     catch (err) { toast(err.message || "Não foi possível concluir"); btn.disabled = false; }
   }
+  /* Em lote, por grupo: uma chamada por processo, na ordem; o que falhar fica na lista e é contado no aviso. */
+  async function emLote(btn, itens, modo, nome) {
+    const cad = modo === "cadastrar", alvo = cad ? itens.filter((x) => x.cliente_id) : itens; if (!alvo.length) return;
+    const rodar = async () => {
+      btn.disabled = true; const rot = btn.textContent; let ok = 0, falhas = 0;
+      for (const x of alvo) {
+        btn.textContent = `${cad ? "Cadastrando" : "Dispensando"} ${ok + falhas + 1} de ${alvo.length}…`;
+        try { const { error } = cad ? await SB.rpc("sync_encontrado_cadastrar", { p_numero: x.numero, p_cliente: null }) : await SB.rpc("sync_encontrado_dispensar", { p_numero: x.numero, p_voltar: false }); if (error) throw error; ok++; }
+        catch (_) { falhas++; }
+      }
+      btn.textContent = rot; btn.disabled = false;
+      toast(`${ok} processo(s) ${cad ? "cadastrado(s)" : "dispensado(s)"}` + (falhas ? ` · ${falhas} não ${cad ? "cadastrado(s)" : "dispensado(s)"}, continuam na lista` : ""));
+      M.ok = false; await carregar(); if (cad) window.PP_PROCESSOS?.recarregar?.();
+    };
+    const titulo = cad ? `Cadastrar ${alvo.length} processo(s)?` : `Dispensar ${alvo.length} processo(s)?`;
+    const texto = cad ? `Os ${alvo.length} processo(s) de ${nome} entram no cadastro do cliente como ativos, sem ficar visíveis ao cliente.` : `Os ${alvo.length} processo(s) de ${nome} saem desta lista. Eles continuam em “Ver dispensados” e podem voltar.`;
+    if (window.NPUI?.confirmar) window.NPUI.confirmar({ titulo, texto, rotuloSim: cad ? "Cadastrar todos" : "Dispensar todos", origem: btn, onSim: rodar });
+    else if (typeof npConfirmar === "function") npConfirmar({ titulo, mensagem: texto, confirmar: cad ? "Cadastrar todos" : "Dispensar todos", onSim: rodar });
+  }
+  function acoesGrupo(k, itens) {
+    const nome = k ? nomeCli(k) : "processos sem cliente identificado";
+    const b = (rot, modo, pri) => window.NPUI?.btn ? window.NPUI.btn(rot, { variante: pri ? "pri" : undefined, onclick: (e) => emLote(e.currentTarget, itens, modo, nome) }) : el("button", { class: "btn sm" + (pri ? " primary" : ""), onclick: (e) => emLote(e.currentTarget, itens, modo, nome) }, rot);
+    return el("div", { "data-np-lote": "1", style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 2px" },
+      k ? b(`Cadastrar todos (${itens.length})`, "cadastrar", true) : null, b(`Dispensar todos (${itens.length})`, "dispensar", false));
+  }
   function linha(x, ro) {
     const b = (rot, fn, pri) => window.NPUI?.btn ? window.NPUI.btn(rot, { variante: pri ? "pri" : undefined, onclick: fn }) : el("button", { class: "btn sm" + (pri ? " primary" : ""), onclick: fn }, rot);
     const acoes = ro ? [] : x.situacao === "dispensado"
@@ -49,6 +74,7 @@
         return el("div", { style: "border:1px solid var(--line);border-radius:10px;padding:10px 14px" },
           el("button", { type: "button", style: "all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:12px;width:100%;font-weight:600", "aria-expanded": String(aberto), onclick: () => { aberto ? M.abertos.delete(k) : M.abertos.add(k); render(); } },
             el("span", {}, k ? nomeCli(k) : "Sem cliente identificado (processos da OAB do escritório)"), el("span", { style: "font-weight:400;color:var(--muted)" }, `${itens.length} processo(s) ${aberto ? "▴" : "▾"}`)),
+          aberto && !ro && !M.verDisp && itens.length > 1 ? acoesGrupo(k, itens) : null,
           aberto ? el("ul", { style: "list-style:none;margin:8px 0 0;padding:0" }, ...itens.map((x) => linha(x, ro))) : null); }),
       !fonte.length ? el("p", { class: "note np-nota", style: "margin:0" }, M.verDisp ? "Nenhum processo dispensado." : "Nenhum processo novo a decidir.") : null);
     const s = window.NPUI?.secao ? window.NPUI.secao("Processos encontrados pelo Sync", corpo) : el("section", { class: "card section" }, el("div", { class: "section-h" }, el("h2", {}, "Processos encontrados pelo Sync")), corpo);
