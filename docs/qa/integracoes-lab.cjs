@@ -6,7 +6,7 @@
    permissões falha-fechadas (nenhuma leitura indevida), contratos públicos (não carregado × vazio × erro), marcos previstos × reuniões
    agendadas × realizadas na Agenda sem suprimir registros legítimos, busca global por estado da lista, paridade da aba da ficha,
    cliente correto nas gravações existentes, 375 px, a11y, V2 e área do cliente intactas. */
-const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs'));
+const { chromium } = require('playwright'); require('./_popup.cjs'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs'));
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });
 const REF = 'ksdwzljfjfucjevdqxvx'; let BASE = '';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json' };
@@ -321,7 +321,7 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
     await v2.ctx.close(); }
   // ========== 4. B5 — busca global integrada ==========
   rel.push('4. B5 — busca global: Negociações e Acompanhamento PJ (só V3.1, só com permissão)');
-  const digitar = async (pg, q) => { await pg.waitForTimeout(300); /* o painel recém-aberto move o foco para o Fechar ~60 ms depois; espera antes de focar a busca */ await pg.fill('#buscaGlobal', ''); await pg.focus('#buscaGlobal'); await pg.type('#buscaGlobal', q, { delay: 20 }); await pg.waitForTimeout(350); };
+  const digitar = async (pg, q) => { await pg.waitForTimeout(300); await require('./_popup.cjs').fecharPopup(pg); /* 25/11: o detalhe é pop-up com véu; a busca global só é alcançada com ele fechado */ /* o painel recém-aberto move o foco para o Fechar ~60 ms depois; espera antes de focar a busca */ await pg.fill('#buscaGlobal', ''); await pg.focus('#buscaGlobal'); await pg.type('#buscaGlobal', q, { delay: 20 }); await pg.waitForTimeout(350); };
   const lerBusca = (pg) => pg.evaluate(() => { const r = document.querySelector('#busca .res'); if (!r) return null; const grupos = {}; let g = null; for (const n of r.children) { if (n.classList.contains('grp-h')) { g = n.textContent; grupos[g] = []; } else if (n.classList.contains('np-busca-extra')) { for (const m of n.children) { if (m.classList.contains('grp-h')) { g = m.textContent; grupos[g] = []; } else if (g) grupos[g].push(m.firstChild?.textContent || m.textContent); } } else if (n.classList.contains('np-busca-est')) grupos._estado = n.textContent; else if (g) grupos[g].push(n.firstChild?.textContent || n.textContent); } return { grupos, proprio: r.classList.contains('np-busca-res'), tab: S.tab, hash: location.hash }; });
   { const { ctx, pg, erros, escritas, leituras } = await contexto(b, { hash: '#painel' });
     await pg.waitForTimeout(600);

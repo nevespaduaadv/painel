@@ -10,7 +10,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const PES = [{ id: 'col-a', nome: 'Ana Teste', nucleo: 'socios', ativo: true, perfil_id: 'u-admin' }, { id: 'col-l', nome: 'Lucas Teste', nucleo: 'juridico', ativo: true, perfil_id: 'u-luc' }, { id: 'col-n', nome: 'Nina Teste', nucleo: 'juridico', ativo: true, perfil_id: 'u-nin' }, { id: 'col-m', nome: 'Mario Teste', nucleo: 'juridico', ativo: true, perfil_id: null }];
 const oc = (id, cid, nome, x = {}) => ({ ocupacao_id: id, colaborador_id: cid, nome, tipo: 'titular', principal: true, ordem: 0, inicio: '2026-11-01T12:00:00Z', afastado_de: null, afastado_ate: null, pendencia: null, tarefas_abertas: 0, ...x });

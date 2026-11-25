@@ -6,7 +6,7 @@
    mesmas ações (Confirmar protocolo → concluirComNota; Marcar como lido → upsert em avisos_leituras; Compromisso → formEvento/
    agenda_eventos; Pausar → PP_TS), navegação entre as telas preservando o item aberto, permissões (perfil só leitura / sem equipe),
    375 px sem sobreposição, contraste e alvos, teclado/ARIA, capturas. */
-const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs'));
+const { chromium } = require('playwright'); require('./_popup.cjs'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs'));
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/hoje-lab'; fs.mkdirSync(OUT, { recursive: true });
 const REF = 'ksdwzljfjfucjevdqxvx';
 let BASE = '';

@@ -10,7 +10,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, dia, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const agora = new Date().toISOString(), mes = agora.slice(0, 7);
 const sf = (n, nome, status, valor, x = {}) => ({ id: 'sf' + n, codigo: 'SF-2026-000' + n, cliente_id: 'c' + n, cliente_nome: nome, contrato_id: n <= 2 ? 'ch1' : null, contrato_codigo: n <= 2 ? 'CH-2026-0001' : null, tipo: 'parcela', descricao: 'Honorários fictícios ' + n, valor_total: valor, qtd_parcelas: 3, vencimento_inicial: dia(10), forma: 'BOLETO', emitir_nf: false, solicitante_nome: 'Ana Teste', solicitante_id: 'col-a', created_by: 'outro', created_at: agora, status, parcelas_pagas: 0, valor_pago: 0, comissao_prevista: 0, rateio: [], ...x });

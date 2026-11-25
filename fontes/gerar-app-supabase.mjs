@@ -61,7 +61,7 @@ html = html.replace('</style>', `
 .sem-marketing .area-marketing{display:none!important}
 .sem-financeiro .area-financeiro{display:none!important}
 .sem-equipe .area-equipe{display:none!important}
-.tab[data-tab="ponto"]{display:none!important} /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
+.tab[data-tab="ponto"],.tab[data-tab="acompanhamento"]{display:none!important} /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
 .sem-growth .area-growth{display:none!important}
 .userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
 .userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}

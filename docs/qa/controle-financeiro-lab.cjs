@@ -12,7 +12,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, dia, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const agora = new Date().toISOString(); const MES = dia(0).slice(0, 7);
 const rg = (id, nome, etapa, x = {}) => ({ id, cliente_id: 'c' + id, chave_cliente: 'c' + id, cliente_nome: nome, etapa, valor: 500, parcela_txt: 'Parcela 3 de 12', venc_ef: dia(0), dias_para: 0, dias_atraso: 0, mensagem_enviada: false, boleto_enviado: false, cobranca_msg_em: null, remarcado_para: null, remarcacoes: 0, venceu_de_novo: false, tarefas: [], tarefas_abertas: 0, excluida: false, link_fatura: 'https://exemplo.invalid/fatura', ...x });

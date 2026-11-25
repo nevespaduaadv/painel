@@ -6,7 +6,7 @@
    mesma escrita do kanban V2; Editar = modal atual; erro do banco = mesmo toast), filtros V3.1 client-side e "Mais filtros",
    painel com os campos reais (valores sem confundir cobrado/acordo; êxito só o gravado), só leitura, ARIA/teclado, capturas,
    V2 intacta sem a chave (Negociações, Fluxo PJ e Monitoramento). */
-const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs')); // cwd = raiz do repositório (como RAIZ)
+const { chromium } = require('playwright'); require('./_popup.cjs'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs')); // cwd = raiz do repositório (como RAIZ)
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/negociacoes-lab'; fs.mkdirSync(OUT, { recursive: true });
 const REF = 'ksdwzljfjfucjevdqxvx';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json' };
@@ -215,7 +215,7 @@ const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); cons
     await pg.evaluate(() => window.PP_NEG.filtro({ escopo: 'todas', concluidas: true })); await pg.waitForTimeout(250); await pg.click('.np-grp[data-g="concluido"] .np-grp-h'); await pg.waitForTimeout(300); // Concluído aberto: a marca "concluída" (ok) tem de existir
     await pg.click(`li.np-it[data-id="${NEGS[0].id}"] .np-it-abrir`); await pg.waitForTimeout(500); await pg.click('.np-p-pe button:has-text("Mover etapa")'); await pg.waitForTimeout(250);
     const pares = [
-      { sel: '.np-resumo b', nome: 'número do resumo' }, { sel: '.np-resumo b.crit', nome: 'número crítico' }, { sel: '.np-resumo b.att', nome: 'número atenção' }, { sel: '.np-resumo span', nome: 'rótulo do resumo' },
+      { sel: '.np-resumo b', nome: 'número do resumo' }, { sel: '.np-resumo b.late', nome: 'número atrasadas' }, { sel: '.np-resumo b.att', nome: 'número atenção' }, { sel: '.np-resumo span', nome: 'rótulo do resumo' },
       { sel: '.np-chipf[aria-pressed="true"]', nome: 'chip ativo' }, { sel: '.np-chipf[aria-pressed="false"]', nome: 'chip inativo' }, { sel: '.np-chipf.crit', nome: 'chip Atrasadas' },
       { sel: '.np-grp-h .t', nome: 'cabeça de grupo' }, { sel: '.np-it-prazo .d', nome: 'prazo' }, { sel: '.np-it-prazo.late .d', nome: 'prazo vencido' }, { sel: '.np-it-abrir .tx', nome: 'título' }, { sel: '.np-it-abrir .ctx', nome: 'contexto' }, { sel: '.ctx .rel.late', nome: 'relativo vencido' },
       { sel: '.np-marca.crit', nome: 'marca quente' }, { sel: '.np-marca.att', nome: 'marca morno/parada' }, { sel: '.np-marca.info', nome: 'marca frio' }, { sel: '.np-marca.ok', nome: 'marca ok' },

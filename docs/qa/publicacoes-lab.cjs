@@ -11,7 +11,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, dia, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const b0 = { tribunal: 'TJSP', orgao: '2ª Vara Cível de Franca', tipo_comunicacao: 'Intimação', tipo_documento: 'Despacho', lida: true, ignorada: false, sem_vinculo: false, providencia: null, tarefas_atribuidas: 0, tarefas_atribuidas_abertas: 0, destinatarios: [{ nome: 'Empresa Alfa Ltda', polo: 'passivo' }], link: 'https://exemplo.invalid/doc' };
 const PUB = [

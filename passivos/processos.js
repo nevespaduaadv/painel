@@ -120,13 +120,20 @@ function renderProcessosV3(v){
   if(!garantir()){if(P.erro&&!P.carregando){v.append(erroP());return}v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"…",label:"carregando"}])}),NPUI.carregando(7));return}
   Object.assign(P.f,{incompleto:false,vencido:false,semProv:false,resp:"",area:"",cliente:""});
   const lista=filtrarP().sort((a,b)=>(a.cliente_nome||"\uffff").localeCompare(b.cliente_nome||"\uffff","pt-BR")||(a.numero_cnj||"").localeCompare(b.numero_cnj||""));P.filtrados=lista;
-  const resumo=NPUI.resumo([{n:lista.length,label:lista.length===1?"processo":"processos"}]);
+  /* 25/11 (sócia): quadros por situação (clicar filtra) e distribuição por tribunal, fase e tipo — sempre sobre os processos ativos */
+  const nSt=st=>P.lista.filter(p=>!st||p.status===st).length;
+  const qdP=(k,t)=>({titulo:t,n:nSt(k),ativo:P.f.status===k,onclick:()=>{P.f.status=k;render()}});
+  const quadrosP=NPUI.quadros([qdP("ativo","Processos ativos"),nSt("suspenso")?qdP("suspenso","Suspensos"):null,nSt("encerrado")?qdP("encerrado","Encerrados"):null,qdP("","Todos os processos")]);
+  const conta=(f)=>{const m=new Map();for(const p of P.lista){if(p.status!=="ativo")continue;let k=String(f(p)||"").trim()||"Não informado";k=k.charAt(0).toUpperCase()+k.slice(1);m.set(k,(m.get(k)||0)+1)}return [...m].map(([rotulo,n])=>({rotulo,n}))};
+  const FASE_R={conhecimento:"Conhecimento",recursal:"Recursal",execucao:"Execução",cumprimento:"Cumprimento de sentença",administrativo:"Administrativo",extrajudicial:"Extrajudicial"};
+  const graficosP=el("div",{class:"np-barras-w"},NPUI.barras({titulo:"Por tribunal",itens:conta(p=>p.tribunal)}),NPUI.barras({titulo:"Por fase processual",itens:conta(p=>FASE_R[p.fase]||p.fase)}),NPUI.barras({titulo:"Por tipo de processo",itens:conta(p=>p.tipo_acao||p.area)}));
   let tq=null;const busca=el("input",{type:"search",class:"np-busca-inline",placeholder:"Buscar nº, cliente, parte, pasta…",value:P.f.q||"","aria-label":"Buscar processo",oninput:ev=>{P.f.q=ev.target.value;clearTimeout(tq);tq=setTimeout(()=>{render();const x=$("#view-processos .np-busca-inline");if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},300)}});
   const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,[{label:"Exportar CSV (lista filtrada)",onclick:()=>{const ls=P.filtrados||[];if(!ls.length){toast("Nada para exportar");return}exportarCSV("processos",ls,COLS_EXP);toast(`${ls.length} linha(s) exportada(s)`)}}],{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-processos .np-ib[aria-label="Mais ações"]')}));
   maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
   const ro=typeof readOnly==="function"&&readOnly();
   const fl=filtrosP();
-  v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita:[busca,maisAc,ro?null:NPUI.btn("Novo processo",{variante:"pri",icone:"mais",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})})]}));
+  v.append(quadrosP,graficosP);
+  v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:lista.length,label:lista.length===1?"processo":"processos"}]),direita:[busca,maisAc,ro?null:NPUI.btn("Novo processo",{variante:"pri",icone:"mais",onclick:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})})]}));
   if(V3.manterPop){V3.manterPop=false;NPUI.reancorarPop()}else NPUI.reancorarPop();
   const obra=el("div",{class:"np-obra"});V3.obra=obra;const corpo=el("div",{class:"np-corpo np-simples"});
   if(!lista.length){

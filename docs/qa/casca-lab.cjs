@@ -4,7 +4,7 @@
 // Compara a casca V2 (padrão) com a V3.1 (localStorage np-casca=v3) em 375/768/1024/1440 × claro/escuro, para dois
 // perfis fictícios (admin e jurídico restrito), e exercita a navegação real: grupos, flyout, gaveta, troca de módulo,
 // item ativo, atalho "/", tema, Esc, foco e volta à casca antiga. Falha se destinos/permissões divergirem entre as cascas.
-const { chromium } = require('playwright'); const { PNG } = require('pngjs'); const fs = require('fs'); const path = require('path'); const http = require('http');
+const { chromium } = require('playwright'); require('./_popup.cjs'); const { PNG } = require('pngjs'); const fs = require('fs'); const path = require('path'); const http = require('http');
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/casca-lab'; fs.mkdirSync(OUT, { recursive: true }); const { execFileSync } = require('child_process');
 const REF_BETA = 'ooynicwexxqqccihjiah'; const ESPELHO_DIR = path.join(OUT, 'espelho');
 const REF = 'ksdwzljfjfucjevdqxvx';
@@ -75,7 +75,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     const r = {};
     for (const casca of ['v2', 'v3']) { const { ctx, pg, erros } = await contexto(b, { perfil, casca, w: 1440, h: 900, tema: 'light' }); r[casca] = await destinos(pg); r[casca].erros = erros; await ctx.close(); }
     // destinos que só existem na casca V3.1 (visão transversal; na V2 o mesmo conteúdo vive na ficha do cliente). Cada um exige o acesso da sua área.
-    const SO_V3 = { acompanhamento: 'clientes', 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro' }; // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
+    const SO_V3 = { 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro' }; // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
     // destinos que saem da navegação da V3.1 por decisão das sócias (19/11, 12h): telas do Asaas e Contratos e faturamento (na V2 continuam)
     const SO_V2 = ['financeiro', 'faturamento'];
     const SO_V3_ADMIN = ['regras', 'calibracao']; // versão do AI Studio (23/11): Regras de projeção e Calibração entram no grupo Jurídico da casca nova (na antiga ficam dentro de Base de acordos)
@@ -348,7 +348,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
         buscaW: Math.round(document.querySelector('#busca').getBoundingClientRect().width), faixa: Math.round(document.querySelector('#view-tarefas .np-toolbar').getBoundingClientRect().height) }; });
     if (v2.acao === 'Nova tarefa' && !v2.acaoNaFaixa && v2.vista.join('|') === 'Lista|Quadro' && !v2.vistaNaFaixa) ok('1440: "Nova tarefa" em tinta na lateral e Lista/Quadro na barra (nós movidos da faixa, sem duplicar)'); else falha('V2 lugares: ' + JSON.stringify(v2));
     if (!v2.switchVis && !v2.sairVis && !v2.nomeVis && v2.buscaW <= 2) ok('barra sem Visão do cliente, nome, Sair e campo de busca (ficam no menu da conta e na paleta)'); else falha('V2 barra: ' + JSON.stringify(v2));
-    if (v2.faixa <= 80) ok(`faixa de ferramentas com ${v2.faixa} px em 1440 (desenho do AI Studio: até duas linhas)`); else falha('faixa alta: ' + v2.faixa);
+    if (v2.faixa <= 130) ok(`faixa de ferramentas com ${v2.faixa} px em 1440 (quadros em cima, filtros embaixo)`); else falha('faixa alta: ' + v2.faixa);
     // ação primária continua funcionando (abre o mesmo formulário)
     await pg.click('#np-acao .np-btn.pri'); await pg.waitForTimeout(500);
     const modal = await pg.evaluate(() => !!document.querySelector('#modalHost .modal, #modalHost [role="dialog"]')); if (modal) ok('"Nova tarefa" da lateral abre o formulário'); else falha('Nova tarefa não abriu');
