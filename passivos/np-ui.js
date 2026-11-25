@@ -194,6 +194,17 @@ const vt = (fn) => { if (reduz() || !doc.startViewTransition || vtEmCurso) { fn(
 const flip = (host, fn) => { const antes = {}; host.querySelectorAll(".np-it").forEach(e => antes[e.dataset.id] = e.getBoundingClientRect()); fn(); if (reduz()) return; host.querySelectorAll(".np-it").forEach(e => { const a = antes[e.dataset.id]; const b = e.getBoundingClientRect(); if (!a) { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: E_IN }); return; } const dy = a.top - b.top; if (Math.abs(dy) > 1 && Math.abs(dy) < 600) e.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 240, easing: E_MOVE }); }); };
 
 /* ---------- botões ---------- */
+/* Paginação de listas longas: devolve null quando cabe tudo em uma página. "onIr(n)" recebe a página pedida (1…N). */
+const fatia = (lista, pagina, porPagina = 40) => { const n = Math.max(1, Math.ceil(lista.length / porPagina)); const p = Math.min(Math.max(1, pagina || 1), n); return { pagina: p, paginas: n, itens: lista.slice((p - 1) * porPagina, p * porPagina), de: lista.length ? (p - 1) * porPagina + 1 : 0, ate: Math.min(lista.length, p * porPagina) }; };
+const paginas = ({ total, pagina = 1, porPagina = 40, onIr, rotulo = "itens" } = {}) => {
+  const n = Math.max(1, Math.ceil(total / porPagina)); if (n <= 1) return null; const p = Math.min(Math.max(1, pagina), n);
+  const b = (txt, alvo, ar) => el("button", { type: "button", class: "np-btn ghost", disabled: alvo < 1 || alvo > n || alvo === p ? "" : null, "aria-label": ar, onclick: () => onIr && onIr(alvo) }, txt);
+  return el("nav", { class: "np-paginas", "aria-label": "Páginas da lista", style: "display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:14px 4px 6px" },
+    b("« Primeira", 1, "Primeira página"), b("‹ Anterior", p - 1, "Página anterior"),
+    el("span", { class: "np-num", "aria-live": "polite", style: "min-width:150px;text-align:center" }, `Página ${p} de ${n}`),
+    b("Próxima ›", p + 1, "Próxima página"), b("Última »", n, "Última página"),
+    el("span", { class: "np-rodape", style: "padding:0 6px" }, `${(p - 1) * porPagina + 1}–${Math.min(total, p * porPagina)} de ${total} ${rotulo}`));
+};
 const btn = (label, { variante = "", onclick, title, disabled, icone, type = "button", cls = "" } = {}) => el("button", { type, class: ("np-btn " + variante + " " + cls).trim(), onclick, title: title || null, disabled: disabled ? "" : null }, icone ? svgIco(I[icone] || icone) : null, label);
 const ib = (icone, label, onclick) => el("button", { type: "button", class: "np-ib", "aria-label": label, title: label, onclick }, svgIco(I[icone] || icone));
 
@@ -675,5 +686,5 @@ const pedirTexto = ({ titulo = "Informar texto", mensagem = "", texto = "", rotu
 };
 
 const ativo = () => doc.documentElement.classList.contains("np-casca-v3");
-window.NPUI = { ativo, form, modalV3, confirmar, pedirTexto, secaoForm, maisCampos, revelarCampo, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+window.NPUI = { fatia, paginas, ativo, form, modalV3, confirmar, pedirTexto, secaoForm, maisCampos, revelarCampo, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

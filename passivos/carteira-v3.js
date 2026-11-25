@@ -9,7 +9,8 @@
   "use strict";
   const ligado = () => { try { return document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI && typeof equipe === "function" && equipe(); } catch (_) { return false; } };
   const LIMPO = { ordem: "az", escopo: "todos", atraso: false, neg: false, proc: false, inad: false, meus: false, seg: "", resp: "", etapa: "", q: "" };
-  const K = { f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
+  const POR_PAGINA = 40;
+  const K = { pg: 1, pgChave: "", f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
   const SIT_B = { inadimplente: "Inadimplente", vai_ficar_inadimplente: "Vai ficar inadimplente", adimplente: "Adimplente" };
   const ETAPAS = { 0: "Contrato fechado", 1: "Cadastro ADVBox", 2: "Formulário enviado", 3: "Formulário respondido", 4: "Auditoria", 5: "R1 agendada", 6: "R1 feita", 7: "R2 feita", 8: "R3 feita", 9: "Ciclo encerrado", 10: "Ciclo mensal" };
   const GRUPOS = [["atencao", "Exigem atenção", "att"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
@@ -91,12 +92,17 @@
       onOpen: () => { K.aberta = null; S.sel = r.c.id; S.sub = null; render(); } });
   }
   function lista(regs) {
-    const host = el("div", { class: "np-corpo" });
+    const host = el("div", { class: "np-corpo" }); K.fatia = null;
     if (!(S.clientes || []).length) { host.append(NPUI.vazio({ titulo: "Nenhum cliente cadastrado", texto: S.db ? "Use “+ Novo cliente” para começar." : "Conectando ao banco de dados…" })); return host; }
     if (!regs.length) { host.append(NPUI.vazio({ titulo: "Nenhum cliente com esses filtros", texto: "Tire um filtro para ver a carteira inteira.", acao: "Limpar filtros", onAcao: () => { K.f = { ...LIMPO }; renderList(); } })); return host; }
     const sinal = K.f.ordem === "za" ? -1 : 1;
     const its = regs.slice().sort((a, b) => sinal * (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"));
-    host.append(el("ul", { class: "np-lst" }, its.map(linha)));
+    // 40 por página; mudar filtro, busca ou ordem volta para a primeira
+    const chave = JSON.stringify(K.f); if (chave !== K.pgChave) { K.pgChave = chave; K.pg = 1; }
+    const fa = NPUI.fatia(its, K.pg, POR_PAGINA); K.pg = fa.pagina; K.fatia = fa;
+    host.append(el("ul", { class: "np-lst" }, fa.itens.map(linha)));
+    const pag = NPUI.paginas({ total: its.length, pagina: fa.pagina, porPagina: POR_PAGINA, rotulo: "clientes", onIr: (n) => { K.pg = n; renderList(); window.scrollTo(0, 0); document.querySelector("#np-carteira .np-corpo")?.scrollTo?.(0, 0); document.querySelector("#np-carteira .np-lst .np-it button, #np-carteira .np-lst .np-it a")?.focus?.({ preventScroll: true }); } });
+    if (pag) host.append(pag);
     return host;
   }
   function filtros(regs) {
@@ -126,7 +132,7 @@
     NPUI.reancorarPop();
     if (K.erro) v.append(NPUI.faixaErro({ texto: "Os prazos dos clientes não carregaram; a lista segue sem eles.", acao: "Tentar de novo", onAcao: () => carregarApoio(true) }));
     const obra = el("div", { class: "np-obra" }); K.obra = obra; const corpo = lista(vis);
-    corpo.append(NPUI.rodape(`${vis.length} de ${regs.length} cliente${regs.length === 1 ? "" : "s"}${vis.length === regs.length ? "" : " com estes filtros"} · ordem alfabética ${K.f.ordem === "za" ? "decrescente (Z–A)" : "crescente (A–Z)"}`));
+    corpo.append(NPUI.rodape(`${K.fatia && K.fatia.paginas > 1 ? `mostrando ${K.fatia.de}–${K.fatia.ate} · ` : ""}${vis.length} de ${regs.length} cliente${regs.length === 1 ? "" : "s"}${vis.length === regs.length ? "" : " com estes filtros"} · ordem alfabética ${K.f.ordem === "za" ? "decrescente (Z–A)" : "crescente (A–Z)"}`));
     obra.append(corpo); v.append(obra);
     K.painel = NPUI.painel({ obra, label: "Resumo do cliente", onClose: () => { K.aberta = null; } });
     if (K.aberta) { if (regs.some((r) => r.c.id === K.aberta)) abrirPainel(K.aberta, { silencioso: true }); else K.aberta = null; }
