@@ -37,7 +37,7 @@
   --np-att:#93600F;          /* âmbar para texto (4,8:1) */
   --np-att-s:#B7791F;        /* âmbar para régua e marcadores (não-texto) */
   --np-crit:#A3302E;         /* fatal */
-  --np-late:#8E2B29;         /* atrasada */
+  --np-late:#93600F;         /* atrasada = âmbar (25/11: fatal em vermelho, atrasado em amarelo) */
   --np-info:#2F5C8F;         /* compromisso / fazendo */
   --np-accent:var(--np-ink); /* destaque = grafite (decisão das sócias de 11/11: sem dourado) */
   /* semânticas (fundo) */
@@ -51,15 +51,15 @@
   --np-scrim:rgba(15,20,28,.38);
   --np-focus:0 0 0 2px var(--np-bg),0 0 0 4px var(--np-ink);
   /* tipografia (famílias já existentes no projeto) */
-  --np-display:"EB Garamond",Georgia,"Times New Roman",serif;
+  --np-display:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif; /* 25/11: sem serifa/cursiva em nenhuma tela (decisão das sócias) — o token fica como alias da UI */
   --np-ui:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --np-fs-1:12px;   /* kbd, contadores, iniciais — mínimo absoluto */
-  --np-fs-2:13px;   /* secundário da linha, meta */
-  --np-fs-3:14px;   /* corpo, título da linha, navegação */
-  --np-fs-4:15px;   /* título da barra */
-  --np-fs-5:15.5px; /* prazo (serifa) */
+  --np-fs-1:12.5px;   /* kbd, contadores, iniciais — mínimo absoluto */
+  --np-fs-2:13.5px;   /* secundário da linha, meta */
+  --np-fs-3:14.5px;   /* corpo, título da linha, navegação */
+  --np-fs-4:15.5px;   /* título da barra */
+  --np-fs-5:14.5px; /* prazo */
   --np-fs-6:17px;   /* título do painel */
-  --np-fs-7:20px;   /* número do resumo (serifa) */
+  --np-fs-7:18px;   /* número do resumo */
   /* forma e medidas */
   --np-r:6px;        /* controles */
   --np-r-lg:10px;    /* folhas flutuantes e painel */
@@ -83,7 +83,7 @@
     --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
     --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
     --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
-    --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0; --np-accent:var(--np-ink);
+    --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#E0B35A; --np-info:#86ADE0; --np-accent:var(--np-ink);
     --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
     --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
     --np-sh-ctrl:0 1px 2px rgba(0,0,0,.35);
@@ -97,7 +97,7 @@
   --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
   --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
   --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
-  --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0; --np-accent:var(--np-ink);
+  --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#E0B35A; --np-info:#86ADE0; --np-accent:var(--np-ink);
   --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
   --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
   --np-sh-ctrl:0 1px 2px rgba(0,0,0,.35);

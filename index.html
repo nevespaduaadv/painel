@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sistema interno — Neves Pádua Advocacia</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
 <style>
 @font-face{font-family:"General Sans";font-weight:300;font-display:swap;src:url(passivos/fontes/general-sans-300.woff2) format("woff2")}
 @font-face{font-family:"General Sans";font-weight:400;font-display:swap;src:url(passivos/fontes/general-sans-400.woff2) format("woff2")}
@@ -52,7 +52,7 @@
   --np-att:#93600F;          /* âmbar para texto (4,8:1) */
   --np-att-s:#B7791F;        /* âmbar para régua e marcadores (não-texto) */
   --np-crit:#A3302E;         /* fatal */
-  --np-late:#8E2B29;         /* atrasada */
+  --np-late:#93600F;         /* atrasada = âmbar (25/11: fatal em vermelho, atrasado em amarelo) */
   --np-info:#2F5C8F;         /* compromisso / fazendo */
   --np-accent:var(--np-ink); /* destaque = grafite (decisão das sócias de 11/11: sem dourado) */
   /* semânticas (fundo) */
@@ -66,15 +66,15 @@
   --np-scrim:rgba(15,20,28,.38);
   --np-focus:0 0 0 2px var(--np-bg),0 0 0 4px var(--np-ink);
   /* tipografia (famílias já existentes no projeto) */
-  --np-display:"EB Garamond",Georgia,"Times New Roman",serif;
+  --np-display:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif; /* 25/11: sem serifa/cursiva em nenhuma tela (decisão das sócias) — o token fica como alias da UI */
   --np-ui:"General Sans","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --np-fs-1:12px;   /* kbd, contadores, iniciais — mínimo absoluto */
-  --np-fs-2:13px;   /* secundário da linha, meta */
-  --np-fs-3:14px;   /* corpo, título da linha, navegação */
-  --np-fs-4:15px;   /* título da barra */
-  --np-fs-5:15.5px; /* prazo (serifa) */
+  --np-fs-1:12.5px;   /* kbd, contadores, iniciais — mínimo absoluto */
+  --np-fs-2:13.5px;   /* secundário da linha, meta */
+  --np-fs-3:14.5px;   /* corpo, título da linha, navegação */
+  --np-fs-4:15.5px;   /* título da barra */
+  --np-fs-5:14.5px; /* prazo */
   --np-fs-6:17px;   /* título do painel */
-  --np-fs-7:20px;   /* número do resumo (serifa) */
+  --np-fs-7:18px;   /* número do resumo */
   /* forma e medidas */
   --np-r:6px;        /* controles */
   --np-r-lg:10px;    /* folhas flutuantes e painel */
@@ -98,7 +98,7 @@
     --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
     --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
     --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
-    --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0; --np-accent:var(--np-ink);
+    --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#E0B35A; --np-info:#86ADE0; --np-accent:var(--np-ink);
     --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
     --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
     --np-sh-ctrl:0 1px 2px rgba(0,0,0,.35);
@@ -112,7 +112,7 @@
   --np-text:#E8EAEC; --np-text-2:#B3B9BF; --np-text-3:#8F979E; --np-inv:#141618;
   --np-ink:#E8EAEC; --np-ink-2:#D0D4D8;
   --np-sel:rgba(255,255,255,.08); --np-sel-2:rgba(255,255,255,.14); --np-hover:rgba(255,255,255,.05);
-  --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#D9716D; --np-info:#86ADE0; --np-accent:var(--np-ink);
+  --np-ok:#6CC391; --np-att:#E0B35A; --np-att-s:#E0B35A; --np-crit:#E57F7B; --np-late:#E0B35A; --np-info:#86ADE0; --np-accent:var(--np-ink);
   --np-ok-bg:rgba(108,195,145,.14); --np-att-bg:rgba(224,179,90,.14); --np-crit-bg:rgba(229,127,123,.14); --np-info-bg:rgba(134,173,224,.14);
   --np-shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);
   --np-sh-ctrl:0 1px 2px rgba(0,0,0,.35);
@@ -150,6 +150,7 @@
   --bg:#151412; --surface:#1D1C1A; --surface-2:#262523; --line:#302E2B;
   --fg:#F2F0EB; --muted:#A8A49F; --faint:#8C8882; --gold:#C2B693; --gold-soft:#3E3828; --shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3); --shadow-pop:0 8px 30px rgba(0,0,0,.5);
   --ok:#4FB577; --warn:#D9B04A; --crit:#D8706B; --info:#7FA7D6; --ch-a:#5EA98A; --ch-b:#C9A35E; --ch-grid:#343A3D; --navy:#141617; --navy-2:#101213; --navy-3:#2A2F32; --btn-primary:#1F8F4C; --btn-primary-shadow:rgba(31,143,76,.3); color-scheme:dark }
+:root{--serif:var(--body)} /* 25/11: sem serifa/cursiva em nenhuma tela (decisão das sócias); o token legado continua em tokens.css */
 /* ============================================================================
    Casca V3.1 (Design System — Fase 1). Só vale sob html.np-casca-v3.
    Ativada pela chave localStorage "np-casca" = "v3" (Meu perfil → Navegação).
@@ -394,7 +395,7 @@ html:root.np-casca-v3{
   --shadow:none; --shadow-pop:var(--np-shadow);
 }
 html.np-casca-v3 .np-ag-livres{display:flex;gap:10px;align-items:baseline;margin:2px 0;padding:8px 12px;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text-3)}
-html.np-casca-v3 .np-ag-livres-r{font:italic 400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
+html.np-casca-v3 .np-ag-livres-r{font:400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
 html.np-casca-v3 .switch input[type="checkbox"],html.np-casca-v3 td input[type="checkbox"]{accent-color:var(--np-ink)}
 
 
@@ -492,17 +493,17 @@ html.np-casca-v3 .np-it-dir{display:flex;gap:10px;align-items:center;justify-con
 html.np-casca-v3 .np-quem{display:inline-flex;align-items:center;gap:6px;font-size:var(--np-fs-2);color:var(--np-text-2)}
 html.np-casca-v3 .np-quem b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--np-surface-2);border:1px solid var(--np-line);font:600 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2);letter-spacing:.02em}
 html.np-casca-v3 .np-quem-vazio{color:var(--np-text-3)}
-html.np-casca-v3 .np-marca{font:italic 500 var(--np-fs-2)/1 var(--np-display);color:var(--np-text-2)}
+html.np-casca-v3 .np-marca{font:500 var(--np-fs-2)/1 var(--np-display);color:var(--np-text-2)}
 html.np-casca-v3 .np-marca.crit{color:var(--np-crit)}html.np-casca-v3 .np-marca.att{color:var(--np-att)}html.np-casca-v3 .np-marca.info{color:var(--np-info)}html.np-casca-v3 .np-marca.ok{color:var(--np-ok)}
 /* feito · reabrir */
 html.np-casca-v3 .np-it-feita{grid-template-columns:1fr;cursor:default;color:var(--np-text-2);background:var(--np-ok-bg)}
-html.np-casca-v3 .np-feito{display:flex;gap:10px;align-items:center;font:italic 500 var(--np-fs-3)/1.2 var(--np-display);padding:6px 0}
+html.np-casca-v3 .np-feito{display:flex;gap:10px;align-items:center;font:500 var(--np-fs-3)/1.2 var(--np-display);padding:6px 0}
 /* ---------- estados ---------- */
 html.np-casca-v3 .np-vazio{padding:36px 12px;text-align:center;color:var(--np-text-2)}
-html.np-casca-v3 .np-vazio h3{font:italic 500 var(--np-fs-6)/1.2 var(--np-display);margin:0 0 6px;color:var(--np-text)}
+html.np-casca-v3 .np-vazio h3{font:500 var(--np-fs-6)/1.2 var(--np-display);margin:0 0 6px;color:var(--np-text)}
 html.np-casca-v3 .np-vazio p{margin:0;font-size:var(--np-fs-2)}
 html.np-casca-v3 .np-erro{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--np-line);border-bottom:1px solid var(--np-line);font-size:var(--np-fs-2);color:var(--np-text-2);margin:8px 0}
-html.np-casca-v3 .np-erro i{font:italic 500 var(--np-fs-3)/1.2 var(--np-display);color:var(--np-crit)}
+html.np-casca-v3 .np-erro i{font:500 var(--np-fs-3)/1.2 var(--np-display);color:var(--np-crit)}
 html.np-casca-v3 .np-esqueleto>div{height:var(--np-row-h);border-bottom:1px solid var(--np-line);background:linear-gradient(90deg,transparent 0 44px,var(--np-surface-2) 44px 120px,transparent 120px 134px,var(--np-surface-2) 134px 60%,transparent 60%)}
 html.np-casca-v3 .np-rodape{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:10px 6px;font-size:var(--np-fs-1);color:var(--np-text-3);flex-wrap:wrap}
 html.np-casca-v3 .np-legenda{display:flex;gap:12px}html.np-casca-v3 .np-legenda span{display:inline-flex;align-items:center;gap:5px}
@@ -797,7 +798,7 @@ html.np-casca-v3 .np-ficha .kpi .l{font:500 var(--np-fs-2)/1.3 var(--np-ui);lett
 html.np-casca-v3 .np-ficha .kpi .v{font:500 var(--np-fs-7)/1.15 var(--np-display);letter-spacing:0;margin-top:6px;color:var(--np-text);font-variant-numeric:tabular-nums}
 html.np-casca-v3 .np-ficha .kpi .h{font-size:var(--np-fs-1);color:var(--np-text-3);margin-top:4px}
 /* pílulas da V2 viram marcas (serifa itálica; cor só semântica) */
-html.np-casca-v3 .np-ficha .pill{background:none;border:0;padding:0;border-radius:0;opacity:1;font:italic 500 var(--np-fs-2)/1.2 var(--np-display);color:var(--np-text-2);white-space:nowrap}
+html.np-casca-v3 .np-ficha .pill{background:none;border:0;padding:0;border-radius:0;opacity:1;font:500 var(--np-fs-2)/1.2 var(--np-display);color:var(--np-text-2);white-space:nowrap}
 html.np-casca-v3 .np-ficha .pill.e3{color:var(--np-late)}html.np-casca-v3 .np-ficha .pill.e2{color:var(--np-att)}html.np-casca-v3 .np-ficha .pill.c{color:var(--np-info)}html.np-casca-v3 .np-ficha .pill.e1{color:var(--np-ok)}html.np-casca-v3 .np-ficha .pill.g{color:var(--np-text-2)}
 /* tabelas compactas: cabeçalho sem caixa alta, número em serifa à direita */
 html.np-casca-v3 .np-ficha table{font-size:var(--np-fs-2);color:var(--np-text)}
@@ -2044,6 +2045,40 @@ html.np-casca-v3 .np-simples .np-it{grid-template-columns:minmax(0,1fr) auto;gri
 html.np-casca-v3 .np-simples .np-it-chk,html.np-casca-v3 .np-simples .np-it-prazo{display:none}
 @media (max-width:600px){html.np-casca-v3 .np-simples .np-it{grid-template-columns:minmax(0,1fr);grid-template-areas:"texto" "dir"}}
 
+/* ============ Bloco 1 (25/11) — sugestões da sócia: sem cursiva, balões, fatal vermelho / atrasado amarelo / hoje em tinta, filtros numa linha à direita ============ */
+html.np-casca-v3 :is(i,em,cite,address){font-style:normal}
+/* marcas viram balões */
+html.np-casca-v3 .np-marca{display:inline-flex;align-items:center;font:500 var(--np-fs-1)/1 var(--np-ui);padding:4px 8px;border-radius:999px;background:var(--np-surface-2);border:1px solid var(--np-line);color:var(--np-text-2);white-space:nowrap}
+html.np-casca-v3 .np-marca:is(.crit,.att,.late,.info,.ok){border-color:transparent}
+html.np-casca-v3 .np-marca.crit{background:var(--np-crit-bg)}html.np-casca-v3 .np-marca:is(.att,.late){background:var(--np-att-bg)}html.np-casca-v3 .np-marca.info{background:var(--np-info-bg)}html.np-casca-v3 .np-marca.ok{background:var(--np-ok-bg)}
+html.np-casca-v3 .np-ficha .pill{display:inline-flex;align-items:center;font:500 var(--np-fs-1)/1 var(--np-ui);padding:4px 8px;border-radius:999px;background:var(--np-surface-2);border:1px solid var(--np-line)}
+html.np-casca-v3 .np-ficha .pill:is(.e1,.e2,.e3,.c){border-color:transparent}
+html.np-casca-v3 .np-ficha .pill.e3{background:var(--np-crit-bg);color:var(--np-crit)}html.np-casca-v3 .np-ficha .pill.e2{background:var(--np-att-bg)}html.np-casca-v3 .np-ficha .pill.c{background:var(--np-info-bg)}html.np-casca-v3 .np-ficha .pill.e1{background:var(--np-ok-bg)}
+/* resumo: cada número num balão */
+html.np-casca-v3 .np-resumo{gap:6px;align-items:center}
+html.np-casca-v3 .np-resumo>span{display:inline-flex;align-items:baseline;gap:5px;padding:5px 10px;border-radius:999px;background:var(--np-surface);border:1px solid var(--np-line);line-height:1}
+html.np-casca-v3 .np-resumo b{font:600 var(--np-fs-4)/1 var(--np-ui);margin:0}
+html.np-casca-v3 .np-resumo b.late{color:var(--np-late)}
+html.np-casca-v3 .np-resumo>span:has(b.crit){background:var(--np-crit-bg);border-color:transparent}html.np-casca-v3 .np-resumo>span:has(b:is(.att,.late)){background:var(--np-att-bg);border-color:transparent}
+/* atrasado: régua cheia em âmbar · vence hoje: tinta */
+html.np-casca-v3 :is(.np-it,.np-cardq).r-late::before{background:var(--np-att-s);width:3px;opacity:1}
+html.np-casca-v3 .np-it.r-late[aria-current="true"]::before{background:var(--np-att-s)}
+html.np-casca-v3 :is(.np-it,.np-cardq).r-hoje::before{background:var(--np-ink)}
+html.np-casca-v3 .np-it-prazo.hoje .d,html.np-casca-v3 .np-cardq .pz.hoje{color:var(--np-text);font-weight:700}
+html.np-casca-v3 .np-legenda i.late{background:var(--np-att-s);width:3px;opacity:1}html.np-casca-v3 .np-legenda i.hoje{background:var(--np-ink)}
+html.np-casca-v3 .np-grp.late .np-grp-h .t{color:var(--np-late)}
+html.np-casca-v3 .np-dossie-frente.r-late::before{width:3px;background:var(--np-att-s)}
+html.np-casca-v3 .np-fila>li.late{border-left-color:var(--np-att-s)}
+@media (max-width:900px){html.np-casca-v3 .np-it-prazo.late .r{color:var(--np-late)}}
+/* filtros: sempre numa linha só, à direita, abaixo do resumo; se não couber, rola de lado (a lista nunca é empurrada por filtros quebrados) */
+@media (min-width:901px){
+  html.np-casca-v3 .np-toolbar{flex-wrap:wrap;row-gap:4px;padding:4px 0}
+  html.np-casca-v3 .np-filtros-w{order:3;flex:1 0 100%;flex-wrap:nowrap;min-width:0}
+  html.np-casca-v3 .np-filtros{flex:0 1 auto;margin-left:auto;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+  html.np-casca-v3 .np-filtros>*{flex:none}
+}
+@media (max-width:900px){html.np-casca-v3 .np-filtros{flex:1 1 100%}html.np-casca-v3 .np-filtros-fixos{flex:0 1 auto;min-width:0;max-width:100%}}
+
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -2312,6 +2347,7 @@ td input:not([type="checkbox"]):not([type="radio"]){width:84px;padding:4px 6px;b
 .sem-marketing .area-marketing{display:none!important}
 .sem-financeiro .area-financeiro{display:none!important}
 .sem-equipe .area-equipe{display:none!important}
+.tab[data-tab="ponto"]{display:none!important} /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
 .sem-growth .area-growth{display:none!important}
 .userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
 .userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}
@@ -2548,7 +2584,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
     PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",acompanhamento:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
-    PP.TAB_AREA["kb-comercial"]="comercial";PP.TABS_DESLIGADAS=new Set(["leads","comercial","automacoes","atendimento"]);
+    PP.TAB_AREA["kb-comercial"]="comercial";PP.TABS_DESLIGADAS=new Set(["leads","comercial","automacoes","atendimento","ponto"]);
     PP.temAcesso=tab=>{if(PP.TABS_DESLIGADAS.has(tab))return false;const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
     for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"kb-comercial",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
     if(!PP.temAcesso("publicacoes"))document.body.classList.add("sem-controle");
@@ -3896,7 +3932,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwwiv0el";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwwky5l8";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");

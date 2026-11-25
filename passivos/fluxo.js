@@ -53,8 +53,7 @@ function cardFluxo(c){
     c.tipos_dividas?el("div",{class:"note"},el("b",{},"Dívidas mapeadas: "),c.tipos_dividas):null,
     el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"},
       el("div",{class:"kv"},el("div",{class:"k"},"Negociações abertas"),el("div",{class:"v"},X.ok?(abertas.length?el("a",{href:"#",style:"color:var(--info)",onclick:e=>{e.preventDefault();S.sub="negociacoes";render()}},`${abertas.length} · ${abertas.map(n=>NEG_LABEL[n.etapa]).filter((v,i,a)=>a.indexOf(v)===i).join(", ")}`):"nenhuma"):"…")),
-      el("div",{class:"kv"},el("div",{class:"k"},"Monitoramento"),el("div",{class:"v"},mon?[el("span",{class:"pill "+(mon.status==="nova_movimentacao"?"e2":"e1")},MON_STATUS[mon.status]),mon.proxima_checagem?` próxima checagem ${fmtD(parseD(mon.proxima_checagem))}`:""]:el("span",{class:"note"},"não iniciado"))),
-      c.notion_url?el("div",{class:"kv"},el("div",{class:"k"},"Notion"),el("div",{class:"v"},el("a",{href:c.notion_url,target:"_blank",rel:"noopener",style:"color:var(--info)"},"↗ card no Notion"))):null));
+      el("div",{class:"kv"},el("div",{class:"k"},"Monitoramento"),el("div",{class:"v"},mon?[el("span",{class:"pill "+(mon.status==="nova_movimentacao"?"e2":"e1")},MON_STATUS[mon.status]),mon.proxima_checagem?` próxima checagem ${fmtD(parseD(mon.proxima_checagem))}`:""]:el("span",{class:"note"},"não iniciado")))));
   return card;
 }
 async function avancar(c){
@@ -78,10 +77,10 @@ function openFluxoForm(c){
       NPUI.maisCampos("Reserva, régua e onboarding",[
         field("fl-pro","Possui processos ajuizados?",pro),field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),
         field("fl-res","Projeto de reserva",res,"Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: 3d · Prata: 20d · Ouro: 45d."),
-        field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip)
+        field("fl-onb","Responsável pelo onboarding",onb),field("fl-tip","Tipos de contratos / dívidas",tip)
       ],{contador:"auto"}))
     :el("div",{class:"form"},field("fl-et","Etapa do fluxo PJ",et,"Só avance quando a etapa anterior estiver 100% cumprida."),field("fl-st","Status",st),field("fl-div","Tem dívida em atraso?",div,"Sim → abre automaticamente o acompanhamento no setor de acordos."),field("fl-adi","Honorários em dia?",adi),field("fl-pro","Possui processos ajuizados?",pro),
-      field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-url","Card no Notion",url),field("fl-tip","Tipos de contratos / dívidas",tip),
+      field("fl-res","Projeto de reserva",res,"Sem reserva não há poder de negociação. Verificar a partir da R2."),field("fl-reg","Régua de relacionamento",reg,"Bronze: silêncio de 3 dias já é risco. Prata: 20. Ouro: 45."),field("fl-srv","Serviço",srv),field("fl-onb","Responsável pelo onboarding",onb),field("fl-tip","Tipos de contratos / dívidas",tip),
       field("fl-regok","Registrato salvo na pasta?",regok,"Condição para o setor de acordos começar a negociar."),field("fl-dir","Direcionamento",dir,"Ao escolher, o sistema abre a tarefa no núcleo certo (Acordos e/ou Jurídico PJ) e garante a negociação. Só muda de novo se você alterar."));
   modal("Fluxo do cliente PJ",body,async()=>{
     const cols={etapa_fluxo:et.value===""?null:+et.value,status:st.value,tem_divida_atraso:triVal(div),adimplente:triVal(adi),possui_processos:triVal(pro),projeto_reserva:res.value||null,regua:reg.value||null,servico:srv.value||null,tipos_dividas:tip.value.trim()||null,responsavel_onboarding_id:onb.value||null,notion_url:url.value.trim()||null,registrato_ok:triVal(regok),direcionamento:dir.value||null};
@@ -171,7 +170,7 @@ function renderNegCliente(c,host){
   if(ok&&m)mon.append(el("div",{class:"ct-b",style:"padding:0;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"},
     kv("Status",el("span",{class:"pill "+(m.status==="nova_movimentacao"?"e2":m.status==="pausado"?"g":"e1")},MON_STATUS[m.status])),kv("Documentos monitorados",(m.documentos||[]).join(", ")||"—"),kv("Última checagem",m.ultima_checagem?fmtD(parseD(m.ultima_checagem)):"—"),
     kv("Próxima checagem",m.proxima_checagem?el("span",{style:m.checagem_vencida?"color:var(--crit);font-weight:700":""},fmtD(parseD(m.proxima_checagem))):"—"),kv("Responsável",m.responsavel_nome||"—"),kv("Processos ativos",String(m.processos_ativos||0))),
-    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},flag("Tem processo",m.tem_processo,"e2"),flag("Foi citado",m.foi_citado,"e3"),flag("Tem garantia",m.tem_garantia,"e2"),m.avalistas?el("span",{class:"pill g"},"Avalistas: "+AVAL[m.avalistas]):null),m.observacoes?el("div",{class:"note",style:"white-space:pre-wrap"},m.observacoes):null);
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},flag("Tem processo",m.tem_processo,"e2"),flag("Foi citado",m.foi_citado,"e3"),flag("Tem garantia",m.tem_garantia,"e2"),m.avalistas?el("span",{class:"pill g"},"Avalistas: "+AVAL[m.avalistas]):null),m.observacoes&&m.observacoes!=="null"?el("div",{class:"note",style:"white-space:pre-wrap"},m.observacoes):null);
   else if(ok)mon.append(el("div",{class:"note"},"Ainda não há monitoramento para este cliente."));
   host.append(mon);
 }

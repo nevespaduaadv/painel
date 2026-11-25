@@ -200,12 +200,12 @@ function linhaAgV3(e,{comDia=false}={}){
   const i=new Date(e.inicio);const p=NPUI.prazoTxt(iso(i),e.dia_inteiro?null:hm(i));
   if(!comDia){p.curta=e.tipo==="marco"?"previsto":e.origem==="prazo"?"prazo":e.dia_inteiro?"dia inteiro":p.hora||"—";p.hora="";p.rel=""}else p.rel="";
   if(!e.dia_inteiro&&comDia)p.hora=hmV3(i);
-  const regua=e.atrasada?"late":e.prazo_fatal?"fatal":e.tipo==="prazo"?"att":null;
+  const regua=e.prazo_fatal?"fatal":e.atrasada?"late":e.tipo==="prazo"?"att":null;
   const dir=[e.prazo_fatal?NPUI.marca("fatal","crit"):e.origem==="prazo"?(e.prazo_origem==="processo"?NPUI.marca("processo"):e.prazo_origem==="negociacao"?NPUI.marca("negociação"):null):TIPO_M[e.tipo]?NPUI.marca(TIPO_M[e.tipo],e.tipo==="audiencia"?"crit":""):null,e.origem==="google"?NPUI.marca("Google"):e.origem==="tarefa"?NPUI.marca("tarefa"):e.origem==="lead"?NPUI.marca("CRM"):null,
     e.tipo==="marco"?NPUI.marca(e.marco.realizada?"realizada":e.vencido?"previsto · não realizado":"marco previsto",e.marco.realizada?"ok":e.vencido?"att":""):e.marco?NPUI.marca("marco "+e.marco.rotulo):null,NPUI.quem(e.colaborador_nome)];
   const fimOk=e.fim&&!isNaN(new Date(e.fim));const fimTxt=!e.dia_inteiro&&fimOk?"até "+hmV3(new Date(e.fim)):null;
   const nDias=e.dia_inteiro&&fimOk?Math.round((new Date(e.fim)-new Date(e.inicio))/864e5):1;const diasTxt=nDias>1?`${nDias} dias (até ${addD(new Date(e.fim),-1).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})`:null;
-  return NPUI.linha({id:e.id,regua,prazo:{...p,tom:regua==="late"||regua==="fatal"?"crit":regua==="att"?"att":""},titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),contexto:ctxV3([e.cliente_nome,e.local,fimTxt,diasTxt]),direita:dir,atual:G3.aberta===e.id,onOpen:li=>abrirPainelAgV3(e,li),titleAbrir:"Ver o compromisso"});
+  return NPUI.linha({id:e.id,regua,prazo:{...p,tom:regua==="fatal"?"crit":regua||""},titulo:String(e.titulo||"").replace(/^PRAZO FATAL:\s*/,""),contexto:ctxV3([e.cliente_nome,e.local,fimTxt,diasTxt]),direita:dir,atual:G3.aberta===e.id,onOpen:li=>abrirPainelAgV3(e,li),titleAbrir:"Ver o compromisso"});
 }
 function abrirPainelAgV3(e,li,{silencioso}={}){
   if(!G3.painel){abrir(e);return}G3.aberta=e.id;
@@ -252,7 +252,7 @@ function renderAgendaV3(){
   const evs=visiveis();const dias=[];for(let d=new Date(ini);d<fim;d=addD(d,1))dias.push(d);
   const porDia=d=>{const k=iso(d);return evs.filter(e=>{const s0=new Date(e.inicio);return e.dia_inteiro?iso(s0)<=k&&iso(addD(new Date(e.fim),-1))>=k:iso(s0)===k}).sort((a,b)=>(a.dia_inteiro?0:1)-(b.dia_inteiro?0:1)||a.inicio.localeCompare(b.inicio))};
   const no=dias.flatMap(d=>porDia(d));const nPr=no.filter(e=>e.tipo==="prazo").length,nFat=no.filter(e=>e.prazo_fatal).length,nAtr=no.filter(e=>e.atrasada).length,nMar=no.filter(e=>e.tipo==="marco").length,nComp=no.length-nPr-nMar;
-  const resumo=NPUI.resumo([{n:nFat,label:"fatais",tom:nFat?"crit":"zero"},{n:nAtr,label:"atrasados",tom:nAtr?"crit":"zero"},{n:nPr,label:"prazos",tom:nPr?"att":"zero"},{n:nComp,label:nComp===1?"compromisso":"compromissos"}].filter(Boolean)); // marcos previstos NÃO entram no resumo (não são compromissos) — a contagem vai no rodapé, para não empurrar os chips Minha agenda / Toda a equipe
+  const resumo=NPUI.resumo([{n:nFat,label:"fatais",tom:nFat?"crit":"zero"},{n:nAtr,label:"atrasados",tom:nAtr?"late":"zero"},{n:nPr,label:"prazos",tom:nPr?"att":"zero"},{n:nComp,label:nComp===1?"compromisso":"compromissos"}].filter(Boolean)); // marcos previstos NÃO entram no resumo (não são compromissos) — a contagem vai no rodapé, para não empurrar os chips Minha agenda / Toda a equipe
   const meu=meuColab();const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
   const quem=(k,l,n)=>C({label:l,n,on:A.quem===k,grupo:"quem",onclick:()=>{A.quem=k;try{localStorage.setItem("pp-agenda-quem",k)}catch(_){}render()}});
   quem("minha","Minha agenda");quem("equipe","Toda a equipe");
@@ -270,8 +270,8 @@ function renderAgendaV3(){
   const obra=el("div",{class:"np-obra"});G3.obra=obra;const corpo=el("div",{class:"np-corpo"});
   corpo.append(el("div",{class:"np-ag-h"},el("h1",{},rot.replace(/^./,c=>c.toUpperCase())),el("span",{class:"np-ag-s"},sync)));
   if(vista==="grade"){ // mesma grade da V2 (horários livres, conflitos, sobreposições); chips abrem o painel; célula vazia abre o formulário no horário
-    if(A.modo==="mes"){const {g,nota}=montarMes(dias,porDia);corpo.append(el("div",{class:"np-grade-w"},g),NPUI.rodape(nota,[["crit","fatal / atrasado"],["att","prazo"]]))}
-    else{const {grade,fora}=montarGrade(dias,porDia,evs);corpo.append(el("div",{class:"np-grade-w"},grade));if(fora.length)corpo.append(el("p",{class:"np-sem np-fora"},"Fora do horário exibido (7h–20h): "+fora.map(e=>`${hm(new Date(e.inicio))} ${e.titulo}`).join(" · ")));corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período${nMar?` · ${nMar} marco${nMar===1?" previsto":"s previstos"} (Acompanhamento PJ)`:""} · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]))}
+    if(A.modo==="mes"){const {g,nota}=montarMes(dias,porDia);corpo.append(el("div",{class:"np-grade-w"},g),NPUI.rodape(nota,[["crit","fatal"],["late","atrasado"],["att","prazo"]]))}
+    else{const {grade,fora}=montarGrade(dias,porDia,evs);corpo.append(el("div",{class:"np-grade-w"},grade));if(fora.length)corpo.append(el("p",{class:"np-sem np-fora"},"Fora do horário exibido (7h–20h): "+fora.map(e=>`${hm(new Date(e.inicio))} ${e.titulo}`).join(" · ")));corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período${nMar?` · ${nMar} marco${nMar===1?" previsto":"s previstos"} (Acompanhamento PJ)`:""} · ${evs.length} carregados`,[["crit","fatal"],["late","atrasado"],["att","prazo"]]))}
     corpo.append(el("div",{class:"ag-legenda"},Object.entries(TIPO).map(([k,l])=>el("span",{},el("i",{style:`background:${COR[k]||COR.outro}`}),l)),el("span",{},el("i",{style:"background:transparent;border:1.5px dashed var(--muted)"}),"do Google"),window.PP_ACOMP?.podeVer?.()===true?el("span",{},el("i",{style:"background:transparent;border:1.5px dotted var(--muted)"}),"marco previsto (Acompanhamento PJ)"):null));
     obra.append(corpo);v.append(obra);G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
     if(G3.aberta){const e=todosItens().find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}
@@ -292,7 +292,7 @@ function renderAgendaV3(){
     fecharLivres();grupos.push(NPUI.grupo({id:"d"+k,titulo:lbl,n:l.length,tom:nac?"crit":null,aberto:A.modo!=="mes"||k>=hoje,itens}))});
   fecharLivres();
   if(!grupos.some(g=>!g.classList?.contains("np-ag-livres")))corpo.append(NPUI.vazio({titulo:"Nada neste período",texto:"Nenhum compromisso, prazo ou feriado."+(readOnly()?"":" Use Compromisso para marcar.")}));else grupos.forEach(g=>corpo.append(g));
-  corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período${nMar?` · ${nMar} marco${nMar===1?" previsto":"s previstos"} (Acompanhamento PJ)`:""} · ${evs.length} carregados`,[["crit","fatal / atrasado"],["att","prazo"]]));
+  corpo.append(NPUI.rodape(`${no.length} ${no.length===1?"item":"itens"} no período${nMar?` · ${nMar} marco${nMar===1?" previsto":"s previstos"} (Acompanhamento PJ)`:""} · ${evs.length} carregados`,[["crit","fatal"],["late","atrasado"],["att","prazo"]]));
   obra.append(corpo);v.append(obra);
   G3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{G3.aberta=null}});
   if(G3.aberta){const e=todosItens().find(x=>x.id===G3.aberta);if(e)abrirPainelAgV3(e,null,{silencioso:true});else G3.aberta=null}

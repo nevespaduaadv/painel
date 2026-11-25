@@ -90,7 +90,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
   // ---------- 2. navegação real na V3 (admin) ----------
   rel.push('2. navegação real na V3.1 (admin, 1440)');
   { const { ctx, pg, erros } = await contexto(b, { perfil: 'admin', casca: 'v3', w: 1440, h: 900, tema: 'light' });
-    const alvos = await pg.evaluate(() => [...document.querySelectorAll('#np-tree .tab[data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab));
+    const alvos = await pg.evaluate(() => [...document.querySelectorAll('#np-tree .tab[data-tab]')].filter(b => !b.hidden && getComputedStyle(b).display !== 'none').map(b => b.dataset.tab));
     let okNav = 0, ruins = [];
     for (const t of alvos) {
       await pg.evaluate((t) => { const b = document.querySelector(`#np-tree .tab[data-tab="${t}"]`); const g = b.closest('.np-g'); if (g && g.dataset.aberto !== '1') g.querySelector('.np-gh').click(); }, t);
