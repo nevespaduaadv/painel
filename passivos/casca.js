@@ -84,8 +84,10 @@
     atendimento: { grupo: "Atendimento", grupoId: null, label: "Atendimento", tabAcesso: "atendimento", cls: "area-atendimento" },
     automacoes: { grupo: "Comercial", grupoId: null, label: "Automações", tabAcesso: "automacoes", cls: "area-comercial" },
     feriados: { grupo: "Ferramentas", grupoId: null, label: "Feriados", tabAcesso: "feriados", cls: "" },
-    regras: { grupo: "Jurídico", grupoId: "juridico", label: "Regras de projeção", tabAcesso: "regras", cls: "admin-only" },
-    calibracao: { grupo: "Jurídico", grupoId: "juridico", label: "Calibração", tabAcesso: "calibracao", cls: "admin-only" },
+    // 25/11 (sócia): Base de acordos, Regras de projeção e Calibração saem do Jurídico e ficam com a gestão
+    historico: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Base de acordos", tabAcesso: "historico", cls: "admin-only" },
+    regras: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Regras de projeção", tabAcesso: "regras", cls: "admin-only" },
+    calibracao: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Calibração", tabAcesso: "calibracao", cls: "admin-only" },
     usuarios: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Usuários e acessos", tabAcesso: "usuarios", cls: "admin-only" },
     perfil: { grupo: "", grupoId: null, label: "Meu perfil", tabAcesso: "perfil", cls: "" },
   };
@@ -203,7 +205,7 @@
     const itens = NAV.filter(n => n.tab || n.link), grupos = NAV.filter(n => n.grupo), byTab = t => itens.find(i => i.tab === t);
     const hub = (chave, label, icone) => { const h = HUBS[chave]; const it = itens.find(i => i.tabs && h && i.tabs.some(t => h.tabs.some(([x]) => x === t))); if (!h || !it) return null;
       // abas de hub sem acesso não entram no modelo (não existem na árvore, no flyout nem na árvore de acessibilidade)
-      return { id: chave, label, icone, cls: it.cls || "", hubTab: it.tab, itens: h.tabs.filter(([t]) => it.tabs.includes(t) && acesso(t)).map(([t, l]) => ({ tab: t, label: l, cls: "" })) }; };
+      return { id: chave, label, icone, cls: it.cls || "", hubTab: it.tab, itens: h.tabs.filter(([t]) => it.tabs.includes(t) && acesso(t) && t !== "historico").map(([t, l]) => ({ tab: t, label: l, cls: "" })) }; };
     const deGrupos = (ids) => grupos.filter(g => ids.includes(g.grupo)).flatMap(g => g.itens.map(i => ({ ...i, cls: ((g.cls || "") + " " + (i.cls || "")).trim() })));
     const ro = soLeitura(); const FIXOS = ro ? [...FIXOS_BASE, "clientes", "acompanhamento"] : FIXOS_BASE;
     const cart = byTab("clientes"), acomp = byTab("acompanhamento");
@@ -233,7 +235,7 @@
     // Ferramentas mantém apenas os destinos aprovados do NAV (ex.: Base de conhecimento em Comercial), preservando
     // apenas o fallback silencioso de breadcrumb/título em ROTAS_META para rotas legadas abertas diretamente.
     const LEGADO_CRM = new Set(["leads", "comercial", "atendimento", "automacoes"]);
-    for (const t of ["regras", "calibracao"]) addAoGrupo("juridico", t, true);
+    for (const t of ["historico", "regras", "calibracao"]) addAoGrupo("equipe", t, true);
     // Rota direta atualmente aberta fora de NAV/hubs (ex.: fin-visao, financeiro-controle): entra no grupo correto se permitida,
     // exceto rotas legadas de CRM/Atendimento (grupoId: null e guardadas em LEGADO_CRM).
     const curTab = tabAtual();

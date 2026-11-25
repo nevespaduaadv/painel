@@ -422,7 +422,8 @@ td input:not([type="checkbox"]):not([type="radio"]){width:84px;padding:4px 6px;b
 .sem-marketing .area-marketing{display:none!important}
 .sem-financeiro .area-financeiro{display:none!important}
 .sem-equipe .area-equipe{display:none!important}
-.tab[data-tab="ponto"],.tab[data-tab="acompanhamento"]{display:none!important} /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
+.tab[data-tab="ponto"],.tab[data-tab="acompanhamento"]{display:none!important}
+.nao-admin .tab[data-tab="historico"]{display:none!important} /* 25/11: Base de acordos só para a gestão */ /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
 .sem-growth .area-growth{display:none!important}
 .userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
 .userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}
@@ -1548,8 +1549,11 @@ function openHistForm(h={}){
   modal(h.id?"Editar acordo":"Registrar acordo na base",body,async()=>{
     if(!credor.value.trim())throw new Error("Informe o credor");if(!(+divida.value)||!valor.value)throw new Error("Informe dívida e valor do acordo");
     const d={credor:credor.value.trim(),grupo:grupo.value,titular:tit.value,produto:prod.value,garantia:gar.value,fase:fase.value,divida:+divida.value,valorAcordo:+valor.value,forma:forma.value,parcelas:forma.value==="parcelado"?(+npar.value||null):1,data:data.value,diasAtraso:dias.value?+dias.value:null,status:status.value,obs:obs.value};
-    if(!(d.credor in S.regras.fatoresBanco)){S.regras.fatoresBanco[d.credor]=0;await S.db.doc("config/regras").set(S.regras)}
-    if(h.id)await S.db.doc("historico/"+h.id).set(d);else await S.db.collection("historico").add(d);toast("Acordo salvo na base");
+    if(h.negociacaoId)d.negociacaoId=h.negociacaoId;
+    const gestaoBase=typeof PP==="undefined"||PP.perfil?.papel==="admin"; // regras de projeção: só a gestão altera
+    if(gestaoBase&&!(d.credor in S.regras.fatoresBanco)){S.regras.fatoresBanco[d.credor]=0;await S.db.doc("config/regras").set(S.regras)}
+    let novo=null;if(h.id)await S.db.doc("historico/"+h.id).set(d);else novo=await S.db.collection("historico").add(d);toast("Acordo salvo na base");
+    if(typeof h.aoSalvar==="function")try{await h.aoSalvar(novo?.id||h.id||null,d)}catch(_){}
   },extra);
 }
 
@@ -1794,7 +1798,7 @@ render();
   db.collection("contratos").onSnapshot(s=>{S.contratos=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>console.warn(e));
 })();
 </script>
-<script src="../passivos/carteira.js?v=mwwq3zg5"></script>
-<script src="../passivos/ficha.js?v=mwwq3zg5"></script>
+<script src="../passivos/carteira.js?v=mwwrx6cj"></script>
+<script src="../passivos/ficha.js?v=mwwrx6cj"></script>
 </body>
 </html>

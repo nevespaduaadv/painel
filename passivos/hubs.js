@@ -4,7 +4,7 @@
 (() => {
   "use strict";
   const HUBS = {
-    juridico: { label: "Jurídico", tabs: [["processos", "Processos e pastas"], ["publicacoes", "Publicações"], ["negociacoes", "Negociações"], ["historico", "Base de acordos"]] },
+    juridico: { label: "Jurídico", tabs: [["processos", "Processos e pastas"], ["publicacoes", "Publicações"], ["negociacoes", "Negociações"]] }, // 25/11: Base de acordos saiu do Jurídico (só gestão)
     financeiro: { label: "Financeiro", tabs: [["financeiro", "Cobranças"], ["faturamento", "Contratos e faturamento"], ["estoque", "Estoque"], ["inventario", "Inventário"]] },
     equipe: { label: "Equipe", tabs: [["equipe", "Colaboradores"], ["usuarios", "Usuários e acessos"]] },
   };

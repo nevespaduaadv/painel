@@ -30,7 +30,8 @@ async function carregar(){
   try{
     const [n,m,c]=await Promise.all([SB.from("v_negociacoes").select("*").order("etapa_ordem").order("ordem").order("updated_at",{ascending:false}),
       SB.from("v_monitoramentos").select("*").order("proxima_checagem",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,nome,nucleo,ativo").order("nome")]);
-    if(n.error)throw n.error;X.neg=n.data||[];X.mon=m.data||[];X.colabs=c.data||[];X.ok=true;X.erro=null;
+    if(n.error)throw n.error;X.neg=n.data||[];X.naBase=new Set();SB.from("negociacoes").select("id,base_acordo_id").not("base_acordo_id","is",null).then(r=>{if(!r.error){X.naBase=new Set((r.data||[]).map(x=>x.id));if(S.tab==="negociacoes")render()}},()=>{}); // coluna da migração 0120; sem ela, nada marcado
+    X.mon=m.data||[];X.colabs=c.data||[];X.ok=true;X.erro=null;
   }catch(e){console.warn("fluxo",e);X.erro=String(e.message||e);toast("Não foi possível carregar negociações")}
   finally{X.carregando=false}
   render();
@@ -138,7 +139,7 @@ function renderNegociacoes(){
   if(negV3())return renderNegociacoesV3();
   const v=$("#view-negociacoes");v.replaceChildren();v.classList.remove("np-v3");
   v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Acordos"),el("h1",{},"Negociações"),el("div",{class:"sub"},"Kanban do setor de acordos: uma negociação por banco/contrato, da abertura ao acordo concluído. Clique no card para editar; arraste entre as colunas (ou use o seletor) para mudar a etapa.")),
-    el("div",{class:"actions"},el("button",{class:"btn",onclick:()=>irPara("historico"),title:"Acordos já fechados: base para a projeção de desconto"},"Base de acordos"),PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("regras")},"Regras de projeção"):null,PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("calibracao")},"Calibração"):null,el("button",{class:"btn primary",onclick:()=>openNegForm(null,{})},"+ Negociação"))));
+    el("div",{class:"actions"},PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("historico"),title:"Acordos já fechados: base para a projeção de desconto"},"Base de acordos"):null,PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("regras")},"Regras de projeção"):null,PP.perfil?.papel==="admin"?el("button",{class:"btn",onclick:()=>irPara("calibracao")},"Calibração"):null,el("button",{class:"btn primary",onclick:()=>openNegForm(null,{})},"+ Negociação"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const fc=sel({"":"Todos os clientes",...Object.fromEntries([...new Set(X.neg.map(n=>n.cliente_id))].map(id=>[id,nomeCli(id)]).sort((a,b)=>a[1].localeCompare(b[1])))},X.fCli);fc.onchange=()=>{X.fCli=fc.value;render()};
   const fr=sel({"":"Todos os responsáveis",...Object.fromEntries(X.colabs.filter(c=>c.ativo).map(c=>[c.id,c.nome]))},X.fResp);fr.onchange=()=>{X.fResp=fr.value;render()};
@@ -423,7 +424,7 @@ function filtrarN3(lista){
 }
 const reguaN3=n=>n.etapa==="concluido"?null:n.atrasada?"late":paradaN(n)?"att":null;
 const tomPrazoN3=n=>n.atrasada&&n.etapa!=="concluido"?"late":"";
-function marcasN3(n){const m=[];if(n.temperatura&&TEMP[n.temperatura])m.push(NPUI.marca(TEMP[n.temperatura].toLowerCase(),TEMP_TOM[n.temperatura]));if(paradaN(n))m.push(NPUI.marca(`parada há ${n.dias_parada}d`,"att"));if(n.etapa==="concluido")m.push(NPUI.marca("concluída","ok"));return m}
+function marcasN3(n){const m=[];if(n.temperatura&&TEMP[n.temperatura])m.push(NPUI.marca(TEMP[n.temperatura].toLowerCase(),TEMP_TOM[n.temperatura]));if(paradaN(n))m.push(NPUI.marca(`parada há ${n.dias_parada}d`,"att"));if(n.etapa==="concluido")m.push(NPUI.marca("concluída","ok"));if(NEG_PEDE_BASE.has(n.etapa)&&!naBaseN(n)&&X.naBase)m.push(NPUI.marca("falta registrar na base","att"));return m}
 function contextoN3(n){
   const p=NPUI.prazoTxt(n.prazo);const partes=[];
   if(n.cliente_nome)partes.push(el("b",{},n.cliente_nome));if(n.banco)partes.push(n.banco);if(n.situacao_processual)partes.push(n.situacao_processual);if(n.aguardando)partes.push("aguardando "+n.aguardando);
@@ -447,10 +448,21 @@ function listaN3(lista){
     host.append(NPUI.grupo({id:k,titulo:l,n:its.length,tom:"",aberto:ab[k]!=null?ab[k]!==false:abertoPadrao,onToggle:v=>{ab[k]=v;NPUI.pref.set("np-neg-grupos",JSON.stringify(ab))},itens:its.map(linhaN3)}))}
   return host;
 }
+/* 25/11 (sócia): acordo formalizado ou concluído alimenta a Base de acordos pela própria negociação. Quem negocia só inclui; a consulta da base é da gestão. */
+const NEG_PEDE_BASE=new Set(["formalizado","concluido"]);
+const naBaseN=n=>!!(X.naBase&&X.naBase.has(n.id));
+function registrarNaBase(n){
+  if(readOnly()||typeof openHistForm!=="function")return;
+  const dias=n.data_inicio_atraso?Math.max(0,Math.round((Date.now()-new Date(n.data_inicio_atraso))/864e5)):null;
+  openHistForm({credor:n.banco||"",divida:+n.valor_cobrado||"",valorAcordo:+n.valor_acordo||"",diasAtraso:dias,status:"fechado",obs:"",negociacaoId:n.id,
+    aoSalvar:async(id)=>{X.naBase=X.naBase||new Set();X.naBase.add(n.id);await SB.from("negociacoes").update({base_acordo_id:id||"registrado"}).eq("id",n.id).then(()=>{},()=>{});render()}});
+}
+function oferecerBase(n,etapa){if(!NEG_PEDE_BASE.has(etapa)||naBaseN(n)||!window.NPUI?.confirmar)return;
+  NPUI.confirmar({titulo:"Registrar na base de acordos?",texto:"O acordo de "+(n.banco||"este banco")+" passa a alimentar a base usada nas projeções. Leva um minuto: banco, tempo em atraso, tipo de dívida, valor inicial e valor de quitação.",rotuloSim:"Registrar agora",rotuloNao:"Depois",onSim:()=>registrarNaBase({...n,etapa})})}
 /* mover etapa: cópia 1:1 do aoSoltar do kanban V2 (e do seletor do card) — mesma escrita, mesmo toast, mesma recarga */
 async function moverN3(n,etapa){
   if(n.etapa===etapa)return;if(readOnly()){toast("Só leitura");return}
-  const {error}=await SB.from("negociacoes").update({etapa}).eq("id",n.id);if(error)toast("Não foi possível mover");else{toast(NEG_LABEL[etapa]);recarregar()}
+  const {error}=await SB.from("negociacoes").update({etapa}).eq("id",n.id);if(error)toast("Não foi possível mover");else{toast(NEG_LABEL[etapa]);recarregar();oferecerBase(n,etapa)}
 }
 function cardN3(n){
   const p=NPUI.prazoTxt(n.prazo);const r=reguaN3(n);
@@ -503,7 +515,7 @@ function renderNegociacoesV3(){
   const resumo=NPUI.resumo([{n:abertas.length,label:"abertas"},{n:nAtr,label:"atrasadas",tom:nAtr?"late":"zero"},{n:nPar,label:"paradas",tom:nPar?"att":"zero"},{n:BRL(abertas.reduce((a,n)=>a+(+n.valor_cobrado||0),0)),label:"em valor cobrado"}],{quadros:true});
   const vista=vistaN3();
   const seg=NPUI.seg([["lista","Lista"],["quadro","Quadro"]],vista,k=>{N3.vista=k;NPUI.pref.set("np-neg-vista",k);NPUI.vt(()=>render())});
-  const maisAcoes=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[{label:"Base de acordos",onclick:()=>irPara("historico")},PP.perfil?.papel==="admin"?{label:"Regras de projeção",onclick:()=>irPara("regras")}:null,PP.perfil?.papel==="admin"?{label:"Calibração",onclick:()=>irPara("calibracao")}:null].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});
+  const maisAcoes=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[PP.perfil?.papel==="admin"?{label:"Base de acordos",onclick:()=>irPara("historico")}:null,PP.perfil?.papel==="admin"?{label:"Regras de projeção",onclick:()=>irPara("regras")}:null,PP.perfil?.papel==="admin"?{label:"Calibração",onclick:()=>irPara("calibracao")}:null].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});
   maisAcoes.setAttribute("aria-haspopup","menu");maisAcoes.setAttribute("aria-expanded","false");
   const direita=[seg,maisAcoes,readOnly()?null:NPUI.btn("Nova negociação",{variante:"pri",icone:"mais",onclick:()=>openNegForm(null,{})})];
   const fl=filtrosN3();v.append(NPUI.toolbar({resumo,filtros:fl.chips,filtrosFixos:fl.fixos,direita}));NPUI.reancorarPop();
@@ -567,7 +579,8 @@ function abrirPainelN3(n,{origem,silencioso}={}){
   const btnMover=readOnly()?null:NPUI.btn("Mover etapa…",{variante:"pri",onclick:(e)=>NPUI.pop(e.currentTarget,NEG_ETAPAS.map(([k,l])=>({label:l,atual:n.etapa===k,onclick:()=>moverN3(n,k)})),{label:"Mover etapa"})});
   if(btnMover){btnMover.setAttribute("aria-haspopup","menu");btnMover.setAttribute("aria-expanded","false")}
   const btnEditar=readOnly()?null:NPUI.btn("Editar",{onclick:()=>openNegForm(null,n)});
-  const mais=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[c?{label:"Abrir cliente",onclick:()=>abrirClienteN3(c.id,"negociacoes")}:null,{label:"Base de acordos",onclick:()=>irPara("historico")}].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});
+  const podeBase=!readOnly()&&NEG_PEDE_BASE.has(n.etapa)||(!readOnly()&&n.etapa==="pagamento_pendente");
+  const mais=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[c?{label:"Abrir cliente",onclick:()=>abrirClienteN3(c.id,"negociacoes")}:null,podeBase?{label:naBaseN(n)?"Registrar de novo na base de acordos":"Registrar na base de acordos",onclick:()=>registrarNaBase(n)}:null,PP.perfil?.papel==="admin"?{label:"Base de acordos",onclick:()=>irPara("historico")}:null].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});
   mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");
   N3.painel.abrir({id:n.id,trilha,titulo:n.titulo||[n.cliente_nome,n.banco].filter(Boolean).join(" | "),corpo,pe:[btnMover,btnEditar,mais],origem:silencioso?null:origem});
 }
