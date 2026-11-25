@@ -22,8 +22,11 @@ async function carregar(){
   try{
     const desde=new Date(Date.now()-120*864e5).toISOString().slice(0,10);
     const pag=async(q)=>{const out=[];for(let i=0;i<10;i++){const {data,error}=await q.range(i*1000,i*1000+999);if(error)throw error;out.push(...(data||[]));if((data||[]).length<1000)break}return out};
-    const [ab,pg,m,s,e]=await Promise.all([pag(SB.from("v_cobrancas").select("*").in("status",["pendente","atrasada"]).order("vencimento",{ascending:true})),
-      pag(SB.from("v_cobrancas").select("*").in("status",["paga","estornada","cancelada"]).gte("vencimento",desde).order("vencimento",{ascending:false})),
+    // "dados" é o retorno bruto do Asaas (mais da metade do peso de cada linha) e nenhuma tela da lista usa: a consulta pede as demais colunas.
+    // As colunas vêm de uma linha de amostra, para acompanhar a view sem lista fixa; se a amostra falhar, volta ao "*".
+    let COLS="*";try{const a=await SB.from("v_cobrancas").select("*").limit(1);const k=a.data&&a.data[0]?Object.keys(a.data[0]).filter(c=>c!=="dados"):[];if(k.length)COLS=k.join(",")}catch(_){}
+    const [ab,pg,m,s,e]=await Promise.all([pag(SB.from("v_cobrancas").select(COLS).in("status",["pendente","atrasada"]).order("vencimento",{ascending:true}).order("id")),
+      pag(SB.from("v_cobrancas").select(COLS).in("status",["paga","estornada","cancelada"]).gte("vencimento",desde).order("vencimento",{ascending:false}).order("id")),
       SB.from("v_financeiro_mes").select("*").eq("mes",mesAtual()).maybeSingle(),
       SB.from("asaas_sincronizacoes").select("*").order("id",{ascending:false}).limit(1).maybeSingle(),SB.from("escritorio").select("dados").eq("id","financeiro").maybeSingle()]);
     F.rows=[...ab,...pg];F.mes=m.data?[m.data]:[];F.sinc=s.data||null;F.cfg=e.data?.dados||{};F.ok=true;F.erro=null;

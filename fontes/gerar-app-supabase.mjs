@@ -364,8 +364,9 @@ window.__PP_LOGIN = new Promise(resolve=>{
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
     PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",acompanhamento:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
-    PP.temAcesso=tab=>{const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
-    for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"leads",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
+    PP.TAB_AREA["kb-comercial"]="comercial";PP.TABS_DESLIGADAS=new Set(["leads","comercial","automacoes","atendimento"]);
+    PP.temAcesso=tab=>{if(PP.TABS_DESLIGADAS.has(tab))return false;const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
+    for(const a of PP.AREAS)if(!PP.temAcesso({clientes:"clientes",juridico:"processos",comercial:"kb-comercial",marketing:"marketing",financeiro:"financeiro",equipe:"equipe",growth:"growth",atendimento:"atendimento",superendividamento:"superendividamento"}[a]))document.body.classList.add("sem-"+a);
     if(!PP.temAcesso("publicacoes"))document.body.classList.add("sem-controle");
     if(!PP.temAcesso(S.tab))S.tab="painel";
     if(S.tab==="usuarios"&&PP.perfil.papel!=="admin")S.tab="clientes";
@@ -477,6 +478,9 @@ if(modo!=='token'){const idx = html.lastIndexOf('</script>');html = html.slice(0
 must('</body>');
 const V=`?v=${Date.now().toString(36)}`;
 html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>\n') + '</body>');
+// Decisão das sócias (25/11/2026): Comercial (leads, funil, importação, fluxos e automações) e Atendimento (WhatsApp) saíram do sistema
+// jurídico; do Comercial fica só a Base de conhecimento. Os arquivos continuam em passivos/ e os dados no banco (vão para o CRM).
+// Ficam 'fechamento' e 'docx-contrato': são a seção Fechamento do Cadastro do cliente (dados do contrato), não o funil.
 // Módulos da equipe: lista ordenada (a ordem importa — ficha depende de carteira/tarefas, conhecimento de documentos,
 // fechamento de docx-contrato…). Cada módulo diz a quais áreas pertence; o carregador (PP.carregarModulos) só baixa
 // os de "core" + as áreas da pessoa (admin = todas; cliente = só carteira e ficha).
@@ -484,11 +488,11 @@ const MODULOS = [
   ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['acompanhamento-pj','clientes'],['fluxo','juridico'],['monitoramento-sync','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['processo-sync','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes'],['marketing','marketing'],
-  ['comercial','comercial'],['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['financeiro-controle','financeiro'],['faturamento','financeiro'],['dossie','core'],
+  ['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['financeiro-controle','financeiro'],['faturamento','financeiro'],['dossie','core'],
   ['estoque','financeiro'],['inventario','financeiro'],['perfil','core'],['avisos','core'],['ponto','core'],['requisicoes','core'],['providencias','clientes'],['config-gestao','core'],['protecao','clientes'],['chat','core'],
-  ['gestao','admin'],['leads','comercial'],['leads-importar','comercial'],['fluxos-mensagens','comercial'],['automacoes','comercial'],
+  ['gestao','admin'],
   ['docx-contrato','comercial'],['fechamento','comercial'],['revisional','juridico'],['pecas','juridico','superendividamento'],
-  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['atendimento','atendimento'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['carteira-v3','clientes'],['ficha-v3','clientes'],['ficha-pf','core'],['hubs','core'],['np-ui','core'],['casca','core'],
+  ['superendividamento','juridico','superendividamento'],['documentos','core'],['conhecimento','core'],['espelho','admin'],['importar-advbox','admin'],['clientes-visao','clientes'],['carteira-v3','clientes'],['ficha-v3','clientes'],['ficha-pf','core'],['hubs','core'],['np-ui','core'],['casca','core'],
 ];
 const loader = `<script>
 PP.MODULOS=${JSON.stringify(MODULOS)};PP.MODULOS_V=${JSON.stringify(V)};PP.modulosCarregados=new Set();

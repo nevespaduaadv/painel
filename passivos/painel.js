@@ -16,7 +16,7 @@ async function carregar(){
       SB.from("v_tarefas").select("id,titulo,status,prazo,prazo_fatal,responsavel_id,responsavel_nome,cliente_nome,faixa,created_by").in("status",["aberta","em_andamento"]),
       SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo"),
       SB.from("tarefa_eventos").select("*").order("criado_em",{ascending:false}).limit(80),
-      SB.from("v_leads").select("id,nome,empresa,status,atraso,tarefas_vencidas,proprietario_id,fase_nome").eq("status","Aberto"),
+      Promise.resolve({data:null,error:{message:"comercial fora do sistema (25/11/2026)"}}), // leads saíram do sistema jurídico
       SB.from("v_tickets").select("*")]);
     if(p.error)throw p.error;
     D.prazos=p.data||[];D.tarefas=t.data||[];D.colab=c.data||[];D.eventos=e.data||[];D.leads=l.error?null:(l.data||[]);D.tickets=tk?.data||[];D.ok=true;
