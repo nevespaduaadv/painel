@@ -64,7 +64,7 @@ const linha = ({ id, regua, check, prazo, titulo, contexto, direita = [], atual 
 };
 
 /* ---------- feedback no lugar ---------- */
-const feito = (li, { texto, acao, onAcao }) => { const f = el("div", { class: "np-feito", role: "status" }, el("span", {}, texto), acao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null); li.replaceChildren(f); li.classList.remove("r-fatal", "r-late", "r-att"); li.removeAttribute("aria-current"); li.classList.add("np-it-feita"); li.animate([{ opacity: .4 }, { opacity: 1 }], { duration: ms(240), easing: E_IN }); return f; };
+const feito = (li, { texto, acao, onAcao }) => { const f = el("div", { class: "np-feito", role: "status" }, el("span", {}, texto), acao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null); li.replaceChildren(f); li.classList.remove("r-fatal", "r-late", "r-att", "r-hoje"); li.removeAttribute("aria-current"); li.classList.add("np-it-feita"); li.animate([{ opacity: .4 }, { opacity: 1 }], { duration: ms(240), easing: E_IN }); return f; };
 const faixaErro = ({ texto, quando, acao = "Tentar de novo", onAcao }) => el("div", { class: "np-erro", role: "alert" }, el("i", {}, texto), quando ? el("span", {}, ` Mostrando os dados de ${quando}.`) : null, onAcao ? el("button", { type: "button", class: "lnk", onclick: onAcao }, acao) : null);
 const vazio = ({ titulo, texto, acao, onAcao }) => el("div", { class: "np-vazio" }, el("h3", {}, titulo), el("p", {}, texto, acao ? [" ", el("button", { type: "button", class: "lnk", onclick: onAcao }, acao)] : null));
 const carregando = (n = 6) => el("div", { class: "np-esqueleto", "aria-busy": "true", "aria-label": "Carregando" }, Array.from({ length: n }, () => el("div", {})));

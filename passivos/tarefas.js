@@ -553,13 +553,13 @@ window.PP_MOD.tarefas=renderTarefasCliente;
    ==================================================================================================================== */
 const tarefasV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 const V3={painel:null,obra:null,aberta:null,grupos:null,vista:null,tick:null,recem:new Map()};
-const FAIXA_TOM={atrasada:"crit",hoje:"att"};
+const FAIXA_TOM={atrasada:"late",hoje:""};
 const ETAPA_N3={analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
 const gruposV3=()=>{if(!V3.grupos){try{V3.grupos=JSON.parse(NPUI.pref.get("np-tarefas-grupos","{}"))||{}}catch(_){V3.grupos={}}}return V3.grupos};
 const vistaV3=()=>{if(!V3.vista)V3.vista=NPUI.pref.get("np-tarefas-vista",null)||(()=>{try{return localStorage.getItem("pp-tarefas-vista")||"lista"}catch(_){return "lista"}})();return V3.vista};
 /* régua e tom do prazo: fatal (vermelho cheio) > atrasada (vermelho 2 px) > vence hoje (âmbar); tarefas fechadas não têm régua */
-const reguaDe=t=>{const ab=t.status==="aberta"||t.status==="em_andamento";if(!ab)return null;if(t.prazo_fatal&&["atrasada","hoje","d7"].includes(t.faixa))return "fatal";if(t.faixa==="atrasada")return "late";if(t.faixa==="hoje")return "att";return null};
-const tomPrazo=t=>{const r=reguaDe(t);return r==="fatal"?"crit":r==="late"?"late":r==="att"?"att":""};
+const reguaDe=t=>{const ab=t.status==="aberta"||t.status==="em_andamento";if(!ab)return null;if(t.prazo_fatal&&["atrasada","hoje","d7"].includes(t.faixa))return "fatal";if(t.faixa==="atrasada")return "late";if(t.faixa==="hoje")return "hoje";return null};
+const tomPrazo=t=>{const r=reguaDe(t);return r==="fatal"?"crit":r==="late"?"late":r==="hoje"?"hoje":""};
 /* contexto da linha: cliente em peso 500 · núcleo · processo · relativo do prazo (a data exata fica na coluna de prazo) */
 function contextoV3(t,{mostrarCliente=true}={}){
   const p=NPUI.prazoTxt(t.prazo,t.hora);const partes=[];
@@ -683,7 +683,7 @@ function renderTarefasV3(){
   const n=k=>abertas.filter(t=>t.faixa===k).length;const fat=abertas.filter(t=>t.prazo_fatal&&["atrasada","hoje","d7"].includes(t.faixa)).length;
   // ordem do Figma (18/11): primeiro o que já passou, depois o fatal de hoje, o dia e a semana
   const fatHoje=abertas.filter(t=>t.prazo_fatal&&t.faixa==="hoje").length;
-  const resumo=NPUI.resumo([{n:n("atrasada"),label:n("atrasada")===1?"atrasada":"atrasadas",tom:n("atrasada")?"crit":"zero"},{n:fatHoje,label:fatHoje===1?"fatal hoje":"fatais hoje",tom:fatHoje?"crit":"zero"},{n:n("hoje"),label:"para hoje",tom:n("hoje")?"att":"zero"},{n:n("d7"),label:"em até 7 dias",tom:n("d7")?"":"zero"},{n:abertas.length,label:abertas.length===1?"aberta":"abertas"}]);
+  const resumo=NPUI.resumo([{n:n("atrasada"),label:n("atrasada")===1?"atrasada":"atrasadas",tom:n("atrasada")?"late":"zero"},{n:fatHoje,label:fatHoje===1?"fatal hoje":"fatais hoje",tom:fatHoje?"crit":"zero"},{n:n("hoje"),label:"para hoje",tom:n("hoje")?"":"zero"},{n:n("d7"),label:"em até 7 dias",tom:n("d7")?"":"zero"},{n:abertas.length,label:abertas.length===1?"aberta":"abertas"}]);
   const vista=vistaV3();
   const seg=NPUI.seg([["lista","Lista"],["quadro","Quadro"]],vista,k=>{V3.vista=k;NPUI.pref.set("np-tarefas-vista",k);try{localStorage.setItem("pp-tarefas-vista",k==="quadro"?"kanban":"lista")}catch(_){}NPUI.vt(()=>render())});
   const direita=[seg,NPUI.btn(el("span",{},"CSV"),{variante:"ghost",cls:"np-csv",title:"Exportar a lista (CSV)",icone:"csv",onclick:()=>csv("tarefas",T.tarefas,["titulo","cliente_nome","responsavel_nome","nucleo","prazo","prazo_fatal","status","prioridade","faixa","horas_apontadas","concluida_em","created_at"])}),readOnly()?null:NPUI.btn("Nova tarefa",{variante:"pri",icone:"mais",onclick:()=>openTarefaForm({})})];
@@ -696,7 +696,7 @@ function renderTarefasV3(){
     const b=NPUI.btn("Carregar anteriores",{onclick:async(e)=>{const bt=e.currentTarget;bt.disabled=true;bt.textContent="Carregando…";await carregarAnteriores(f.resp);render()}});b.setAttribute("data-np-anteriores","1");
     corpo.append(el("div",{class:"np-rodape",style:"display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 4px"},el("span",{},`Mostrando as feitas e canceladas dos últimos ${JANELA_DIAS} dias.`),b));
   }
-  corpo.append(NPUI.rodape(`${lista.length} tarefa${lista.length===1?"":"s"} com estes filtros · ${ab2} aberta${ab2===1?"":"s"}`,[["crit","fatal"],["late","atrasada"],["att","vence hoje"]]));
+  corpo.append(NPUI.rodape(`${lista.length} tarefa${lista.length===1?"":"s"} com estes filtros · ${ab2} aberta${ab2===1?"":"s"}`,[["crit","fatal"],["late","atrasada"],["hoje","vence hoje"]]));
   obra.append(corpo);v.append(obra);
   V3.painel=NPUI.painel({obra,label:"Detalhe da tarefa",onClose:()=>{V3.aberta=null;clearInterval(V3.tick)}});
   if(V3.aberta){const t=T.tarefas.find(x=>x.id===V3.aberta);if(t)abrirPainelV3(t,{silencioso:true});else V3.aberta=null}

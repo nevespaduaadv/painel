@@ -242,7 +242,7 @@ html:root.np-casca-v3{
   --shadow:none; --shadow-pop:var(--np-shadow);
 }
 html.np-casca-v3 .np-ag-livres{display:flex;gap:10px;align-items:baseline;margin:2px 0;padding:8px 12px;border-bottom:1px solid var(--np-line);font:400 var(--np-fs-2)/1.35 var(--np-ui);color:var(--np-text-3)}
-html.np-casca-v3 .np-ag-livres-r{font:italic 400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
+html.np-casca-v3 .np-ag-livres-r{font:400 13.5px/1.2 var(--np-serif,var(--serif));color:var(--np-text-2);flex:none}
 html.np-casca-v3 .switch input[type="checkbox"],html.np-casca-v3 td input[type="checkbox"]{accent-color:var(--np-ink)}
 
 
