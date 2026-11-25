@@ -188,5 +188,5 @@ function tempoReal(){const ch=SB.channel("processos-lista");for(const t of ["pro
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^processos\/([0-9a-f-]{36})$/i.exec(h);if(m){P.sel=m[1];carregarAndamentos(m[1])}return _h.apply(this,arguments)}}
 window.PP_PROCESSOS={lista:()=>{garantir();return P.lista},recarregar:()=>{P.ok=false;garantir()},abrir:(id,opts={})=>{P.sel=id;P.voltar=opts.voltar||null;S.tab="processos";try{localStorage.setItem("pp-tab","processos")}catch(_){}history.replaceState(null,"","#processos/"+id);render()}};
 {const _r=render;render=function(){_r();const v=$("#view-processos");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="processos")S.tab="clientes";v.hidden=S.tab!=="processos";if(S.tab==="processos")renderProcessos()}}
-window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal();setTimeout(garantir,1500)}});
+window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){tempoReal()}});
 })();

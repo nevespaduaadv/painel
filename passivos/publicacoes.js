@@ -2,7 +2,7 @@
    Supabase: publicacoes, v_publicacoes, v_publicacoes_resumo, djen_requisicoes; RPCs djen_atualizar(), djen_buscar_periodo(inicio,fim). Só equipe. */
 (()=>{
 "use strict";
-const U={lista:[],resumo:null,procs:[],colab:[],ok:false,carregando:false,periodo:"30",soNaoLidas:false,soSemVinculo:false,fCli:"",q:"",erro:null,aba:"lista",f:{pend:false,semProc:false,naoLidas:false,prazo:false,diverg:false,origem:""},
+const U={lista:[],resumo:null,procs:[],colab:[],ok:false,carregando:false,periodo:"7",soNaoLidas:false,soSemVinculo:false,fCli:"",q:"",erro:null,aba:"lista",f:{pend:false,semProc:false,naoLidas:false,prazo:false,diverg:false,origem:""},
   sync:{instalada:false,ativo:false,estado:{},revisor:false,fontes:new Map(),prazos:new Map()}};
 const hojeISO=(n=0)=>{const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const nomeCli=id=>(S.clientes.find(c=>c.id===id)||{}).nome||id||"—";
@@ -209,7 +209,7 @@ function filtrosPub(){
     C({label:"Prazo a conferir",n:n(p=>aConferir(p)>0),on:f.prazo,grupo:"attr",title:"Prazo sugerido pela plataforma, aguardando a conferência do Jurídico",onclick:()=>{f.prazo=!f.prazo;render()}});
     C({label:"Fontes divergentes",n:n(p=>divergDe(p).length>0),on:f.diverg,grupo:"attr",title:"As fontes trazem informações diferentes",onclick:()=>{f.diverg=!f.diverg;render()}});
   }
-  const extras=[U.q.trim(),U.fCli,f.origem,U.periodo!=="30"?"p":""].filter(Boolean).length;
+  const extras=[U.q.trim(),U.fCli,f.origem,U.periodo!=="7"?"p":""].filter(Boolean).length;
   const mais=NPUI.chip({label:"Mais filtros",n:extras||null,on:extras>0,title:"Busca, período, cliente, origem",onclick:e=>NPUI.pop(e.currentTarget,()=>{
     let t=null;const q=el("input",{type:"search",placeholder:"Texto, nº do processo ou parte…",value:U.q,"aria-label":"Buscar publicação",oninput:ev=>{U.q=ev.target.value;clearTimeout(t);t=setTimeout(()=>{V3.manterPop=true;render()},300)}});
     const per=sel({"7":"Últimos 7 dias","30":"Últimos 30 dias","90":"Últimos 90 dias","todos":"Tudo"},U.periodo);per.onchange=()=>{U.periodo=per.value;NPUI.fecharPop();recarregar();render()};
