@@ -32,7 +32,7 @@
   // ---------- carga ----------
   async function carregarBase() {
     const [a, t, c, p, cr] = await Promise.all([SB.from("ts_atividades").select("*").order("ordem"), SB.from("ts_tabelas_hora").select("*").order("nome"), SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo").order("nome"),
-      SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao").order("numero_cnj"), SB.from("ts_cronometros").select("*")]);
+      npTodas(()=>SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao").order("numero_cnj").order("id")), SB.from("ts_cronometros").select("*")]);
     H.ativ = a.data || []; H.tabelas = t.data || []; H.colab = c.data || []; H.procs = p.data || []; H.ok = true;
     const m = meu(); H.cron = (cr.data || []).find((x) => x.colaborador_id === m?.id) || null;
     if (!H.sem.data) { H.sem.data = hoje(); H.sem.colab = m?.id || null; }

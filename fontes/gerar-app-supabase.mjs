@@ -234,6 +234,9 @@ html = html.replace('<script>', `<div class="login" id="login">
 <script>
 /* ---------- Runtime Supabase: mesma interface do banco do protótipo (doc/collection/onSnapshot) ---------- */
 const SB = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.stringify(SUPABASE_KEY)});
+/* A API devolve no máximo 1000 linhas por chamada. npTodas percorre as páginas até o fim; "montar" devolve a consulta já ordenada
+   (a ordenação precisa ser estável: termine com um desempate único, em geral .order("id")). */
+window.npTodas=async(montar)=>{const out=[];for(let i=0;i<100;i++){const {data,error}=await montar().range(i*1000,i*1000+999);if(error)return {data:null,error};out.push(...(data||[]));if((data||[]).length<1000)break}return {data:out,error:null}};
 const SB_URL = ${JSON.stringify(SUPABASE_URL)}, SB_KEY = ${JSON.stringify(SUPABASE_KEY)};
 const PP = {perfil:null, listeners:{}, cache:{}};
 const TABELAS = {clientes:"clientes", contratos:"contratos", historico:"historico"};
@@ -248,7 +251,7 @@ async function carregar(col){
     // formato compatível com referencias(): divida/valorAcordo sintéticos a partir do desconto
     return data.filter(r=>r.desc!=null).map(r=>({id:r.id,credor:r.credor,grupo:r.grupo,forma:r.forma,status:r.status,data:r.data,divida:1,valorAcordo:1-Number(r.desc)}));
   }
-  const {data,error}=await SB.from(TABELAS[col]).select("*").order("id");
+  const {data,error}=await npTodas(()=>SB.from(TABELAS[col]).select("*").order("id"));
   if(error) throw error;
   let notas={};
   if(NOTA_CAMPO[col] && equipe()){

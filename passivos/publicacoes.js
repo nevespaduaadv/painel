@@ -14,7 +14,7 @@ async function carregar(){
   try{
     let q=SB.from("v_publicacoes").select("*").order("data_disponibilizacao",{ascending:false}).order("id",{ascending:false}).limit(500);
     if(U.periodo!=="todos")q=q.gte("data_disponibilizacao",hojeISO(-Number(U.periodo)));
-    const [a,b,c,d]=await Promise.all([q,SB.from("v_publicacoes_resumo").select("*").maybeSingle(),SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao,status").order("numero_cnj"),SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo").order("nome")]);
+    const [a,b,c,d]=await Promise.all([q,SB.from("v_publicacoes_resumo").select("*").maybeSingle(),npTodas(()=>SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao,status").order("numero_cnj").order("id")),SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo").order("nome")]);
     if(a.error)throw a.error;U.lista=a.data||[];U.resumo=b.data||null;U.procs=c.data||[];U.colab=d.data||[];U.ok=true;U.erro=null;
     await carregarSync();
   }catch(e){console.warn("publicacoes",e);U.erro=e;toast("Não foi possível carregar as publicações")}

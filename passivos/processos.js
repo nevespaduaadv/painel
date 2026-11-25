@@ -6,7 +6,7 @@ const P={lista:[],ok:false,carregando:false,f:{q:"",cliente:"",status:"ativo",re
 async function carregar(){
   if(P.carregando)return;P.carregando=true;
   try{
-    const [a,c]=await Promise.all([SB.from("v_processos").select("*").order("proximo_prazo",{ascending:true,nullsFirst:false}),SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome")]);
+    const [a,c]=await Promise.all([npTodas(()=>SB.from("v_processos").select("*").order("proximo_prazo",{ascending:true,nullsFirst:false}).order("id")),SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome")]);
     if(a.error)throw a.error;P.lista=a.data||[];P.colab=c.data||[];P.ok=true;P.erro=null;
   }catch(e){console.warn("processos",e);P.erro=Date.now();toast("Não foi possível carregar os processos")}
   finally{P.carregando=false}

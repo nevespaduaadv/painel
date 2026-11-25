@@ -12,7 +12,7 @@ async function carregar(){
   if(D.carregando)return;D.carregando=true;
   try{
     const [p,t,c,e,l,tk]=await Promise.all([
-      SB.from("v_prazos").select("*").order("prazo"),
+      npTodas(()=>SB.from("v_prazos").select("*").order("prazo").order("id")),
       SB.from("v_tarefas").select("id,titulo,status,prazo,prazo_fatal,responsavel_id,responsavel_nome,cliente_nome,faixa,created_by").in("status",["aberta","em_andamento"]),
       SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo"),
       SB.from("tarefa_eventos").select("*").order("criado_em",{ascending:false}).limit(80),

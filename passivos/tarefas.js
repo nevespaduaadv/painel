@@ -50,7 +50,7 @@ async function carregar(){
     /* v_tarefas vem em páginas de 1000: a API corta a resposta em 1000 linhas e, sem isso, a tela mostrava só as mais antigas
        (com o histórico trazido do ADVBox, as tarefas abertas ficavam de fora). */
     const todasTarefas=async()=>{let out=[];for(let i=0;;i+=1000){const {data,error}=await SB.from("v_tarefas").select("*").order("prazo",{ascending:true,nullsFirst:false}).order("id").range(i,i+999);if(error)return {data:null,error};out=out.concat(data||[]);if((data||[]).length<1000)break}return {data:out,error:null}};
-    const [t,c,p,tk,mo]=await Promise.all([todasTarefas(),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria"),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
+    const [t,c,p,tk,mo]=await Promise.all([todasTarefas(),SB.from("colaboradores").select("id,perfil_id,nome,apelido,nucleo,ativo").order("nome"),npTodas(()=>SB.from("processos").select("id,cliente_id,numero_cnj,parte_contraria").order("id")),SB.from("v_tickets").select("*"),SB.from("motivos_reagendamento").select("*").eq("ativo",true).order("ordem")]);
     if(t.error)throw t.error;
     T.tarefas=t.data;T.colab=c.data||[];T.processos=p.data||[];T.tickets=Object.fromEntries((tk.data||[]).map(x=>[x.id,x]));T.motivos=mo.error?null:(mo.data||[]);T.ok=true;T.erro=null;
   }catch(e){console.warn("tarefas",e);T.erro=String(e.message||e);toast("Não foi possível carregar as tarefas")}
