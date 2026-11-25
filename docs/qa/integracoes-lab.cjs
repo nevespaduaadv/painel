@@ -198,6 +198,8 @@ const painel = (pg, raiz) => pg.evaluate((raiz) => { const p = document.querySel
   rel.push('2. B3 — Tarefas ↔ Acompanhamento PJ');
   { const { ctx, pg, erros, escritas, leituras } = await contexto(b, { hash: '#tarefas' });
     await pg.waitForFunction(() => window.PP_TAREFAS && window.PP_TAREFAS.lista().length >= 5 && document.querySelector('#view-tarefas .np-it[data-id]'), null, { timeout: 12000 });
+    // a tela abre nas tarefas de quem está logado; este cenário olha tarefas de vários responsáveis (como um link vindo de outra tela)
+    await pg.evaluate(() => window.PP_TAREFAS.filtro({})); await pg.waitForTimeout(200);
     const marcas = await pg.evaluate(() => Object.fromEntries(['t1', 't10', 't9', 't-r1-c8'].map(id => { const li = document.querySelector(`#view-tarefas .np-it[data-id="${id}"]`); return [id, li ? [...li.querySelectorAll('.np-marca')].map(m => m.textContent) : 'ausente']; })));
     const temAcomp = (v) => Array.isArray(v) && v.includes('acomp');
     if (temAcomp(marcas.t1) && temAcomp(marcas['t-r1-c8']) && Array.isArray(marcas.t10) && !temAcomp(marcas.t10) && Array.isArray(marcas.t9) && !temAcomp(marcas.t9)) ok('linhas: marca "acomp" só nas tarefas do núcleo Acompanhamento PJ (t1, t-r1-c8); t10 (Acordos, mesmo cliente) e t9 (Jurídico) sem marca'); else falha('marcas: ' + JSON.stringify(marcas));
