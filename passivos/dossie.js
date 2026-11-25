@@ -51,12 +51,13 @@
   function cardDossieV3(c) {
     const st = D.cache[c.id]; if (!st) carregar(c.id);
     const box = el("section", { class: "card section np-dossie", "aria-busy": st && st.ok ? null : "true" });
-    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Dossiê"), el("div", { class: "note" }, "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")),
+    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, c.tipo_pessoa === "PF" ? "Histórico do cliente" : "Dossiê"), el("div", { class: "note" }, c.tipo_pessoa === "PF" ? "Tudo o que foi registrado e feito por este cliente. Andamentos e publicações ficam na página de cada processo." : "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")),
       el("div", { class: "actions edit-only" }, NPUI.btn("Registrar", { onclick: () => window.PP_CARTEIRA?.registrar(c.id, {}) }))));
     if (!st || !st.ok) { box.append(NPUI.carregando(4)); return box; }
     // informações relevantes (fixadas): régua de tinta = o que o escritório marcou como essencial
     const fix = st.itens.filter((i) => i.fixado);
-    box.append(NPUI.secao("Informações relevantes", fix.length
+    const ehPF = c.tipo_pessoa === "PF"; // 25/11 (sócia): na carteira PF a página começa direto na linha do tempo
+    if (!ehPF) box.append(NPUI.secao("Informações relevantes", fix.length
       ? el("ul", { class: "np-dossie-fix" }, ...fix.map((i) => el("li", {}, el("p", {}, i.texto), el("small", {}, [i.autor, fmtD(i.quando)].filter(Boolean).join(" · ")))))
       : el("p", { class: "note" }, "Nada fixado. Ao registrar uma “Informação do cliente”, marque “Fixar no perfil”.")));
     // três frentes: a régua diz o estado (prazo vencido ou frente parada = atrasada; prazo em até 7 dias = atenção)
@@ -82,7 +83,7 @@
         mk.length ? el("p", { class: "mk" }, ...mk) : null,
         el("div", { class: "pe edit-only" }, NPUI.btn("Registrar aqui", { variante: "ghost", onclick: () => window.PP_CARTEIRA?.registrar(c.id, { frente: k }) }))));
     }
-    box.append(frentes);
+    if (!ehPF) box.append(frentes);
     // linha do tempo: filtros cumulativos de frente (chips), origem, ordem, exportar, 20 por página
     const F = D.filtro[c.id] = D.filtro[c.id] && typeof D.filtro[c.id] === "object" ? D.filtro[c.id] : { frentes: new Set(), origem: "", ordem: "recente", pagina: 1 };
     const cont = Object.fromEntries(Object.keys(FRENTES).map((k) => [k, st.itens.filter((i) => i.frente === k).length]));
@@ -128,7 +129,7 @@
     if (v3()) return cardDossieV3(c);
     const st = D.cache[c.id]; if (!st) { carregar(c.id); }
     const box = el("section", { class: "card section", style: "display:flex;flex-direction:column;gap:12px" });
-    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, "Dossiê"), el("div", { class: "note" }, "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm primary", onclick: () => window.PP_CARTEIRA?.registrar(c.id, {}) }, "+ Registrar"))));
+    box.append(el("div", { class: "section-h" }, el("div", {}, el("h2", {}, c.tipo_pessoa === "PF" ? "Histórico do cliente" : "Dossiê"), el("div", { class: "note" }, c.tipo_pessoa === "PF" ? "Tudo o que foi registrado e feito por este cliente. Andamentos e publicações ficam na página de cada processo." : "O que o escritório sabe e faz por este cliente, nas três frentes. Andamentos e publicações ficam na página de cada processo.")), el("div", { class: "actions edit-only" }, el("button", { class: "btn sm primary", onclick: () => window.PP_CARTEIRA?.registrar(c.id, {}) }, "+ Registrar"))));
     if (!st || !st.ok) { box.append(el("div", { class: "note" }, "Carregando…")); return box; }
     // informações relevantes (fixadas)
     const fix = st.itens.filter((i) => i.fixado);

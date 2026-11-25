@@ -170,6 +170,8 @@ function linhaPub(p){
   return li;
 }
 /* estado das fontes: DJEN (busca automática) e Sync (integração). Sem a integração instalada, os comandos do Sync ficam desativados. */
+/* 25/11 (sócia): a linha das integrações sai da tela; volta sozinha quando há falha (erro de busca no DJEN ou de conexão com o Sync) ou por “Mais ações → Ver integrações” */
+const fontesComProblema=()=>+(U.resumo?.erros_recentes||0)>0||(U.sync?.instalada&&U.sync?.ativo&&U.sync?.estado?.conexao==="erro");
 function fontesPub(){
   const r=U.resumo||{},y=U.sync;
   const sync=!y.instalada?["não instalada neste ambiente",""]:!y.ativo?["desligada",""]:y.estado?.conexao==="ok"?["ligada","ok"]:y.estado?.conexao==="erro"?["ligada, com erro de conexão","crit"]:["ligada","att"];
@@ -227,12 +229,12 @@ function renderPubV3(v){
   const vivos=U.lista.filter(p=>!p.ignorada),nP=vivos.filter(p=>!p.providencia).length,nV=vivos.filter(p=>sitP(p)==="vencida").length,nS=vivos.filter(p=>p.sem_vinculo).length,nZ=vivos.filter(p=>aConferir(p)>0).length,nR=vivos.filter(p=>emRevisao(p)>0).length;
   const resumo=NPUI.resumo([{n:nP,label:"a analisar",tom:nP?"":"zero"},{n:nV,label:"fora do prazo de análise",tom:nV?"crit":"zero"},{n:nS,label:"sem processo",tom:nS?"att":"zero"},U.sync.instalada?{n:nZ,label:nZ===1?"prazo a conferir":"prazos a conferir",tom:nZ?"att":"zero"}:null,U.sync.instalada&&nR?{n:nR,label:nR===1?"prazo em revisão":"prazos em revisão",tom:"att"}:null],{quadros:true});
   const lista=filtrarPub();
-  const itensAc=[{label:"Buscar período no DJEN…",onclick:buscarPeriodo},{label:"Exportar CSV (lista filtrada)",onclick:()=>{if(!lista.length){toast("Nada para exportar");return}exportarCSV("publicacoes",lista,COLS_PUB);toast(`${lista.length} linha(s) exportada(s)`)}},
+  const itensAc=[{label:"Buscar período no DJEN…",onclick:buscarPeriodo},{label:U.verFontes?"Ocultar integrações (DJEN e Sync)":"Ver integrações (DJEN e Sync)",onclick:()=>{U.verFontes=!U.verFontes;render()}},{label:"Exportar CSV (lista filtrada)",onclick:()=>{if(!lista.length){toast("Nada para exportar");return}exportarCSV("publicacoes",lista,COLS_PUB);toast(`${lista.length} linha(s) exportada(s)`)}},
     PP.perfil?.papel==="admin"&&TR().limparAntigas?{label:"Dar ciência em lote…",onclick:()=>TR().limparAntigas()}:null].filter(Boolean);
   const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,itensAc,{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-publicacoes .np-ib[aria-label="Mais ações"]')}));maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
   const seg=NPUI.seg([["lista","Publicações"],["rel","Tempestividade"]],U.aba,k=>{U.aba=k;V3.aberta=null;render()},"Vista");
   const fl=U.aba==="lista"?filtrosPub():{chips:[],fixos:[]};
-  v.append(NPUI.toolbar({resumo,filtros:U.aba==="lista"?fl.chips:null,filtrosFixos:U.aba==="lista"?fl.fixos:null,direita:[seg,maisAc,NPUI.btn("Atualizar agora",{variante:"pri",title:"Confere agora as respostas do DJEN",onclick:atualizar})]}),fontesPub());
+  v.append(NPUI.toolbar({resumo,filtros:U.aba==="lista"?fl.chips:null,filtrosFixos:U.aba==="lista"?fl.fixos:null,direita:[seg,maisAc,NPUI.btn("Atualizar agora",{variante:"pri",title:"Confere agora as respostas do DJEN",onclick:atualizar})]}),(U.verFontes||fontesComProblema())?fontesPub():null);
   NPUI.reancorarPop();V3.manterPop=false;
   if(U.aba==="rel"){const w=el("div",{class:"np-pf-legado np-pub-rel"});v.append(w);TR().renderRelatorio?TR().renderRelatorio(w):w.append(el("p",{class:"np-nota"},"Relatório indisponível."));return}
   const obra=el("div",{class:"np-obra"}),corpo=el("div",{class:"np-corpo"});
@@ -321,6 +323,6 @@ function abrirPainelPub(p,{origem}={}){
 /* ---------- Integração ---------- */
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};return r}}
 {const _r=render;render=function(){_r();const vp=$("#view-publicacoes");if(!vp)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="publicacoes")S.tab="clientes";vp.hidden=S.tab!=="publicacoes";if(S.tab==="publicacoes")renderPublicacoes()}}
-window.PP_PUBLICACOES={abrirId:id=>{V3.aberta=id;if(S.tab!=="publicacoes"){S.tab="publicacoes";try{location.hash="#publicacoes"}catch(_){}}render()},sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
+window.PP_PUBLICACOES={verIntegracoes:(v=true)=>{U.verFontes=!!v;render()},abrirId:id=>{V3.aberta=id;if(S.tab!=="publicacoes"){S.tab="publicacoes";try{location.hash="#publicacoes"}catch(_){}}render()},sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("publicacoes");ch.on("postgres_changes",{event:"*",schema:"public",table:"publicacoes"},()=>{U.ok=false;if(S.tab==="publicacoes")garantir()});ch.subscribe()}});
 })();
