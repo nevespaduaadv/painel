@@ -500,7 +500,7 @@ function renderNegociacoesV3(){
   if(N3.escopo!=="abertas"&&!X.concluidas)X.concluidas=true;
   const base=listaBaseN3();const abertas=base.filter(n=>n.etapa!=="concluido"),concl=base.filter(n=>n.etapa==="concluido");
   const nAtr=abertas.filter(n=>n.atrasada).length,nPar=abertas.filter(paradaN).length;
-  const resumo=NPUI.resumo([{n:abertas.length,label:"abertas"},{n:nAtr,label:"atrasadas",tom:nAtr?"crit":"zero"},{n:nPar,label:"paradas",tom:nPar?"att":"zero"},{n:BRL(abertas.reduce((a,n)=>a+(+n.valor_cobrado||0),0)),label:"em valor cobrado"}]);
+  const resumo=NPUI.resumo([{n:abertas.length,label:"abertas"},{n:nAtr,label:"atrasadas",tom:nAtr?"late":"zero"},{n:nPar,label:"paradas",tom:nPar?"att":"zero"},{n:BRL(abertas.reduce((a,n)=>a+(+n.valor_cobrado||0),0)),label:"em valor cobrado"}],{quadros:true});
   const vista=vistaN3();
   const seg=NPUI.seg([["lista","Lista"],["quadro","Quadro"]],vista,k=>{N3.vista=k;NPUI.pref.set("np-neg-vista",k);NPUI.vt(()=>render())});
   const maisAcoes=NPUI.btn("Mais ações",{variante:"ghost",onclick:(e)=>NPUI.pop(e.currentTarget,[{label:"Base de acordos",onclick:()=>irPara("historico")},PP.perfil?.papel==="admin"?{label:"Regras de projeção",onclick:()=>irPara("regras")}:null,PP.perfil?.papel==="admin"?{label:"Calibração",onclick:()=>irPara("calibracao")}:null].filter(Boolean),{label:"Mais ações",alinhar:"dir"})});

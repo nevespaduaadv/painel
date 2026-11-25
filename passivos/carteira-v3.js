@@ -10,7 +10,7 @@
   const ligado = () => { try { return document.documentElement.classList.contains("np-casca-v3") && !!window.NPUI && typeof equipe === "function" && equipe(); } catch (_) { return false; } };
   const LIMPO = { ordem: "az", escopo: "todos", atraso: false, neg: false, proc: false, inad: false, meus: false, seg: "", resp: "", etapa: "", q: "" };
   const POR_PAGINA = 40;
-  const K = { pg: 1, pgChave: "", f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
+  const K = { lista: false, idx: null, idxCarregando: false, pg: 1, pgChave: "", f: { ...LIMPO }, aberta: null, painel: null, obra: null, grupos: null, prazos: null, colab: null, carregando: false, erro: null };
   const SIT_B = { inadimplente: "Inadimplente", vai_ficar_inadimplente: "Vai ficar inadimplente", adimplente: "Adimplente" };
   const ETAPAS = { 0: "Contrato fechado", 1: "Cadastro ADVBox", 2: "Formulário enviado", 3: "Formulário respondido", 4: "Auditoria", 5: "R1 agendada", 6: "R1 feita", 7: "R2 feita", 8: "R3 feita", 9: "Ciclo encerrado", 10: "Ciclo mensal" };
   const GRUPOS = [["atencao", "Exigem atenção", "att"], ["negociacao", "Em negociação ou acordo", ""], ["em_dia", "Contratos em dia", ""], ["sem", "Sem contratos ativos", ""]];
@@ -65,10 +65,25 @@
       if (f.semResp && !r.semResp) return false; if (f.atraso && !r.atraso) return false; if (f.neg && !r.neg) return false; if (f.proc && !(r.proc > 0)) return false; if (f.inad && r.sitB !== "inadimplente") return false;
       if (f.meus && !(meu && resps(r.c).includes(meu.id))) return false; if (f.resp && !resps(r.c).includes(f.resp)) return false;
       if (f.seg && (r.c.segmento || "") !== f.seg) return false; if (f.etapa !== "" && String(r.etapa ?? "") !== f.etapa) return false;
-      if (q && !(norm(r.c.nome).includes(q) || norm(r.c.nome_fantasia).includes(q) || (qd.length >= 3 && digitos(r.c.cnpj).includes(qd)))) return false;
+      if (q && !(norm(r.c.nome).includes(q) || norm(r.c.nome_fantasia).includes(q) || (qd.length >= 3 && digitos(r.c.cnpj).includes(qd)) || noIndice(r.c.id, q, qd))) return false;
       return true;
     });
   }
+  /* busca também por sócio/contato e número de processo (25/11): índice leve (duas colunas de cada tabela), carregado só na primeira busca */
+  async function carregarIndice() {
+    if (K.idx || K.idxCarregando) return; K.idxCarregando = true;
+    try {
+      const todas = window.npTodas || (async (m) => (await m()).data || []);
+      const [ct, pr] = await Promise.all([todas(() => SB.from("contatos").select("id,cliente_id,nome").order("id")), todas(() => SB.from("processos").select("id,cliente_id,numero_cnj").order("id"))]);
+      const idx = new Map(); const por = (cid) => { let x = idx.get(cid); if (!x) { x = { nomes: "", procs: "" }; idx.set(cid, x); } return x; };
+      for (const c of ct || []) if (c.cliente_id && c.nome) por(c.cliente_id).nomes += " " + norm(c.nome);
+      for (const p of pr || []) if (p.cliente_id && p.numero_cnj) por(p.cliente_id).procs += " " + digitos(p.numero_cnj);
+      K.idx = idx;
+    } catch (_) { K.idx = new Map(); }
+    finally { K.idxCarregando = false; }
+    if (S.tab === "clientes" && !S.sel && K.f.q) { renderList(); const x = document.querySelector("#np-carteira .np-busca-inline"); if (x) { x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }
+  }
+  const noIndice = (cid, q, qd) => { const x = K.idx?.get(cid); if (!x) return false; return (q.length >= 3 && x.nomes.includes(q)) || (qd.length >= 5 && x.procs.includes(qd)); };
   /* Carteira simples (pedido das sócias, 23/11): só a lista dos clientes. Situação dos contratos, valores e prazos ficam na ficha do cliente e na Gestão. */
   function contexto(r) {
     const c = r.c; const partes = [];
@@ -107,9 +122,6 @@
   }
   function filtros(regs) {
     const f = K.f; const chips = []; const C = (o) => { const c = NPUI.chip(o); chips.push(c); return c; }; const meu = meuColab();
-    const esc = (k, l, n) => C({ label: l, n, on: f.escopo === k, grupo: "escopo", onclick: () => { f.escopo = k; renderList(); } });
-    esc("todos", "Todos"); esc("pj", "PJ", regs.filter((r) => r.tipo !== "PF").length); esc("pf", "PF", regs.filter((r) => r.tipo === "PF").length);
-    chips.push(NPUI.sepv());
     C({ label: f.ordem === "za" ? "Z–A" : "A–Z", on: false, title: f.ordem === "za" ? "Ordem decrescente (Z–A). Clique para crescente." : "Ordem crescente (A–Z). Clique para decrescente.", onclick: () => { f.ordem = f.ordem === "za" ? "az" : "za"; renderList(); } });
     return { chips, fixos: [] };
   }
@@ -123,15 +135,22 @@
     window.PP_CLIENTES_VISAO?.carregar?.(); carregarApoio();
     const v = el("div", { class: "np-v3 np-carteira", id: "np-carteira" }); m.append(v);
     const regs = registros(); const vis = filtrar(regs);
-    const resumo = NPUI.resumo([{ n: regs.length, label: regs.length === 1 ? "cliente" : "clientes" }]);
-    let tq = null; const busca = el("input", { type: "search", class: "np-busca-inline", placeholder: "Buscar nome ou CNPJ…", value: K.f.q || "", "aria-label": "Buscar cliente por nome ou CNPJ", oninput: (ev) => { K.f.q = ev.target.value.trim(); clearTimeout(tq); tq = setTimeout(() => { renderList(); const x = document.querySelector("#np-carteira .np-busca-inline"); if (x) { x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 300); } });
+    const nPF = regs.filter((r) => r.tipo === "PF").length, nPJ = regs.length - nPF;
+    if (K.f.q) { K.lista = true; carregarIndice(); }
+    const abrirCarteira = (k) => { if (K.lista && K.f.escopo === k) K.lista = false; else { K.f.escopo = k; K.lista = true; } renderList(); };
+    const qd = (k, titulo, n) => ({ titulo, n, ativo: K.lista && K.f.escopo === k, acao: K.lista && K.f.escopo === k ? "Ocultar clientes" : "Mostrar clientes", onclick: () => abrirCarteira(k) });
+    const quadros = NPUI.quadros([qd("todos", "Todos os clientes", regs.length), qd("pf", "Carteira PF", nPF), qd("pj", "Carteira PJ", nPJ)]);
+    let tq = null; const busca = el("input", { type: "search", class: "np-busca-inline", placeholder: "Buscar nome, CNPJ, sócio ou processo…", title: "Nome ou razão social, CNPJ/CPF, nome do sócio ou número do processo", value: K.f.q || "", "aria-label": "Buscar cliente por nome, CNPJ, sócio ou número do processo", oninput: (ev) => { K.f.q = ev.target.value.trim(); clearTimeout(tq); tq = setTimeout(() => { renderList(); const x = document.querySelector("#np-carteira .np-busca-inline"); if (x) { x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 300); } });
     const fl = filtros(regs); const ro = typeof readOnly === "function" && readOnly();
-    const maisAc = NPUI.ib("pontos", "Mais ações", () => NPUI.pop(maisAc, [{ label: "Exportar CSV (lista filtrada)", onclick: () => exportar(vis.slice().sort((a, b) => (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"))) }, { label: "Acompanhamento PJ", onclick: () => irPara("acompanhamento") }], { label: "Mais ações", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-ib[aria-label="Mais ações"]') }));
+    const maisAc = NPUI.ib("pontos", "Mais ações", () => NPUI.pop(maisAc, [{ label: "Exportar CSV (lista filtrada)", onclick: () => exportar(vis.slice().sort((a, b) => (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"))) }, { label: "Acompanhamento PJ (todos os clientes PJ por etapa)", onclick: () => irPara("acompanhamento") }], { label: "Mais ações", alinhar: "dir", refoco: () => document.querySelector('#np-carteira .np-ib[aria-label="Mais ações"]') }));
     maisAc.setAttribute("aria-haspopup", "menu"); maisAc.setAttribute("aria-expanded", "false");
-    v.append(NPUI.toolbar({ resumo, filtros: fl.chips, filtrosFixos: fl.fixos, direita: [busca, ro ? null : NPUI.btn("+ Novo cliente", { variante: "pri", disabled: !S.db, onclick: () => openClientForm({}) }), maisAc] }));
+    v.append(quadros);
+    v.append(NPUI.toolbar({ filtros: K.lista ? fl.chips : [], filtrosFixos: fl.fixos, direita: [busca, ro ? null : NPUI.btn("+ Novo cliente", { variante: "pri", disabled: !S.db, onclick: () => openClientForm({}) }), maisAc] }));
     NPUI.reancorarPop();
     if (K.erro) v.append(NPUI.faixaErro({ texto: "Os prazos dos clientes não carregaram; a lista segue sem eles.", acao: "Tentar de novo", onAcao: () => carregarApoio(true) }));
-    const obra = el("div", { class: "np-obra" }); K.obra = obra; const corpo = lista(vis);
+    if (K.lista && K.f.escopo === "pj") v.append(el("div", { class: "np-qd-nota" }, "Panorama dos clientes PJ por etapa do ciclo: ", el("button", { type: "button", class: "lnk", onclick: () => irPara("acompanhamento") }, "abrir o Acompanhamento PJ"), "."));
+    const obra = el("div", { class: "np-obra" }); K.obra = obra; const corpo = K.lista ? lista(vis) : el("div", { class: "np-corpo" }, el("div", { class: "np-qd-nota" }, "Escolha uma carteira acima para ver a lista, ou busque um cliente pelo nome, CNPJ, sócio ou número do processo."));
+    if (!K.lista) { obra.append(corpo); v.append(obra); K.painel = NPUI.painel({ obra, label: "Resumo do cliente", onClose: () => { K.aberta = null; } }); return; }
     corpo.append(NPUI.rodape(`${K.fatia && K.fatia.paginas > 1 ? `mostrando ${K.fatia.de}–${K.fatia.ate} · ` : ""}${vis.length} de ${regs.length} cliente${regs.length === 1 ? "" : "s"}${vis.length === regs.length ? "" : " com estes filtros"} · ordem alfabética ${K.f.ordem === "za" ? "decrescente (Z–A)" : "crescente (A–Z)"}`));
     obra.append(corpo); v.append(obra);
     K.painel = NPUI.painel({ obra, label: "Resumo do cliente", onClose: () => { K.aberta = null; } });

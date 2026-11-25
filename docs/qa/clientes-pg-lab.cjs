@@ -14,7 +14,7 @@ const H = process.env.PGLAB_HOST, PORT = process.env.PGLAB_PORT || '5432', UID =
 if (!H || !UID) { console.log('PGLAB_HOST/PGLAB_UID ausentes: laboratório não executado (exige PostgreSQL local com o esquema do espelho).'); process.exit(2); }
 const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.cjs'), 'utf8'); const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '');
 const L = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + "\nmodule.exports={servir,contexto};")(L, L, require, path.join(process.cwd(), 'docs/qa'), process);
-const { servir, contexto } = L.exports || L; const { chromium } = require('playwright');
+const { servir, contexto } = L.exports || L; const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 // ---- psql: script por stdin, valores por -v (sem montar SQL com texto do usuário) ----
 const psql = (script, vars = {}, { sessao = true } = {}) => {

@@ -10,7 +10,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, dia, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const mes = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7);
 const b0 = { tipo: 'parcela', forma: 'BOLETO', status_asaas: 'PENDING', regua_enviadas: [], regua_parada: false, link_fatura: 'https://exemplo.invalid/fatura', link_boleto: null, asaas_id: 'pay_ficticio', asaas_cliente_id: 'cus_ficticio' };

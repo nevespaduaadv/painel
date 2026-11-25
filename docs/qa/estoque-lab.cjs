@@ -9,7 +9,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,dia,medirContraste,medirAlvos};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, dia, medirContraste, medirAlvos } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const agora = new Date().toISOString();
 const pr = (id, nome, cat, saldo, min, x = {}) => ({ id, nome, categoria: cat, unidade: 'un', ativo: true, saldo_atual: saldo, estoque_minimo: min, qtd_desejada: min * 3, zerado: saldo === 0, abaixo_minimo: saldo <= min, compra_sugerida: saldo <= min ? min * 3 - saldo : 0, consumo_semanal: 1, consumo_mensal: 4, previsao_confiavel: saldo > 0, dias_restantes: saldo * 7, tarefa_status: null, observacoes: null, ...x });

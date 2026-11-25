@@ -1,0 +1,27 @@
+/* Desde 25/11 o detalhe (NPUI.painel) abre como pop-up central com véu: a lista atrás dele não recebe clique.
+   Os roteiros dos labs foram escritos para o painel lateral (clicavam em outra linha com o painel aberto). Este apoio
+   faz o que a pessoa faria: se o alvo do clique está fora do pop-up aberto, fecha o pop-up antes (botão ✕) e segue.
+   Cliques dentro do pop-up, de menus (np-pop) e de modais não são tocados. Basta um require('./_popup.cjs') por lab. */
+const { chromium } = require('playwright');
+if (!chromium.__npPopup) {
+  chromium.__npPopup = true;
+  const liberar = async (pg, sel) => {
+    try {
+      const loc = pg.locator(sel).first(); if (!(await loc.count())) return;
+      const dentro = await loc.evaluate((e) => !!e.closest('.np-painel, #np-pop, .np-pop, .modal, .np-modal-v3, dialog, .toast, #toast'));
+      if (dentro) return;
+      for (let i = 0; i < 4; i++) { // repete: uma recarga em curso pode reabrir o pop-up (a tela o restaura ao redesenhar)
+        const fechou = await pg.evaluate(() => { const p = [...document.querySelectorAll('.np-painel[data-modo="centro"]')].find((x) => !x.hidden && x.getClientRects().length); if (!p) return false; p.querySelector('.np-p-h > .np-ib')?.click(); return true; });
+        if (!fechou) break;
+        await pg.waitForFunction(() => ![...document.querySelectorAll('.np-painel[data-modo="centro"]')].some((x) => !x.hidden && x.getClientRects().length), null, { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(350); /* deixa a transição de fechar terminar antes do próximo clique */
+      }
+    } catch (_) { /* seletor que o locator não resolve: segue o clique normal */ }
+  };
+  const vestir = (pg) => { if (pg.__npPopup) return pg; pg.__npPopup = true; const click = pg.click.bind(pg); pg.click = async (sel, opts) => { /* tentativas curtas: uma recarga em curso pode restaurar o pop-up entre o fechar e o clique */ for (let i = 0; ; i++) { await liberar(pg, sel); try { return await click(sel, { ...(opts || {}), timeout: i < 9 ? 3000 : (opts && opts.timeout) || 30000 }); } catch (e) { if (i >= 9 || !/Timeout/.test(String(e && e.message))) throw e; } } }; return pg; };
+  const vestirCtx = (ctx) => { const np = ctx.newPage.bind(ctx); ctx.newPage = async (...a) => vestir(await np(...a)); return ctx; };
+  const launch = chromium.launch.bind(chromium);
+  chromium.launch = async (...a) => { const b = await launch(...a); const nc = b.newContext.bind(b); b.newContext = async (...x) => vestirCtx(await nc(...x)); const np = b.newPage.bind(b); b.newPage = async (...x) => vestir(await np(...x)); return b; };
+}
+
+/* para roteiros que usam a busca global com o pop-up aberto: fecha antes */
+module.exports.fecharPopup = async (pg) => { await pg.evaluate(() => { const p = [...document.querySelectorAll('.np-painel[data-modo="centro"]')].find((x) => !x.hidden && x.getClientRects().length); p?.querySelector('.np-p-h > .np-ib')?.click(); }); await pg.waitForTimeout(450); };

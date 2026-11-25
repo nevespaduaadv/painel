@@ -11,7 +11,7 @@ const srcI = fs.readFileSync(path.join(process.cwd(), 'docs/qa/integracoes-lab.c
 const headI = srcI.slice(0, srcI.indexOf('(async () => {')).replace(/^const rel = \[\].*$/m, '').replace("const OUT = process.argv[2] || '/tmp/integracoes-lab'; fs.mkdirSync(OUT, { recursive: true });", "const OUT = '" + OUT.replace(/'/g, "\\'") + "';");
 const M = {}; new Function('module', 'exports', 'require', '__dirname', 'process', headI + '\nmodule.exports={servir,contexto,medirContraste};')(M, M, require, path.join(process.cwd(), 'docs/qa'), process);
 const { servir, contexto, medirContraste } = M.exports;
-const { chromium } = require('playwright');
+const { chromium } = require('playwright'); require('./_popup.cjs');
 const rel = []; let falhas = 0; const ok = (m) => rel.push('  ok    ' + m); const falha = (m) => { falhas++; rel.push('  FALHA ' + m); };
 const PARES = [['--bg', '--np-bg'], ['--surface', '--np-surface'], ['--surface-2', '--np-surface-2'], ['--line', '--np-line'], ['--fg', '--np-text'], ['--muted', '--np-text-2'], ['--faint', '--np-text-3'], ['--ok', '--np-ok'], ['--warn', '--np-att'], ['--crit', '--np-crit'], ['--info', '--np-info'], ['--btn-primary', '--np-ink'], ['--on-dark', '--np-inv']];
 const TELAS = [['equipe', 'equipe']]; // Base de acordos (historico) saiu daqui: ganhou apresentação própria na versão do AI Studio (23/11) // telas ainda com a apresentação da V2 dentro da casca; Processos saiu daqui na V8 (processos-lab) e Publicações na V9 (publicacoes-lab)

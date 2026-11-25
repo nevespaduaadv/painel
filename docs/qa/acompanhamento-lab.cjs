@@ -5,7 +5,7 @@
    (vencida / esta semana / próximas / sem agendamento / não iniciado / encerrados) e resumo, marcas e etapa, painel com os
    dados reais (ciclo, Raio-X, pendências, atas, reserva planejada × acumulada), formulários com o cliente explícito e troca
    de cliente sem vazar gravações, filtros, ARIA/teclado, capturas, aba da ficha intacta, ambiente sem a migração 0104. */
-const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs')); // cwd = raiz do repositório (como RAIZ)
+const { chromium } = require('playwright'); require('./_popup.cjs'); const fs = require('fs'); const path = require('path'); const http = require('http'); const { medirContraste, medirAlvos } = require(path.join(process.cwd(), 'docs/qa/_a11y.cjs')); // cwd = raiz do repositório (como RAIZ)
 const RAIZ = process.cwd(); const OUT = process.argv[2] || '/tmp/acompanhamento-lab'; fs.mkdirSync(OUT, { recursive: true });
 const REF = 'ksdwzljfjfucjevdqxvx';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json' };
