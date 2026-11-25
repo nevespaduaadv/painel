@@ -280,6 +280,7 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     const gm = await pg.evaluate(() => ({ mes: !!document.querySelector('#view-agenda .np-grade-w .ag-mes'), lista: document.querySelectorAll('#view-agenda .np-grp').length, chips: document.querySelectorAll('#view-agenda .ag-mes .ag-ev').length }));
     if (gm.mes && gm.lista === 0 && gm.chips >= 8) ok(`Grade + Mês: grade mensal da V2 (${gm.chips} chips) dentro da obra V3.1`); else falha('grade mês: ' + JSON.stringify(gm));
     await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="semana"]'); await pg.waitForTimeout(700);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="grade"]'); await pg.waitForTimeout(500); /* 25/11: Lista/Grade é lembrada por período */
     const gs = await pg.evaluate(() => { const chips = [...document.querySelectorAll('#view-agenda .ag-grade .ag-ev')]; return { grade: !!document.querySelector('#view-agenda .np-grade-w .ag-grade'), chips: chips.length, slots: document.querySelectorAll('#view-agenda .ag-grade .ag-slot').length, inteiros: document.querySelectorAll('#view-agenda .ag-grade .ag-inteiro .ag-ev').length, fora: document.querySelector('#view-agenda .np-fora')?.textContent || '' }; });
     await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="lista"]'); await pg.waitForTimeout(700);
     const ls = await pg.evaluate(() => document.querySelectorAll('#view-agenda li.np-it[data-id]:not([data-id^="fer:"])').length);
@@ -294,6 +295,7 @@ const ir = async (pg, tab) => { await pg.evaluate((t) => { location.hash = '#' +
     if (gf.t === 'Novo compromisso' && gf.h === '10:00') ok('célula vazia da grade abre "Novo compromisso" no horário da célula (10h) — capacidade da V2 preservada'); else falha('célula: ' + JSON.stringify(gf));
     await pg.evaluate(() => document.querySelector('#modalHost .btn:not(.primary)').click()); await pg.waitForTimeout(200);
     await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="dia"]'); await pg.waitForTimeout(600);
+    await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="grade"]'); await pg.waitForTimeout(500); /* Dia abre em lista por padrão */
     const gd = await pg.evaluate(() => ({ cols: getComputedStyle(document.querySelector('#view-agenda .ag-grade')).gridTemplateColumns.split(' ').length, chips: document.querySelectorAll('#view-agenda .ag-grade .ag-ev').length }));
     if (gd.cols === 2 && gd.chips === 6) ok('Grade + Dia: uma coluna com os 6 itens de hoje'); else falha('grade dia: ' + JSON.stringify(gd));
     await pg.click(':is(#view-agenda, #np-barra-vista) .np-seg button[data-k="lista"]'); await pg.waitForTimeout(400);

@@ -57,6 +57,8 @@ async function abrir(b, o = {}) {
   if (o.erro || o.vazio) await r.pg.waitForFunction((V) => document.querySelector(V + ' .np-erro, ' + V + ' .np-vazio'), V, { timeout: 15000 });
   else if (o.casca !== 'v2') await r.pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 });
   else await r.pg.waitForFunction((V) => document.querySelector(V + ' table tbody tr'), V, { timeout: 15000 });
+  /* 25/11: a linha das integrações só aparece com falha ou por “Mais ações → Ver integrações”; os roteiros abaixo a conferem, então é aberta aqui */
+  if (o.casca !== 'v2' && !o.erro && !o.vazio) { r.fontesPorPadrao = await r.pg.evaluate((V) => !!document.querySelector(V + ' .np-pub-fontes'), V); await r.pg.evaluate(() => window.PP_PUBLICACOES?.verIntegracoes?.(true)); await r.pg.waitForTimeout(150); }
   await r.pg.waitForTimeout(500);
   return r;
 }

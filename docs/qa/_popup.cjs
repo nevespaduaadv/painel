@@ -18,9 +18,12 @@ if (!chromium.__npPopup) {
     } catch (_) { /* seletor que o locator não resolve: segue o clique normal */ }
   };
   const vestir = (pg) => { if (pg.__npPopup) return pg; pg.__npPopup = true; const click = pg.click.bind(pg); pg.click = async (sel, opts) => { /* tentativas curtas: uma recarga em curso pode restaurar o pop-up entre o fechar e o clique */ for (let i = 0; ; i++) { await liberar(pg, sel); try { return await click(sel, { ...(opts || {}), timeout: i < 9 ? 3000 : (opts && opts.timeout) || 30000 }); } catch (e) { if (i >= 9 || !/Timeout/.test(String(e && e.message))) throw e; } } }; return pg; };
-  const vestirCtx = (ctx) => { const np = ctx.newPage.bind(ctx); ctx.newPage = async (...a) => vestir(await np(...a)); return ctx; };
+  /* 25/11: na Agenda, Semana e Mês passaram a abrir em grade/calendário por padrão. Os roteiros foram escritos para a lista;
+     por isso os labs começam com a preferência "lista" gravada (quem testa a grade troca a preferência no próprio roteiro). */
+  const prefLista = () => { try { for (const m of ['semana', 'mes']) for (const suf of ['', '-beta']) { const k = 'np-agenda-vista-' + m + suf; if (localStorage.getItem(k) == null) localStorage.setItem(k, 'lista'); } } catch (_) {} };
+  const vestirCtx = (ctx) => { const ai = ctx.addInitScript.bind(ctx); ai(prefLista).catch(() => {}); ctx.addInitScript = async (...a) => { const r = await ai(...a); await ai(prefLista); return r; }; /* os labs limpam o localStorage no próprio init: a preferência é regravada depois de cada um */ const np = ctx.newPage.bind(ctx); ctx.newPage = async (...a) => vestir(await np(...a)); return ctx; };
   const launch = chromium.launch.bind(chromium);
-  chromium.launch = async (...a) => { const b = await launch(...a); const nc = b.newContext.bind(b); b.newContext = async (...x) => vestirCtx(await nc(...x)); const np = b.newPage.bind(b); b.newPage = async (...x) => vestir(await np(...x)); return b; };
+  chromium.launch = async (...a) => { const b = await launch(...a); const nc = b.newContext.bind(b); b.newContext = async (...x) => vestirCtx(await nc(...x)); const np = b.newPage.bind(b); b.newPage = async (...x) => { const pg = await np(...x); await pg.addInitScript(prefLista).catch(() => {}); return vestir(pg); }; return b; };
 }
 
 /* para roteiros que usam a busca global com o pop-up aberto: fecha antes */

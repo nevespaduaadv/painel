@@ -260,7 +260,8 @@ function renderAgendaV3(){
   if(outros.length){chips.push(NPUI.sepv());const sel0=outros.find(c=>c.id===A.quem);if(sel0)quem(sel0.id,sel0.nome);
     const mais=NPUI.chip({label:"Pessoa…",on:false,grupo:"quem",title:"Agenda de outra pessoa"});mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false");mais.onclick=()=>NPUI.pop(mais,outros.map(c=>({label:c.nome,atual:A.quem===c.id,onclick:()=>{A.quem=c.id;try{localStorage.setItem("pp-agenda-quem",c.id)}catch(_){}render()}})),{label:"Agenda de",refoco:()=>document.querySelector('#view-agenda .np-chipf[aria-haspopup]')});chips.push(mais)}
   const seg=NPUI.seg([["dia","Dia"],["semana","Semana"],["mes","Mês"]],A.modo,k=>{A.modo=k;try{localStorage.setItem("pp-agenda-modo",k)}catch(_){}NPUI.vt(()=>render())},"Período");
-  const vista=NPUI.pref.get("np-agenda-vista","lista");const segV=NPUI.seg([["lista","Lista"],["grade","Grade"]],vista,k=>{NPUI.pref.set("np-agenda-vista",k);NPUI.vt(()=>render())},"Visualização");
+  /* 25/11 (sócia): Dia em lista, Semana em grade de horários, Mês em calendário; a troca Lista/Grade fica lembrada por período */
+  const chaveV="np-agenda-vista-"+A.modo;const vista=NPUI.pref.get(chaveV,A.modo==="dia"?"lista":"grade");const segV=NPUI.seg([["lista","Lista"],["grade",A.modo==="mes"?"Calendário":"Grade"]],vista,k=>{NPUI.pref.set(chaveV,k);NPUI.vt(()=>render())},"Visualização");
   const mover=n=>{A.ref=A.modo==="mes"?new Date(A.ref.getFullYear(),A.ref.getMonth()+n,1):addD(A.ref,n*(A.modo==="semana"?7:1));render()};
   const nav=el("span",{class:"np-nav-per",role:"group","aria-label":"Navegar no período"},NPUI.ib("chevE","Anterior",()=>mover(-1)),NPUI.btn("Hoje",{variante:"ghost",onclick:()=>{A.ref=hojeLocal();render()}}),NPUI.ib("chevD","Próximo",()=>mover(1)));
   const sync=meu?.agenda_sync?(meu.agenda_sync_erro?"Google: "+meu.agenda_sync_erro.slice(0,60):meu.agenda_sync_em?"Google sincronizado "+new Date(meu.agenda_sync_em).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Google: aguardando 1ª sincronização"):"Google Calendar desligado para você";
@@ -319,7 +320,7 @@ html.np-casca-v3 .ag-mn .ag-dn{font:500 var(--np-fs-2)/1 var(--np-display);font-
 html.np-casca-v3 .ag-mq{background:var(--np-surface-2);color:var(--np-text-3);font-variant-numeric:tabular-nums}
 html.np-casca-v3 .ag-ev{background:var(--np-surface-2);color:var(--np-text);border:1px solid var(--np-line);border-left:3px solid var(--c,var(--np-ink));border-radius:var(--np-r);font:400 var(--np-fs-1)/1.3 var(--np-ui);padding:3px 6px}
 html.np-casca-v3 .ag-ev:hover{filter:none;border-color:var(--np-line-2);background:var(--np-hover)}
-html.np-casca-v3 .ag-ev.atrasada{--c:var(--np-crit);border-left-color:var(--np-crit)}
+html.np-casca-v3 .ag-ev.atrasada{--c:var(--np-att-s);border-left-color:var(--np-att-s)}
 html.np-casca-v3 .ag-ev.marco{background:transparent;border:1px dotted var(--np-text-3);border-left:3px dotted var(--c);color:var(--np-text-2)}
 html.np-casca-v3 .ag-mais{color:var(--np-text-2);font:500 var(--np-fs-1)/1.2 var(--np-ui)}html.np-casca-v3 .ag-mais:hover{color:var(--np-text);text-decoration:underline}
 html.np-casca-v3 .ag-legenda{color:var(--np-text-3);font-size:var(--np-fs-1)}

@@ -3,6 +3,7 @@
    Em pessoa física, tira da tela o que só faz sentido para empresa: linhas repetidas ou de PJ na qualificação (razão social,
    representante legal, grupo econômico, endereço), o título "Sócios e contatos" vira "Contatos" e o bloco de contexto empresarial some
    quando está vazio. Nos demais clientes nada muda. */
+window.PP_SERVICOS_PF = ["Superendividamento", "RMC", "Readequação de Margem", "SE + RMC + Readequação", "Fraude", "Gestão de Passivo PF"]; // 25/11 (sócia): serviço contratado na carteira PF
 (() => {
   "use strict";
   const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
@@ -20,9 +21,9 @@
     const p = c.pf || {}, t = (v) => inp("text", v || "");
     const nome = t(c.nome), cpf = t(c.cnpj ? cpfMasc(c.cnpj) : ""), rg = t(p.rg), nasc = inp("date", /^\d{4}-\d{2}-\d{2}/.test(p.nascimento || "") ? p.nascimento.slice(0, 10) : ""),
       civil = sel({ "": "—", "Solteiro(a)": "Solteiro(a)", "Casado(a)": "Casado(a)", "União estável": "União estável", "Divorciado(a)": "Divorciado(a)", "Separado(a)": "Separado(a)", "Viúvo(a)": "Viúvo(a)", ...(p.estado_civil ? { [p.estado_civil]: p.estado_civil } : {}) }, p.estado_civil || ""),
-      prof = t(p.profissao), cel = t(c.telefone), fixo = t(p.telefone_fixo), email = inp("email", c.email || ""), ender = t(c.endereco), bairro = t(p.bairro), cidade = t(c.cidade),
+      prof = t(p.profissao), serv = sel({ "": "—", ...Object.fromEntries(window.PP_SERVICOS_PF.map((x) => [x, x])), ...(p.servico ? { [p.servico]: p.servico } : {}) }, p.servico || ""), cel = t(c.telefone), fixo = t(p.telefone_fixo), email = inp("email", c.email || ""), ender = t(c.endereco), bairro = t(p.bairro), cidade = t(c.cidade),
       uf = sel({ "": "—", ...Object.fromEntries(UFS.map((u) => [u, u])) }, c.uf || ""), cep = t(c.cep);
-    const body = el("div", { class: "form" }, field("pf-nome", "Nome completo", nome), field("pf-cpf", "CPF", cpf), field("pf-rg", "RG", rg), field("pf-nasc", "Nascimento", nasc), field("pf-civil", "Estado civil", civil), field("pf-prof", "Profissão", prof),
+    const body = el("div", { class: "form" }, field("pf-nome", "Nome completo", nome), field("pf-cpf", "CPF", cpf), field("pf-rg", "RG", rg), field("pf-nasc", "Nascimento", nasc), field("pf-civil", "Estado civil", civil), field("pf-prof", "Profissão", prof), field("pf-serv", "Serviço contratado", serv),
       field("pf-cel", "Celular / WhatsApp", cel), field("pf-fixo", "Telefone fixo", fixo), field("pf-email", "E-mail", email), field("pf-end", "Endereço (rua e número)", ender), field("pf-bairro", "Bairro", bairro), field("pf-cid", "Cidade", cidade), field("pf-uf", "UF", uf), field("pf-cep", "CEP", cep));
     modal("Dados pessoais", body, async () => {
       const erro = (el0, msg) => { const e = new Error(msg); e.campo = el0; try { el0.focus(); } catch (_) {} return e; };
@@ -32,7 +33,7 @@
       // lê o jsonb atual e só troca o que o formulário cobre: o que mais existir em dados (advbox, notas, etc.) fica como está
       const { data: cur, error: e0 } = await SB.from("clientes").select("dados,cnpj,cpf_titular").eq("id", c.id).single(); if (e0) throw new Error("Não foi possível ler o cadastro: " + (e0.message || ""));
       const d0 = cur?.dados || {}, docFmt = doc ? cpfMasc(doc) : null;
-      const pf = { ...(d0.pf || {}), rg: n(rg.value), nascimento: nasc.value || null, estado_civil: civil.value || null, profissao: n(prof.value), bairro: n(bairro.value), telefone_fixo: n(fixo.value) };
+      const pf = { ...(d0.pf || {}), rg: n(rg.value), nascimento: nasc.value || null, estado_civil: civil.value || null, profissao: n(prof.value), servico: serv.value || null, bairro: n(bairro.value), telefone_fixo: n(fixo.value) };
       const cols = { cnpj: docFmt, email: n(email.value), telefone: n(cel.value), endereco: n(ender.value), cidade: n(cidade.value), uf: uf.value || null, cep: n(cep.value) };
       // o CPF do titular acompanha o CPF do cliente quando eram o mesmo (ou estava vazio)
       if (!cur?.cpf_titular || dig(cur.cpf_titular) === dig(cur.cnpj)) cols.cpf_titular = docFmt;

@@ -1711,3 +1711,11 @@ html.np-casca-v3 .np-barras .n{font-variant-numeric:tabular-nums;color:var(--np-
 html.np-casca-v3 .np-barras .v{color:var(--np-text-3);font-size:var(--np-fs-1)}
 html.np-casca-v3 .np-painel[data-modo="centro"] h2{view-transition-name:none}
 @media (min-width:901px){html.np-casca-v3 #np-carteira .np-busca-inline{min-width:340px}}
+/* ============ Bloco 2b (25/11) — ficha do cliente ============ */
+html.np-casca-v3 .np-ficha-quadros{margin:12px 0 4px;grid-template-columns:repeat(auto-fit,minmax(170px,240px))}
+html.np-casca-v3 .np-ficha-quadros .np-qd b{font-size:22px}
+html.np-casca-v3 .np-fc-escr:empty{display:none}
+html.np-casca-v3 .np-fc-resp{display:inline-flex;align-items:center}
+.np-fin-situ{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.np-fin-prog{display:flex;gap:10px;align-items:center}
+.np-fin-prog b{font-size:18px;font-variant-numeric:tabular-nums}

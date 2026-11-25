@@ -53,7 +53,7 @@
     const docInfo = docFmt(c);
     const grupo = String(c.grupo || c.dados?.grupo || "").trim();
     const stInfo = STATUS_MAP[c.status || "ativo"] || [c.status || "Ativo", "muted"];
-    const metaExtras = [cidadeTxt(c), c.segmento, resp ? "Responsável: " + resp : null].filter(Boolean);
+    const metaExtras = [cidadeTxt(c), c.segmento].filter(Boolean);
 
     const idItens = [];
     if (docInfo) {
@@ -90,6 +90,7 @@
       if (idItens.length) idItens.push(el("span", { class: "np-fc-id-sep", "aria-hidden": "true" }, "·"));
       idItens.push(el("span", {}, metaExtras.join(" · ")));
     }
+    if (resp) idItens.push(el("span", { class: "np-fc-resp", title: "Responsável pelo cliente" }, NPUI.quem(resp)));
 
     // valor e marcas: as MESMAS contas da Carteira V3.1 (PP_CARTEIRA_V3), que repetem as da V2
     const reg = window.PP_CARTEIRA_V3?.registro?.(c.id) || null;
@@ -97,11 +98,26 @@
     const valor = reg ? (reg.ks.length
       ? el("span", { class: "np-ficha-val", title: "saldo em contratos ativos" }, el("b", {}, NPUI.brl(reg.total)), ` em ${reg.ks.length} contrato${reg.ks.length === 1 ? "" : "s"} ativo${reg.ks.length === 1 ? "" : "s"}`)
       : el("span", { class: "np-ficha-val vazio" }, "sem contratos ativos")) : null;
+    /* 25/11 (sócia): cabeçalho com quadros (saldo, contratos, processos), serviço contratado (PF) e adimplência com o escritório.
+       A adimplência lê só a contagem de cobranças em atraso do cliente (uma consulta leve, sem trazer linhas). */
+    const servPF = c.tipo_pessoa === "PF" ? (c.pf?.servico || c.dados?.pf?.servico || null) : null;
+    const escr = el("span", { class: "np-fc-escr" });
+    if (window.PP?.temAcesso?.("financeiro") || window.PP?.perfil?.papel === "admin") {
+      Promise.all([SB.from("cobrancas").select("id", { count: "exact", head: true }).eq("cliente_id", c.id).eq("status", "atrasada"), SB.from("cobrancas").select("id", { count: "exact", head: true }).eq("cliente_id", c.id)])
+        .then(([at, tot]) => { if (at.error || tot.error || !escr.isConnected || !tot.count) return; escr.replaceChildren(at.count ? NPUI.marca("inadimplente com o escritório", "crit") : NPUI.marca("adimplente com o escritório", "ok")); }).catch(() => {});
+    }
+    const marcasSemProc = marcas.filter((m) => !/processo/.test(m.textContent));
+    const nProc = reg && reg.proc != null ? reg.proc : null;
+    const quadros = reg && window.NPUI?.quadros ? NPUI.quadros([
+      reg.ks.length ? { titulo: "Saldo em contratos ativos", n: NPUI.brl(reg.total), sub: `${reg.ks.length} contrato${reg.ks.length === 1 ? "" : "s"} ativo${reg.ks.length === 1 ? "" : "s"}` } : (c.tipo_pessoa === "PF" ? null : { titulo: "Contratos ativos", n: 0, tom: "zero", sub: "sem contratos ativos" }),
+      nProc != null ? { titulo: "Processos ativos", n: nProc, tom: nProc ? "" : "zero" } : null]) : null;
+    if (quadros) { quadros.classList.add("np-ficha-quadros"); if (!quadros.children.length) quadros.hidden = true; }
     id.classList.add("np-ficha-id");
     id.replaceChildren(
-      el("div", { class: "np-fc-head-top" }, el("h1", { class: "np-ficha-nome" }, c.nome || "(sem nome)"), NPUI.marca(stInfo[0], stInfo[1])),
+      el("div", { class: "np-fc-head-top" }, el("h1", { class: "np-ficha-nome" }, c.nome || "(sem nome)"), NPUI.marca(stInfo[0], stInfo[1]), servPF ? NPUI.marca(servPF, "info") : null, escr),
       idItens.length ? el("div", { class: "np-fc-id-row" }, ...idItens) : null,
-      valor || marcas.length ? el("div", { class: "np-ficha-marcas" }, valor, ...marcas) : null
+      quadros,
+      marcasSemProc.length ? el("div", { class: "np-ficha-marcas" }, ...marcasSemProc) : null
     );
     const acts = head.querySelector(":scope > .actions");
     if (acts) { acts.classList.add("np-ficha-acoes"); acts.querySelectorAll(".btn").forEach((b) => b.classList.add("np-ficha-b")); }
