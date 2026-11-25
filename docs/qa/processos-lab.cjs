@@ -37,7 +37,7 @@ async function abrir(b, o = {}) {
   await r.ctx.route(/supabase\.co\/rest\/v1\/(v_processos|andamentos|colaboradores|v_tarefas|v_dossie)/, (rota) => {
     const u = new URL(rota.request().url()); const p = u.pathname; if (rota.request().method() !== 'GET') return rota.fallback();
     const pid = (u.searchParams.get('processo_id') || '').replace('eq.', '');
-    if (p.startsWith('/rest/v1/v_processos')) { r.leiturasProc++; if (falhar > 0) { falhar--; return rota.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ message: 'falha fictícia' }) }); } return json(rota, o.vazio ? [] : PROC); }
+    if (p.startsWith('/rest/v1/v_processos')) { r.leiturasProc++; if (falhar > 0) { falhar--; return rota.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ message: 'falha fictícia' }) }); } return json(rota, o.vazio ? [] : o.muitos ? Array.from({ length: o.muitos }, (_, i) => ({ ...PROC[0], id: 'pm' + i, status: 'ativo', cliente_nome: 'Cliente ' + String(i + 1).padStart(3, '0'), numero_cnj: String(1000000 + i) + '-11.2026.8.26.0196' })) : PROC); }
     if (p.startsWith('/rest/v1/v_tarefas')) { if (!pid) return rota.fallback(); return json(rota, TAR[pid] || []); }
     if (p.startsWith('/rest/v1/v_dossie')) { if (!pid) return rota.fallback(); return json(rota, REGS[pid] || []); }
     if (p.startsWith('/rest/v1/andamentos')) return json(rota, ANDS[(u.searchParams.get('processo_id') || '').replace('eq.', '')] || []);
@@ -157,6 +157,19 @@ const painel = (pg) => pg.evaluate(() => { const p = document.querySelector('#vi
     await pg.screenshot({ path: path.join(OUT, `processos-${w}-${tema}-ficha.png`), fullPage: w === 375 });
     await ctx.close();
   }
+  // ---------- paginação: 40 por página ----------
+  rel.push('paginação (95 processos fictícios, 40 por página)');
+  { const r = await abrir(b, { muitos: 95 });
+    const ler = () => r.pg.evaluate(() => ({ linhas: document.querySelectorAll('#view-processos li.np-it').length, primeiro: document.querySelector('#view-processos li.np-it')?.textContent.match(/Cliente \d+/)?.[0], pag: document.querySelector('#view-processos .np-paginas .np-num')?.textContent, faixa: document.querySelector('#view-processos .np-paginas .np-rodape')?.textContent, desab: [...document.querySelectorAll('#view-processos .np-paginas button')].filter(x => x.disabled).map(x => x.textContent) }));
+    const p1 = await ler();
+    if (p1.linhas === 40 && p1.pag === 'Página 1 de 3' && p1.primeiro === 'Cliente 001' && /^1–40 de 95 processos$/.test(p1.faixa) && p1.desab.join('|') === '« Primeira|‹ Anterior') ok(`página 1: 40 linhas, "${p1.pag}", "${p1.faixa}", Primeira/Anterior desabilitados`); else falha('página 1: ' + JSON.stringify(p1));
+    await r.pg.click('#view-processos .np-paginas button:has-text("Próxima")'); await r.pg.waitForTimeout(250); const p2 = await ler();
+    if (p2.linhas === 40 && p2.pag === 'Página 2 de 3' && p2.primeiro === 'Cliente 041' && !p2.desab.length) ok('Próxima: página 2 começa no 41º'); else falha('página 2: ' + JSON.stringify(p2));
+    await r.pg.click('#view-processos .np-paginas button:has-text("Última")'); await r.pg.waitForTimeout(250); const p3 = await ler();
+    if (p3.linhas === 15 && p3.pag === 'Página 3 de 3' && /^81–95 de 95/.test(p3.faixa) && p3.desab.join('|') === 'Próxima ›|Última »') ok('Última: 15 linhas restantes, Próxima/Última desabilitados'); else falha('página 3: ' + JSON.stringify(p3));
+    await r.pg.fill('#view-processos .np-busca-inline', 'Cliente 09'); await r.pg.waitForTimeout(700); const b1 = await ler();
+    if (b1.linhas === 6 && !b1.pag) ok('busca volta para a primeira página e some com a paginação quando cabe tudo (6 resultados)'); else falha('busca: ' + JSON.stringify(b1));
+    await r.ctx.close(); }
   await b.close(); srv.close && srv.close();
   const txt = rel.join('\n') + '\n\n' + (falhas ? `${falhas} falha(s).` : 'Tudo certo.'); fs.writeFileSync(path.join(OUT, 'relatorio.txt'), txt); console.log(txt); process.exit(falhas ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -134,8 +134,14 @@ function renderProcessosV3(v){
     corpo.append(NPUI.vazio(semNada?{titulo:"Nenhum processo cadastrado",texto:"Cadastre o primeiro processo.",acao:ro?null:"Novo processo",onAcao:()=>window.PP_CARTEIRA?.openProcessoForm(null,{})}
       :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver os demais processos.",acao:"Limpar filtros",onAcao:()=>{limparP();render()}}));
   }else{
-    corpo.append(el("ul",{class:"np-lst"},lista.map(linhaP)));
-    corpo.append(NPUI.rodape(`${lista.length} de ${P.lista.length} ${P.lista.length===1?"processo":"processos"} · por cliente, em ordem alfabética`));
+    // 40 por página; mudar filtro ou busca volta para a primeira; ao voltar da ficha, abre a página onde está o processo
+    const chave=JSON.stringify([P.f.q,P.f.status]);if(chave!==P.pgChave){P.pgChave=chave;P.pg=1}
+    if(V3.focar){const i=lista.findIndex(x=>x.id===V3.focar);if(i>=0)P.pg=Math.floor(i/40)+1}
+    const fa=NPUI.fatia(lista,P.pg,40);P.pg=fa.pagina;
+    corpo.append(el("ul",{class:"np-lst"},fa.itens.map(linhaP)));
+    const pag=NPUI.paginas({total:lista.length,pagina:fa.pagina,porPagina:40,rotulo:"processos",onIr:n=>{P.pg=n;render();window.scrollTo(0,0);$("#view-processos .np-corpo")?.scrollTo?.(0,0)}});
+    if(pag)corpo.append(pag);
+    corpo.append(NPUI.rodape(`${fa.paginas>1?`mostrando ${fa.de}–${fa.ate} · `:""}${lista.length} de ${P.lista.length} ${P.lista.length===1?"processo":"processos"} · por cliente, em ordem alfabética`));
   }
   obra.append(corpo);v.append(obra);
   V3.painel=NPUI.painel({obra,label:"Detalhe do processo",onClose:()=>{V3.aberta=null}});
