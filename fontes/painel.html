@@ -1290,8 +1290,11 @@ function openHistForm(h={}){
   modal(h.id?"Editar acordo":"Registrar acordo na base",body,async()=>{
     if(!credor.value.trim())throw new Error("Informe o credor");if(!(+divida.value)||!valor.value)throw new Error("Informe dívida e valor do acordo");
     const d={credor:credor.value.trim(),grupo:grupo.value,titular:tit.value,produto:prod.value,garantia:gar.value,fase:fase.value,divida:+divida.value,valorAcordo:+valor.value,forma:forma.value,parcelas:forma.value==="parcelado"?(+npar.value||null):1,data:data.value,diasAtraso:dias.value?+dias.value:null,status:status.value,obs:obs.value};
-    if(!(d.credor in S.regras.fatoresBanco)){S.regras.fatoresBanco[d.credor]=0;await S.db.doc("config/regras").set(S.regras)}
-    if(h.id)await S.db.doc("historico/"+h.id).set(d);else await S.db.collection("historico").add(d);toast("Acordo salvo na base");
+    if(h.negociacaoId)d.negociacaoId=h.negociacaoId;
+    const gestaoBase=typeof PP==="undefined"||PP.perfil?.papel==="admin"; // regras de projeção: só a gestão altera
+    if(gestaoBase&&!(d.credor in S.regras.fatoresBanco)){S.regras.fatoresBanco[d.credor]=0;await S.db.doc("config/regras").set(S.regras)}
+    let novo=null;if(h.id)await S.db.doc("historico/"+h.id).set(d);else novo=await S.db.collection("historico").add(d);toast("Acordo salvo na base");
+    if(typeof h.aoSalvar==="function")try{await h.aoSalvar(novo?.id||h.id||null,d)}catch(_){}
   },extra);
 }
 

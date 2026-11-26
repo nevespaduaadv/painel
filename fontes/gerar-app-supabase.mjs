@@ -61,7 +61,8 @@ html = html.replace('</style>', `
 .sem-marketing .area-marketing{display:none!important}
 .sem-financeiro .area-financeiro{display:none!important}
 .sem-equipe .area-equipe{display:none!important}
-.tab[data-tab="ponto"],.tab[data-tab="acompanhamento"]{display:none!important} /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
+.tab[data-tab="ponto"],.tab[data-tab="acompanhamento"]{display:none!important}
+.nao-admin .tab[data-tab="historico"]{display:none!important} /* 25/11: Base de acordos só para a gestão */ /* 25/11: Ponto desligado (PP.TABS_DESLIGADAS) */
 .sem-growth .area-growth{display:none!important}
 .userbox{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:none}
 .userbox .btn{background:var(--surface);color:var(--fg);border-color:var(--line);padding:5px 10px;font-size:13px;text-decoration:none}
@@ -246,7 +247,9 @@ const FICHA_COLS = ["nome","ativo","endereco","representante","representante_cpf
 const equipe = ()=>PP.perfil && (PP.perfil.papel==="admin"||PP.perfil.papel==="colaborador");
 
 async function carregar(col){
-  if(col==="historico" && !equipe()){
+  /* 25/11 (decisão das sócias): só a gestão consulta a Base de acordos. A equipe continua projetando descontos pela visão
+     anônima "referencias" (credor, forma, desconto) — a mesma que o cliente usa — e alimenta a base ao concluir um acordo. */
+  if(col==="historico" && PP.perfil?.papel!=="admin"){
     const {data,error}=await SB.from("referencias").select("*");
     if(error) throw error;
     // formato compatível com referencias(): divida/valorAcordo sintéticos a partir do desconto
@@ -295,6 +298,7 @@ async function gravar(col,id,doc,{merge=false}={}){
   const row={id,dados:d};if(col==="contratos")row.cliente_id=d.clienteId;
   // coluna cnpj acompanha o formulário só quando o CNPJ vem no pedido (apagar o CNPJ limpa a coluna, como na Ficha cadastral)
   if(col==="clientes"&&Object.prototype.hasOwnProperty.call(doc,"cnpj"))row.cnpj=String(doc.cnpj??"").trim()||null;
+  if(col==="historico"&&PP.perfil?.papel!=="admin"){const {error}=await SB.from("historico").insert(row);if(error)throw error;return} // quem não é da gestão só inclui (sem ler nem alterar)
   const {error}=await SB.from(TABELAS[col]).upsert(row);if(error)throw error;
   if(notaCampo && !merge){
     const nid=(col==="clientes"?"cliente:":"contrato:")+id;
@@ -363,7 +367,7 @@ window.__PP_LOGIN = new Promise(resolve=>{
     if(PP.perfil.papel!=="admin")document.body.classList.add("nao-admin");
     PP.podeGrowth=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("growth");if(!PP.podeGrowth)document.body.classList.add("sem-growth");
     PP.podeFinanceiro=PP.perfil.papel==="admin"||(PP.perfil.acessos||[]).includes("financeiro");if(!PP.podeFinanceiro)document.body.classList.add("sem-financeiro");
-    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",acompanhamento:"clientes",atendimento:"atendimento",historico:"juridico",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
+    PP.AREAS=["clientes","juridico","comercial","marketing","financeiro","equipe","growth","atendimento","superendividamento"];PP.TAB_AREA={clientes:"clientes",acompanhamento:"clientes",atendimento:"atendimento",historico:"admin",regras:"admin",calibracao:"admin",processos:"juridico",negociacoes:"juridico",revisional:"juridico",superendividamento:"superendividamento",pecas:"juridico",monitoramento:"juridico",publicacoes:"controle",autenticador:"juridico",leads:"comercial",automacoes:"comercial",comercial:"comercial",marketing:"marketing",financeiro:"financeiro",estoque:"financeiro",inventario:"financeiro",faturamento:"financeiro",equipe:"equipe",horas:"equipe",growth:"growth",visao:"admin",usuarios:"admin",espelho:"admin","importar-advbox":"admin",requisicoes:"equipe","config-gestao":"equipe"};
     PP.escopoTarefas=()=>PP.perfil.papel==="admin"?{tudo:true}:(PP.perfil.acessos||[]).includes("tarefas_equipe")?{tudo:false,nucleos:["juridico","acordos","acompanhamento_pj"]}:{tudo:false,nucleos:null};
     PP.TAB_AREA["kb-comercial"]="comercial";PP.TABS_DESLIGADAS=new Set(["leads","comercial","automacoes","atendimento","ponto"]);
     PP.temAcesso=tab=>{if(PP.TABS_DESLIGADAS.has(tab))return false;const a=PP.TAB_AREA[tab];if(!a)return true;if(PP.perfil.papel==="admin")return true;if(a==="admin")return false;if(a==="controle")return (PP.perfil.acessos||[]).includes("tarefas_equipe")&&(PP.perfil.acessos||[]).includes("juridico");if(a==="superendividamento")return (PP.perfil.acessos||[]).includes("juridico")||(PP.perfil.acessos||[]).includes("superendividamento");return (PP.perfil.acessos||[]).includes(a)};
