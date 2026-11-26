@@ -41,7 +41,7 @@ const orfas=()=>K.pend.filter(x=>!x.na_fila).slice().sort((a,b)=>(b.fatal-a.fata
 const fataisDe=g=>filaDe(g).filter(x=>x.fatal).length;
 const elegiveis=g=>(g.ocupantes||[]).filter(o=>!o.pendencia&&!afastadoHoje(o));
 const NUC_L={...NUCLEOS,financeiro:"Financeiro"};
-const AREAS_L={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento",superendividamento:"Superendividamento",tarefas_equipe:"Tarefas da equipe",protecao:"Proteção patrimonial"};
+const AREAS_L={clientes:"Clientes",juridico:"Jurídico",comercial:"Comercial",marketing:"Marketing",financeiro:"Financeiro",equipe:"Equipe",growth:"Growth",atendimento:"Atendimento",superendividamento:"Superendividamento",ferramentas:"Ferramentas",tarefas_equipe:"Tarefas da equipe",protecao:"Proteção patrimonial"};
 const dataBR=iso=>iso?new Date(iso).toLocaleDateString("pt-BR"):"—";
 async function carregarCargos(){
   if(K.carregando)return;K.carregando=true;
