@@ -21,9 +21,13 @@ if (!chromium.__npPopup) {
   /* 25/11: na Agenda, Semana e Mês passaram a abrir em grade/calendário por padrão. Os roteiros foram escritos para a lista;
      por isso os labs começam com a preferência "lista" gravada (quem testa a grade troca a preferência no próprio roteiro). */
   const prefLista = () => { try { for (const m of ['semana', 'mes']) for (const suf of ['', '-beta']) { const k = 'np-agenda-vista-' + m + suf; if (localStorage.getItem(k) == null) localStorage.setItem(k, 'lista'); } } catch (_) {} };
-  const vestirCtx = (ctx) => { const ai = ctx.addInitScript.bind(ctx); ai(prefLista).catch(() => {}); ctx.addInitScript = async (...a) => { const r = await ai(...a); await ai(prefLista); return r; }; /* os labs limpam o localStorage no próprio init: a preferência é regravada depois de cada um */ const np = ctx.newPage.bind(ctx); ctx.newPage = async (...a) => vestir(await np(...a)); return ctx; };
+  /* 26/11: o jsDelivr passou a responder com desafio (403) a máquinas de CI para o supabase-js@2, e a página não iniciava
+     ("PP is not defined"). Os laboratórios são "sem rede": a biblioteca é servida de uma cópia local (docs/qa/vendor). */
+  const SB_LOCAL = require('fs').readFileSync(require('path').join(__dirname, 'vendor', 'supabase-js-2.119.2.umd.js'));
+  const semCdn = (alvo) => alvo.route(/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', body: SB_LOCAL })).catch(() => {});
+  const vestirCtx = (ctx) => { semCdn(ctx); const ai = ctx.addInitScript.bind(ctx); ai(prefLista).catch(() => {}); ctx.addInitScript = async (...a) => { const r = await ai(...a); await ai(prefLista); return r; }; /* os labs limpam o localStorage no próprio init: a preferência é regravada depois de cada um */ const np = ctx.newPage.bind(ctx); ctx.newPage = async (...a) => vestir(await np(...a)); return ctx; };
   const launch = chromium.launch.bind(chromium);
-  chromium.launch = async (...a) => { const b = await launch(...a); const nc = b.newContext.bind(b); b.newContext = async (...x) => vestirCtx(await nc(...x)); const np = b.newPage.bind(b); b.newPage = async (...x) => { const pg = await np(...x); await pg.addInitScript(prefLista).catch(() => {}); return vestir(pg); }; return b; };
+  chromium.launch = async (...a) => { const b = await launch(...a); const nc = b.newContext.bind(b); b.newContext = async (...x) => vestirCtx(await nc(...x)); const np = b.newPage.bind(b); b.newPage = async (...x) => { const pg = await np(...x); await semCdn(pg); await pg.addInitScript(prefLista).catch(() => {}); return vestir(pg); }; return b; };
 }
 
 /* para roteiros que usam a busca global com o pop-up aberto: fecha antes */
