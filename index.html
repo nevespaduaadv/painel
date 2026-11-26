@@ -2133,6 +2133,20 @@ html.np-casca-v3 .np-fc-resp{display:inline-flex;align-items:center}
 .np-fin-situ{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
 .np-fin-prog{display:flex;gap:10px;align-items:center}
 .np-fin-prog b{font-size:18px;font-variant-numeric:tabular-nums}
+/* Financeiro · previsto × recebido por mês */
+html.np-casca-v3 .fc3-meses{margin-top:14px}
+html.np-casca-v3 .fc3-mg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;align-items:end;margin-top:10px}
+html.np-casca-v3 .fc3-mg .col{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+html.np-casca-v3 .fc3-mg .bs{display:flex;gap:4px;align-items:flex-end;height:140px;width:100%;justify-content:center;border-bottom:1px solid var(--np-line)}
+html.np-casca-v3 .fc3-mg .bs i{display:block;width:min(22px,40%);border-radius:4px 4px 0 0;min-height:2px}
+html.np-casca-v3 .fc3-mg i.p,html.np-casca-v3 .fc3-leg i.p{background:var(--np-line-2)}
+html.np-casca-v3 .fc3-mg i.r,html.np-casca-v3 .fc3-leg i.r{background:var(--np-ok)}
+html.np-casca-v3 .fc3-mg .v{font:600 var(--np-fs-1)/1 var(--np-ui);font-variant-numeric:tabular-nums;color:var(--np-text)}
+html.np-casca-v3 .fc3-mg .m{font:400 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-3)}
+html.np-casca-v3 .fc3-mg .col.atual .m{color:var(--np-text);font-weight:600}
+html.np-casca-v3 .fc3-leg{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0 0;font-size:var(--np-fs-1);color:var(--np-text-3)}
+html.np-casca-v3 .fc3-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:6px}
+@media (max-width:600px){html.np-casca-v3 .fc3-mg{gap:4px}html.np-casca-v3 .fc3-mg .bs{height:100px}}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
@@ -3994,7 +4008,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwwshdya";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes"],["marketing","marketing"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico"],["pecas","juridico","superendividamento"],["superendividamento","juridico","superendividamento"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwwsv07z";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
