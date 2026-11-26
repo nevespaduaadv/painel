@@ -7,10 +7,10 @@
    Automações: página reservada (as skills de marketing entram aqui depois). */
 (()=>{
 "use strict";
-const P={lista:[],colab:[],ok:false,carregando:false,erro:null,semTabela:false,aberto:null,coment:[],painel:null,obra:null,arrastando:null,catalogo:[],sec:null,rascunho:""};
+const P={lista:[],colab:[],ok:false,carregando:false,erro:null,semTabela:false,aberto:null,coment:[],painel:null,obra:null,arrastando:null,catalogo:[],sec:null,rascunho:"",add:null,ncom:new Map(),verArq:false,arq:null,etqEd:null,editDesc:false,editCom:null,rascDesc:null};
 const COLS=[["ideias","Ideias"],["planejamento","Planejamento"],["producao","Em produção"],["aprovacao","Aguardando aprovação"]];
 const COL_R=Object.fromEntries(COLS);
-const CORES=[["verde","#2e7d4f"],["amarelo","#b8860b"],["laranja","#c2622d"],["vermelho","#a23b3b"],["roxo","#6a4fb3"],["azul","#2f6fb3"]];
+const CORES=[["verde","#2e7d4f"],["amarelo","#b8860b"],["laranja","#c2622d"],["vermelho","#a23b3b"],["roxo","#6a4fb3"],["azul","#2f6fb3"],["céu","#1f7f96"],["lima","#55801c"],["rosa","#b03f86"],["cinza","#5f6670"]];
 const COR_R=Object.fromEntries(CORES);
 const FORMATO={reels:"Reels",carrossel:"Carrossel",estatico:"Estático",story:"Story",artigo:"Artigo",email:"E-mail",video:"Vídeo",live:"Live",outro:"Outro"};
 const CANAIS={instagram:"Instagram",linkedin:"LinkedIn",youtube:"YouTube",tiktok:"TikTok",blog:"Blog/site",whatsapp:"WhatsApp",email:"E-mail"};
@@ -28,6 +28,7 @@ async function carregar(){
     if(c.error){P.semTabela=/mkt_producao|schema cache|does not exist|PGRST205/i.test(c.error.message||"");throw c.error}
     P.lista=c.data||[];P.colab=(k.data||[]).filter(x=>x.ativo!==false&&!/^(Distribui|Teste|Rob)/.test(x.nome||""));P.semTabela=false;
     try{const e=await SB.from("mkt_etiquetas").select("nome,cor").order("nome");P.catalogo=e.error?[]:(e.data||[])}catch(_){P.catalogo=[]}
+    try{const q=await SB.from("mkt_producao_comentarios").select("card_id").eq("tipo","comentario");P.ncom=new Map();for(const r of q.data||[])P.ncom.set(r.card_id,(P.ncom.get(r.card_id)||0)+1)}catch(_){P.ncom=new Map()}
     // situação das pautas já enviadas (uma consulta só, pelos ids)
     const ids=[...new Set(P.lista.map(x=>x.pauta_id).filter(Boolean))];P.pautas=new Map();
     if(ids.length){const r=await SB.from("pautas").select("id,status,data_prevista").in("id",ids);for(const p of r.data||[])P.pautas.set(p.id,p)}
@@ -40,25 +41,44 @@ const garantir=()=>{if(!P.ok&&!P.carregando)carregar();return P.ok};
 async function salvar(id,patch){const {error}=await SB.from("mkt_producao").update({...patch,updated_at:new Date().toISOString()}).eq("id",id);if(error){toast("Não foi possível salvar");throw error}const c=P.lista.find(x=>x.id===id);if(c)Object.assign(c,patch)}
 async function mover(c,coluna){if(ro()||c.coluna===coluna)return;const ult=Math.max(0,...P.lista.filter(x=>x.coluna===coluna).map(x=>x.ordem||0))+10;try{const de=COL_R[c.coluna];await salvar(c.id,{coluna,ordem:ult});registrar(c.id,`moveu de ${de} para ${COL_R[coluna]}`);toast(COL_R[coluna]);render();if(P.aberto===c.id)abrirCartao(c.id,null,true)}catch(_){}}
 
-/* ---------- novo cartão ---------- */
-function novoCartao(coluna){
-  if(ro())return;const tit=inp("text","",{placeholder:"Ex.: Carrossel — 5 erros ao renegociar com o banco"}),desc=el("textarea",{rows:"4",placeholder:"Ideia, gancho, roteiro, referências…"}),col=sel(COL_R,coluna||"ideias");
-  const body=el("div",{class:"form"},field("mp-tit","Título",tit),field("mp-col","Coluna",col),field("mp-desc","Descrição (opcional)",desc));
-  modal("Novo cartão de conteúdo",body,async()=>{if(!tit.value.trim())throw new Error("Informe o título");const meu=meuColab();
-    const ult=Math.max(0,...P.lista.filter(x=>x.coluna===col.value).map(x=>x.ordem||0))+10;
-    const {data,error}=await SB.from("mkt_producao").insert({titulo:tit.value.trim(),descricao:desc.value.trim()||null,coluna:col.value,ordem:ult,membros:meu?[meu.id]:[]}).select("*").single();
-    if(error)throw new Error(error.message);P.lista.push(data);registrar(data.id,"adicionou este cartão a "+COL_R[data.coluna]);toast("Cartão criado");render()},null,{confirmar:"Criar cartão"});
+/* ---------- novo cartão: direto na coluna, como no Trello (26/11, 14h39) ---------- */
+async function criarCartao(coluna,titulo){
+  const t=(titulo||"").trim();if(!t||ro())return null;
+  const ult=Math.max(0,...P.lista.filter(x=>x.coluna===coluna).map(x=>x.ordem||0))+10;
+  const {data,error}=await SB.from("mkt_producao").insert({titulo:t.slice(0,200),coluna,ordem:ult}).select("*").single();
+  if(error){toast("Não foi possível criar o cartão");return null}
+  P.lista.push(data);registrar(data.id,"adicionou este cartão a "+COL_R[data.coluna]);return data;
 }
+function abrirAdd(k){P.add=k;render();setTimeout(()=>{const i=document.querySelector(`.np-mp-col[data-col="${k}"] .np-mp-novo textarea`);if(i)i.focus()},0)}
+function blocoAdd(k){
+  if(ro())return null;
+  if(P.add!==k)return el("button",{type:"button",class:"np-mp-addbtn",onclick:()=>abrirAdd(k)},"+ Adicionar um cartão");
+  const ta=el("textarea",{rows:"2",placeholder:"Insira um título para o cartão…","aria-label":"Título do novo cartão em "+COL_R[k],maxlength:"200"});
+  const criar=async()=>{const t=ta.value.trim();if(!t){ta.focus();return}ta.disabled=true;const c=await criarCartao(k,t);if(c)abrirAdd(k);else{ta.disabled=false;ta.focus()}};
+  ta.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();criar()}else if(e.key==="Escape"){e.stopPropagation();P.add=null;render()}};
+  return el("div",{class:"np-mp-novo"},ta,el("div",{class:"l"},NPUI.btn("Adicionar cartão",{variante:"pri",onclick:criar}),el("button",{type:"button",class:"np-mp-x","aria-label":"Cancelar",title:"Cancelar",onclick:()=>{P.add=null;render()}},"×")));
+}
+
+/* ---------- datas ---------- */
+const LAPIS='<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>';
+const MESES=["jan.","fev.","mar.","abr.","mai.","jun.","jul.","ago.","set.","out.","nov.","dez."];
+const dCurta=iso=>{const [, m, d]=String(iso).slice(0,10).split("-");return `${+d} de ${MESES[+m-1]}`};
+const hCurta=h=>h?String(h).slice(0,5):"";
+const entregaEm=c=>c.data_entrega?new Date(`${String(c.data_entrega).slice(0,10)}T${hCurta(c.hora_entrega)||"23:59"}:00`):null;
+function sitEntrega(c){const d=entregaEm(c);if(!d)return null;if(c.concluido_em)return ["Concluído","ok"];if(c.pauta_id)return null;const f=d-new Date();if(f<0)return ["Em atraso","late"];if(f<864e5)return ["Entregar em breve","att"];return null}
+const atrasado=c=>sitEntrega(c)?.[0]==="Em atraso";
 
 /* ---------- quadro ---------- */
 function cartao(c){
-  const feitos=(c.checklist||[]).filter(i=>i.ok).length,tot=(c.checklist||[]).length;const atras=c.data_entrega&&c.data_entrega<hojeISO()&&!c.pauta_id&&!c.concluido_em;const pa=c.pauta_id?P.pautas?.get(c.pauta_id):null;
+  const feitos=(c.checklist||[]).filter(i=>i.ok).length,tot=(c.checklist||[]).length;const pa=c.pauta_id?P.pautas?.get(c.pauta_id):null;const sit=sitEntrega(c);const nc=P.ncom?.get(c.id)||0;
   const el0=el("li",{class:"np-mp-card"+(c.concluido_em?" ok":""),draggable:ro()?null:"true","data-id":c.id},bola(c),
     el("button",{type:"button",class:"np-mp-abrir",onclick:e=>abrirCartao(c.id,e.currentTarget)},
       (c.etiquetas||[]).length?el("span",{class:"np-mp-etqs"},...(c.etiquetas||[]).map(t=>el("i",{style:`background:${COR_R[t.cor]||"#8a8f98"}`,title:t.nome||t.cor},t.nome||""))):null,
       el("span",{class:"t"},c.titulo),
       el("span",{class:"m"},
-        c.data_entrega?NPUI.marca("entrega "+dBR(c.data_entrega).slice(0,5),atras?"late":""):null,
+        c.data_entrega?NPUI.marca(dCurta(c.data_entrega)+(c.hora_entrega?", "+hCurta(c.hora_entrega):""),sit?sit[1]:""):null,
+        c.descricao?el("span",{class:"np-mp-ind",title:"Este cartão tem descrição","aria-label":"tem descrição"},"≡"):null,
+        nc?el("span",{class:"np-mp-ind",title:nc===1?"1 comentário":nc+" comentários"},String(nc)+(nc===1?" comentário":" comentários")):null,
         tot?NPUI.marca(`${feitos}/${tot}`,feitos===tot?"ok":""):null,
         (c.anexos||[]).length?NPUI.marca(`${c.anexos.length} anexo${c.anexos.length===1?"":"s"}`):null,
         c.pauta_id?NPUI.marca("na pauta"+(pa?": "+(ST_PAUTA[pa.status]||pa.status):""),pa?.status==="aprovado"?"ok":"info"):null),
@@ -66,18 +86,29 @@ function cartao(c){
   if(!ro()){el0.addEventListener("dragstart",e=>{P.arrastando=c.id;el0.classList.add("arr");try{e.dataTransfer.setData("text/plain",c.id);e.dataTransfer.effectAllowed="move"}catch(_){}});el0.addEventListener("dragend",()=>{P.arrastando=null;el0.classList.remove("arr");document.querySelectorAll(".np-mp-col.alvo").forEach(x=>x.classList.remove("alvo"))})}
   return el0;
 }
+/* cartões arquivados: restaurar ou excluir de vez */
+async function carregarArq(){const {data}=await SB.from("mkt_producao").select("id,titulo,coluna,anexos,updated_at").eq("arquivado",true).order("updated_at",{ascending:false});P.arq=data||[];if(S.tab==="mkt-producao")render()}
+function renderArquivados(v){
+  v.append(NPUI.toolbar({resumo:el("h2",{class:"np-mp-h2"},"Cartões arquivados"),direita:[NPUI.btn("Voltar ao quadro",{onclick:()=>{P.verArq=false;P.arq=null;render()}})]}));
+  if(!P.arq){v.append(NPUI.carregando(4));carregarArq();return}
+  if(!P.arq.length){v.append(NPUI.vazio({titulo:"Nenhum cartão arquivado",texto:"Os cartões arquivados pelo menu “Mais ações” aparecem aqui."}));return}
+  v.append(el("ul",{class:"np-mp-arq"},...P.arq.map(a=>el("li",{},el("span",{class:"t"},a.titulo),el("span",{class:"c"},COL_R[a.coluna]||""),
+    ro()?null:NPUI.btn("Restaurar",{onclick:async()=>{const {error}=await SB.from("mkt_producao").update({arquivado:false,updated_at:new Date().toISOString()}).eq("id",a.id);if(error){toast("Não foi possível restaurar");return}registrar(a.id,"restaurou este cartão");toast("Cartão de volta ao quadro");P.ok=false;P.arq=null;render()}}),
+    ro()?null:NPUI.btn("Excluir",{variante:"ghost",onclick:()=>NPUI.confirmar({titulo:"Excluir cartão de vez?",texto:`“${a.titulo}” será apagado com os comentários e os arquivos anexados. Não dá para desfazer.`,rotuloSim:"Excluir",perigo:true,onSim:async()=>{const arqs=(a.anexos||[]).filter(x=>x.caminho_storage).map(x=>x.caminho_storage);if(arqs.length)await SB.storage.from("anexos").remove(arqs).then(()=>{},()=>{});const {error}=await SB.from("mkt_producao").delete().eq("id",a.id);if(error){toast("Não foi possível excluir");return}toast("Cartão excluído");P.arq=null;render()}})})))));
+}
 function renderProducao(){
   const v=$("#view-mkt-producao");v.replaceChildren();v.classList.add("np-v3","np-mp");
   if(!garantir()){v.append(NPUI.carregando(6));return}
   if(P.erro){v.append(P.semTabela?NPUI.vazio({titulo:"Produção de conteúdo ainda não ativada",texto:"Falta criar a estrutura no banco (migração 0122). Assim que ela for aplicada, o quadro aparece aqui."}):NPUI.faixaErro({texto:"Não foi possível carregar o quadro.",onAcao:()=>{P.ok=false;render()}}));return}
-  const n=k=>P.lista.filter(c=>c.coluna===k).length;const atras=P.lista.filter(c=>c.data_entrega&&c.data_entrega<hojeISO()&&!c.pauta_id&&!c.concluido_em).length;const naPauta=P.lista.filter(c=>c.pauta_id).length;
+  if(P.verArq){renderArquivados(v);return}
+  const n=k=>P.lista.filter(c=>c.coluna===k).length;const atras=P.lista.filter(atrasado).length;const naPauta=P.lista.filter(c=>c.pauta_id).length;
   v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:P.lista.length,label:P.lista.length===1?"cartão":"cartões"},{n:n("producao"),label:"em produção"},{n:n("aprovacao"),label:"aguardando aprovação",tom:n("aprovacao")?"att":"zero"},atras?{n:atras,label:atras===1?"entrega atrasada":"entregas atrasadas",tom:"late"}:null,naPauta?{n:naPauta,label:"na pauta",tom:""}:null],{quadros:true}),
-    direita:[NPUI.btn("Ver a pauta",{variante:"ghost",onclick:()=>irPara("marketing")}),ro()?null:NPUI.btn("Novo cartão",{variante:"pri",icone:"mais",onclick:()=>novoCartao("ideias")})]}));
+    direita:[NPUI.btn("Arquivados",{variante:"ghost",onclick:()=>{P.verArq=true;P.arq=null;render()}}),NPUI.btn("Ver a pauta",{variante:"ghost",onclick:()=>irPara("marketing")}),ro()?null:NPUI.btn("Novo cartão",{variante:"pri",icone:"mais",onclick:()=>abrirAdd("ideias")})]}));
   const obra=el("div",{class:"np-obra"});P.obra=obra;
   const quadro=el("div",{class:"np-mp-quadro"},...COLS.map(([k,l])=>{const itens=P.lista.filter(c=>c.coluna===k).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
     const col=el("section",{class:"np-mp-col","data-col":k,"aria-label":l},
-      el("div",{class:"np-mp-ch"},el("h2",{},l),el("span",{class:"n"},String(itens.length)),ro()?null:NPUI.ib("mais","Novo cartão em "+l,()=>novoCartao(k))),
-      el("ul",{class:"np-mp-lista"},...(itens.length?itens.map(cartao):[el("li",{class:"np-mp-vazio"},k==="aprovacao"?"Nada aguardando aprovação.":"Nenhum cartão aqui.")])));
+      el("div",{class:"np-mp-ch"},el("h2",{},l),el("span",{class:"n"},String(itens.length))),
+      el("ul",{class:"np-mp-lista"},...itens.map(cartao)),blocoAdd(k)||(itens.length?null:el("p",{class:"np-mp-vazio"},"Nenhum cartão aqui.")));
     if(!ro()){col.addEventListener("dragover",e=>{if(P.arrastando){e.preventDefault();col.classList.add("alvo")}});col.addEventListener("dragleave",e=>{if(!col.contains(e.relatedTarget))col.classList.remove("alvo")});col.addEventListener("drop",e=>{e.preventDefault();col.classList.remove("alvo");const c=P.lista.find(x=>x.id===P.arrastando);if(c)mover(c,k)})}
     return col}));
   obra.append(el("div",{class:"np-corpo"},quadro));v.append(obra);
@@ -85,86 +116,119 @@ function renderProducao(){
   if(P.aberto){if(P.lista.some(c=>c.id===P.aberto))abrirCartao(P.aberto,null,true);else P.aberto=null}
 }
 
-/* ---------- cartão aberto (26/11, 11h38: no molde do Trello — bolinha de concluir, barra de botões, comentários e atividade ao lado) ---------- */
-async function carregarComent(id){const {data}=await SB.from("mkt_producao_comentarios").select("*").eq("card_id",id).order("created_at",{ascending:false});P.coment=data||[];if(P.aberto===id)abrirCartao(id,null,true)}
+/* ---------- cartão aberto, no molde do Trello ---------- */
+async function carregarComent(id){const {data}=await SB.from("mkt_producao_comentarios").select("*").eq("card_id",id).order("created_at",{ascending:false});P.coment=data||[];(P.ncom=P.ncom||new Map()).set(id,P.coment.filter(k=>k.tipo!=="atividade").length);if(P.aberto===id)abrirCartao(id,null,true)}
 const meuNome=()=>meuColab()?.nome||PP.perfil?.nome||null;
 const registrar=(id,texto)=>SB.from("mkt_producao_comentarios").insert({card_id:id,autor_id:PP.perfil?.id||null,autor_nome:meuNome(),texto,tipo:"atividade"}).then(()=>{if(P.aberto===id)carregarComent(id)},()=>{});
 const quando=s=>new Date(s).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 const chaveE=t=>(t.nome||"")+"|"+t.cor;
-const catalogo=()=>{const m=new Map();for(const t of P.catalogo||[])m.set(chaveE(t),{nome:t.nome||"",cor:t.cor});for(const c of P.lista)for(const t of c.etiquetas||[])if(!m.has(chaveE(t)))m.set(chaveE(t),{nome:t.nome||"",cor:t.cor});return [...m.values()].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"))};
+const catalogo=()=>{const m=new Map();for(const t of P.catalogo||[])m.set(chaveE(t),{nome:t.nome||"",cor:t.cor});for(const c of P.lista)for(const t of c.etiquetas||[])if(!m.has(chaveE(t)))m.set(chaveE(t),{nome:t.nome||"",cor:t.cor});return [...m.values()].sort((a,b)=>(a.nome||"￿").localeCompare(b.nome||"￿","pt-BR")||CORES.findIndex(x=>x[0]===a.cor)-CORES.findIndex(x=>x[0]===b.cor))};
 async function concluir(c){if(ro())return;const feito=!c.concluido_em;try{await salvar(c.id,{concluido_em:feito?new Date().toISOString():null,concluido_por:feito?PP.perfil?.id||null:null});registrar(c.id,feito?"concluiu este cartão":"reabriu este cartão");toast(feito?"Cartão concluído":"Cartão reaberto");render()}catch(_){}}
-function bola(c,grande){const ok=!!c.concluido_em;return el("button",{type:"button",class:"np-mp-bola"+(ok?" ok":"")+(grande?" g":""),role:"checkbox","aria-checked":String(ok),"aria-label":(ok?"Reabrir":"Concluir")+": "+c.titulo,title:ok?"Concluído — clique para reabrir":"Marcar como concluído",disabled:ro()?"":null,onclick:e=>{e.stopPropagation();concluir(c)}})}
+function bola(c,grande){const ok=!!c.concluido_em;return el("button",{type:"button",class:"np-mp-bola"+(ok?" ok":"")+(grande?" g":""),role:"checkbox","aria-checked":String(ok),"aria-label":(ok?"Marcar como incompleto":"Marcar como concluído")+": "+c.titulo,title:ok?"Marcar como incompleto":"Marcar como concluído",disabled:ro()?"":null,onclick:e=>{e.stopPropagation();concluir(c)}})}
 async function enviarArquivos(c,files){
   if(!files||!files.length)return;const novos=[];
   for(const f of files){if(f.size>25*1024*1024){toast(`${f.name}: acima de 25 MB`);continue}
     const limpo=f.name.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w.\-]+/g,"_").slice(-80);const caminho=`marketing/producao/${c.id}/${Date.now()}-${limpo}`;
     const {error}=await SB.storage.from("anexos").upload(caminho,f,{contentType:f.type||undefined});if(error){toast("Falha ao enviar "+f.name);continue}
     novos.push({nome:f.name,caminho_storage:caminho,tamanho:f.size,tipo:f.type||null})}
-  if(novos.length){try{await salvar(c.id,{anexos:[...(c.anexos||[]),...novos]});registrar(c.id,"anexou "+novos.map(a=>a.nome).join(", "));toast(novos.length===1?"Arquivo anexado":`${novos.length} arquivos anexados`);render()}catch(_){}}
+  if(novos.length){try{P.sec=null;await salvar(c.id,{anexos:[...(c.anexos||[]),...novos]});registrar(c.id,"anexou "+novos.map(a=>a.nome).join(", "));toast(novos.length===1?"Arquivo anexado":`${novos.length} arquivos anexados`);render()}catch(_){}}
 }
-async function abrirAnexo(a){const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}
+async function abrirAnexo(a){if(a.url){window.open(a.url,"_blank","noopener");return}const {data,error}=await SB.storage.from("anexos").createSignedUrl(a.caminho_storage,300);if(error||!data?.signedUrl){toast("Não foi possível abrir o anexo");return}window.open(data.signedUrl,"_blank","noopener")}
+/* etiqueta do quadro: renomear/trocar a cor vale para todos os cartões; excluir tira de todos */
+async function trocarEtiqueta(antiga,nova){
+  const k=chaveE(antiga);const alvos=P.lista.filter(c=>(c.etiquetas||[]).some(x=>chaveE(x)===k));
+  for(const c of alvos){const lst=[];for(const x of c.etiquetas||[]){if(chaveE(x)!==k)lst.push(x);else if(nova&&!lst.some(y=>chaveE(y)===chaveE(nova)))lst.push(nova)}await salvar(c.id,{etiquetas:lst}).catch(()=>{})}
+  await SB.from("mkt_etiquetas").delete().eq("nome",antiga.nome||"").eq("cor",antiga.cor).then(()=>{},()=>{});P.catalogo=(P.catalogo||[]).filter(x=>chaveE(x)!==k);
+  if(nova&&!(P.catalogo||[]).some(x=>chaveE(x)===chaveE(nova))){P.catalogo.push(nova);await SB.from("mkt_etiquetas").insert({nome:nova.nome||"",cor:nova.cor}).then(()=>{},()=>{})}
+}
+async function copiarCartao(c){
+  const ult=Math.max(0,...P.lista.filter(x=>x.coluna===c.coluna).map(x=>x.ordem||0))+10;
+  const {data,error}=await SB.from("mkt_producao").insert({titulo:(c.titulo+" (cópia)").slice(0,200),descricao:c.descricao||null,coluna:c.coluna,ordem:ult,etiquetas:c.etiquetas||[],checklist:(c.checklist||[]).map(i=>({...i,ok:false})),membros:c.membros||[],data_inicio:c.data_inicio||null,data_entrega:c.data_entrega||null,hora_entrega:c.hora_entrega||null}).select("*").single();
+  if(error){toast("Não foi possível copiar");return}P.lista.push(data);registrar(data.id,`copiou este cartão de “${c.titulo}”`);toast("Cartão copiado");P.aberto=data.id;P.sec=null;render()}
 function abrirCartao(id,origem,silencioso){
-  const c=P.lista.find(x=>x.id===id);if(!c||!P.painel)return;const novoAberto=P.aberto!==id;P.aberto=id;if(novoAberto){P.coment=[];P.sec=null;P.rascunho="";carregarComent(id)}
+  const c=P.lista.find(x=>x.id===id);if(!c||!P.painel)return;const novoAberto=P.aberto!==id;P.aberto=id;if(novoAberto){P.coment=[];P.sec=null;P.rascunho="";P.editDesc=false;P.editCom=null;carregarComent(id)}
   const leit=ro();const pa=c.pauta_id?P.pautas?.get(c.pauta_id):null;const reabrir=()=>abrirCartao(id,null,true);const salvarE=(patch)=>salvar(c.id,patch).then(()=>render(),()=>{});
-  // título (com a bolinha de concluir) e descrição — salvam ao sair do campo
+  const abre=k=>{P.sec=k;reabrir()};const alterna=k=>abre(P.sec===k?null:k);
   const tit=inp("text",c.titulo,{class:"np-mp-tit"+(c.concluido_em?" ok":""),"aria-label":"Título do cartão",disabled:leit?"":null});tit.onchange=()=>{const t=tit.value.trim();if(!t){tit.value=c.titulo;return}salvarE({titulo:t})};
-  const desc=el("textarea",{class:"np-mp-desc",rows:"5",placeholder:"Ideia, gancho, roteiro, referências…","aria-label":"Descrição",disabled:leit?"":null},c.descricao||"");desc.onchange=()=>{salvar(c.id,{descricao:desc.value.trim()||null}).then(()=>toast("Descrição salva"),()=>{})};
-  // barra de botões: cada um abre o seu quadro logo abaixo (nada é obrigatório)
   const file=el("input",{type:"file",multiple:"",hidden:"","aria-hidden":"true",tabindex:"-1"});file.onchange=()=>{enviarArquivos(c,[...file.files]);file.value=""};
-  const alterna=k=>{P.sec=P.sec===k?null:k;reabrir()};
-  const bt=(k,rot,ic)=>{const b=NPUI.btn(rot,{icone:ic,onclick:()=>alterna(k)});b.setAttribute("aria-expanded",String(P.sec===k));if(P.sec===k)b.classList.add("on");return b};
-  const barra=leit?null:el("div",{class:"np-mp-barra",role:"toolbar","aria-label":"Adicionar ao cartão"},NPUI.btn("Adicionar",{icone:"mais",onclick:()=>file.click(),title:"Anexar imagens, vídeos, PDFs e documentos (até 25 MB cada)"}),bt("etq","Etiquetas"),bt("datas","Datas"),bt("chk","Checklist"),bt("mb","Membros"),file);
-  // quadro aberto pela barra
+  // barra: “Adicionar” lista tudo; ao lado ficam só os atalhos do que o cartão ainda não tem (igual ao Trello)
+  const temE=(c.etiquetas||[]).length>0,temD=!!(c.data_inicio||c.data_entrega),temC=(c.checklist||[]).length>0,temM=(c.membros||[]).length>0;
+  const bt=(k,rot)=>{const b=NPUI.btn(rot,{onclick:()=>alterna(k)});b.setAttribute("aria-expanded",String(P.sec===k));if(P.sec===k)b.classList.add("on");return b};
+  const btAdd=NPUI.btn("Adicionar",{icone:"mais",onclick:e=>NPUI.pop(e.currentTarget,[{label:"Etiquetas",title:"Organize, categorize e priorize",onclick:()=>abre("etq")},{label:"Datas",title:"Data de início e data de entrega",onclick:()=>abre("datas")},{label:"Checklist",title:"Adicionar subtarefas",onclick:()=>abre("chk")},{label:"Membros",title:"Atribuir membros",onclick:()=>abre("mb")},{label:"Anexo",title:"Arquivos do computador ou links",onclick:()=>abre("anx")}],{label:"Adicionar ao cartão"})});btAdd.setAttribute("aria-haspopup","menu");btAdd.setAttribute("aria-expanded","false");
+  const barra=leit?null:el("div",{class:"np-mp-barra",role:"toolbar","aria-label":"Adicionar ao cartão"},btAdd,temE?null:bt("etq","Etiquetas"),temD?null:bt("datas","Datas"),temC?null:bt("chk","Checklist"),temM?null:bt("mb","Membros"),bt("anx","Anexo"),file);
+  const cabPop=(t,voltar)=>el("div",{class:"np-mp-poph"},voltar?el("button",{type:"button",class:"np-mp-x","aria-label":"Voltar",title:"Voltar",onclick:voltar},"‹"):null,el("h3",{},t),el("button",{type:"button",class:"np-mp-x","aria-label":"Fechar",title:"Fechar",onclick:()=>abre(null)},"×"));
   let quadro=null;
   if(!leit&&P.sec==="etq"){
     const tem=t=>(c.etiquetas||[]).some(x=>chaveE(x)===chaveE(t));
-    const lista=catalogo().map((t,i)=>{const cb=el("input",{type:"checkbox",id:"mp-eq-"+i,checked:tem(t)?"":null});cb.onchange=()=>salvarE({etiquetas:cb.checked?[...(c.etiquetas||[]),t]:(c.etiquetas||[]).filter(x=>chaveE(x)!==chaveE(t))});return el("li",{},cb,el("label",{for:"mp-eq-"+i,style:`background:${COR_R[t.cor]||"#8a8f98"}`},t.nome||"(sem nome)"))});
-    const nome=inp("text","",{placeholder:"Nome da nova etiqueta","aria-label":"Nome da nova etiqueta",maxlength:"40"});let corSel=P.corNova||"verde";
-    const cores=el("div",{class:"np-mp-cores",role:"radiogroup","aria-label":"Cor da etiqueta"},...CORES.map(([k,h])=>{const b=el("button",{type:"button",role:"radio","aria-checked":String(k===corSel),"aria-label":k,title:k,style:`background:${h}`,onclick:()=>{corSel=P.corNova=k;cores.querySelectorAll("button").forEach(x=>x.setAttribute("aria-checked",String(x===b)))}});return b}));
-    const criar=async()=>{const n=nome.value.trim().slice(0,40);if(!n){nome.focus();return}const t={nome:n,cor:corSel};if(!catalogo().some(x=>chaveE(x)===chaveE(t))){(P.catalogo=P.catalogo||[]).push(t);SB.from("mkt_etiquetas").insert({nome:n,cor:corSel}).then(()=>{},()=>{})}if(!tem(t))await salvar(c.id,{etiquetas:[...(c.etiquetas||[]),t]}).catch(()=>{});render()};
-    nome.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();criar()}};
-    quadro=el("div",{class:"np-mp-pop"},el("h3",{},"Etiquetas"),lista.length?el("ul",{class:"np-mp-eqs"},...lista):el("p",{class:"np-mp-nota"},"Nenhuma etiqueta criada ainda."),el("div",{class:"np-mp-nova"},el("b",{},"Criar uma nova etiqueta"),nome,cores,NPUI.btn("Criar etiqueta",{onclick:criar})));
+    const itens=catalogo().map((t,i)=>{const cb=el("input",{type:"checkbox",id:"mp-eq-"+i,checked:tem(t)?"":null,"aria-label":t.nome||"Etiqueta "+t.cor});cb.onchange=()=>salvarE({etiquetas:cb.checked?[...(c.etiquetas||[]),t]:(c.etiquetas||[]).filter(x=>chaveE(x)!==chaveE(t))});
+      return el("li",{"data-b":(t.nome||"").toLowerCase()},cb,el("label",{for:"mp-eq-"+i,style:`background:${COR_R[t.cor]||"#8a8f98"}`,title:`Cor: ${t.cor}, título: ${t.nome||"nenhum"}`},t.nome||" "),NPUI.ib(LAPIS,"Editar etiqueta "+(t.nome||t.cor),()=>{P.etqEd={antiga:t,nome:t.nome||"",cor:t.cor};abre("etq-ed")}))});
+    const busca=inp("search","",{placeholder:"Buscar etiquetas…","aria-label":"Buscar etiquetas"});const ul=el("ul",{class:"np-mp-eqs"},...itens);busca.oninput=()=>{const q=busca.value.trim().toLowerCase();for(const li of ul.children)li.hidden=!!q&&!li.dataset.b.includes(q)};
+    quadro=el("div",{class:"np-mp-pop"},cabPop("Etiquetas"),itens.length?busca:null,itens.length?ul:el("p",{class:"np-mp-nota"},"Nenhuma etiqueta criada ainda."),NPUI.btn("Criar uma nova etiqueta",{onclick:()=>{P.etqEd={antiga:null,nome:"",cor:"verde"};abre("etq-ed")}}));
+  }else if(!leit&&P.sec==="etq-ed"&&P.etqEd){
+    const E=P.etqEd;const nome=inp("text",E.nome,{id:"mp-en","aria-label":"Título da etiqueta",maxlength:"40"});const prev=el("div",{class:"np-mp-prev",style:`background:${COR_R[E.cor]||"#8a8f98"}`},E.nome||" ");nome.oninput=()=>{E.nome=nome.value;prev.textContent=nome.value||" "};
+    const cores=el("div",{class:"np-mp-cores",role:"radiogroup","aria-label":"Selecionar uma cor"},...CORES.map(([k,h])=>{const b=el("button",{type:"button",role:"radio","aria-checked":String(k===E.cor),"aria-label":k,title:k,style:`background:${h}`,onclick:()=>{E.cor=k;prev.style.background=h;cores.querySelectorAll("button").forEach(x=>x.setAttribute("aria-checked",String(x===b)))}});return b}));
+    const gravar=async()=>{const nova={nome:E.nome.trim().slice(0,40),cor:E.cor};if(E.antiga){if(chaveE(E.antiga)!==chaveE(nova))await trocarEtiqueta(E.antiga,nova)}else{if(!catalogo().some(x=>chaveE(x)===chaveE(nova))){(P.catalogo=P.catalogo||[]).push(nova);SB.from("mkt_etiquetas").insert({nome:nova.nome,cor:nova.cor}).then(()=>{},()=>{})}if(!(c.etiquetas||[]).some(x=>chaveE(x)===chaveE(nova)))await salvar(c.id,{etiquetas:[...(c.etiquetas||[]),nova]}).catch(()=>{})}P.etqEd=null;P.sec="etq";render()};
+    nome.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();gravar()}};
+    quadro=el("div",{class:"np-mp-pop"},cabPop(E.antiga?"Editar etiqueta":"Criar etiqueta",()=>{P.etqEd=null;abre("etq")}),prev,el("label",{for:"mp-en",class:"np-mp-rot"},"Título"),nome,el("span",{class:"np-mp-rot"},"Selecionar uma cor"),cores,
+      el("div",{class:"np-mp-acoes"},NPUI.btn(E.antiga?"Salvar":"Criar",{variante:"pri",onclick:gravar}),E.antiga?NPUI.btn("Excluir",{variante:"ghost",onclick:()=>NPUI.confirmar({titulo:"Excluir etiqueta?",texto:"Ela sai de todos os cartões do quadro. Não dá para desfazer.",rotuloSim:"Excluir",perigo:true,onSim:async()=>{await trocarEtiqueta(E.antiga,null);P.etqEd=null;P.sec="etq";render()}})}):null));
   }else if(!leit&&P.sec==="datas"){
-    const dIni=inp("date",c.data_inicio||"",{id:"mp-di"}),dEnt=inp("date",c.data_entrega||"",{id:"mp-de"});dIni.onchange=()=>salvarE({data_inicio:dIni.value||null});dEnt.onchange=()=>salvarE({data_entrega:dEnt.value||null});
-    quadro=el("div",{class:"np-mp-pop"},el("h3",{},"Datas"),el("p",{class:"np-mp-nota"},"Opcional. Preencha só quando o conteúdo tiver prazo."),el("div",{class:"np-mp-datas"},el("label",{for:"mp-di"},"Data de início",dIni),el("label",{for:"mp-de"},"Data de entrega",dEnt)),(c.data_inicio||c.data_entrega)?NPUI.btn("Remover datas",{variante:"ghost",onclick:()=>salvarE({data_inicio:null,data_entrega:null})}):null);
+    const dIni=inp("date",c.data_inicio||"",{id:"mp-di"}),dEnt=inp("date",c.data_entrega||"",{id:"mp-de"}),hEnt=inp("time",hCurta(c.hora_entrega),{id:"mp-he","aria-label":"Horário da entrega"});
+    quadro=el("div",{class:"np-mp-pop"},cabPop("Datas"),el("p",{class:"np-mp-nota"},"Opcional. Preencha só quando o conteúdo tiver prazo."),el("div",{class:"np-mp-datas"},el("label",{for:"mp-di"},"Data de início",dIni),el("label",{for:"mp-de"},"Data de entrega",el("span",{class:"par"},dEnt,hEnt))),
+      el("div",{class:"np-mp-acoes"},NPUI.btn("Salvar",{variante:"pri",onclick:()=>{P.sec=null;salvarE({data_inicio:dIni.value||null,data_entrega:dEnt.value||null,hora_entrega:dEnt.value&&hEnt.value?hEnt.value:null})}}),temD?NPUI.btn("Remover",{variante:"ghost",onclick:()=>{P.sec=null;salvarE({data_inicio:null,data_entrega:null,hora_entrega:null})}}):null));
   }else if(!leit&&P.sec==="mb"){
-    quadro=el("div",{class:"np-mp-pop"},el("h3",{},"Membros"),el("ul",{class:"np-mp-mbs"},...P.colab.map((k,i)=>{const cb=el("input",{type:"checkbox",id:"mp-mb-"+i,checked:(c.membros||[]).includes(k.id)?"":null});cb.onchange=()=>salvarE({membros:cb.checked?[...(c.membros||[]),k.id]:(c.membros||[]).filter(x=>x!==k.id)});return el("li",{},cb,el("label",{for:"mp-mb-"+i},k.nome))})));
+    quadro=el("div",{class:"np-mp-pop"},cabPop("Membros"),el("ul",{class:"np-mp-mbs"},...P.colab.map((k,i)=>{const cb=el("input",{type:"checkbox",id:"mp-mb-"+i,checked:(c.membros||[]).includes(k.id)?"":null});cb.onchange=()=>salvarE({membros:cb.checked?[...(c.membros||[]),k.id]:(c.membros||[]).filter(x=>x!==k.id)});return el("li",{},cb,el("label",{for:"mp-mb-"+i},k.nome))})));
+  }else if(!leit&&P.sec==="anx"){
+    const link=inp("url","",{id:"mp-al",placeholder:"Cole um link (https://…)"}),txt=inp("text","",{id:"mp-at",placeholder:"Texto a ser exibido (opcional)",maxlength:"80"});
+    const inserir=()=>{const u=link.value.trim();if(!/^https?:\/\/\S+$/i.test(u)){toast("Cole um link começando com https://");link.focus();return}P.sec=null;const nome=txt.value.trim()||u.replace(/^https?:\/\//,"").slice(0,60);salvar(c.id,{anexos:[...(c.anexos||[]),{nome,url:u}]}).then(()=>{registrar(c.id,"anexou o link "+nome);render()},()=>{})};
+    link.onkeydown=txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();inserir()}};
+    quadro=el("div",{class:"np-mp-pop"},cabPop("Anexar"),el("b",{class:"np-mp-rot"},"Anexe um arquivo do seu computador"),el("p",{class:"np-mp-nota"},"Imagens, vídeos, PDFs e documentos, até 25 MB cada."),el("div",{},NPUI.btn("Escolher um arquivo",{onclick:()=>file.click()})),el("label",{for:"mp-al",class:"np-mp-rot"},"Ou cole um link"),link,el("label",{for:"mp-at",class:"np-mp-rot"},"Texto para exibição (opcional)"),txt,el("div",{class:"np-mp-acoes"},NPUI.btn("Inserir link",{variante:"pri",onclick:inserir})));
   }
-  // resumo do que já está no cartão
-  const atras=c.data_entrega&&c.data_entrega<hojeISO()&&!c.pauta_id&&!c.concluido_em;
-  const fichas=[...(c.etiquetas||[]).map(t=>el("span",{class:"np-mp-etq",style:`background:${COR_R[t.cor]||"#8a8f98"}`},t.nome||t.cor,leit?null:el("button",{type:"button","aria-label":"Remover etiqueta "+(t.nome||t.cor),onclick:()=>salvarE({etiquetas:(c.etiquetas||[]).filter(x=>chaveE(x)!==chaveE(t))})},"×"))),
-    c.data_inicio?NPUI.marca("início "+dBR(c.data_inicio)):null,c.data_entrega?NPUI.marca("entrega "+dBR(c.data_entrega),atras?"late":""):null,c.concluido_em?NPUI.marca("concluído em "+dBR(c.concluido_em),"ok"):null,
-    ...(c.membros||[]).map(mid=>el("span",{class:"np-mp-mb"},NPUI.quem(nomeC(mid)||"?"),leit?null:el("button",{type:"button",class:"np-mp-x","aria-label":"Remover "+(nomeC(mid)||"membro"),onclick:()=>salvarE({membros:(c.membros||[]).filter(x=>x!==mid)})},"×")))].filter(Boolean);
-  // anexos
-  const anexos=(c.anexos||[]).length?NPUI.secao(`Anexos (${c.anexos.length})`,el("div",{class:"np-mp-anexos"},...(c.anexos||[]).map((a,i)=>el("span",{class:"np-mp-anx"},el("button",{type:"button",class:"lnk",onclick:()=>abrirAnexo(a),title:"Abrir "+a.nome},a.nome),leit?null:el("button",{type:"button",class:"np-mp-x","aria-label":"Remover "+a.nome,title:"Remover do cartão",onclick:()=>NPUI.confirmar({titulo:"Remover anexo?",texto:`“${a.nome}” sai deste cartão.`,rotuloSim:"Remover",perigo:true,onSim:async()=>{await SB.storage.from("anexos").remove([a.caminho_storage]).then(()=>{},()=>{});await salvar(c.id,{anexos:(c.anexos||[]).filter((_,j)=>j!==i)});render()}})},"×"))))):null;
-  // checklist (aparece quando há itens ou quando o botão Checklist está aberto)
+  // linha de informações (só o que o cartão já tem): etiquetas, membros e data de entrega
+  const sit=sitEntrega(c);const info=[];
+  if(temE)info.push(el("div",{class:"np-mp-inf"},el("span",{class:"rot"},"Etiquetas"),el("div",{class:"v"},...(c.etiquetas||[]).map(t=>el("button",{type:"button",class:"np-mp-etq g",style:`background:${COR_R[t.cor]||"#8a8f98"}`,title:"Abrir etiquetas",disabled:leit?"":null,onclick:()=>abre("etq")},t.nome||" ")),leit?null:NPUI.ib("mais","Adicionar etiqueta",()=>abre("etq")))));
+  if(temM)info.push(el("div",{class:"np-mp-inf"},el("span",{class:"rot"},"Membros"),el("div",{class:"v"},...(c.membros||[]).map(mid=>el("span",{class:"np-mp-mb",title:nomeC(mid)||""},NPUI.quem(nomeC(mid)||"?"))),leit?null:NPUI.ib("mais","Adicionar membro",()=>abre("mb")))));
+  if(temD)info.push(el("div",{class:"np-mp-inf"},el("span",{class:"rot"},c.data_entrega?"Data de entrega":"Data de início"),el("div",{class:"v"},el("button",{type:"button",class:"np-mp-dt",disabled:leit?"":null,title:"Alterar datas",onclick:()=>abre("datas")},c.data_entrega?(c.data_inicio?dCurta(c.data_inicio)+" – ":"")+dCurta(c.data_entrega)+(c.hora_entrega?", "+hCurta(c.hora_entrega):""):dCurta(c.data_inicio)),sit?NPUI.marca(sit[0],sit[1]):null)));
+  // descrição: leitura com “Editar”; edição com Salvar/Cancelar
+  let secDesc;
+  if(P.editDesc&&!leit){const ta=el("textarea",{class:"np-mp-desc",rows:"6",placeholder:"Adicione uma descrição mais detalhada…","aria-label":"Descrição"},P.rascDesc??c.descricao??"");ta.oninput=()=>{P.rascDesc=ta.value};
+    secDesc=NPUI.secao("Descrição",ta,el("div",{class:"np-mp-acoes"},NPUI.btn("Salvar",{variante:"pri",onclick:()=>{const t=ta.value.trim()||null;P.editDesc=false;P.rascDesc=null;salvarE({descricao:t})}}),NPUI.btn("Cancelar",{variante:"ghost",onclick:()=>{P.editDesc=false;P.rascDesc=null;reabrir()}})));setTimeout(()=>{if(document.activeElement?.tagName!=="TEXTAREA"&&document.activeElement?.tagName!=="INPUT")ta.focus()},0)}
+  else{const editar=()=>{P.editDesc=true;P.rascDesc=null;reabrir()};secDesc=NPUI.secao("Descrição",c.descricao?el("div",{class:"np-mp-desctx"},el("p",{},c.descricao),leit?null:NPUI.btn("Editar",{onclick:editar})):leit?el("p",{class:"np-mp-nota"},"Sem descrição."):el("button",{type:"button",class:"np-mp-descvazia",onclick:editar},"Adicione uma descrição mais detalhada…"))}
+  const anexos=(c.anexos||[]).length?NPUI.secao(`Anexos (${c.anexos.length})`,el("div",{class:"np-mp-anexos"},...(c.anexos||[]).map((a,i)=>el("span",{class:"np-mp-anx"},el("button",{type:"button",class:"lnk",onclick:()=>abrirAnexo(a),title:(a.url?"Abrir o link ":"Abrir ")+a.nome},(a.url?"↗ ":"")+a.nome),leit?null:el("button",{type:"button",class:"np-mp-x","aria-label":"Remover "+a.nome,title:"Remover do cartão",onclick:()=>NPUI.confirmar({titulo:"Remover anexo?",texto:`“${a.nome}” sai deste cartão.`,rotuloSim:"Remover",perigo:true,onSim:async()=>{if(a.caminho_storage)await SB.storage.from("anexos").remove([a.caminho_storage]).then(()=>{},()=>{});await salvar(c.id,{anexos:(c.anexos||[]).filter((_,j)=>j!==i)});render()}})},"×"))))):null;
   let secChk=null;
-  if((c.checklist||[]).length||P.sec==="chk"){
+  if(temC||P.sec==="chk"){
     const chk=el("ul",{class:"np-mp-chk"},...(c.checklist||[]).map((it,i)=>{const cb=el("input",{type:"checkbox",id:"mp-ck-"+i,checked:it.ok?"":null,disabled:leit?"":null});cb.onchange=()=>salvarE({checklist:(c.checklist||[]).map((x,j)=>j===i?{...x,ok:cb.checked}:x)});
       return el("li",{class:it.ok?"ok":""},cb,el("label",{for:"mp-ck-"+i},it.t),leit?null:el("button",{type:"button",class:"np-mp-x","aria-label":"Remover item",onclick:()=>salvarE({checklist:(c.checklist||[]).filter((_,j)=>j!==i)})},"×"))}));
-    const novoIt=inp("text","",{placeholder:"Novo item do checklist…","aria-label":"Novo item do checklist",class:"np-mp-novoit"});const addIt=()=>{const t=novoIt.value.trim();if(!t)return;P.sec="chk";salvarE({checklist:[...(c.checklist||[]),{t:t.slice(0,160),ok:false}]})};novoIt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addIt()}};
-    secChk=NPUI.secao(`Checklist${(c.checklist||[]).length?" ("+(c.checklist||[]).filter(i=>i.ok).length+"/"+c.checklist.length+")":""}`,chk,leit?null:el("div",{class:"np-mp-add"},novoIt,NPUI.btn("Adicionar",{onclick:addIt})));
+    const novoIt=inp("text","",{placeholder:"Adicionar um item…","aria-label":"Novo item do checklist",class:"np-mp-novoit"});const addIt=()=>{const t=novoIt.value.trim();if(!t)return;P.sec="chk";salvarE({checklist:[...(c.checklist||[]),{t:t.slice(0,160),ok:false}]})};novoIt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addIt()}};
+    const feitos=(c.checklist||[]).filter(i=>i.ok).length,tot=(c.checklist||[]).length;
+    secChk=NPUI.secao(`Checklist${tot?" ("+Math.round(feitos/tot*100)+"%)":""}`,tot?el("div",{class:"np-mp-prog",role:"progressbar","aria-valuemin":"0","aria-valuemax":String(tot),"aria-valuenow":String(feitos),"aria-label":"Itens concluídos"},el("i",{style:`width:${Math.round(feitos/tot*100)}%`})):null,chk,leit?null:el("div",{class:"np-mp-add"},novoIt,NPUI.btn("Adicionar",{onclick:addIt})));
   }
   const gestor=sel({"":"— definir —",...Object.fromEntries(P.colab.map(k=>[k.id,k.nome]))},c.gestor_id||"");gestor.setAttribute("aria-label","Responsável pela gestão");if(leit)gestor.disabled=true;gestor.onchange=()=>salvar(c.id,{gestor_id:gestor.value||null}).then(()=>toast("Responsável pela gestão salvo"),()=>{});
-  // comentários e atividade (histórico do cartão, do mais recente para o mais antigo)
-  const ta=el("textarea",{rows:"2",placeholder:"Escrever um comentário…","aria-label":"Novo comentário"},P.rascunho||"");ta.oninput=()=>{P.rascunho=ta.value};
-  const comentar=async()=>{const t=ta.value.trim();if(!t)return;const {error}=await SB.from("mkt_producao_comentarios").insert({card_id:c.id,autor_id:PP.perfil?.id||null,autor_nome:meuNome(),texto:t});if(error){toast("Não foi possível comentar");return}P.rascunho="";carregarComent(c.id)};
+  // comentários e atividade
+  const ta=el("textarea",{rows:"2",placeholder:"Escrever um comentário…","aria-label":"Novo comentário"},P.rascunho||"");const btCom=NPUI.btn("Salvar",{variante:"pri",onclick:()=>comentar()});btCom.disabled=!(P.rascunho||"").trim();ta.oninput=()=>{P.rascunho=ta.value;btCom.disabled=!ta.value.trim()};
+  const comentar=async()=>{const t=ta.value.trim();if(!t)return;const {error}=await SB.from("mkt_producao_comentarios").insert({card_id:c.id,autor_id:PP.perfil?.id||null,autor_nome:meuNome(),texto:t});if(error){toast("Não foi possível comentar");return}P.rascunho="";await carregarComent(c.id);render()};
   ta.onkeydown=e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();comentar()}};
-  const coments=el("ul",{class:"np-mp-com"},...(P.coment.length?P.coment.map(k=>k.tipo==="atividade"?el("li",{class:"atv"},el("p",{},el("b",{},k.autor_nome||"Equipe")," "+k.texto),el("span",{class:"q"},quando(k.created_at))):el("li",{},el("div",{class:"h"},el("b",{},k.autor_nome||"Equipe"),el("span",{},quando(k.created_at))),el("p",{class:"cx"},k.texto))):[el("li",{class:"np-mp-vazio"},"Sem comentários ainda.")]));
+  const meuId=PP.perfil?.id;const admin=PP.perfil?.papel==="admin";
+  const itemCom=k=>{
+    if(k.tipo==="atividade")return el("li",{class:"atv"},el("p",{},el("b",{},k.autor_nome||"Equipe")," "+k.texto),el("span",{class:"q"},quando(k.created_at)));
+    const meu=!leit&&k.autor_id&&k.autor_id===meuId;
+    if(P.editCom===k.id&&meu){const e=el("textarea",{rows:"3","aria-label":"Editar comentário"},k.texto);return el("li",{},el("div",{class:"h"},el("b",{},k.autor_nome||"Equipe"),el("span",{},quando(k.created_at))),e,el("div",{class:"np-mp-acoes"},NPUI.btn("Salvar",{variante:"pri",onclick:async()=>{const t=e.value.trim();if(!t)return;const {error}=await SB.from("mkt_producao_comentarios").update({texto:t,editado_em:new Date().toISOString()}).eq("id",k.id);if(error){toast("Não foi possível salvar");return}P.editCom=null;carregarComent(c.id)}}),NPUI.btn("Cancelar",{variante:"ghost",onclick:()=>{P.editCom=null;reabrir()}})))}
+    return el("li",{},el("div",{class:"h"},el("b",{},k.autor_nome||"Equipe"),el("span",{},quando(k.created_at)+(k.editado_em?" (editado)":""))),el("p",{class:"cx"},k.texto),
+      (meu||(admin&&!leit))?el("div",{class:"np-mp-cl"},meu?el("button",{type:"button",class:"lnk",onclick:()=>{P.editCom=k.id;reabrir()}},"Editar"):null,meu?el("span",{"aria-hidden":"true"},"•"):null,el("button",{type:"button",class:"lnk",onclick:()=>NPUI.confirmar({titulo:"Excluir comentário?",texto:"O comentário é apagado do cartão.",rotuloSim:"Excluir",perigo:true,onSim:async()=>{const {error}=await SB.from("mkt_producao_comentarios").delete().eq("id",k.id);if(error){toast("Não foi possível excluir");return}await carregarComent(c.id);render()}})},"Excluir")):null)};
+  const coments=el("ul",{class:"np-mp-com"},...(P.coment.length?P.coment.map(itemCom):[el("li",{class:"np-mp-vazio"},"Sem comentários ainda.")]));
   const pautaInfo=c.pauta_id?el("div",{class:"np-mp-pauta",role:"status"},NPUI.marca("na pauta",pa?.status==="aprovado"?"ok":"info"),el("span",{},pa?`Situação: ${ST_PAUTA[pa.status]||pa.status}${pa.data_prevista?" · previsto para "+dBR(pa.data_prevista):""}.`:"Enviado para a Pauta de conteúdo."),el("button",{type:"button",class:"lnk",onclick:()=>irPara("marketing")},"Abrir a pauta")):null;
   const corpo=el("div",{class:"np-mp-det"},
-    el("div",{class:"np-mp-p"},pautaInfo,el("div",{class:"np-mp-cab"},bola(c,true),tit),barra,quadro,fichas.length?el("div",{class:"np-mp-fichas"},...fichas):null,NPUI.secao("Descrição",desc),anexos,secChk,NPUI.secao("Responsável pela gestão",gestor,el("p",{class:"np-mp-nota"},"Quem acompanha e aprova este conteúdo."))),
-    el("aside",{class:"np-mp-l","aria-label":"Comentários e atividade"},el("h3",{},"Comentários e atividade"),leit?null:el("div",{class:"np-mp-add col"},ta,NPUI.btn("Comentar",{onclick:comentar})),coments));
+    el("div",{class:"np-mp-p"},pautaInfo,el("div",{class:"np-mp-cab"},bola(c,true),tit),barra,quadro,info.length?el("div",{class:"np-mp-infos"},...info):null,secDesc,anexos,secChk,NPUI.secao("Responsável pela gestão",gestor,el("p",{class:"np-mp-nota"},"Quem acompanha e aprova este conteúdo."))),
+    el("aside",{class:"np-mp-l","aria-label":"Comentários e atividade"},el("h3",{},"Comentários e atividade"),leit?null:el("div",{class:"np-mp-add col"},ta,btCom),coments));
   const btnMover=leit?null:NPUI.btn("Mover para…",{onclick:e=>NPUI.pop(e.currentTarget,COLS.filter(([k])=>k!==c.coluna).map(([k,l])=>({label:l,onclick:()=>mover(c,k)})),{label:"Mover para"})});if(btnMover){btnMover.setAttribute("aria-haspopup","menu");btnMover.setAttribute("aria-expanded","false")}
   const btnPauta=!leit&&c.coluna==="aprovacao"&&!c.pauta_id?NPUI.btn("Enviar para a pauta",{variante:"pri",onclick:()=>enviarParaPauta(c)}):null;
-  const mais=leit?null:NPUI.btn("Mais ações",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,[{label:"Arquivar cartão",onclick:()=>NPUI.confirmar({titulo:"Arquivar cartão?",texto:"O cartão sai do quadro. Os anexos e comentários ficam guardados.",rotuloSim:"Arquivar",onSim:async()=>{await salvar(c.id,{arquivado:true});P.lista=P.lista.filter(x=>x.id!==c.id);P.aberto=null;P.painel?.fechar?.();render()}})}],{label:"Mais ações",alinhar:"dir"})});if(mais){mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false")}
+  const mais=leit?null:NPUI.btn("Mais ações",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,[{label:"Copiar cartão",onclick:()=>copiarCartao(c)},{label:"Arquivar cartão",onclick:()=>NPUI.confirmar({titulo:"Arquivar cartão?",texto:"O cartão sai do quadro e fica em “Arquivados”, de onde pode ser restaurado.",rotuloSim:"Arquivar",onSim:async()=>{await salvar(c.id,{arquivado:true});registrar(c.id,"arquivou este cartão");P.lista=P.lista.filter(x=>x.id!==c.id);P.aberto=null;P.painel?.fechar?.();render()}})}],{label:"Mais ações",alinhar:"dir"})});if(mais){mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false")}
   P.painel.abrir({id:c.id,trilha:"Marketing · Produção de conteúdo",titulo:COL_R[c.coluna]||"Cartão",corpo,pe:[btnPauta,btnMover,mais].filter(Boolean),origem:silencioso?null:origem});
-  if(P.sec==="chk"){const i=corpo.querySelector(".np-mp-novoit");if(i)setTimeout(()=>i.focus(),0)}
+  const foco=P.sec==="chk"?".np-mp-novoit":P.sec==="etq-ed"?"#mp-en":null;if(foco){const i=corpo.querySelector(foco);if(i)setTimeout(()=>i.focus(),0)}
 }
 
 /* ---------- enviar para a pauta ---------- */
 function enviarParaPauta(c){
-  const fmt=sel(FORMATO,"carrossel"),canal=sel(CANAIS,"instagram"),data=inp("date",c.data_entrega||""),hora=inp("time",""),gest=sel({"":"— escolher —",...Object.fromEntries(P.colab.map(k=>[k.id,k.nome]))},c.gestor_id||""),resp=sel({"":"— ninguém —",...Object.fromEntries(P.colab.map(k=>[k.id,k.nome]))},(c.membros||[])[0]||meuColab()?.id||"");
+  const fmt=sel(FORMATO,"carrossel"),canal=sel(CANAIS,"instagram"),data=inp("date",c.data_entrega||""),hora=inp("time",hCurta(c.hora_entrega)),gest=sel({"":"— escolher —",...Object.fromEntries(P.colab.map(k=>[k.id,k.nome]))},c.gestor_id||""),resp=sel({"":"— ninguém —",...Object.fromEntries(P.colab.map(k=>[k.id,k.nome]))},(c.membros||[])[0]||meuColab()?.id||"");
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("div",{class:"help"},"O conteúdo entra no calendário da Pauta de conteúdo com a situação “aguardando aprovação”. Lá, a gestão comenta e marca como “aprovado para postar”.")),
     field("mp-pf","Formato",fmt),field("mp-pc","Canal",canal),field("mp-pd","Data prevista de publicação",data),field("mp-ph","Horário (opcional)",hora),field("mp-pr","Responsável pelo conteúdo",resp),field("mp-pg","Responsável pela gestão",gest,"Quem vai aprovar."));
   modal("Enviar para a pauta",body,async()=>{
@@ -252,6 +316,33 @@ html.np-casca-v3 .np-mp-l textarea{background:var(--np-surface)}
 html.np-casca-v3 .np-mp-com{max-height:46vh;overflow:auto}
 html.np-casca-v3 .np-mp-com .cx{background:var(--np-surface);border:1px solid var(--np-line);border-radius:var(--np-r);padding:8px 10px;margin-top:4px}
 html.np-casca-v3 .np-mp-com .atv p{margin:0;color:var(--np-text-2)}html.np-casca-v3 .np-mp-com .atv p b{color:var(--np-text)}html.np-casca-v3 .np-mp-com .atv .q{font-size:var(--np-fs-1);color:var(--np-text-3)}
+html.np-casca-v3 .np-mp-addbtn{appearance:none;border:0;background:transparent;width:100%;text-align:left;cursor:pointer;color:var(--np-text-2);font:500 var(--np-fs-2)/1.3 var(--np-ui);padding:10px 8px;border-radius:var(--np-r);min-height:44px;margin-top:6px}
+html.np-casca-v3 .np-mp-addbtn:hover{background:var(--np-surface);color:var(--np-text)}html.np-casca-v3 .np-mp-addbtn:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-mp-novo{display:flex;flex-direction:column;gap:8px;margin-top:8px}html.np-casca-v3 .np-mp-novo textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-3)/1.35 var(--np-ui);padding:10px 12px;resize:none;box-shadow:var(--np-sh-ctrl)}
+html.np-casca-v3 .np-mp-novo .l{display:flex;gap:8px;align-items:center}html.np-casca-v3 .np-mp-novo .np-mp-x{font-size:20px;min-width:44px;min-height:44px}
+html.np-casca-v3 .np-mp-lista{min-height:0}html.np-casca-v3 p.np-mp-vazio{margin:0}
+html.np-casca-v3 .np-mp-ind{display:inline-flex;align-items:center;gap:4px;font:500 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-mp-h2{font:600 var(--np-fs-5)/1.3 var(--np-ui);margin:0}
+html.np-casca-v3 .np-mp-arq{list-style:none;margin:0;padding:0;border:1px solid var(--np-line);border-radius:var(--np-r-lg);background:var(--np-surface)}
+html.np-casca-v3 .np-mp-arq li{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--np-line);flex-wrap:wrap}html.np-casca-v3 .np-mp-arq li:first-child{border-top:0}
+html.np-casca-v3 .np-mp-arq .t{flex:1 1 220px;font-weight:500}html.np-casca-v3 .np-mp-arq .c{color:var(--np-text-3);font-size:var(--np-fs-1)}
+html.np-casca-v3 .np-mp-poph{display:flex;align-items:center;gap:8px}html.np-casca-v3 .np-mp-poph h3{flex:1;text-align:center}html.np-casca-v3 .np-mp-poph .np-mp-x{font-size:20px;min-width:32px;min-height:32px}
+html.np-casca-v3 .np-mp-pop input[type=search],html.np-casca-v3 .np-mp-pop input[type=text],html.np-casca-v3 .np-mp-pop input[type=url],html.np-casca-v3 .np-mp-pop input[type=time]{width:100%;box-sizing:border-box;height:36px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1 var(--np-ui);padding:0 10px}
+html.np-casca-v3 .np-mp-eqs label{min-height:16px}html.np-casca-v3 .np-mp-eqs .np-ib{flex:none}
+html.np-casca-v3 .np-mp-prev{border-radius:6px;color:#fff;font:600 var(--np-fs-2)/1.2 var(--np-ui);padding:10px 12px;min-height:16px}
+html.np-casca-v3 .np-mp-rot{font:600 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-mp-acoes{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+html.np-casca-v3 .np-mp-datas .par{display:flex;gap:8px}html.np-casca-v3 .np-mp-datas .par input[type=time]{flex:0 0 110px}
+html.np-casca-v3 .np-mp-infos{display:flex;gap:20px;flex-wrap:wrap}html.np-casca-v3 .np-mp-inf{display:flex;flex-direction:column;gap:6px;min-width:0}
+html.np-casca-v3 .np-mp-inf .rot{font:600 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-2)}html.np-casca-v3 .np-mp-inf .v{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+html.np-casca-v3 button.np-mp-etq.g{appearance:none;border:0;cursor:pointer;border-radius:6px;padding:0 12px;min-width:44px;height:32px;font:600 var(--np-fs-1)/1 var(--np-ui);justify-content:center}html.np-casca-v3 button.np-mp-etq.g:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-mp-dt{appearance:none;border:1px solid var(--np-line);background:var(--np-surface-2);color:var(--np-text);font:500 var(--np-fs-2)/1 var(--np-ui);height:32px;padding:0 10px;border-radius:var(--np-r);cursor:pointer}html.np-casca-v3 .np-mp-dt:hover{border-color:var(--np-ink)}
+html.np-casca-v3 .np-mp-desctx{display:flex;gap:10px;align-items:flex-start}html.np-casca-v3 .np-mp-desctx p{flex:1;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+html.np-casca-v3 .np-mp-descvazia{appearance:none;width:100%;text-align:left;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface-2);color:var(--np-text-3);font:400 var(--np-fs-2)/1.45 var(--np-ui);padding:10px 12px;min-height:56px;cursor:pointer}html.np-casca-v3 .np-mp-descvazia:hover{border-color:var(--np-ink);color:var(--np-text-2)}
+html.np-casca-v3 .np-mp-prog{height:6px;border-radius:999px;background:var(--np-line);overflow:hidden;margin-bottom:8px}html.np-casca-v3 .np-mp-prog i{display:block;height:100%;background:var(--np-ok)}
+html.np-casca-v3 .np-mp-com textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1.45 var(--np-ui);padding:8px 10px;margin:4px 0 6px}
+html.np-casca-v3 .np-mp-p select{width:100%;max-width:320px;box-sizing:border-box;height:36px;border:1px solid var(--np-line);border-radius:var(--np-r);background:var(--np-surface);color:var(--np-text);font:400 var(--np-fs-2)/1 var(--np-ui);padding:0 8px}
+html.np-casca-v3 .np-mp-cl{display:flex;gap:6px;align-items:center;font-size:var(--np-fs-1);color:var(--np-text-3);margin-top:2px}
 @media (max-width:980px){html.np-casca-v3 .np-mp-det{grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .np-mp-quadro{grid-template-columns:repeat(4,minmax(260px,80vw))}}
 `;
 document.head.append(el("style",{},CSS));
