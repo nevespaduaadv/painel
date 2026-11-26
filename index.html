@@ -2228,6 +2228,51 @@ html.np-casca-v3 .np-app .l{font:500 11.5px/1.2 var(--np-ui);text-align:center;c
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-app .i{transition:none}html.np-casca-v3 .np-app:hover .i{transform:none}}
 @media (max-width:600px){html.np-casca-v3 .np-hoje-wp{grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .np-rel-h{font-size:44px}}
 
+/* ---------- Tratar publicação (26/11): publicação à esquerda, decisão à direita ---------- */
+.np-tp{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:0;margin:-14px -18px -4px;min-height:min(62vh,560px)}
+.np-tp-pub{padding:16px 18px;border-right:1px solid var(--np-line,#E3E3DF);background:var(--np-surface-2,#F6F6F4);display:flex;flex-direction:column;gap:8px;min-width:0}
+.np-tp-num{font:600 var(--np-fs-4,15.5px)/1.3 var(--np-ui,inherit);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.np-tp-meta{font-size:var(--np-fs-1,12.5px);color:var(--np-text-2,#4D545C)}
+.np-tp-fichas{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.np-tp-m{display:inline-flex;align-items:center;font:500 var(--np-fs-1,12.5px)/1 var(--np-ui,inherit);padding:5px 9px;border-radius:999px;background:var(--np-surface,#fff);border:1px solid var(--np-line,#E3E3DF);color:var(--np-text-2,#4D545C)}
+.np-tp-m.late{background:color-mix(in srgb,var(--np-late,#93600F) 14%,transparent);border-color:transparent;color:var(--np-late,#93600F)}
+.np-tp-teor{flex:1 1 220px;min-height:160px;max-height:58vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--np-surface,#fff);border:1px solid var(--np-line,#E3E3DF);border-radius:var(--np-r-lg,10px);padding:12px 14px;font-size:var(--np-fs-2,13.5px);line-height:1.55}
+.np-tp-teor:focus-visible{outline:none;box-shadow:var(--np-focus)}
+.np-tp-teor mark{background:color-mix(in srgb,var(--np-late,#93600F) 18%,transparent);color:inherit;border-radius:3px;padding:0 2px}
+.np-tp-dec{padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.np-tp-passo{display:flex;flex-direction:column;gap:8px}
+.np-tp-rot{font:600 var(--np-fs-2,13.5px)/1.3 var(--np-ui,inherit);color:var(--np-text,#1D2126)}.np-tp-rot small{font-weight:400;color:var(--np-text-3,#5F666E);font-size:var(--np-fs-1,12.5px);margin-left:6px}
+.np-tp-nota{font-size:var(--np-fs-1,12.5px);color:var(--np-text-3,#5F666E)}
+.np-tp-vinc{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;border:1px solid var(--np-line,#E3E3DF);border-radius:var(--np-r,6px);padding:8px 10px;background:var(--np-surface-2,#F6F6F4);font-size:var(--np-fs-2,13.5px)}
+.np-tp-vinc input[type=search]{flex:1 1 100%}.np-tp-vinc .ok{color:var(--np-ok,#1E7A4C)}
+.np-tp-res{list-style:none;margin:0;padding:0;flex:1 1 100%;display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto}
+.np-tp-res button{appearance:none;width:100%;text-align:left;border:0;background:transparent;padding:8px;border-radius:var(--np-r,6px);cursor:pointer;color:var(--np-text,#1D2126);font:400 var(--np-fs-2,13.5px)/1.3 var(--np-ui,inherit);min-height:36px}
+.np-tp-res button:hover,.np-tp-res button:focus-visible{background:var(--np-surface,#fff);outline:none;box-shadow:inset 0 0 0 1px var(--np-line,#E3E3DF)}
+.np-tp-seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.np-tp-seg button{appearance:none;border:1px solid var(--np-line,#E3E3DF);background:var(--np-surface,#fff);border-radius:var(--np-r,6px);padding:8px 6px;font:500 var(--np-fs-1,12.5px)/1.25 var(--np-ui,inherit);color:var(--np-text-2,#4D545C);min-height:48px;cursor:pointer}
+.np-tp-seg button:hover{border-color:var(--np-ink,#2A2E31);color:var(--np-text,#1D2126)}.np-tp-seg button:focus-visible{outline:none;box-shadow:var(--np-focus)}
+.np-tp-seg button[aria-pressed=true]{background:var(--np-ink,#2A2E31);border-color:var(--np-ink,#2A2E31);color:var(--np-surface,#fff)}
+.np-tp-vazio{border:1px dashed var(--np-line,#E3E3DF);border-radius:var(--np-r,6px);padding:14px;color:var(--np-text-3,#5F666E);font-size:var(--np-fs-2,13.5px);text-align:center}
+.np-tp-grade{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.np-tp-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.np-tp .np-tp-f>label,.np-tp-lab{font:500 var(--np-fs-1,12.5px)/1.3 var(--np-ui,inherit);color:var(--np-text-2,#4D545C);text-transform:none;letter-spacing:0}.np-tp-f>label b{color:var(--np-crit,#A3302E)}.np-tp-f>label span{font-weight:400;color:var(--np-text-3,#5F666E)}
+.np-tp :is(select,input:not([type=checkbox]),textarea){width:100%;min-width:0;box-sizing:border-box}
+.np-tp :is(select,input:not([type=checkbox])){min-height:36px!important;height:36px;padding:0 10px;border-radius:var(--np-r,6px)}
+.np-tp textarea{min-height:64px!important;border-radius:var(--np-r,6px);padding:8px 10px}
+.np-tp-conta{display:grid;grid-template-columns:72px minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,.9fr);gap:8px}
+.np-tp-resb{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--np-line,#E3E3DF);border-left:3px solid var(--np-ink,#2A2E31);border-radius:var(--np-r,6px);padding:10px 12px;background:var(--np-surface-2,#F6F6F4)}
+.np-tp-resb .d{font:600 var(--np-fs-6,17px)/1.2 var(--np-ui,inherit);font-variant-numeric:tabular-nums}.np-tp-resb .e{font-size:var(--np-fs-1,12.5px);color:var(--np-text-2,#4D545C)}
+.np-tp-resb .ck{margin-left:auto;display:flex;gap:8px;align-items:center;font:500 var(--np-fs-2,13.5px)/1 var(--np-ui,inherit);color:var(--np-text,#1D2126);cursor:pointer;text-transform:none;letter-spacing:0;min-height:36px}
+.np-tp-resb .ck input{width:16px;height:16px;margin:0;accent-color:var(--np-ink,#2A2E31)}
+.np-tp-notas{font-size:var(--np-fs-1,12.5px);color:var(--np-text-2,#4D545C);display:flex;flex-direction:column;gap:2px}
+.np-tp-cad{font-size:var(--np-fs-1,12.5px);color:var(--np-text-2,#4D545C);display:grid;grid-template-columns:auto 1fr auto;gap:3px 12px;border:1px dashed var(--np-line,#E3E3DF);border-radius:var(--np-r,6px);padding:8px 10px}
+.np-tp-cad b{grid-column:1/-1;color:var(--np-text,#1D2126)}
+.np-tp-mais summary{cursor:pointer;font-size:var(--np-fs-2,13.5px);color:var(--np-text-2,#4D545C);padding:4px 0}.np-tp-mais summary i{font-style:normal;color:var(--np-text-3,#5F666E)}.np-tp-mais[open] summary{margin-bottom:8px}
+.np-tp .lnk{appearance:none;border:0;background:none;padding:0;color:var(--np-info,#2F5C8F);text-decoration:underline;cursor:pointer;font:inherit;font-weight:500}
+.np-tp [hidden]{display:none!important}
+.btn.np-tp-espera{opacity:.5}
+@media (max-width:860px){.np-tp{grid-template-columns:minmax(0,1fr);min-height:0}.np-tp-pub{border-right:0;border-bottom:1px solid var(--np-line,#E3E3DF)}.np-tp-teor{flex:0 0 auto;max-height:30vh}.np-tp-seg{grid-template-columns:1fr 1fr}.np-tp-grade{grid-template-columns:1fr}.np-tp-conta{grid-template-columns:72px minmax(0,1fr)}.np-tp-resb .ck{margin-left:0}.np-tp :is(select,input:not([type=checkbox])){min-height:44px!important;height:44px}.np-tp-seg button{min-height:48px}}
+
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -4091,7 +4136,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes","ferramentas"],["marketing","marketing"],["marketing-producao","marketing"],["ferramentas","core"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico","ferramentas"],["pecas","juridico","superendividamento","ferramentas"],["superendividamento","juridico","superendividamento","ferramentas"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwxvrnzm";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes","ferramentas"],["marketing","marketing"],["marketing-producao","marketing"],["ferramentas","core"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico","ferramentas"],["pecas","juridico","superendividamento","ferramentas"],["superendividamento","juridico","superendividamento","ferramentas"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwxyfbb6";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
