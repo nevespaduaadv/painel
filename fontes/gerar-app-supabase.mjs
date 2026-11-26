@@ -180,7 +180,9 @@ html = html.replace('<div id="view-calibracao" hidden class="main"></div>', '<di
 must('<script>');
 if(modo==='token'){
 html = html.replace('<script>', `<div class="login" id="login"><div class="card"><div class="eyebrow">Neves Pádua Advocacia</div><h1>Área do cliente</h1><div class="note" id="l-msg">Carregando a sua posição…</div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 26/11: a biblioteca do Supabase vem de uma cópia junto do sistema, em versão fixa (antes: jsDelivr, sem versão). O CDN fica só como reserva. -->
+<script src="../vendor/supabase-js-2.119.2.umd.js"></script>
+<script>window.supabase||document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"><\\/script>')</script>
 <script>
 /* ---------- Runtime por token: sem login. Os dados vêm de painel_por_token(t) (só o publicado para o cliente). ---------- */
 const REAL = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.stringify(SUPABASE_KEY)});
@@ -232,7 +234,9 @@ html = html.replace('<script>', `<div class="login" id="login">
     <div class="note">Acesso restrito à equipe do escritório e aos clientes convidados. Esqueceu a senha? Fale com o escritório.</div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 26/11: a biblioteca do Supabase vem de uma cópia junto do sistema, em versão fixa (antes: jsDelivr, sem versão). O CDN fica só como reserva. -->
+<script src="vendor/supabase-js-2.119.2.umd.js"></script>
+<script>window.supabase||document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"><\\/script>')</script>
 <script>
 /* ---------- Runtime Supabase: mesma interface do banco do protótipo (doc/collection/onSnapshot) ---------- */
 const SB = window.supabase.createClient(${JSON.stringify(SUPABASE_URL)}, ${JSON.stringify(SUPABASE_KEY)});
