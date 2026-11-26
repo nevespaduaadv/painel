@@ -413,6 +413,9 @@ async function cascatearCadeia(t,novoPrazo,motivo){
       const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const {error}=await SB.from("tarefas").update({prazo:iso,motivo_reagendamento:"Cadeia: "+(motivo||"reagendamento da etapa Protocolar")}).eq("id",x.id);if(!error)n++}
     if(n)toast(`Cadeia reagendada: ${n} etapa(s) ${delta>0?"adiada(s)":"antecipada(s)"} ${Math.abs(delta)} dia(s)`)}catch(e){toast("Cadeia: "+e.message)}
 }
+/* tipos de tarefa (Configurações → Tipos de tarefa): carregados uma vez, sob demanda; sem a tabela (0121), não há sugestões */
+const TT={lista:null,pedindo:null};
+window.PP_TIPOS_TAREFA={invalidar(){TT.lista=null;TT.pedindo=null},carregar(){if(TT.lista)return Promise.resolve(TT.lista);if(!TT.pedindo)TT.pedindo=SB.from("tipos_tarefa").select("nome").eq("ativo",true).order("ordem").order("nome").then(r=>{TT.lista=r.error?[]:(r.data||[]).map(x=>x.nome);return TT.lista},()=>{TT.lista=[];return TT.lista});return TT.pedindo}};
 function openTarefaForm(t={}){
   const meu=meuColab();
   let anexoForm=null;
@@ -420,6 +423,7 @@ function openTarefaForm(t={}){
         kon=sel({"":"— sem vínculo —"},""),pro=sel({"":"— sem vínculo —"},""),resp=selColab(t.responsavel_id||meu?.id),nuc=sel({"":"—",...NUCLEOS},t.nucleo||meu?.nucleo||""),
         prazo=inp("date",t.prazo||""),hora=inp("time",(t.hora||"").slice(0,5)),fatal=check("Prazo fatal",t.prazo_fatal,"Prazo processual ou contratual improrrogável."),pri=sel(PRIORIDADE,String(t.prioridade||2)),status=sel(STATUS,t.status||"aberta"),
         hr=inp("number","",{step:"0.25",min:0,placeholder:"0"});
+  { const dl=el("datalist",{id:"np-tipos-tarefa"});titulo.setAttribute("list","np-tipos-tarefa");titulo.setAttribute("autocomplete","off");titulo.after?.(dl);window.PP_TIPOS_TAREFA.carregar().then(ls=>{dl.replaceChildren(...ls.map(n=>el("option",{value:n})));if(!dl.isConnected)(titulo.parentNode||document.body).append(dl)}) }
   const vincular=()=>{const cid=cli.value;
     kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cid).map(k=>el("option",{value:k.id,selected:k.id===t.contrato_id?"":null},shortName(k))));
     pro.replaceChildren(el("option",{value:""},"— sem vínculo —"),...T.processos.filter(p=>p.cliente_id===cid||p.id===t.processo_id).map(p=>el("option",{value:p.id,selected:p.id===t.processo_id?"":null},(p.numero_cnj||"(sem número)")+(p.parte_contraria?" · "+p.parte_contraria:""))));};

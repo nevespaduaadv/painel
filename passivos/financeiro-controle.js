@@ -253,7 +253,27 @@ function v3Visao(v){
   const tAtr=rs.filter(r=>(r.tarefas||[]).some(t=>(t.status==="aberta"||t.status==="em_andamento")&&t.prazo&&t.prazo<hoje));if(tAtr.length)pend.push([`${pl(tAtr.length,"tarefa da régua atrasada","tarefas da régua atrasadas")}`,()=>{K.fTarefa=true;ir("fin-regua")},"crit"]);
   const pendC=el("section",{class:"fc3-card"},el("h2",{},"Pendências de hoje"),pend.length?el("ul",{class:"fc3-pend"},...pend.map(([t,f,tom])=>el("li",{class:tom||""},el("button",{type:"button",class:"fc3-lnk",onclick:f},t)))):el("p",{class:"fc3-vazio"},"Nenhuma pendência hoje."));
   v.append(el("div",{class:"fc3-duo"},etapas,pendC));
+  v.append(cartaoMeses3());
 }
+/* 25/11 (sócia): visão por mês, como no painel do ADVBox — previsto × recebido dos últimos meses e dos próximos, direto das cobranças do Asaas
+   (v_financeiro_mes, uma linha por mês). Só leitura; nenhuma regra financeira muda. */
+const SERIE={dados:null,pedindo:false};
+function cartaoMeses3(){
+  const card=el("section",{class:"fc3-card fc3-meses"},el("h2",{},"Previsto e recebido por mês"));
+  if(!SERIE.dados){if(!SERIE.pedindo){SERIE.pedindo=true;SB.from("v_financeiro_mes").select("mes,previsto,recebido,atrasado").order("mes").then(r=>{SERIE.dados=r.error||!Array.isArray(r.data)?[]:r.data;SERIE.pedindo=false;if(S.tab==="fin-visao")render()},()=>{SERIE.dados=[];SERIE.pedindo=false})}
+    card.append(el("p",{class:"fc3-vazio"},"Carregando…"));return card}
+  const ref=K.mes||new Date().toISOString().slice(0,7);const add=(m,n)=>{const d=new Date(m+"-15T12:00:00");d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7)};
+  const meses=[-5,-4,-3,-2,-1,0,1,2].map(n=>add(ref,n));const por=new Map(SERIE.dados.map(x=>[x.mes,x]));
+  const ls=meses.map(m=>({m,prev:+(por.get(m)?.previsto)||0,rec:+(por.get(m)?.recebido)||0,atr:+(por.get(m)?.atrasado)||0}));
+  const max=Math.max(1,...ls.map(x=>Math.max(x.prev,x.rec)));
+  if(!ls.some(x=>x.prev||x.rec)){card.append(el("p",{class:"fc3-vazio"},"Sem cobranças registradas nestes meses."));return card}
+  const nomeM=m=>{const d=new Date(m+"-15T12:00:00");return d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","")+"/"+m.slice(2,4)};
+  card.append(el("div",{class:"fc3-mg",role:"img","aria-label":"Previsto e recebido por mês: "+ls.map(x=>`${nomeM(x.m)} previsto ${R$(x.prev)}, recebido ${R$(x.rec)}`).join("; ")},
+    ...ls.map(x=>el("div",{class:"col"+(x.m===ref?" atual":""),title:`${nomeM(x.m)} · previsto ${R$(x.prev)} · recebido ${R$(x.rec)}${x.atr?" · em atraso "+R$(x.atr):""}`},
+      el("div",{class:"bs"},el("i",{class:"p",style:`height:${Math.round(100*x.prev/max)}%`}),el("i",{class:"r",style:`height:${Math.round(100*x.rec/max)}%`})),
+      el("span",{class:"v"},x.prev?pct(x.rec,x.prev):"—"),el("span",{class:"m"},nomeM(x.m))))),
+    el("p",{class:"fc3-leg"},el("i",{class:"p"}),"previsto",el("i",{class:"r"}),"recebido"," · o percentual é o recebido sobre o previsto do mês"));
+  return card}
 
 /* ---------- 2) Régua de cobrança ---------- */
 function cartao3(r){

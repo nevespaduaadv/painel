@@ -203,6 +203,40 @@ function kpiBandV3(itens){
 function cardChartV3(titulo,sub,corpo,...extra){
   return el("div",{class:"np-gestao-card"},el("h3",{},titulo),sub?el("div",{class:"sub"},sub):null,corpo,...extra);
 }
+/* 25/11 (sócia): controle da gestão sobre as tarefas de todos — prazos alterados, cancelamentos e trocas de responsável dos últimos 30 dias.
+   Lê tarefa_eventos (o histórico que cada tarefa já grava) e os títulos das tarefas envolvidas; carrega só quando a seção aparece. */
+const MOV={dados:null,pedindo:false,erro:null,tipo:"",quem:""};
+const MOV_TIPO={prazo_alterado:"Prazo alterado",cancelada:"Cancelada",reatribuida:"Responsável trocado"};
+async function carregarMov(){if(MOV.pedindo)return;MOV.pedindo=true;MOV.erro=null;
+  try{const desde=new Date(Date.now()-30*864e5).toISOString();
+    const ev=await SB.from("tarefa_eventos").select("id,tarefa_id,tipo,de,para,nota,autor_nome,criado_em").in("tipo",Object.keys(MOV_TIPO)).gte("criado_em",desde).order("criado_em",{ascending:false}).limit(400);
+    if(ev.error)throw ev.error;const ids=[...new Set((ev.data||[]).map(e=>e.tarefa_id))];const tit=new Map();
+    for(let i=0;i<ids.length;i+=150){const r=await SB.from("v_tarefas").select("id,titulo,cliente_nome,responsavel_nome").in("id",ids.slice(i,i+150));for(const t of r.data||[])tit.set(t.id,t)}
+    MOV.dados=(ev.data||[]).map(e=>({...e,t:tit.get(e.tarefa_id)||null}))}
+  catch(e){MOV.erro=String(e?.message||e);MOV.dados=[]}finally{MOV.pedindo=false}
+  if(S.tab==="visao")render()}
+function cardMovTarefas(){
+  const sec=el("section",{class:"np-gestao-sec",id:"s-mov-tarefas"},el("div",{class:"np-gestao-sh"},el("h2",{},"Movimentações de tarefas"),el("span",{class:"meta"},"últimos 30 dias · prazos alterados, cancelamentos e trocas de responsável")));
+  if(!MOV.dados){if(!MOV.pedindo)carregarMov();sec.append(NPUI.carregando(3));return sec}
+  if(MOV.erro){sec.append(NPUI.faixaErro({texto:"Não foi possível carregar as movimentações.",onAcao:()=>{MOV.dados=null;render()}}));return sec}
+  const quems=[...new Set(MOV.dados.map(e=>e.autor_nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const fT=sel({"":"Todos os tipos",...MOV_TIPO},MOV.tipo);fT.setAttribute("aria-label","Tipo de movimentação");fT.onchange=()=>{MOV.tipo=fT.value;render()};
+  const fQ=sel({"":"Toda a equipe",...Object.fromEntries(quems.map(q=>[q,q]))},MOV.quem);fQ.setAttribute("aria-label","Quem fez");fQ.onchange=()=>{MOV.quem=fQ.value;render()};
+  const ls=MOV.dados.filter(e=>(!MOV.tipo||e.tipo===MOV.tipo)&&(!MOV.quem||e.autor_nome===MOV.quem));
+  const n=k=>MOV.dados.filter(e=>e.tipo===k).length;
+  const dh=x=>{const d=new Date(x);return isNaN(d)?"—":d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})};
+  const dBR=x=>/^\d{4}-\d{2}-\d{2}/.test(String(x||""))?String(x).slice(0,10).split("-").reverse().join("/"):(x||"—");
+  sec.append(NPUI.quadros([{titulo:"Prazos alterados",n:n("prazo_alterado"),tom:n("prazo_alterado")?"att":"zero"},{titulo:"Tarefas canceladas",n:n("cancelada"),tom:n("cancelada")?"":"zero"},{titulo:"Responsável trocado",n:n("reatribuida"),tom:n("reatribuida")?"":"zero"}]),
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin:0 0 10px"},fT,fQ),
+    el("div",{class:"np-gestao-card"},tabV3([
+      {t:"Quando",f:e=>dh(e.criado_em)},{t:"O quê",f:e=>NPUI.marca(MOV_TIPO[e.tipo]||e.tipo,e.tipo==="prazo_alterado"?"att":"")},
+      {t:"Tarefa",f:e=>e.t?el("button",{type:"button",class:"lnk",title:"Abrir a tarefa",onclick:()=>window.PP_TAREFAS?.abrir?.(e.tarefa_id)},e.t.titulo||"(sem título)"):"(tarefa não encontrada)"},
+      {t:"Cliente",f:e=>e.t?.cliente_nome||"—"},
+      {t:"De → para",f:e=>e.tipo==="prazo_alterado"?dBR(e.de)+" → "+dBR(e.para):e.tipo==="reatribuida"?(e.de||"—")+" → "+(e.para||"—"):"—"},
+      {t:"Motivo / nota",f:e=>e.nota||"—"},{t:"Por",f:e=>e.autor_nome||"—"}
+    ],ls.slice(0,60),"Nenhuma movimentação com estes filtros")),
+    ls.length>60?el("p",{class:"np-ts-sub"},`Mostrando as 60 mais recentes de ${ls.length}.`):null);
+  return sec}
 function tabV3(cols,linhas,vazio){
   return el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
     el("thead",{},el("tr",{},cols.map(c=>el("th",{class:c.r?"r":""},c.t)))),
@@ -410,10 +444,11 @@ function renderVisaoV3(v){
           {t:"Colaborador",f:r=>r.nome},{t:"Núcleo",f:r=>NUCLEOS[r.nucleo]||"—"},{t:"Horas mês",r:1,f:r=>horasFmt(r.horas_mes_atual)},
           {t:"Horas 30d",r:1,f:r=>horasFmt(r.horas_30d)},{t:"Registros 30d",r:1,f:r=>String(r.registros_30d)},
           {t:"Tarefas",r:1,f:r=>String(r.tarefas_abertas)},
-          {t:"Atrasadas",r:1,f:r=>r.tarefas_atrasadas>0?NPUI.marca(String(r.tarefas_atrasadas),"crit"):"0"},
+          {t:"Atrasadas",r:1,f:r=>r.tarefas_atrasadas>0?NPUI.marca(String(r.tarefas_atrasadas),"late"):"0"},
           {t:"Concluídas mês",r:1,f:r=>String(r.concluidas_mes)},{t:"Processos",r:1,f:r=>String(r.processos_ativos)}
         ],D.equipe||[],"Nenhum colaborador cadastrado")));
     corpo.append(sec);
+    corpo.append(cardMovTarefas());
   }
   corpo.append(NPUI.rodape("Fonte: views SQL do Supabase. Estágios conforme Res. CMN 4.966/2021."));
 }
