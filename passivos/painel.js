@@ -251,32 +251,61 @@ function abrirPainelHojeV3(i,li){
   const pe=[NPUI.btn("Abrir na agenda",{variante:"pri",onclick:()=>window.PP_AGENDA?.ir(new Date(e.inicio),"dia")}),e.origem==="tarefa"&&e.tarefa_id?NPUI.btn("Abrir a tarefa",{onclick:()=>window.PP_TAREFAS?.abrir(e.tarefa_id)}):null,e.lead_id?NPUI.btn("Abrir o lead",{onclick:()=>{location.hash="#leads/"+e.lead_id}}):null,e.link&&e.origem==="google"?el("a",{class:"np-btn",href:e.link,target:"_blank",rel:"noopener"},"Abrir no Google"):null];
   H3.painel.abrir({id:H3.aberta,trilha:[el("span",{},"Hoje"),el("span",{},"Compromisso")],titulo:e.titulo,corpo:[props,desc],pe,origem:li?.querySelector(".np-it-abrir")||li});
 }
-/* 25/11 (sócia): a tela Hoje ganha uma coluna de widgets — calendário do mês, lembretes pessoais e atalhos escolhidos por cada pessoa.
-   Lembretes e atalhos ficam guardados no navegador de quem usa (NPUI.pref), por perfil; nada vai para o banco. */
-const ATALHOS_HOJE=[["tarefas","Tarefas e prazos"],["agenda","Agenda"],["avisos","Avisos"],["clientes","Clientes"],["processos","Processos e pastas"],["publicacoes","Publicações"],["negociacoes","Negociações"],["fin-visao","Financeiro"],["superendividamento","Superendividamento"],["revisional","Revisional de contratos"],["conhecimento","Base de conhecimento"],["visao","Visão geral"],["perfil","Meu perfil"]];
-function lateralHojeV3(porDia,hoje){
-  const f=D.foco;const uid=PP.perfil?.id||"eu";const lado=el("aside",{class:"np-hoje-lado","aria-label":"Widgets"});
-  const wid=(titulo,extra,...kids)=>el("section",{class:"np-wid"},el("div",{class:"np-wid-h"},el("h2",{},titulo),extra||null),...kids);
-  // --- calendário do mês em foco (os mesmos itens da lista: prazos e compromissos)
-  const ref=parseD(f.dia);const y=ref.getFullYear(),m=ref.getMonth();const prim=new Date(y,m,1);const ini=addDia(prim,-((prim.getDay()+6)%7));
-  const irMes=n=>{const d=new Date(y,m+n,1);f.dia=isoD(d);if(f.modo!=="mes")f.modo="dia";render()};
-  const navCal=el("span",{class:"np-wid-nav"},NPUI.ib("chevE","Mês anterior",()=>irMes(-1)),NPUI.ib("chevD","Próximo mês",()=>irMes(1)));
-  const grade=el("div",{class:"np-cal",role:"grid","aria-label":"Calendário de "+prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})},...["S","T","Q","Q","S","S","D"].map(x=>el("span",{class:"np-cal-ds","aria-hidden":"true"},x)));
-  for(let i=0;i<42;i++){const d=addDia(ini,i);const k=isoD(d);if(i>=35&&d.getMonth()!==m)break;const l=porDia[k]||[];const fora=d.getMonth()!==m;
-    const tom=l.some(x=>x.fatal)?" fatal":l.some(x=>x.atrasada)?" late":l.length?" tem":"";
-    grade.append(el("button",{type:"button",class:"np-cal-d"+(fora?" fora":"")+(k===hoje?" hoje":"")+(k===f.dia&&f.modo==="dia"?" sel":"")+tom,title:d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})+(l.length?` · ${l.length} ${l.length===1?"item":"itens"}`:""),"aria-label":d.toLocaleDateString("pt-BR",{day:"numeric",month:"long"})+(l.length?`, ${l.length} ${l.length===1?"item":"itens"}`:""),onclick:()=>{f.modo="dia";f.dia=k;render()}},String(d.getDate())))}
-  lado.append(wid(prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase()),navCal,grade,el("p",{class:"np-wid-nota"},"Clique num dia para ver o que há nele.")));
-  // --- lembretes pessoais
-  const chL="np-hoje-lembretes-"+uid;const ta=el("textarea",{class:"np-wid-ta",rows:"5",placeholder:"Anote aqui o que não pode esquecer…","aria-label":"Lembretes pessoais"},NPUI.pref.get(chL,"")||"");let tl=null;const est=el("span",{class:"np-wid-est","aria-live":"polite"});
-  ta.oninput=()=>{clearTimeout(tl);tl=setTimeout(()=>{NPUI.pref.set(chL,ta.value);est.textContent="salvo";setTimeout(()=>{est.textContent=""},1500)},500)};
-  lado.append(wid("Lembretes",est,ta,el("p",{class:"np-wid-nota"},"Só você vê. Ficam guardados neste navegador.")));
-  // --- atalhos escolhidos pela pessoa
-  const chA="np-hoje-atalhos-"+uid;const poss=ATALHOS_HOJE.filter(([t])=>{try{return t==="perfil"||(document.getElementById("view-"+t)&&(!PP.temAcesso||PP.temAcesso(t)))}catch(_){return false}});
-  let esc;try{esc=JSON.parse(NPUI.pref.get(chA,"null"))}catch(_){esc=null}if(!Array.isArray(esc))esc=["tarefas","agenda","clientes","processos"];
-  const ativos=poss.filter(([t])=>esc.includes(t));
-  const btnP=NPUI.btn("Personalizar",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,poss.map(([t,l])=>({label:(esc.includes(t)?"✓ ":"")+l,onclick:()=>{const n=esc.includes(t)?esc.filter(x=>x!==t):[...esc,t];NPUI.pref.set(chA,JSON.stringify(n));render()}})),{label:"Escolher atalhos",alinhar:"dir"})});btnP.setAttribute("aria-haspopup","menu");btnP.setAttribute("aria-expanded","false");
-  lado.append(wid("Atalhos",btnP,ativos.length?el("div",{class:"np-wid-at"},...ativos.map(([t,l])=>el("button",{type:"button",class:"np-btn",onclick:()=>irPara(t)},l))):el("p",{class:"np-wid-nota"},"Nenhum atalho escolhido. Use Personalizar.")));
-  return lado}
+/* Widgets da tela Hoje (25/11; arrastáveis desde 26/11, pedido da sócia: “como a tela de um iPhone”).
+   Há duas áreas — a principal (acima da lista do dia) e a lateral. Cada widget pode ser arrastado de uma para a outra e reordenado;
+   o menu “⋯” de cada um faz o mesmo sem arrastar. A disposição, os lembretes e os atalhos ficam no navegador de quem usa (NPUI.pref), por perfil. */
+const ATALHOS_HOJE=[["tarefas","Tarefas e prazos"],["agenda","Agenda"],["avisos","Avisos"],["clientes","Clientes"],["processos","Processos e pastas"],["publicacoes","Publicações"],["negociacoes","Negociações"],["fin-visao","Financeiro"],["ferramentas","Ferramentas"],["superendividamento","Superendividamento"],["revisional","Revisional de contratos"],["conhecimento","Base de conhecimento"],["marketing","Pauta de conteúdo"],["mkt-producao","Produção de conteúdo"],["visao","Visão geral"],["perfil","Meu perfil"]];
+const I_ATALHO={tarefas:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',agenda:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',avisos:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',clientes:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',processos:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',publicacoes:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/>',negociacoes:'<path d="M4 7h12M4 12h16M4 17h9"/>',"fin-visao":'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',ferramentas:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',superendividamento:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h8M8 16h5"/>',revisional:'<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>',conhecimento:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',marketing:'<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6"/>',"mkt-producao":'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>',visao:'<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>',perfil:'<circle cx="12" cy="8" r="4"/><path d="M6 21a6 6 0 0 1 12 0"/>'};
+const WID_NOME={relogio:"Relógio",proximo:"Próximo compromisso",atalhos:"Atalhos",calendario:"Calendário",lembretes:"Lembretes"};
+const WID_PADRAO={principal:["relogio","proximo","atalhos"],lado:["calendario","lembretes"]};
+let relogioT=null,widArr=null;
+function disposicaoHoje(uid){let d=null;try{d=JSON.parse(NPUI.pref.get("np-hoje-widgets-"+uid,"null"))}catch(_){}
+  const ids=Object.keys(WID_NOME);const p=Array.isArray(d?.principal)?d.principal.filter(x=>ids.includes(x)):[...WID_PADRAO.principal];const l=Array.isArray(d?.lado)?d.lado.filter(x=>ids.includes(x)&&!p.includes(x)):WID_PADRAO.lado.filter(x=>!p.includes(x));
+  for(const id of ids)if(!p.includes(id)&&!l.includes(id))(WID_PADRAO.principal.includes(id)?p:l).push(id); // widget novo entra na área padrão dele
+  return {principal:[...new Set(p)],lado:[...new Set(l)]}}
+function widgetsHojeV3(porDia,hoje){
+  const f=D.foco;const uid=PP.perfil?.id||"eu";const disp=disposicaoHoje(uid);
+  const gravar=()=>{NPUI.pref.set("np-hoje-widgets-"+uid,JSON.stringify(disp));render()};
+  const moverW=(id,zona,antes)=>{for(const z of ["principal","lado"])disp[z]=disp[z].filter(x=>x!==id);const l=disp[zona];const i=antes&&antes!==id?l.indexOf(antes):-1;if(i>=0)l.splice(i,0,id);else l.push(id);gravar()};
+  const svg=d=>{const s0=document.createElementNS("http://www.w3.org/2000/svg","svg");s0.setAttribute("viewBox","0 0 24 24");s0.setAttribute("fill","none");s0.setAttribute("stroke","currentColor");s0.setAttribute("stroke-width","1.6");s0.setAttribute("stroke-linecap","round");s0.setAttribute("stroke-linejoin","round");s0.setAttribute("aria-hidden","true");s0.innerHTML=d;return s0};
+  const CORPO={
+    relogio(){const hh=el("b",{class:"np-rel-h"}),dd=el("span",{class:"np-rel-d"});const tick=()=>{const n=new Date();hh.textContent=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");dd.textContent=n.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())};tick();clearInterval(relogioT);relogioT=setInterval(()=>{if(!hh.isConnected){clearInterval(relogioT);relogioT=null;return}tick()},15000);
+      return {corpo:[el("div",{class:"np-rel",role:"timer","aria-label":"Hora atual"},hh,dd)]}},
+    proximo(){const agora=new Date();const hm=String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0");const evs=(porDia[hoje]||[]).filter(i=>i.k==="evento").sort((a,b)=>(a.hora||"99")<(b.hora||"99")?-1:1);const prox=evs.find(i=>i.hora&&i.hora>=hm)||evs.find(i=>!i.hora);const resto=evs.filter(i=>i!==prox&&(!i.hora||i.hora>=hm)).length;
+      return {corpo:[prox?el("button",{type:"button",class:"np-prox",title:"Abrir o compromisso",onclick:e=>abrirPainelHojeV3(prox,e.currentTarget)},el("b",{},prox.hora?prox.hora.replace(":","h"):"dia inteiro"),el("span",{class:"t"},prox.titulo),prox.sub?el("span",{class:"s"},prox.sub):null):el("p",{class:"np-wid-nota",style:"margin:0"},evs.length?"Os compromissos de hoje já passaram.":"Nenhum compromisso hoje."),
+        el("p",{class:"np-wid-nota"},resto?`Mais ${resto} hoje. `:"",el("button",{type:"button",class:"lnk",onclick:()=>irPara("agenda")},"Abrir a agenda"))]}},
+    atalhos(zona){const chA="np-hoje-atalhos-"+uid;const poss=ATALHOS_HOJE.filter(([t])=>{try{return t==="perfil"||(document.getElementById("view-"+t)&&(!PP.temAcesso||PP.temAcesso(t)))}catch(_){return false}});
+      let esc;try{esc=JSON.parse(NPUI.pref.get(chA,"null"))}catch(_){esc=null}if(!Array.isArray(esc))esc=["tarefas","agenda","clientes","processos"];const ativos=poss.filter(([t])=>esc.includes(t));
+      const btnP=NPUI.btn("Personalizar",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,poss.map(([t,l])=>({label:(esc.includes(t)?"✓ ":"")+l,onclick:()=>{const n=esc.includes(t)?esc.filter(x=>x!==t):[...esc,t];NPUI.pref.set(chA,JSON.stringify(n));render()}})),{label:"Escolher atalhos",alinhar:"dir"})});btnP.setAttribute("aria-haspopup","menu");btnP.setAttribute("aria-expanded","false");
+      return {extra:btnP,corpo:[ativos.length?el("div",{class:"np-wid-at"+(zona==="principal"?" np-apps":"")},...ativos.map(([t,l])=>zona==="principal"?el("button",{type:"button",class:"np-app",title:l,onclick:()=>irPara(t)},el("span",{class:"i"},svg(I_ATALHO[t]||I_ATALHO.ferramentas)),el("span",{class:"l"},l)):el("button",{type:"button",class:"np-btn",onclick:()=>irPara(t)},l))):el("p",{class:"np-wid-nota"},"Nenhum atalho escolhido. Use Personalizar.")]}},
+    calendario(){const ref=parseD(f.dia);const y=ref.getFullYear(),m=ref.getMonth();const prim=new Date(y,m,1);const ini=addDia(prim,-((prim.getDay()+6)%7));
+      const irMes=n=>{const d=new Date(y,m+n,1);f.dia=isoD(d);if(f.modo!=="mes")f.modo="dia";render()};
+      const navCal=el("span",{class:"np-wid-nav"},NPUI.ib("chevE","Mês anterior",()=>irMes(-1)),NPUI.ib("chevD","Próximo mês",()=>irMes(1)));
+      const grade=el("div",{class:"np-cal",role:"grid","aria-label":"Calendário de "+prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})},...["S","T","Q","Q","S","S","D"].map(x=>el("span",{class:"np-cal-ds","aria-hidden":"true"},x)));
+      for(let i=0;i<42;i++){const d=addDia(ini,i);const k=isoD(d);if(i>=35&&d.getMonth()!==m)break;const l=porDia[k]||[];const fora=d.getMonth()!==m;
+        const tom=l.some(x=>x.fatal)?" fatal":l.some(x=>x.atrasada)?" late":l.length?" tem":"";
+        grade.append(el("button",{type:"button",class:"np-cal-d"+(fora?" fora":"")+(k===hoje?" hoje":"")+(k===f.dia&&f.modo==="dia"?" sel":"")+tom,title:d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})+(l.length?` · ${l.length} ${l.length===1?"item":"itens"}`:""),"aria-label":d.toLocaleDateString("pt-BR",{day:"numeric",month:"long"})+(l.length?`, ${l.length} ${l.length===1?"item":"itens"}`:""),onclick:()=>{f.modo="dia";f.dia=k;render()}},String(d.getDate())))}
+      return {titulo:prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase()),extra:navCal,corpo:[grade,el("p",{class:"np-wid-nota"},"Clique num dia para ver o que há nele.")]}},
+    lembretes(){const chL="np-hoje-lembretes-"+uid;const ta=el("textarea",{class:"np-wid-ta",rows:"5",placeholder:"Anote aqui o que não pode esquecer…","aria-label":"Lembretes pessoais"},NPUI.pref.get(chL,"")||"");let tl=null;const est=el("span",{class:"np-wid-est","aria-live":"polite"});
+      ta.oninput=()=>{clearTimeout(tl);tl=setTimeout(()=>{NPUI.pref.set(chL,ta.value);est.textContent="salvo";setTimeout(()=>{est.textContent=""},1500)},500)};
+      return {extra:est,corpo:[ta,el("p",{class:"np-wid-nota"},"Só você vê. Ficam guardados neste navegador.")]}},
+  };
+  const montarW=(id,zona)=>{const w=CORPO[id](zona);const lista=disp[zona];const i=lista.indexOf(id);const outra=zona==="principal"?"lado":"principal";
+    const menu=NPUI.ib("pontos","Mover o widget "+WID_NOME[id],e=>NPUI.pop(e.currentTarget,[{label:zona==="principal"?"Mover para a lateral":"Mover para a área principal",onclick:()=>moverW(id,outra)},i>0?{label:zona==="principal"?"Mover para antes":"Subir",onclick:()=>{lista.splice(i,1);lista.splice(i-1,0,id);gravar()}}:null,i<lista.length-1?{label:zona==="principal"?"Mover para depois":"Descer",onclick:()=>{lista.splice(i,1);lista.splice(i+1,0,id);gravar()}}:null].filter(Boolean),{label:"Mover widget",alinhar:"dir"}));menu.classList.add("np-wid-menu");menu.setAttribute("aria-haspopup","menu");menu.setAttribute("aria-expanded","false");
+    const sec=el("section",{class:"np-wid np-wid-"+id,"data-wid":id,draggable:"true","aria-label":WID_NOME[id]},el("div",{class:"np-wid-h",title:"Arraste para mudar de lugar"},el("h2",{},w.titulo||WID_NOME[id]),w.extra||null,menu),...w.corpo);
+    // arrastar só pela barra do título (não atrapalha selecionar texto, digitar nos lembretes nem clicar no calendário)
+    let pelaBarra=false;sec.addEventListener("pointerdown",e=>{pelaBarra=!!e.target.closest(".np-wid-h")&&!e.target.closest("button,select,input,textarea,a")});
+    sec.addEventListener("dragstart",e=>{if(!pelaBarra){e.preventDefault();return}widArr=id;sec.classList.add("arr");try{e.dataTransfer.setData("text/plain",id);e.dataTransfer.effectAllowed="move"}catch(_){}document.body.classList.add("np-wid-arrastando")});
+    sec.addEventListener("dragend",()=>{widArr=null;sec.classList.remove("arr");document.body.classList.remove("np-wid-arrastando");document.querySelectorAll(".np-wid-zona.alvo,.np-wid.antes").forEach(x=>x.classList.remove("alvo","antes"))});
+    sec.addEventListener("dragover",e=>{if(widArr&&widArr!==id){e.preventDefault();e.stopPropagation();sec.classList.add("antes");sec.closest(".np-wid-zona")?.classList.add("alvo")}});
+    sec.addEventListener("dragleave",e=>{if(!sec.contains(e.relatedTarget))sec.classList.remove("antes")});
+    sec.addEventListener("drop",e=>{if(!widArr||widArr===id)return;e.preventDefault();e.stopPropagation();moverW(widArr,zona,id)});
+    return sec};
+  const zonaEl=(zona,cls,rot)=>{const z=el(zona==="lado"?"aside":"div",{class:"np-wid-zona "+cls,"data-zona":zona,"aria-label":rot},...disp[zona].map(id=>montarW(id,zona)),el("p",{class:"np-wid-solte","aria-hidden":"true"},"Solte aqui"));
+    z.addEventListener("dragover",e=>{if(widArr){e.preventDefault();z.classList.add("alvo")}});z.addEventListener("dragleave",e=>{if(!z.contains(e.relatedTarget))z.classList.remove("alvo")});z.addEventListener("drop",e=>{if(!widArr)return;e.preventDefault();moverW(widArr,zona)});
+    if(!disp[zona].length)z.classList.add("vazia");return z};
+  return {principal:zonaEl("principal","np-hoje-wp","Widgets da área principal"),lado:zonaEl("lado","np-hoje-lado","Widgets da lateral")};
+}
 function grupoHojeV3(id,titulo,lista,{tom,aberto=true,vazio,comDia=true,acao}={}){
   if(!lista.length&&!vazio)return null;
   // vazio no padrão do DS: o que aconteceu + a próxima ação, na própria linha
@@ -376,7 +405,7 @@ function renderPainelV3(){
   const gAtv=NPUI.grupo({id:"atividade",titulo:"Atividade recente"+(escAtv.tudo?"":escAtv.nucleos?" · suas e do jurídico":" · só as suas"),n:eventosVis.length,aberto:NPUI.pref.get("np-hoje-g-atividade","0")==="1",onToggle:ab=>NPUI.pref.set("np-hoje-g-atividade",ab?"1":"0"),itens:itensAtv.length?itensAtv:[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Sem movimentação ainda."))]});
   if(atvHead)gAtv.querySelector(".np-grp-c>ul").prepend(el("li",{class:"np-atv-fl"},atvHead));corpo.append(gAtv);
   const tot=Object.values(porDia).flat().length;corpo.append(NPUI.rodape(`${prazos.length} prazo${prazos.length===1?"":"s"} · ${tot} ${tot===1?"item":"itens"} no período carregado`,[["crit","fatal"],["late","atrasado"],["hoje","hoje"]]));
-  obra.append(corpo,lateralHojeV3(porDia,hoje));v.append(obra);
+  { const W=widgetsHojeV3(porDia,hoje);corpo.prepend(W.principal);obra.append(corpo,W.lado) } v.append(obra);
   H3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{H3.aberta=null}});
   if(H3.aberta){const [,id]=H3.aberta.split(":");const e=D.cal.agenda.find(x=>x.id===id);if(e){const i={k:"evento",e,atrasada:false};abrirPainelHojeV3(i,null)}else H3.aberta=null}
 }

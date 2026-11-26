@@ -24,7 +24,7 @@
   }
 
   // ---------- tratar: ler + vincular + providência (+ tarefa) em um só lugar ----------
-  function modalTratar(p) {
+  function modalTratar(p, opts = {}) {
     const PUB = window.PP_PUBLICACOES || {}; const colab = (T.colab.length ? T.colab : (PUB.colab?.() || [])).filter((c) => c.ativo !== false); const procs = PUB.procs?.() || [];
     const TT = PUB.TIPOS_TAREFA_PUB || { prazo: "Cumprir prazo", manifestar: "Manifestar nos autos", recurso: "Analisar cabimento de recurso", audiencia: "Preparar audiência", cliente: "Comunicar o cliente", diligencia: "Diligência / providência" };
     const fmtD2 = (iso) => fmtDt(iso);
@@ -99,8 +99,9 @@
         const { error } = await SB.rpc("publicacao_tratar", { p_id: p.id, p_providencia: prov.value, p_obs: obs.value.trim() || null, p_encaminhar: prov.value === "encaminhada" ? para.value : null }); if (error) throw new Error(error.message);
         toast("Publicação tratada");
       }
+      try { opts.aoRegistrar?.(); } catch (_) {}
       recarregar();
-    });
+    }, typeof opts.detalhes === "function" ? el("button", { class: "btn", type: "button", title: "Situação, prazos sugeridos, fontes e histórico", onclick: () => { $("#modalHost").replaceChildren(); opts.detalhes(); } }, "Ver detalhes") : null);
     const host = $("#modalHost"); const btn = host?.querySelector("button.btn.primary"); if (btn) btn.textContent = "Registrar";
     const card = host?.querySelector(".modal > .card"); if (card) card.style.maxWidth = "900px";
     if (!p.lida) SB.from("publicacoes").update({ lida: true }).eq("id", p.id).then(() => { p.lida = true; });

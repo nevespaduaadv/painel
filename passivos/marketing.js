@@ -4,7 +4,7 @@
 (()=>{
 "use strict";
 const M={lista:[],colab:[],pedidos:[],ok:false,carregando:false,visao:"calendario",calModo:"mes",mes:null,sel:null,coment:[],fStatus:"",fResp:"",busca:""};
-const STATUS={ideia:"Ideia",em_aprovacao:"Em aprovação",ajustar:"Ajustar",aprovado:"Aprovado",em_producao:"Em produção",agendado:"Agendado",publicado:"Publicado",cancelado:"Cancelado"};
+const STATUS={ideia:"Ideia",em_aprovacao:"Aguardando aprovação",ajustar:"Ajustar",aprovado:"Aprovado para postar",em_producao:"Em produção",agendado:"Agendado",publicado:"Publicado",cancelado:"Cancelado"};
 const COR={ideia:"#8a8f98",em_aprovacao:"#b8964a",ajustar:"#b4452f",aprovado:"#2e7d4f",em_producao:"#2f6fb3",agendado:"#6a4fb3",publicado:"#0c1f38",cancelado:"#aaa"};
 const FORMATO={reels:"Reels",carrossel:"Carrossel",estatico:"Estático",story:"Story",artigo:"Artigo",email:"E-mail",video:"Vídeo",live:"Live",outro:"Outro"};
 const ICONE={reels:"🎬",carrossel:"🖼️",estatico:"📷",story:"⏱️",artigo:"📝",email:"✉️",video:"📹",live:"🔴",outro:"📌"};
@@ -414,7 +414,7 @@ function renderMarketingV3(){
   ]);
   const chips=[];const C=o=>{const c=NPUI.chip(o);chips.push(c);return c};
   C({label:"Todas",on:!M.fStatus,grupo:"st",onclick:()=>{M.fStatus="";render()}});
-  C({label:"Em aprovação",n:nAprov||null,on:M.fStatus==="em_aprovacao",grupo:"st",onclick:()=>{M.fStatus=M.fStatus==="em_aprovacao"?"":"em_aprovacao";render()}});
+  C({label:"Aguardando aprovação",n:nAprov||null,on:M.fStatus==="em_aprovacao",grupo:"st",onclick:()=>{M.fStatus=M.fStatus==="em_aprovacao"?"":"em_aprovacao";render()}});
   C({label:"Ajustar",n:ativas.filter(p=>p.status==="ajustar").length||null,on:M.fStatus==="ajustar",grupo:"st",onclick:()=>{M.fStatus=M.fStatus==="ajustar"?"":"ajustar";render()}});
   C({label:"Em produção",n:ativas.filter(p=>p.status==="em_producao").length||null,on:M.fStatus==="em_producao",grupo:"st",onclick:()=>{M.fStatus=M.fStatus==="em_producao"?"":"em_producao";render()}});
   const extras=[M.fResp,M.fStatus&&!["em_aprovacao","ajustar","em_producao"].includes(M.fStatus)].filter(Boolean).length;
@@ -489,7 +489,7 @@ const CSS=`.mk-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));ga
 .mk-coment{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}.mk-c{padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:13.5px}.mk-c.ajuste{border-left:3px solid #b4452f}.mk-c.aprovacao{border-left:3px solid #2e7d4f}.mk-c.status{background:transparent;color:var(--muted);font-size:12px;padding:2px 10px}.mk-c .s{font-size:11.5px;color:var(--muted);margin-bottom:2px}
 @media (max-width:860px){.mk-cal{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}.mk-dia{min-height:56px;padding:2px}.mk-chip>span:first-child{font-size:10px}.mk-chip .s{display:none}}`;
 document.head.append(el("style",{},CSS));
-window.PP_MARKETING={v3:marketingV3,render:()=>marketingV3()?renderMarketingV3():renderMarketing(),rotulo:rotuloMkV3};
+window.PP_MARKETING={invalidar(){M.ok=false},v3:marketingV3,render:()=>marketingV3()?renderMarketingV3():renderMarketing(),rotulo:rotuloMkV3};
 {const _r=render;render=function(){_r();const vm=$("#view-marketing");if(!vm)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="marketing")S.tab="clientes";vm.hidden=S.tab!=="marketing";if(S.tab==="marketing"){if(marketingV3())renderMarketingV3();else{vm.classList.remove("np-v3");renderMarketing()}}}}
 window.__PP_LOGIN?.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("marketing");let t;ch.on("postgres_changes",{event:"*",schema:"public",table:"pautas"},()=>{clearTimeout(t);t=setTimeout(()=>{M.ok=false;if(S.tab==="marketing")garantir()},400)});ch.on("postgres_changes",{event:"*",schema:"public",table:"pautas_comentarios"},()=>{if(M.sel)carregarComent(M.sel.id)});ch.on("postgres_changes",{event:"*",schema:"public",table:"marketing_pedidos"},()=>{M.ok=false;if(S.tab==="marketing")garantir()});ch.subscribe()}});
 })();

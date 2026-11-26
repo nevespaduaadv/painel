@@ -75,11 +75,12 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
     const r = {};
     for (const casca of ['v2', 'v3']) { const { ctx, pg, erros } = await contexto(b, { perfil, casca, w: 1440, h: 900, tema: 'light' }); r[casca] = await destinos(pg); r[casca].erros = erros; await ctx.close(); }
     // destinos que só existem na casca V3.1 (visão transversal; na V2 o mesmo conteúdo vive na ficha do cliente). Cada um exige o acesso da sua área.
-    const SO_V3 = { 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro' }; // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
+    const SO_V3 = { 'fin-visao': 'financeiro', 'fin-regua': 'financeiro', 'fin-retornos': 'financeiro', 'fin-recuperacao': 'financeiro', 'mkt-automacoes': 'marketing', 'mkt-producao': 'marketing', ferramentas: 'conhecimento' }; /* 26/11: Marketing vira grupo (Pauta, Automações, Produção) e Ferramentas vira um item só, que abre a página de botões */
+    const VIA_FERRAMENTAS = ['revisional', 'superendividamento', 'pecas', 'monitoramento', 'autenticador', 'conhecimento']; // na casca nova estas telas abrem pela página Ferramentas // Controle Financeiro (19/11): as quatro páginas entram na lateral da V3.1 para quem tem o Financeiro
     // destinos que saem da navegação da V3.1 por decisão das sócias (19/11, 12h): telas do Asaas e Contratos e faturamento (na V2 continuam)
     const SO_V2 = ['financeiro', 'faturamento'];
     const SO_V3_ADMIN = ['historico', 'regras', 'calibracao']; /* 25/11: Base de acordos, Regras e Calibração ficam com a gestão, no grupo Equipe e gestão (na casca antiga a base abre por Negociações) */ // versão do AI Studio (23/11): Regras de projeção e Calibração entram no grupo Jurídico da casca nova (na antiga ficam dentro de Base de acordos)
-    const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t) && !SO_V3_ADMIN.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t) && !SO_V2.includes(t)), retirados = SO_V2.filter(t => r.v3.tabs.includes(t));
+    const extras = r.v3.tabs.filter(t => !r.v2.tabs.includes(t) && !SO_V3_ADMIN.includes(t)), faltam = r.v2.tabs.filter(t => !r.v3.tabs.includes(t) && !SO_V2.includes(t) && !(VIA_FERRAMENTAS.includes(t) && r.v3.tabs.includes('ferramentas'))), retirados = SO_V2.filter(t => r.v3.tabs.includes(t));
     const extrasOk = extras.every(t => SO_V3[t] && r.v2.tabs.includes(SO_V3[t])) && Object.keys(SO_V3).every(t => !r.v2.tabs.includes(SO_V3[t]) || extras.includes(t));
     const a = JSON.stringify(r.v2.tabs), c = JSON.stringify(r.v3.tabs);
     if (!faltam.length && !retirados.length && extrasOk) ok(`${perfil}: destinos da V2 presentes na V3.1, exceto os retirados do Financeiro [${SO_V2.filter(t => r.v2.tabs.includes(t))}]` + (extras.length ? ` + só-V3.1 [${extras}] (exige acesso a ${extras.map(t => SO_V3[t]).join(', ')})` : ' (nenhum extra)')); else falha(`${perfil}: destinos diferem\n        V2: ${a}\n        V3: ${c}`);
@@ -183,7 +184,7 @@ function diffPng(a, b) { let d = 0; for (let i = 0; i < a.data.length; i += 4) i
   { const { ctx, pg } = await contexto(b, { perfil: 'juridico', casca: 'v3', w: 1440, h: 900, tema: 'light' });
     const r = await pg.evaluate(() => {
       const vis = (e) => { for (let x = e; x && x !== document; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden' || x.hidden) return false; } return e.getClientRects().length > 0; };
-      const todos = [...new Set([...NAV.flatMap(n => n.itens ? n.itens.map(i => i.tab) : [n.tab]), ...Object.values(PP_HUBS.HUBS).flatMap(h => h.tabs.map(([t]) => t))].filter(Boolean))];
+      const todos = [...new Set([...NAV.flatMap(n => n.itens ? n.itens.map(i => i.tab) : [n.tab]), ...Object.values(PP_HUBS.HUBS).flatMap(h => h.tabs.map(([t]) => t)), 'ferramentas', 'mkt-producao', 'mkt-automacoes'].filter(Boolean))];
       const permitidos = new Set(todos.filter(t => PP.temAcesso(t)));
       document.querySelectorAll('#np-tree .np-g').forEach(g => { if (g.dataset.aberto !== '1') g.querySelector('.np-gh').click(); });
       const naCasca = [...document.querySelectorAll('#np-side .tab[data-tab], #np-fly .tab[data-tab]')];
