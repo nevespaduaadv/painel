@@ -251,6 +251,32 @@ function abrirPainelHojeV3(i,li){
   const pe=[NPUI.btn("Abrir na agenda",{variante:"pri",onclick:()=>window.PP_AGENDA?.ir(new Date(e.inicio),"dia")}),e.origem==="tarefa"&&e.tarefa_id?NPUI.btn("Abrir a tarefa",{onclick:()=>window.PP_TAREFAS?.abrir(e.tarefa_id)}):null,e.lead_id?NPUI.btn("Abrir o lead",{onclick:()=>{location.hash="#leads/"+e.lead_id}}):null,e.link&&e.origem==="google"?el("a",{class:"np-btn",href:e.link,target:"_blank",rel:"noopener"},"Abrir no Google"):null];
   H3.painel.abrir({id:H3.aberta,trilha:[el("span",{},"Hoje"),el("span",{},"Compromisso")],titulo:e.titulo,corpo:[props,desc],pe,origem:li?.querySelector(".np-it-abrir")||li});
 }
+/* 25/11 (sócia): a tela Hoje ganha uma coluna de widgets — calendário do mês, lembretes pessoais e atalhos escolhidos por cada pessoa.
+   Lembretes e atalhos ficam guardados no navegador de quem usa (NPUI.pref), por perfil; nada vai para o banco. */
+const ATALHOS_HOJE=[["tarefas","Tarefas e prazos"],["agenda","Agenda"],["avisos","Avisos"],["clientes","Clientes"],["processos","Processos e pastas"],["publicacoes","Publicações"],["negociacoes","Negociações"],["fin-visao","Financeiro"],["superendividamento","Superendividamento"],["revisional","Revisional de contratos"],["conhecimento","Base de conhecimento"],["visao","Visão geral"],["perfil","Meu perfil"]];
+function lateralHojeV3(porDia,hoje){
+  const f=D.foco;const uid=PP.perfil?.id||"eu";const lado=el("aside",{class:"np-hoje-lado","aria-label":"Widgets"});
+  const wid=(titulo,extra,...kids)=>el("section",{class:"np-wid"},el("div",{class:"np-wid-h"},el("h2",{},titulo),extra||null),...kids);
+  // --- calendário do mês em foco (os mesmos itens da lista: prazos e compromissos)
+  const ref=parseD(f.dia);const y=ref.getFullYear(),m=ref.getMonth();const prim=new Date(y,m,1);const ini=addDia(prim,-((prim.getDay()+6)%7));
+  const irMes=n=>{const d=new Date(y,m+n,1);f.dia=isoD(d);if(f.modo!=="mes")f.modo="dia";render()};
+  const navCal=el("span",{class:"np-wid-nav"},NPUI.ib("chevE","Mês anterior",()=>irMes(-1)),NPUI.ib("chevD","Próximo mês",()=>irMes(1)));
+  const grade=el("div",{class:"np-cal",role:"grid","aria-label":"Calendário de "+prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})},...["S","T","Q","Q","S","S","D"].map(x=>el("span",{class:"np-cal-ds","aria-hidden":"true"},x)));
+  for(let i=0;i<42;i++){const d=addDia(ini,i);const k=isoD(d);if(i>=35&&d.getMonth()!==m)break;const l=porDia[k]||[];const fora=d.getMonth()!==m;
+    const tom=l.some(x=>x.fatal)?" fatal":l.some(x=>x.atrasada)?" late":l.length?" tem":"";
+    grade.append(el("button",{type:"button",class:"np-cal-d"+(fora?" fora":"")+(k===hoje?" hoje":"")+(k===f.dia&&f.modo==="dia"?" sel":"")+tom,title:d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})+(l.length?` · ${l.length} ${l.length===1?"item":"itens"}`:""),"aria-label":d.toLocaleDateString("pt-BR",{day:"numeric",month:"long"})+(l.length?`, ${l.length} ${l.length===1?"item":"itens"}`:""),onclick:()=>{f.modo="dia";f.dia=k;render()}},String(d.getDate())))}
+  lado.append(wid(prim.toLocaleDateString("pt-BR",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase()),navCal,grade,el("p",{class:"np-wid-nota"},"Clique num dia para ver o que há nele.")));
+  // --- lembretes pessoais
+  const chL="np-hoje-lembretes-"+uid;const ta=el("textarea",{class:"np-wid-ta",rows:"5",placeholder:"Anote aqui o que não pode esquecer…","aria-label":"Lembretes pessoais"},NPUI.pref.get(chL,"")||"");let tl=null;const est=el("span",{class:"np-wid-est","aria-live":"polite"});
+  ta.oninput=()=>{clearTimeout(tl);tl=setTimeout(()=>{NPUI.pref.set(chL,ta.value);est.textContent="salvo";setTimeout(()=>{est.textContent=""},1500)},500)};
+  lado.append(wid("Lembretes",est,ta,el("p",{class:"np-wid-nota"},"Só você vê. Ficam guardados neste navegador.")));
+  // --- atalhos escolhidos pela pessoa
+  const chA="np-hoje-atalhos-"+uid;const poss=ATALHOS_HOJE.filter(([t])=>{try{return t==="perfil"||(document.getElementById("view-"+t)&&(!PP.temAcesso||PP.temAcesso(t)))}catch(_){return false}});
+  let esc;try{esc=JSON.parse(NPUI.pref.get(chA,"null"))}catch(_){esc=null}if(!Array.isArray(esc))esc=["tarefas","agenda","clientes","processos"];
+  const ativos=poss.filter(([t])=>esc.includes(t));
+  const btnP=NPUI.btn("Personalizar",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,poss.map(([t,l])=>({label:(esc.includes(t)?"✓ ":"")+l,onclick:()=>{const n=esc.includes(t)?esc.filter(x=>x!==t):[...esc,t];NPUI.pref.set(chA,JSON.stringify(n));render()}})),{label:"Escolher atalhos",alinhar:"dir"})});btnP.setAttribute("aria-haspopup","menu");btnP.setAttribute("aria-expanded","false");
+  lado.append(wid("Atalhos",btnP,ativos.length?el("div",{class:"np-wid-at"},...ativos.map(([t,l])=>el("button",{type:"button",class:"np-btn",onclick:()=>irPara(t)},l))):el("p",{class:"np-wid-nota"},"Nenhum atalho escolhido. Use Personalizar.")));
+  return lado}
 function grupoHojeV3(id,titulo,lista,{tom,aberto=true,vazio,comDia=true,acao}={}){
   if(!lista.length&&!vazio)return null;
   // vazio no padrão do DS: o que aconteceu + a próxima ação, na própria linha
@@ -280,7 +306,7 @@ function renderPainelV3(){
   // continuam em Tarefas e prazos; publicações a analisar só entram quando a classificação ADVBox (0116) estiver em uso, para não somar o acervo antigo.
   const nFatHoje=prazos.filter(z=>z.prazo_fatal&&z.faixa==="hoje").length,paraHoje=Math.max(0,venHoje-nFatHoje),nAv=window.PP_AVISOS?.naoLidos?.()||0;
   const itensRes=[{n:nFatHoje,label:nFatHoje===1?"prazo fatal hoje":"prazos fatais hoje",tom:"crit"},{n:atrasadas.length,label:atrasadas.length===1?"atrasada":"atrasadas",tom:atrasadas.length?"late":"zero"},{n:paraHoje,label:paraHoje===1?"tarefa para hoje":"tarefas para hoje",tom:""},{n:evHoje,label:evHoje===1?"compromisso hoje":"compromissos hoje",tom:""},{n:nAv,label:nAv===1?"aviso não lido":"avisos não lidos",tom:""}].filter(i=>i.n>0);
-  const resumo=itensRes.length?NPUI.resumo(itensRes):el("div",{class:"np-resumo np-resumo-calmo",role:"status","aria-live":"polite"},D.escopo==="equipe"?"Nada pendente na equipe":"Nada pendente para você");
+  const resumo=itensRes.length?NPUI.resumo(itensRes,{quadros:true}):el("div",{class:"np-resumo np-resumo-calmo",role:"status","aria-live":"polite"},D.escopo==="equipe"?"Nada pendente na equipe":"Nada pendente para você");
   // quem vê a equipe e está em "Minhas": o que a equipe tem de crítico aparece numa linha, com o caminho para ver
   const podeEquipe=!!(esc.tudo||esc.nucleos);const daEquipe=z=>esc.tudo||(esc.nucleos||[]).includes(z.nucleo)||(meu&&z.responsavel_id===meu.id);
   const eqP=podeEquipe&&D.escopo==="minhas"?D.prazos.filter(daEquipe):[];// só o que está POR VIR (hoje e 7 dias): prazo vencido da equipe não entra nesta linha — ele aparece, com contexto, em "Equipe" e em Tarefas.
@@ -295,7 +321,7 @@ function renderPainelV3(){
   const navSempre=f.modo==="dia"&&f.dia===hoje?el("span",{class:"np-nav-per",role:"group","aria-label":"Navegar no período"},NPUI.ib("chevE","Dia anterior",()=>mover(-1)),NPUI.ib("chevD","Próximo dia",()=>mover(1))):nav;
   const direita=[seg,navSempre,NPUI.ib("sino","Receber resumo agora (Discord/WhatsApp, o mesmo das 8h)",enviarResumo),readOnly()?null:NPUI.btn("Nova tarefa",{variante:"pri",icone:"mais",onclick:()=>window.PP_TAREFAS?.nova?.()})];
   v.append(NPUI.toolbar({resumo,filtros:chips.length?chips:null,direita}));NPUI.reancorarPop();
-  const obra=el("div",{class:"np-obra"});H3.obra=obra;const corpo=el("div",{class:"np-corpo"});
+  const obra=el("div",{class:"np-obra np-hoje-obra"});H3.obra=obra;const corpo=el("div",{class:"np-corpo"});
   // saudação + data (serifa) — substitui o cabeçalho da V2
   const nomeEq=esc.tudo?"equipe":"Jurídico";
   const linhaEq=eqFat>0||eqHoje>0?el("p",{class:"np-hoje-eq"},esc.tudo?"Na equipe: ":"No Jurídico: ",[eqHoje>0?[el("b",{},String(eqHoje)),eqHoje===1?" prazo vence hoje":" prazos vencem hoje"]:null,eqFat>0&&eqHoje>0?" · ":null,eqFat>0?[el("b",{},String(eqFat)),eqFat===1?" fatal nos próximos 7 dias":" fatais nos próximos 7 dias"]:null].flat().filter(Boolean)," ",el("button",{type:"button",class:"lnk",onclick:irEquipe},esc.tudo?"Ver a equipe":"Ver o Jurídico")):null;
@@ -350,7 +376,7 @@ function renderPainelV3(){
   const gAtv=NPUI.grupo({id:"atividade",titulo:"Atividade recente"+(escAtv.tudo?"":escAtv.nucleos?" · suas e do jurídico":" · só as suas"),n:eventosVis.length,aberto:NPUI.pref.get("np-hoje-g-atividade","0")==="1",onToggle:ab=>NPUI.pref.set("np-hoje-g-atividade",ab?"1":"0"),itens:itensAtv.length?itensAtv:[el("li",{class:"np-it np-it-vazia"},el("span",{class:"np-it-chk np-it-chk-vazio","aria-hidden":"true"}),el("span",{class:"np-it-prazo"}),el("span",{class:"np-it-abrir np-sem"},"Sem movimentação ainda."))]});
   if(atvHead)gAtv.querySelector(".np-grp-c>ul").prepend(el("li",{class:"np-atv-fl"},atvHead));corpo.append(gAtv);
   const tot=Object.values(porDia).flat().length;corpo.append(NPUI.rodape(`${prazos.length} prazo${prazos.length===1?"":"s"} · ${tot} ${tot===1?"item":"itens"} no período carregado`,[["crit","fatal"],["late","atrasado"],["hoje","hoje"]]));
-  obra.append(corpo);v.append(obra);
+  obra.append(corpo,lateralHojeV3(porDia,hoje));v.append(obra);
   H3.painel=NPUI.painel({obra,label:"Compromisso",onClose:()=>{H3.aberta=null}});
   if(H3.aberta){const [,id]=H3.aberta.split(":");const e=D.cal.agenda.find(x=>x.id===id);if(e){const i={k:"evento",e,atrasada:false};abrirPainelHojeV3(i,null)}else H3.aberta=null}
 }
