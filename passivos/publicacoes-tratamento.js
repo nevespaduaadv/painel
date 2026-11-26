@@ -11,7 +11,7 @@
   "use strict";
   const T = { aba: "lista", rel: [], relOk: false, hist: {}, pubProc: {}, soPendentes: false, colab: [] };
   const PROV = { gerou_prazo: ["Gerou prazo", "e1"], nada_a_fazer: ["Nada a fazer", "g"], duplicidade: ["Duplicidade", "g"], encaminhada: ["Encaminhada", "e2"], ciencia: ["Ciência", "g"] };
-  const ACAO = { captada: "Captada no DJEN", lida: "Lida", ignorada: "Ignorada", vinculada: "Vinculada a processo", desvinculada: "Desvinculada", tratada: "Tratada", tarefa_criada: "Tarefa criada", reaberta: "Reaberta" };
+  const ACAO = { captada: "Recebida", lida: "Lida", ignorada: "Ignorada", vinculada: "Vinculada a processo", desvinculada: "Desvinculada", tratada: "Tratada", tarefa_criada: "Tarefa criada", reaberta: "Reaberta" };
   const fmtDH = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
   const fmtDt = (iso) => iso ? new Date(iso.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR") : "—";
   const recarregar = () => { window.PP_PUBLICACOES?.recarregar?.(); T.relOk = false; T.pubProc = {}; };
@@ -125,14 +125,14 @@
       if (E.prov === "gerou_prazo" && !prazo.value && !E.dataManual) recalc(); atualizarBotao(); }
     const usarSugestao = (z) => { E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = String(z.rotulo || "Cumprir prazo").trim();
       if (!wfSel.value) { titulo.value = rot + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "0"; }
-      ajustar(); resE.replaceChildren("data sugerida pelo Sync (" + rot + ") — confira nos autos · ", lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
+      ajustar(); resE.replaceChildren("data sugerida (" + rot + ") — confira nos autos · ", lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
     (async () => { try {
       const [f, z] = await Promise.all([SB.from("publicacao_fontes").select("publicacao_id,fonte,resumo:bruto->>resumo,tipo_ato:bruto->>tipo_ato").eq("publicacao_id", p.id).eq("fonte", "sync"),
         SB.from("publicacao_prazos").select("id,publicacao_id,origem,rotulo,data_sugerida,estado,data_conferida,tarefa_id").eq("publicacao_id", p.id).order("data_sugerida")]);
       const fonte = (f.data || []).filter((x) => String(x.publicacao_id) === String(p.id) && x.fonte === "sync" && String(x.resumo || "").trim()).sort((a, b) => String(b.resumo).length - String(a.resumo).length)[0];
-      if (fonte) { caixaSync.replaceChildren(el("div", { class: "r" }, "Resumo do Sync", fonte.tipo_ato ? el("span", {}, " · " + fonte.tipo_ato) : null), el("p", {}, String(fonte.resumo).trim()), el("small", {}, "Leitura automática da plataforma. Vale o teor abaixo.")); caixaSync.hidden = false; }
+      if (fonte) { caixaSync.replaceChildren(el("div", { class: "r" }, "Resumo", fonte.tipo_ato ? el("span", {}, " · " + fonte.tipo_ato) : null), el("p", {}, String(fonte.resumo).trim()), el("small", {}, "Resumo automático. Vale o teor abaixo.")); caixaSync.hidden = false; }
       const pz = (z.data || []).filter((x) => String(x.publicacao_id) === String(p.id) && x.estado !== "descartado" && x.data_sugerida);
-      if (pz.length) { sugBox.replaceChildren(el("div", { class: "r" }, pz.length === 1 ? "Prazo sugerido pelo Sync" : "Prazos sugeridos pelo Sync"),
+      if (pz.length) { sugBox.replaceChildren(el("div", { class: "r" }, pz.length === 1 ? "Prazo sugerido" : "Prazos sugeridos"),
           el("ul", {}, ...pz.map((x) => { const conf = x.estado !== "sugerido"; return el("li", {}, el("span", { class: "n" }, x.rotulo || "Prazo"), el("span", { class: "d" }, fmtD2(conf && x.data_conferida ? x.data_conferida : x.data_sugerida)),
             conf ? el("span", { class: "np-tp-nota" }, x.tarefa_id ? "já conferido, com tarefa" : "já conferido") : el("button", { type: "button", class: "btn sm", "data-z": String(x.id), "aria-pressed": "false", title: "Preenche a data e o título da tarefa com esta sugestão. Você confere e pode alterar.", onclick: () => usarSugestao(x) }, "Usar")); })),
           el("small", {}, "Sugestão automática, não é prazo do escritório. “Usar” só preenche; confira o ato, a regra e o calendário do juízo.")); sugBox.hidden = false; }

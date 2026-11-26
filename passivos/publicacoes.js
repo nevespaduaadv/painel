@@ -42,7 +42,7 @@ const recarregar=()=>{U.ok=false;U.erro=null;garantir()};
 function renderPublicacoes(){
   const v=$("#view-publicacoes");v.replaceChildren();
   v.classList.toggle("np-v3",pubV3());if(pubV3())return renderPubV3(v);
-  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Publicações"),el("div",{class:"sub"},"Intimações e comunicações do DJEN em nome da OAB do escritório. Chegam sozinhas 3× ao dia (dias úteis); quando o processo já está cadastrado, viram andamento e tarefa “Analisar publicação”.")),
+  v.append(el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Jurídico"),el("h1",{},"Publicações"),el("div",{class:"sub"},"Intimações e comunicações em nome da OAB do escritório. Chegam sozinhas 3× ao dia (dias úteis); quando o processo já está cadastrado, viram andamento e tarefa “Analisar publicação”.")),
     el("div",{class:"actions"},btnExportar("publicacoes",()=>U.lista||[],COLS_PUB),el("button",{class:"btn sm",onclick:buscarPeriodo},"Buscar período…"),el("button",{class:"btn sm primary",onclick:atualizar},"Atualizar agora"))));
   if(!garantir()){v.append(el("div",{class:"note"},"Carregando…"));return}
   const r=U.resumo||{};
@@ -121,11 +121,11 @@ function vincular(p){
     toast("Publicação vinculada");recarregar();
   });
 }
-async function atualizar(){toast("Verificando respostas do DJEN…");const {data,error}=await SB.rpc("djen_atualizar");if(error){toast("Falha: "+(error.message||""));return}toast(data?`${data} publicação(ões) gravadas`:"Nada novo por enquanto — a busca é assíncrona; tente de novo em 1 minuto");recarregar()}
+async function atualizar(){toast("Verificando novas publicações…");const {data,error}=await SB.rpc("djen_atualizar");if(error){toast("Falha: "+(error.message||""));return}toast(data?`${data} publicação(ões) gravadas`:"Nada novo por enquanto — a busca é assíncrona; tente de novo em 1 minuto");recarregar()}
 function buscarPeriodo(){
   const ini=inp("date",hojeISO(-30)),fim=inp("date",hojeISO());
-  const body=el("div",{class:"form"},el("div",{class:"f full note"},"Pede ao DJEN todas as publicações da OAB no período (máx. 400 dias por pedido). As páginas chegam aos poucos; clique em “Atualizar agora” ou aguarde o processamento automático (a cada 10 min)."),field("bp-ini","De",ini),field("bp-fim","Até",fim));
-  modal("Buscar período no DJEN",body,async()=>{const {error}=await SB.rpc("djen_buscar_periodo",{inicio:ini.value,fim:fim.value});if(error)throw new Error(error.message||"Falha ao solicitar");toast("Pedido enviado ao DJEN")});
+  const body=el("div",{class:"form"},el("div",{class:"f full note"},"Busca todas as publicações da OAB no período (máx. 400 dias por pedido). As páginas chegam aos poucos; clique em “Atualizar agora” ou aguarde o processamento automático (a cada 10 min)."),field("bp-ini","De",ini),field("bp-fim","Até",fim));
+  modal("Buscar período",body,async()=>{const {error}=await SB.rpc("djen_buscar_periodo",{inicio:ini.value,fim:fim.value});if(error)throw new Error(error.message||"Falha ao solicitar");toast("Pedido enviado")});
 }
 
 /* ---------- V9 · Publicações em V3.1 (lista por situação + painel) com as marcas da integração AtendeDireito Sync ----------
@@ -163,10 +163,10 @@ function abrirPubOuTratar(p,origem){
 function linhaPub(p){
   const st=sitP(p),d=p.dias_para_tratar,m=[];
   if(p.sem_vinculo&&!p.ignorada)m.push(NPUI.marca("sem processo","att"));
-  const nz=aConferir(p);if(nz){const k=NPUI.marca(nz===1?"prazo a conferir":nz+" prazos a conferir","att");k.title="Prazo sugerido pela plataforma. Só vale depois da conferência do Jurídico.";m.push(k)}
+  const nz=aConferir(p);if(nz){const k=NPUI.marca(nz===1?"prazo a conferir":nz+" prazos a conferir","att");k.title="Prazo sugerido automaticamente. Só vale depois da conferência do Jurídico.";m.push(k)}
   if(emRevisao(p)){const k=NPUI.marca("prazo em revisão","att");k.title="Conferido, aguardando a revisão de quem responde pelo Jurídico";m.push(k)}
   if(divergDe(p).length){const k=NPUI.marca("fontes divergentes","att");k.title="As fontes trazem informações diferentes. Abra para conciliar.";m.push(k)}
-  if(fontesDe(p).has("sync")){const k=NPUI.marca(origemTxt(p),"info");k.classList.add("np-so-largo");k.title="Origem do registro";m.push(k)}
+  /* 26/11: a marca de origem (DJEN, Sync) saiu da lista — quem trata não precisa saber de onde veio; a origem segue em “Ver integrações” e no histórico */
   if(p.providencia){m.push(NPUI.marca(PROVL[p.providencia]||p.providencia,p.providencia==="gerou_prazo"?"ok":""));if(p.tempestiva===false){const k=NPUI.marca("fora do prazo","crit");k.classList.add("np-so-largo");m.push(k)}}
   const rel=st==="vencida"?`análise vencida há ${-d} d`:st==="pendente"?(d===0?"analisar hoje":p.prazo_tratamento?"analisar até "+dBR(p.prazo_tratamento).slice(0,5):""):"";
   const ctx=[p.cliente_nome||(p.cliente_sugerido_nome?"parece ser de "+p.cliente_sugerido_nome:null),p.tipo_documento||p.tipo_comunicacao,[p.tribunal,p.orgao].filter(Boolean).join(" ")||null,(p.resumo||"").slice(0,140)||null].filter(Boolean).join(" · ");
@@ -216,7 +216,7 @@ function filtrosPub(){
   C({label:"Sem processo",n:n(p=>p.sem_vinculo),on:f.semProc,grupo:"attr",title:"Publicações de processos que não estão cadastrados",onclick:()=>{f.semProc=!f.semProc;render()}});
   C({label:"Não lidas",n:n(p=>!p.lida),on:f.naoLidas,grupo:"attr",onclick:()=>{f.naoLidas=!f.naoLidas;render()}});
   if(U.sync.instalada){
-    C({label:"Prazo a conferir",n:n(p=>aConferir(p)>0),on:f.prazo,grupo:"attr",title:"Prazo sugerido pela plataforma, aguardando a conferência do Jurídico",onclick:()=>{f.prazo=!f.prazo;render()}});
+    C({label:"Prazo a conferir",n:n(p=>aConferir(p)>0),on:f.prazo,grupo:"attr",title:"Prazo sugerido automaticamente, aguardando a conferência do Jurídico",onclick:()=>{f.prazo=!f.prazo;render()}});
     C({label:"Fontes divergentes",n:n(p=>divergDe(p).length>0),on:f.diverg,grupo:"attr",title:"As fontes trazem informações diferentes",onclick:()=>{f.diverg=!f.diverg;render()}});
   }
   const extras=[U.q.trim(),U.fCli,f.origem,U.periodo!=="7"?"p":""].filter(Boolean).length;
@@ -226,7 +226,7 @@ function filtrosPub(){
     const fc=sel({"":"Todos os clientes",...Object.fromEntries([...new Set(U.lista.map(p=>p.cliente_id).filter(Boolean))].map(id=>[id,nomeCli(id)]).sort((a,b)=>a[1].localeCompare(b[1])))},U.fCli);fc.onchange=()=>{U.fCli=fc.value;render()};
     const fo=sel({"":"Todas as origens",djen:"DJEN",sync:"AtendeDireito Sync"},f.origem);fo.onchange=()=>{f.origem=fo.value;render()};
     const L=(l,c)=>el("div",{},el("label",{},l),c);
-    return [el("div",{class:"np-pop-form"},L("Buscar",q),L("Período",per),L("Cliente",fc),U.sync.instalada?L("Origem",fo):null,
+    return [el("div",{class:"np-pop-form"},L("Buscar",q),L("Período",per),L("Cliente",fc),
       el("div",{style:"display:flex;justify-content:space-between;gap:8px"},NPUI.btn("Limpar",{variante:"ghost",onclick:()=>{limparPub();NPUI.fecharPop();render()}}),NPUI.btn("Fechar",{onclick:()=>NPUI.fecharPop()})))]},{role:"dialog",label:"Mais filtros",alinhar:"dir",refoco:()=>$('#view-publicacoes .np-chipf[aria-haspopup="dialog"]')})});
   mais.setAttribute("aria-haspopup","dialog");mais.setAttribute("aria-expanded","false");
   return {chips,fixos:[mais]};
@@ -237,16 +237,16 @@ function renderPubV3(v){
   const vivos=U.lista.filter(p=>!p.ignorada),nP=vivos.filter(p=>!p.providencia).length,nV=vivos.filter(p=>sitP(p)==="vencida").length,nS=vivos.filter(p=>p.sem_vinculo).length,nZ=vivos.filter(p=>aConferir(p)>0).length,nR=vivos.filter(p=>emRevisao(p)>0).length;
   const resumo=NPUI.resumo([{n:nP,label:"a analisar",tom:nP?"":"zero"},{n:nV,label:"fora do prazo de análise",tom:nV?"crit":"zero"},{n:nS,label:"sem processo",tom:nS?"att":"zero"},U.sync.instalada?{n:nZ,label:nZ===1?"prazo a conferir":"prazos a conferir",tom:nZ?"att":"zero"}:null,U.sync.instalada&&nR?{n:nR,label:nR===1?"prazo em revisão":"prazos em revisão",tom:"att"}:null],{quadros:true});
   const lista=filtrarPub();
-  const itensAc=[{label:"Buscar período no DJEN…",onclick:buscarPeriodo},{label:U.verFontes?"Ocultar integrações (DJEN e Sync)":"Ver integrações (DJEN e Sync)",onclick:()=>{U.verFontes=!U.verFontes;render()}},{label:"Exportar CSV (lista filtrada)",onclick:()=>{if(!lista.length){toast("Nada para exportar");return}exportarCSV("publicacoes",lista,COLS_PUB);toast(`${lista.length} linha(s) exportada(s)`)}},
+  const itensAc=[{label:"Buscar período…",onclick:buscarPeriodo},{label:U.verFontes?"Ocultar integrações":"Ver integrações",onclick:()=>{U.verFontes=!U.verFontes;render()}},{label:"Exportar CSV (lista filtrada)",onclick:()=>{if(!lista.length){toast("Nada para exportar");return}exportarCSV("publicacoes",lista,COLS_PUB);toast(`${lista.length} linha(s) exportada(s)`)}},
     PP.perfil?.papel==="admin"&&TR().limparAntigas?{label:"Dar ciência em lote…",onclick:()=>TR().limparAntigas()}:null].filter(Boolean);
   const maisAc=NPUI.ib("pontos","Mais ações",()=>NPUI.pop(maisAc,itensAc,{label:"Mais ações",alinhar:"dir",refoco:()=>$('#view-publicacoes .np-ib[aria-label="Mais ações"]')}));maisAc.setAttribute("aria-haspopup","menu");maisAc.setAttribute("aria-expanded","false");
   const seg=NPUI.seg([["lista","Publicações"],["rel","Tempestividade"]],U.aba,k=>{U.aba=k;V3.aberta=null;render()},"Vista");
   const fl=U.aba==="lista"?filtrosPub():{chips:[],fixos:[]};
-  v.append(NPUI.toolbar({resumo,filtros:U.aba==="lista"?fl.chips:null,filtrosFixos:U.aba==="lista"?fl.fixos:null,direita:[seg,maisAc,NPUI.btn("Atualizar agora",{variante:"pri",title:"Confere agora as respostas do DJEN",onclick:atualizar})]}),(U.verFontes||fontesComProblema())?fontesPub():null);
+  v.append(NPUI.toolbar({resumo,filtros:U.aba==="lista"?fl.chips:null,filtrosFixos:U.aba==="lista"?fl.fixos:null,direita:[seg,maisAc,NPUI.btn("Atualizar agora",{variante:"pri",title:"Confere agora se chegaram publicações novas",onclick:atualizar})]}),(U.verFontes||fontesComProblema())?fontesPub():null);
   NPUI.reancorarPop();V3.manterPop=false;
   if(U.aba==="rel"){const w=el("div",{class:"np-pf-legado np-pub-rel"});v.append(w);TR().renderRelatorio?TR().renderRelatorio(w):w.append(el("p",{class:"np-nota"},"Relatório indisponível."));return}
   const obra=el("div",{class:"np-obra"}),corpo=el("div",{class:"np-corpo"});
-  if(!lista.length)corpo.append(NPUI.vazio(!U.lista.length?{titulo:"Nenhuma publicação no período",texto:"As publicações chegam sozinhas três vezes por dia. Para trazer um período anterior, peça ao DJEN.",acao:"Buscar período",onAcao:buscarPeriodo}
+  if(!lista.length)corpo.append(NPUI.vazio(!U.lista.length?{titulo:"Nenhuma publicação no período",texto:"As publicações chegam sozinhas três vezes por dia. Para trazer um período anterior, use “Buscar período”.",acao:"Buscar período",onAcao:buscarPeriodo}
     :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver as demais publicações.",acao:"Limpar filtros",onAcao:()=>{limparPub();render()}}));
   else{
     let ab={};try{ab=JSON.parse(NPUI.pref.get("np-pub-grupos")||"{}")||{}}catch(e){}
@@ -267,7 +267,7 @@ function conferirPrazo(p,z,dec){
   const data=inp("date",dec==="corrigir"?(z.data_sugerida||""):(z.data_sugerida||"")),fatal=el("input",{type:"checkbox"}),obs=el("textarea",{rows:"3",placeholder:dec==="confirmar"?"Observação (opcional)":"Motivo (obrigatório)"});
   if(dec!=="corrigir")data.disabled=true;
   const T={confirmar:"Confirmar o prazo sugerido",corrigir:"Corrigir o prazo",descartar:"Descartar a sugestão",reabrir:"Reabrir a conferência"}[dec];
-  const body=el("div",{class:"form"},el("div",{class:"f full note"},(z.rotulo||"Prazo")+" · sugerido pela plataforma: "+dBR(z.data_sugerida)+". A sugestão é automática. Confira nos autos o tipo de ato, a regra processual aplicável e o calendário do juízo antes de registrar. Prazo fatal, data posterior à sugerida e descarte passam por revisão de quem responde pelo Jurídico."),
+  const body=el("div",{class:"form"},el("div",{class:"f full note"},(z.rotulo||"Prazo")+" · sugerido automaticamente: "+dBR(z.data_sugerida)+". A sugestão é automática. Confira nos autos o tipo de ato, a regra processual aplicável e o calendário do juízo antes de registrar. Prazo fatal, data posterior à sugerida e descarte passam por revisão de quem responde pelo Jurídico."),
     dec==="confirmar"||dec==="corrigir"?el("div",{class:"f"},el("label",{},"Data do prazo"),data):null,
     dec==="confirmar"||dec==="corrigir"?el("div",{class:"f"},el("label",{style:"display:flex;gap:8px;align-items:center"},fatal,"Prazo fatal")):null,
     el("div",{class:"f full"},el("label",{},dec==="confirmar"?"Observação":"Motivo"),obs));
@@ -299,7 +299,7 @@ function abrirPainelPub(p,{origem}={}){
     ["Cliente",p.cliente_nome||(p.cliente_sugerido_nome?"parece ser de "+p.cliente_sugerido_nome:null)],
     ["Tribunal / órgão",[p.tribunal,p.orgao].filter(Boolean).join(" · ")||null],["Tipo",[p.tipo_comunicacao,p.tipo_documento,p.classe].filter(Boolean).join(" · ")||null],
     ["Partes",(p.destinatarios||[]).map(d=>d.nome+(d.polo?` (${d.polo})`:"")).filter(Boolean).join("; ")||null],
-    ["Origem",[origemTxt(p),p.link?[" · ",el("a",{href:p.link,target:"_blank",rel:"noopener"},"abrir no tribunal")]:null]],
+    ["Link",p.link?el("a",{href:p.link,target:"_blank",rel:"noopener"},"abrir no tribunal"):null],
     p.tarefa_id?["Tarefa",el("button",{type:"button",class:"np-link",onclick:()=>window.PP_TAREFAS?.abrir(p.tarefa_id)},(p.tarefa_status==="concluida"?"concluída":"aberta")+(p.tarefa_prazo?" · prazo "+dBR(p.tarefa_prazo):""))]:null,
     +(p.tarefas_atribuidas_abertas||0)?["Atribuída a",NPUI.quem(p.atribuidas_para)]:null,
   ].filter(x=>x&&x[1]!=null));
@@ -308,10 +308,10 @@ function abrirPainelPub(p,{origem}={}){
   /* quem confere: só quem tem atribuição sobre esta publicação (0114b). O banco confere de novo. Sem a 0114b, vale o acesso ao Jurídico. */
   const yc=U.sync;yc.podeConf=yc.podeConf||new Map();let podeConf=yc.podeConf.get(p.id);
   if(pzs.length&&jur&&podeConf===undefined){yc.podeConf.set(p.id,null);SB.rpc("pode_conferir_prazo",{p_publicacao:p.id}).then(({data,error})=>{yc.podeConf.set(p.id,error?true:data===true);if(V3.aberta===p.id)abrirPainelPub(p)},()=>{yc.podeConf.set(p.id,true);if(V3.aberta===p.id)abrirPainelPub(p)})}
-  const secPz=pzs.length?NPUI.secao("Prazos",el("p",{class:"np-nota"},"A data sugerida vem da plataforma e não é prazo do escritório. Vale a data conferida por alguém do Jurídico."),
+  const secPz=pzs.length?NPUI.secao("Prazos",el("p",{class:"np-nota"},"A data sugerida é automática e não é prazo do escritório. Vale a data conferida por alguém do Jurídico."),
     el("ul",{class:"np-pub-pz"},pzs.map(z=>{const conf=z.estado==="confirmado"||z.estado==="corrigido";
       return el("li",{class:"e-"+z.estado},el("div",{class:"t"},el("b",{},z.rotulo||"Prazo")," ",z.estado==="sugerido"?NPUI.marca("a conferir","att"):z.estado==="descartado"?NPUI.marca("descartado"):NPUI.marca(z.estado==="corrigido"?"corrigido":"confirmado","ok"),conf&&z.fatal?[" ",NPUI.marca("fatal","crit")]:null,z.revisao_pendente?[" ",NPUI.marca("aguardando revisão","att")]:null),
-        el("dl",{},el("dt",{},"Sugerido pela plataforma"),el("dd",{},dBR(z.data_sugerida)),conf?[el("dt",{},"Conferido"),el("dd",{class:"serif"},dBR(z.data_conferida))]:null,
+        el("dl",{},el("dt",{},"Sugerido"),el("dd",{},dBR(z.data_sugerida)),conf?[el("dt",{},"Conferido"),el("dd",{class:"serif"},dBR(z.data_conferida))]:null,
           z.conferido_em?[el("dt",{},z.estado==="descartado"?"Descartado por":"Conferido por"),el("dd",{},(z.conferido_por_nome||"—")+" em "+dhBR(z.conferido_em))]:null,
           conf?[el("dt",{},"Registrado"),el("dd",{},z.tarefa_id?el("button",{type:"button",class:"np-link",onclick:()=>window.PP_TAREFAS?.abrir(z.tarefa_id)},"na tarefa"):"sem tarefa")]:null,
           z.observacao?[el("dt",{},"Observação"),el("dd",{},z.observacao)]:null,
