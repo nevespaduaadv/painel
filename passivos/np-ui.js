@@ -319,6 +319,25 @@ const form = ({ titulo, contexto, campos = [], validarTudo, salvar, excluir, ori
    .modal > .card (primeiro .card do host) > h2 … corpo … .actions (extra, Cancelar, Salvar = primeiro button.btn.primary) — quem renomeia ou
    remove o Salvar, acrescenta classe ao .card ou esvazia #modalHost (exclusões) continua funcionando; o encerramento só remove o próprio diálogo,
    nunca um formulário aberto em seguida. */
+/* 26/11 · Janelas no visual do sistema: seletor curto (2 a 4 opções, sem “— escolha —”) vira botões lado a lado.
+   O <select> continua no lugar (só fica invisível), com o mesmo id e valor: o módulo lê e grava nele como sempre, e os
+   botões acompanham. Nada de regra muda — é a mesma escolha, visível de uma vez. */
+const segmentarSelects = (raiz) => {
+  const feitos = new Map();
+  const elegivel = (sl) => !sl.multiple && !sl.size && sl.options.length >= 2 && sl.options.length <= 4 && ![...sl.options].some((o) => o.value === "" || o.disabled || /^[—-]/.test(o.textContent.trim())) && [...sl.options].reduce((n, o) => n + o.textContent.trim().length, 0) <= (sl.options.length === 4 ? 20 : 30) && !sl.dataset.npSegNao && !sl.closest(".np-tp,table,.np-seg-nao,[data-sem-seg]") && !sl.hasAttribute("data-sem-seg");
+  const montar = (sl) => { const g = el("div", { class: "np-segs", role: "radiogroup", "aria-label": sl.getAttribute("aria-label") || (sl.id && raiz.querySelector(`label[for="${CSS.escape(sl.id)}"]`)?.textContent) || null });
+    const sinal = sl.options.length + "|" + [...sl.options].map((o) => o.value + "=" + o.textContent).join("|");
+    for (const o of sl.options) g.append(el("button", { type: "button", role: "radio", "data-v": o.value, "aria-checked": "false", tabindex: "-1", onclick: () => { if (sl.disabled) return; sl.value = o.value; sl.dispatchEvent(new Event("input", { bubbles: true })); sl.dispatchEvent(new Event("change", { bubbles: true })); pintar(sl, g); } }, o.textContent.trim()));
+    g.addEventListener("keydown", (e) => { const d = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0; if (!d) return; e.preventDefault(); const bs = [...g.children]; const i = bs.findIndex((b) => b.getAttribute("aria-checked") === "true"); const n = bs[(i + d + bs.length) % bs.length]; n.click(); n.focus(); });
+    sl.classList.add("np-seg-oculto"); sl.setAttribute("tabindex", "-1"); sl.after(g); feitos.set(sl, { g, sinal }); pintar(sl, g);
+    /* não coube (texto cortado)? volta a ser seletor comum */ requestAnimationFrame(() => { if (g.isConnected && g.offsetWidth && [...g.children].some((b) => b.scrollWidth > b.clientWidth + 1)) { g.remove(); sl.classList.remove("np-seg-oculto"); sl.removeAttribute("tabindex"); sl.dataset.npSegNao = "1"; feitos.delete(sl); } }); };
+  const pintar = (sl, g) => { for (const b of g.children) { const on = b.dataset.v === sl.value; b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; b.disabled = sl.disabled; } if (![...g.children].some((b) => b.tabIndex === 0) && g.firstElementChild) g.firstElementChild.tabIndex = 0; };
+  const varrer = () => { for (const sl of raiz.querySelectorAll("select")) { const f = feitos.get(sl); const sinal = sl.options.length + "|" + [...sl.options].map((o) => o.value + "=" + o.textContent).join("|");
+      if (f) { if (!f.g.isConnected || f.sinal !== sinal) { f.g.remove(); sl.classList.remove("np-seg-oculto"); sl.removeAttribute("tabindex"); feitos.delete(sl); if (elegivel(sl)) montar(sl); } else pintar(sl, f.g); }
+      else if (elegivel(sl)) montar(sl); } };
+  varrer(); const t = setInterval(varrer, 250); const ob = new MutationObserver(() => varrer()); ob.observe(raiz, { childList: true, subtree: true });
+  return () => { clearInterval(t); ob.disconnect(); };
+};
 const modalV3 = (title, body, onSave, extra, opts = {}) => {
   if (typeof needDb === "function" && !needDb()) return;
   const host = doc.querySelector("#modalHost"); if (!host) return; host.replaceChildren();
@@ -338,7 +357,8 @@ const modalV3 = (title, body, onSave, extra, opts = {}) => {
   const fundo = el("div", { class: "modal np-form-fundo" }, card);
   const marcar = (e) => { if (e.isTrusted && !enviando) sujo = true; }; corpo.addEventListener("input", marcar, true); corpo.addEventListener("change", marcar, true);
   const outroAberto = () => [...host.querySelectorAll('[role="dialog"]')].some((d) => d !== card);
-  const restaurar = () => { if (fechado) return; fechado = true; obs.disconnect(); doc.removeEventListener("keydown", teclas, true); if (fundo.isConnected) fundo.remove();
+  let pararSeg = null;
+  const restaurar = () => { if (fechado) return; fechado = true; obs.disconnect(); try { pararSeg?.(); } catch (_) {} doc.removeEventListener("keydown", teclas, true); if (fundo.isConnected) fundo.remove();
     if (outroAberto()) return; /* outro formulário abriu no lugar deste: ele cuida do inert e do foco */ app?.removeAttribute("inert");
     const alvo = (origemEl && origemEl.isConnected && typeof origemEl.focus === "function") ? origemEl : null; setTimeout(() => { try { alvo ? alvo.focus() : doc.body.focus(); } catch (_) {} }, 0); };
   const focaveis = () => [...(confirmando ? confirmBox : card).querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((e) => !e.disabled && !e.hidden && e.offsetParent !== null && !e.closest("[hidden],[inert]"));
@@ -382,6 +402,7 @@ const modalV3 = (title, body, onSave, extra, opts = {}) => {
     if (e.key === "Enter" && enviando) { e.preventDefault(); e.stopPropagation(); } };
   doc.addEventListener("keydown", teclas, true);
   host.append(fundo); app?.setAttribute("inert", "");
+  pararSeg = segmentarSelects(corpo);
   // quem esvazia #modalHost (exclusões da V2, outro formulário) encerra este diálogo: inert, ouvintes e foco são desfeitos
   const obs = new MutationObserver(() => { if (!fundo.isConnected && !fechado) restaurar(); }); obs.observe(host, { childList: true });
   setTimeout(() => { if (fechado) return; const primeiro = corpo.querySelector("input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled])"); (primeiro || btnX).focus(); }, 0);
