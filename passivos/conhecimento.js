@@ -3,6 +3,7 @@
 (()=>{
 "use strict";
 const K={lista:[],ok:false,carregando:false,sel:null,art:null,versoes:[],busca:"",resultados:null,resultadosDocs:null,editando:false,tema:"",area:""};
+const TEMA_REUNIOES="Pautas e transcrições de reuniões";
 const AREAS={juridico:"Jurídico",comercial:"Comercial",financeiro:"Financeiro",administrativo:"Administrativo",marketing:"Marketing",geral:"Geral"};
 const podeArea=a=>{const p=PP.perfil||{};if(p.papel==="admin")return true;const ac=p.acessos||[];if(a==="geral")return true;if(a==="administrativo")return ac.includes("financeiro")||ac.includes("equipe");return ac.includes(a)};
 const AREAS_MINHAS=()=>Object.fromEntries(Object.entries(AREAS).filter(([k])=>podeArea(k)));
@@ -127,6 +128,8 @@ function renderConhecimentoV3(v){
     direita:[
       buscaInp,
       NPUI.btn(nDocs?`Documentos base (${nDocs})`:"Documentos base",{onclick:()=>abrir("documentos")}),
+      // 26/11 (sócia): na base de Marketing, um espaço próprio para pautas e transcrições de reuniões
+      K.area==="marketing"?NPUI.btn("+ Pauta ou transcrição de reunião",{onclick:()=>novoArtigo({area:"marketing",tema:TEMA_REUNIOES,titulo:"Reunião de "+new Date().toLocaleDateString("pt-BR"),corpo_md:"# Reunião de "+new Date().toLocaleDateString("pt-BR")+"\n\n## Pauta\n\n- \n\n## Transcrição\n\nCole aqui a transcrição ou o link da gravação.\n\n## Encaminhamentos\n\n- "})}):null,
       NPUI.btn("+ Artigo",{variante:"pri",onclick:()=>novoArtigo()})
     ]
   }));
@@ -386,7 +389,7 @@ function renderEditor(main){
   main.append(el("div",{class:"form",style:"grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"},field("kb-tit","Título",tit),field("kb-area","Área",area),el("div",{class:"f"},el("label",{for:"kb-tema"},"Tema"),el("div",{},Object.assign(tema,{id:"kb-tema"}),dl)),field("kb-res","Resumo",res),field("kb-tags","Tags",tags),field("kb-pub","Situação",pub)));
   main.append(el("div",{style:"display:grid;grid-template-columns:1fr 1fr;gap:14px"},el("div",{},ta),prev));
 }
-function novoArtigo(){K.art={id:null,titulo:"",area:K.area||"juridico",tema:K.tema||"Operação jurídica",resumo:"",tags:[],publicado:true,corpo_md:"# Título\n\nTexto…"};K.sel="novo";K.editando=true;render()}
+function novoArtigo(pre={}){K.art={id:null,titulo:"",area:K.area||"juridico",tema:K.tema||"Operação jurídica",resumo:"",tags:[],publicado:true,corpo_md:"# Título\n\nTexto…",...pre};K.sel="novo";K.editando=true;render()}
 async function verVersao(x){
   const {data}=await SB.from("conteudos_versoes").select("*").eq("id",x.id).single();if(!data)return;
   const host=el("div",{class:"f full"});renderMd(data.corpo_md,host);

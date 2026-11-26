@@ -91,7 +91,14 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     const integ = await pg.evaluate(() => [...document.querySelectorAll('#np-pop .np-pub-integ-ac .np-btn')].map(x => x.textContent + ':' + x.disabled));
     if (JSON.stringify(integ) === JSON.stringify(['Testar conexão:true', 'Sincronizar agora:true', 'Ligar:true'])) ok('"Ver integração": Testar conexão, Sincronizar agora e Ligar aparecem DESATIVADOS'); else falha('integração: ' + JSON.stringify(integ));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-integracao.png') }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); await pg.evaluate(() => { if (document.querySelector('#np-pop.on')) window.NPUI?.fecharPop?.(); }); await pg.waitForTimeout(150); // no runner o Esc às vezes chega antes do foco voltar ao balão
-    await pg.click(`${V} li.np-it[data-id="101"] .np-it-abrir`); await pg.waitForTimeout(700); const p = await painel(pg);
+    { /* 26/11: clicar numa publicação pendente abre uma tela só, com o texto e as opções de tratamento */
+      const pend = await pg.evaluate(() => { const p = window.PP_PUBLICACOES.lista().find(x => !x.providencia && !x.ignorada && String(x.id) !== '101'); return p ? String(p.id) : null; /* a 101 é usada adiante como não lida (abrir o tratamento marca como lida) */ });
+      if (pend) { await pg.click(`${V} li.np-it[data-id="${pend}"] .np-it-abrir`); await pg.waitForTimeout(700);
+        const m = await pg.evaluate(() => { const c = document.querySelector('#modalHost .modal .card'); return c ? { titulo: c.querySelector('h2')?.textContent.trim(), prov: !!c.querySelector('#tr-prov'), texto: (c.textContent || '').length > 200, detalhes: [...c.querySelectorAll('button')].some(b => /Ver detalhes/.test(b.textContent)), painel: !![...document.querySelectorAll('.np-painel')].find(x => !x.hidden && x.getClientRects().length) } : null; });
+        if (m && /Tratar publicação/.test(m.titulo) && m.prov && m.texto && m.detalhes && !m.painel) ok('publicação pendente abre direto em “Tratar publicação” (texto + providência + Ver detalhes), sem pop-up intermediário'); else falha('tela única de tratamento: ' + JSON.stringify(m));
+        await pg.evaluate(() => document.querySelector('#modalHost')?.replaceChildren()); await pg.waitForTimeout(300); }
+      else falha('sem publicação pendente no cenário para testar a tela única'); }
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("101")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700); const p = await painel(pg);
     if (p && p.titulo === '1000001-11.2026.8.26.0196' && /recebida/.test(p.props['Situação']) && p.props['Origem'].startsWith('DJEN') && /abrir no tribunal/.test(p.props['Origem']) && /Texto fictício da intimação 101/.test(p.texto) && !/sem processo/.test(p.props['Processo']) && !p.secoes.includes('Prazos')) ok(`painel 101: situação "${p.props['Situação']}", origem "${p.props['Origem']}", texto integral, sem seção de prazos`); else falha('painel 101: ' + JSON.stringify(p));
     if (p && ['Tratar', 'Atribuir tarefa', 'Marcar como lida'].every(x => p.todosBotoes.includes(x))) ok('ações do painel = as da tela atual: Tratar, Atribuir tarefa, Marcar como lida'); else falha('botões: ' + JSON.stringify(p && p.todosBotoes));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-painel.png') });
@@ -101,7 +108,7 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     await pg.click(V + ' .np-seg button:has-text("Publicações")'); await pg.waitForTimeout(400);
     if (!escritas.length) ok('nenhuma gravação ao listar, filtrar, abrir o painel e trocar de vista'); else falha('escritas: ' + JSON.stringify(escritas.slice(0, 3)));
     // ler não é tratar: marcar como lida muda só a leitura
-    await pg.click(`${V} li.np-it[data-id="101"] .np-it-abrir`); await pg.waitForTimeout(500); const nL = escritas.length; await pg.click(`${V} .np-painel .np-btn:has-text("Marcar como lida")`); await pg.waitForTimeout(600);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("101")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(500); const nL = escritas.length; await pg.click(`${V} .np-painel .np-btn:has-text("Marcar como lida")`); await pg.waitForTimeout(600);
     const wl = escritas.slice(nL); if (wl.length === 1 && /^PATCH \/rest\/v1\/publicacoes/.test(wl[0]) && /\{"lida":true\}/.test(wl[0]) && !/providencia|tratada/.test(wl[0])) ok('"Marcar como lida" grava só a leitura (lida = true): não registra providência nem tratamento'); else falha('lida: ' + JSON.stringify(wl));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
     await ctx.close(); }
@@ -114,7 +121,7 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     if (e.s1 && e.s1.marcas.some(m => /^2 prazos a conferir\|att/.test(m)) && e.s1.marcas.some(m => /^Sync\|info/.test(m))) ok('recebida pelo Sync: marcas "2 prazos a conferir" e "Sync"'); else falha('-1: ' + JSON.stringify(e.s1));
     if (e.l105 && e.l105.marcas.some(m => /^DJEN \+ Sync\|info/.test(m)) && !e.l105.marcas.some(m => /conferir/.test(m))) ok('mesma comunicação nas duas fontes: UMA linha, marca "DJEN + Sync"; prazo já conferido não aparece como pendência'); else falha('105: ' + JSON.stringify(e.l105));
     if (e.s2 && e.s2.marcas.some(m => /^fontes divergentes\|att/.test(m))) ok('possível duplicata: linha própria com "fontes divergentes"'); else falha('-2: ' + JSON.stringify(e.s2));
-    await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(700); let p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700); let p = await painel(pg);
     if (p && p.secoes.includes('Prazos') && p.prazos.length === 2 && /a conferir/.test(p.prazos[0].t) && /Sugerido pela plataforma/.test(p.prazos[0].dl) && !/Conferido/.test(p.prazos[0].dl) && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Confirmar', 'Corrigir', 'Descartar']) && p.props['Origem'] === 'Sync') ok('painel: duas hipóteses de prazo "a conferir", só com a data sugerida; ações Confirmar, Corrigir, Descartar'); else falha('painel -1: ' + JSON.stringify(p));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-prazos.png') });
     await pg.click(`${V} .np-pub-pz > li:first-child .ac .np-btn:has-text("Confirmar")`); await pg.waitForTimeout(500);
@@ -123,25 +130,25 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     if (ch.length === 1 && /"p_prazo":11/.test(ch[0]) && /"p_decisao":"confirmar"/.test(ch[0]) && /"p_fatal":false/.test(ch[0])) ok('Confirmar → uma chamada de conferência (prazo 11, decisão "confirmar", fatal só se marcado); nada antes do clique'); else falha('conferir: ' + JSON.stringify(escritas.slice(antes)));
     if (escritas.slice(0, antes).every(x => /rpc\/(prazo_revisor|pode_conferir_prazo)/.test(x))) ok('nenhuma gravação até a pessoa registrar a conferência'); else falha('escritas antes: ' + JSON.stringify(escritas.slice(0, 3)));
     await pg.waitForFunction((V) => document.querySelector(V + ' li.np-it'), V, { timeout: 15000 }); await pg.waitForTimeout(400);
-    await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("105")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700); p = await painel(pg);
     if (p && p.prazos.length === 1 && /corrigido/.test(p.prazos[0].t) && /fatal/.test(p.prazos[0].t) && /Conferido por\s*Ana Teste/.test(p.prazos[0].dl) && /Registrado\s*na tarefa/.test(p.prazos[0].dl) && /Feriado local/.test(p.prazos[0].dl) && /aguardando revisão/.test(p.prazos[0].t) && /Revisão\s*pendente · prazo fatal/.test(p.prazos[0].dl) && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Reabrir'])) ok('prazo conferido: sugerido × conferido lado a lado, "fatal" marcado pela pessoa, quem e quando, tarefa, observação; "aguardando revisão" visível; quem não é revisor só tem Reabrir'); else falha('painel 105: ' + JSON.stringify(p && p.prazos));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-conferido.png') });
-    await pg.click(`${V} li.np-it[data-id="-2"] .np-it-abrir`); await pg.waitForTimeout(700); p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-2")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700); p = await painel(pg);
     if (p && p.secoes.includes('Fontes divergentes') && /Pode ser a mesma comunicação da publicação 101/.test(p.diverg[0].tx) && JSON.stringify(p.diverg[0].ac) === JSON.stringify(['É a mesma comunicação', 'São comunicações diferentes'])) ok('fontes divergentes: explicação e conciliação humana ("é a mesma" / "são diferentes")'); else falha('painel -2: ' + JSON.stringify(p && p.diverg));
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-divergencia.png') });
     // modo só leitura (quem não tem acesso ao Jurídico não vê a aba; a recusa da conferência está nos testes do banco, casos de permissão da 0114)
     await pg.evaluate(() => { S.canWrite = false; render(); }); await pg.waitForTimeout(400);
-    await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(600); p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(600); p = await painel(pg);
     if (p && !p.todosBotoes.some(x => /Tratar|Atribuir|Confirmar|Vincular|Marcar/.test(x))) ok('só leitura: painel sem ações'); else falha('só leitura: ' + JSON.stringify(p && p.todosBotoes));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
     await ctx.close(); }
   { const { ctx, pg, escritas } = await abrir(b, { sync: true, semAtribuicao: true });
-    await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(1200); const p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(1200); const p = await painel(pg);
     const nota = await pg.evaluate((V) => [...document.querySelectorAll(V + ' .np-pub-pz p.np-nota')].map(x => x.textContent).join(' '), V);
     if (p && p.prazos.length === 2 && p.prazos.every(z => !z.ac.length) && /cabe a quem responde por este processo/.test(nota) && escritas.some(x => /rpc\/pode_conferir_prazo/.test(x) && /"p_publicacao":-1/.test(x)) && !escritas.some(x => /publicacao_prazo_conferir/.test(x))) ok('pessoa do Jurídico SEM atribuição sobre a publicação: vê os prazos, não vê Confirmar, Corrigir nem Descartar, e a tela explica por quê (a consulta é feita ao banco por publicação)'); else falha('sem atribuição: ' + JSON.stringify([p && p.prazos, nota, escritas.slice(0, 4)]));
     await ctx.close(); }
   { const { ctx, pg, escritas } = await abrir(b, { sync: true, escrita: (m, p) => /rpc\/prazo_revisor/.test(p) ? { status: 200, body: true } : null });
-    await pg.click(`${V} li.np-it[data-id="105"] .np-it-abrir`); await pg.waitForTimeout(700); const p = await painel(pg);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("105")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700); const p = await painel(pg);
     if (p && JSON.stringify(p.prazos[0].ac) === JSON.stringify(['Aprovar revisão', 'Devolver', 'Reabrir'])) ok('revisora (outra pessoa que não quem conferiu): Aprovar revisão e Devolver'); else falha('revisora: ' + JSON.stringify(p && p.prazos));
     const n0 = escritas.length; await pg.click(`${V} .np-pub-pz .ac .np-btn:has-text("Aprovar revisão")`); await pg.waitForTimeout(700);
     const ch = escritas.slice(n0).filter(x => /rpc\/publicacao_prazo_revisar/.test(x));
@@ -167,7 +174,7 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     const m = await medirContraste(pg, [{ sel: V + ' .np-resumo b', nome: 'número do resumo' }, { sel: V + ' .np-resumo span', nome: 'rótulo do resumo' }, { sel: V + ' .np-grp-h .t', nome: 'título do grupo' }, { sel: V + ' li.np-it .np-it-abrir .tx', nome: 'título da linha' }, { sel: V + ' li.np-it .np-it-abrir .ctx', nome: 'contexto' }, { sel: V + ' li.np-it .np-it-prazo', nome: 'data' }, { sel: V + ' li.np-it .np-marca', nome: 'marca' }, { sel: V + ' .np-pub-fontes', nome: 'fontes' }, { sel: V + ' .np-pub-fontes .np-marca', nome: 'situação da integração' }, { sel: V + ' .np-rodape', nome: 'rodapé' }, { sel: V + ' .np-chipf', nome: 'filtro' }]);
     let alv = []; if (w === 375) alv = (await medirAlvos(pg, V)).filter(a => a.h < 44 && !/np-it$/.test(a.nome));
     await pg.screenshot({ path: path.join(OUT, `publicacoes-${w}-${tema}.png`) });
-    await pg.click(`${V} li.np-it[data-id="-1"] .np-it-abrir`); await pg.waitForTimeout(700);
+    await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(700);
     const l2 = await lateral(pg);
     const mp = await medirContraste(pg, [{ sel: V + ' .np-painel .np-props dt', nome: 'rótulo' }, { sel: V + ' .np-painel .np-props dd', nome: 'valor' }, { sel: V + ' .np-painel .np-sec h3', nome: 'título da seção' }, { sel: V + ' .np-painel .np-sec p.np-nota', nome: 'nota' }, { sel: V + ' .np-pub-pz .t', nome: 'prazo' }, { sel: V + ' .np-pub-pz dt', nome: 'rótulo do prazo' }, { sel: V + ' .np-pub-pz dd', nome: 'data do prazo' }, { sel: V + ' .np-pub-pz .np-marca', nome: 'marca do prazo' }, { sel: V + ' .np-pub-texto', nome: 'texto' }, { sel: V + ' .np-painel .np-btn', nome: 'botão' }]);
     let alvP = []; if (w === 375) alvP = (await medirAlvos(pg, V + ' .np-painel')).filter(a => a.h < 44);

@@ -45,6 +45,10 @@
   // Ícones só da casca para destinos que o NAV não cobre (o ICONES global continua valendo para a V2 e para os demais)
   const I_TAB = {
     avisos: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+    ferramentas: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+    marketing: '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>',
+    "mkt-producao": '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>',
+    "mkt-automacoes": '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
     financeiro: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
     "financeiro-controle": '<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>',
     "fin-visao": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
@@ -90,9 +94,20 @@
     calibracao: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Calibração", tabAcesso: "calibracao", cls: "admin-only" },
     usuarios: { grupo: "Equipe e gestão", grupoId: "equipe", label: "Usuários e acessos", tabAcesso: "usuarios", cls: "admin-only" },
     perfil: { grupo: "", grupoId: null, label: "Meu perfil", tabAcesso: "perfil", cls: "" },
+    // 26/11 (sócia): Ferramentas vira um item só (página de botões); as telas das ferramentas ficam fora da árvore, com a trilha “Ferramentas”
+    ferramentas: { grupo: "", grupoId: null, label: "Ferramentas", tabAcesso: "ferramentas", cls: "" },
+    revisional: { grupo: "Ferramentas", grupoId: null, label: "Revisional de contratos", tabAcesso: "revisional", cls: "area-juridico" },
+    superendividamento: { grupo: "Ferramentas", grupoId: null, label: "Superendividamento", tabAcesso: "superendividamento", cls: "area-superendividamento" },
+    pecas: { grupo: "Ferramentas", grupoId: null, label: "Modelos de peças", tabAcesso: "pecas", cls: "area-juridico" },
+    monitoramento: { grupo: "Ferramentas", grupoId: null, label: "Monitoramento", tabAcesso: "monitoramento", cls: "area-juridico" },
+    autenticador: { grupo: "Ferramentas", grupoId: null, label: "Autenticador (2FA)", tabAcesso: "autenticador", cls: "area-juridico" },
+    conhecimento: { grupo: "Ferramentas", grupoId: null, label: "Base de conhecimento", tabAcesso: "conhecimento", cls: "" },
+    // 26/11 (sócia): Marketing é um grupo próprio — Pauta de conteúdo, Automações e Produção de conteúdo
+    "mkt-automacoes": { grupo: "Marketing", grupoId: "marketing", label: "Automações", tabAcesso: "mkt-automacoes", cls: "area-marketing" },
+    "mkt-producao": { grupo: "Marketing", grupoId: "marketing", label: "Produção de conteúdo", tabAcesso: "mkt-producao", cls: "area-marketing" },
   };
   const temIcone = (i) => { const k = i.icone || i.tab; return !!(typeof ICONES === "object" && ICONES && ICONES[k]); };
-  const I_GRUPO = { clientes: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>', administrativo: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>' };
+  const I_GRUPO = { marketing: '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>', clientes: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', juridico: '<path d="M12 3v18M3 7h18M5 7l-3 7a4 4 0 0 0 8 0zM19 7l-3 7a4 4 0 0 0 8 0z"/>', financeiro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', equipe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>', ferramentas: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3L16.7 8.3"/>', administrativo: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>' };
   const ws = el("div", { class: "np-ws" }, el("div", { class: "np-mono", "aria-hidden": "true" }, "NP"), el("div", { class: "np-rot" }, el("b", {}, "Neves Pádua"), el("small", {}, "Advocacia")));
   const buscaBtn = el("button", { class: "np-busca-btn edit-only", type: "button", onclick: () => { const i = $("#buscaGlobal"); if (i) { fecharGaveta(); i.focus(); } } }, ico(LUPA), el("span", {}, "Buscar"), el("kbd", {}, "/"));
   // Semântica: <nav> com listas de botões (não é tablist — os grupos expansíveis não são abas); o destino atual leva
@@ -212,7 +227,8 @@
     const gCli = ro || !cart ? null : { id: "clientes", label: "Clientes", icone: "clientes", cls: "", itens: [{ ...cart, label: "Carteira" }, acomp].filter(Boolean) };
     const gs = [gCli, hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
       { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
-      { id: "ferramentas", label: "Ferramentas", icone: "ferramentas", cls: "", itens: deGrupos(["juridico-ferr", "comercial", "marketing"]) }].filter(g => g && g.itens.length);
+      { id: "marketing", label: "Marketing", icone: "marketing", cls: "", itens: deGrupos(["marketing"]).filter(i => i.tab === "marketing").map(i => ({ ...i, label: "Pauta de conteúdo" })) }].filter(g => g && g.itens.length);
+    const FERR_TABS = ["revisional", "superendividamento", "pecas", "monitoramento", "autenticador", "conhecimento"];
     // Financeiro (19/11, 12h — decisão das sócias): só as quatro páginas da especificação do setor. Estoque e Inventário passam para o grupo
     // Administrativo, com a mesma regra de acesso de antes. As telas do Asaas e Contratos e faturamento saem da navegação da casca nova
     // (a integração com o Asaas continua; na casca antiga nada muda). Nenhuma permissão foi alterada.
@@ -236,16 +252,19 @@
     // apenas o fallback silencioso de breadcrumb/título em ROTAS_META para rotas legadas abertas diretamente.
     const LEGADO_CRM = new Set(["leads", "comercial", "atendimento", "automacoes"]);
     for (const t of ["historico", "regras", "calibracao"]) addAoGrupo("equipe", t, true);
+    for (const t of ["mkt-automacoes", "mkt-producao"]) addAoGrupo("marketing", t, true);
     // Rota direta atualmente aberta fora de NAV/hubs (ex.: fin-visao, financeiro-controle): entra no grupo correto se permitida,
     // exceto rotas legadas de CRM/Atendimento (grupoId: null e guardadas em LEGADO_CRM).
     const curTab = tabAtual();
     if (curTab && !LEGADO_CRM.has(curTab) && ROTAS_META[curTab]?.grupoId && !FIXOS.includes(curTab) && curTab !== "perfil") addAoGrupo(ROTAS_META[curTab].grupoId, curTab, false);
     // itens do NAV que não entraram em fixos, hubs ou grupos conhecidos: grupo "Outros" (nunca se perde destino)
-    const cobertos = new Set([...FIXOS, "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
+    const cobertos = new Set([...FIXOS, ...FERR_TABS, "ferramentas", "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
     const soltos = itens.filter(i => i.tab && !i.tabs && !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab)).concat(grupos.filter(g => !["equipe", "gestao", "juridico-ferr", "comercial", "marketing"].includes(g.grupo)).flatMap(g => g.itens.filter(i => !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab))));
     if (soltos.length) gs.push({ id: "outros", label: "Outros", icone: "ferramentas", cls: "", itens: soltos });
-    return { fixos: FIXOS.map(byTab).filter(Boolean), perfil: byTab("perfil"), grupos: gs, links: itens.filter(i => i.link) };
+    // item único “Ferramentas” (fica aceso também dentro de cada ferramenta)
+    const finais = !ro && $("#view-ferramentas") && acesso("ferramentas") && FERR_TABS.some(t => $("#view-" + t) && acesso(t)) ? [{ tab: "ferramentas", label: "Ferramentas", cls: "edit-only", alt: FERR_TABS }] : [];
+    return { fixos: FIXOS.map(byTab).filter(Boolean), perfil: byTab("perfil"), grupos: gs, finais, links: itens.filter(i => i.link) };
   }
   /* contagens da lateral (Figma de 18/11): só o que pede ação de quem está logado, e só quando há algo — sem número, sem ruído.
      Cada módulo registra a sua em window.__NP_CONT[tab] = { fn, rotulo }; fn devolve null enquanto o dado não estiver carregado. */
@@ -306,6 +325,7 @@
       if (!(aberto || temAtivo)) corpo.setAttribute("inert", "");
       tree.append(grp);
     }
+    if (m.finais.length) tree.append(el("div", { class: "np-sec" }), lista(m.finais.map(i => item(i, "np-top"))));
     // rodapé: pessoa (nome real do colaborador/perfil, sem prefixo de e-mail) + Meu perfil + links externos
     const nome = nomeRealUsuario();
     const ini = iniciaisUsuario(nome);
@@ -334,7 +354,7 @@
     if (brand && !somenteLeitura()) {
       const todos = m.fixos.concat(m.grupos.flatMap(g => g.itens), m.perfil ? [m.perfil] : []);
       const i = todos.find(ativo);
-      const titulo = i?.label || meta?.label;
+      const titulo = i?.label || meta?.label || (cur === "ferramentas" ? "Ferramentas" : null);
       if (titulo) brand.textContent = titulo;
     }
     if (flyG) atualizarFly();

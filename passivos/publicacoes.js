@@ -152,6 +152,14 @@ const limparPub=()=>{Object.assign(U.f,{pend:false,semProc:false,naoLidas:false,
 function filtrarPub(){const f=U.f,ql=U.q.trim().toLowerCase();
   return U.lista.filter(p=>(!U.fCli||p.cliente_id===U.fCli)&&(!f.pend||(!p.providencia&&!p.ignorada))&&(!f.semProc||(p.sem_vinculo&&!p.ignorada))&&(!f.naoLidas||(!p.lida&&!p.ignorada))&&(!f.prazo||aConferir(p)>0)&&(!f.diverg||divergDe(p).length>0)&&(!f.origem||fontesDe(p).has(f.origem))
     &&(!ql||[p.texto,p.numero_processo,p.orgao,p.cliente_nome,JSON.stringify(p.destinatarios)].join(" ").toLowerCase().includes(ql)))}
+/* 26/11 (sócia): publicação pendente abre direto numa tela só — o conteúdo e as opções de tratamento juntos (era: pop-up de leitura → “Tratar” → segunda tela).
+   Ao registrar, a tela fecha, a lista é atualizada e o foco vai para a próxima publicação pendente. Publicação já tratada (ou quem só consulta) segue abrindo o detalhe. */
+function abrirPubOuTratar(p,origem){
+  const ro=typeof readOnly==="function"&&readOnly();
+  if(ro||p.providencia||p.ignorada||!podeJur()||!TR().modalTratar){abrirPainelPub(p,{origem});return}
+  const ordem=V3.ordem||[];const i=ordem.indexOf(p.id);const prox=ordem.slice(i+1).concat(ordem.slice(0,Math.max(0,i))).map(id=>U.lista.find(x=>x.id===id)).find(x=>x&&!x.providencia&&!x.ignorada&&x.id!==p.id);
+  TR().modalTratar(p,{aoRegistrar:()=>{V3.aberta=null;V3.focar=prox?prox.id:null;V3.tratada=p.id},detalhes:()=>abrirPainelPub(p,{origem})});
+}
 function linhaPub(p){
   const st=sitP(p),d=p.dias_para_tratar,m=[];
   if(p.sem_vinculo&&!p.ignorada)m.push(NPUI.marca("sem processo","att"));
@@ -165,7 +173,7 @@ function linhaPub(p){
   const li=NPUI.linha({id:String(p.id),regua:st==="vencida"?"late":st==="pendente"&&d===0?"att":null,atual:V3.aberta===p.id,riscado:!!p.ignorada,
     prazo:{curta:dBR(p.data_disponibilizacao).slice(0,5),rel,exata:"Disponibilizada em "+dBR(p.data_disponibilizacao)+(p.prazo_tratamento&&!p.providencia?" · analisar até "+dBR(p.prazo_tratamento):""),tom:st==="vencida"?"late":""},
     titulo:p.numero_processo||"(sem número)",contexto:ctx,direita:[...m,p.atribuidas_para&&+(p.tarefas_atribuidas_abertas||0)?NPUI.quem(p.atribuidas_para,{title:"Tarefa com "+p.atribuidas_para}):null],titleAbrir:"Abrir a publicação",
-    onOpen:x=>abrirPainelPub(p,{origem:x.querySelector(".np-it-abrir")})});
+    onOpen:x=>abrirPubOuTratar(p,x.querySelector(".np-it-abrir"))});
   if(!p.lida&&!p.ignorada)li.classList.add("np-nao-lida");
   return li;
 }
@@ -242,6 +250,7 @@ function renderPubV3(v){
     :{titulo:"Nada com esses filtros",texto:"Tire um filtro para ver as demais publicações.",acao:"Limpar filtros",onAcao:()=>{limparPub();render()}}));
   else{
     let ab={};try{ab=JSON.parse(NPUI.pref.get("np-pub-grupos")||"{}")||{}}catch(e){}
+    V3.ordem=GRUPOS_PUB.flatMap(([k])=>lista.filter(p=>sitP(p)===k).map(p=>p.id));
     for(const [k,l,tom] of GRUPOS_PUB){const its=lista.filter(p=>sitP(p)===k);if(!its.length)continue;
       corpo.append(NPUI.grupo({id:"pub-"+k,titulo:l,n:its.length,tom,aberto:ab[k]!=null?ab[k]!==false:(k==="vencida"||k==="pendente"),onToggle:x=>{ab[k]=x;NPUI.pref.set("np-pub-grupos",JSON.stringify(ab))},itens:its.map(linhaPub)}))}
     const fora=U.lista.length-lista.length;
@@ -250,6 +259,8 @@ function renderPubV3(v){
   obra.append(corpo);v.append(obra);
   V3.painel=NPUI.painel({obra,label:"Detalhe da publicação",onClose:()=>{V3.aberta=null}});
   if(V3.aberta!=null){const p=U.lista.find(x=>x.id===V3.aberta);if(p)abrirPainelPub(p,{silencioso:true});else V3.aberta=null}
+  // depois de um tratamento: foco e destaque na próxima pendente (só quando a lista já foi recarregada e a publicação tratada saiu das pendentes)
+  if(V3.focar!=null&&!U.carregando&&!(()=>{const t=U.lista.find(x=>x.id===V3.tratada);return t&&!t.providencia&&!t.ignorada})()){const alvo=v.querySelector(`li[data-id="${CSS.escape(String(V3.focar))}"]`);V3.focar=null;if(alvo){alvo.classList.add("np-pub-prox");const b=alvo.querySelector(".np-it-abrir");requestAnimationFrame(()=>{try{alvo.scrollIntoView({block:"center"});b?.focus({preventScroll:true})}catch(_){}})}}
 }
 /* conferência humana do prazo sugerido: confirmar, corrigir, descartar ou reabrir */
 function conferirPrazo(p,z,dec){
@@ -323,6 +334,6 @@ function abrirPainelPub(p,{origem}={}){
 /* ---------- Integração ---------- */
 {const _c=window.PP_MOD.contagens;window.PP_MOD.contagens=c=>{const r=_c?_c(c):{};return r}}
 {const _r=render;render=function(){_r();const vp=$("#view-publicacoes");if(!vp)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="publicacoes")S.tab="clientes";vp.hidden=S.tab!=="publicacoes";if(S.tab==="publicacoes")renderPublicacoes()}}
-window.PP_PUBLICACOES={verIntegracoes:(v=true)=>{U.verFontes=!!v;render()},abrirId:id=>{V3.aberta=id;if(S.tab!=="publicacoes"){S.tab="publicacoes";try{location.hash="#publicacoes"}catch(_){}}render()},sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
+window.PP_PUBLICACOES={abrirDetalhe:id=>{const p=U.lista.find(x=>String(x.id)===String(id));if(p)abrirPainelPub(p)},verIntegracoes:(v=true)=>{U.verFontes=!!v;render()},abrirId:id=>{V3.aberta=id;if(S.tab!=="publicacoes"){S.tab="publicacoes";try{location.hash="#publicacoes"}catch(_){}}render()},sync:()=>U.sync,lista:()=>U.lista,colab:()=>U.colab,procs:()=>U.procs,recarregar,abrir,atribuir,vincular,marcar,TIPOS_TAREFA_PUB};
 window.__PP_LOGIN.then(()=>{if(typeof equipe==="function"&&equipe()){const ch=SB.channel("publicacoes");ch.on("postgres_changes",{event:"*",schema:"public",table:"publicacoes"},()=>{U.ok=false;if(S.tab==="publicacoes")garantir()});ch.subscribe()}});
 })();

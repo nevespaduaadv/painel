@@ -1761,3 +1761,55 @@ html.np-casca-v3 .np-cal-d:is(.tem,.late,.fatal)::after{content:"";position:abso
 html.np-casca-v3 .np-cal-d.late::after{background:var(--np-att-s)}html.np-casca-v3 .np-cal-d.fatal::after{background:var(--np-crit)}
 html.np-casca-v3 .np-cal-d.hoje:is(.tem,.late,.fatal)::after{background:var(--np-inv)}
 @media (max-width:900px){html.np-casca-v3 .np-wid{padding:14px 8px}html.np-casca-v3 .np-wid-h,html.np-casca-v3 .np-wid-nota,html.np-casca-v3 .np-wid-at{padding:0 6px}html.np-casca-v3 .np-cal{gap:0}html.np-casca-v3 .np-cal-d{height:44px}html.np-casca-v3 .np-wid-at .np-btn{height:44px}html.np-casca-v3 .np-wid-ta{width:calc(100% - 12px);margin:0 6px}}
+/* ============ v2 (26/11) — Ferramentas em quadros ============ */
+html.np-casca-v3 .np-ferr-h{margin:8px 0 18px}
+html.np-casca-v3 .np-ferr-h h1{font:600 26px/1.2 var(--np-ui);margin:4px 0 4px;color:var(--np-text)}
+html.np-casca-v3 .np-ferr-h p{margin:0;color:var(--np-text-2)}
+html.np-casca-v3 .np-ferr-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+html.np-casca-v3 .np-ferr-q{appearance:none;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:118px;padding:18px;text-align:left;background:var(--np-ink);color:var(--np-inv);border:1px solid var(--np-ink);border-radius:var(--np-r-lg);font:inherit;transition:transform var(--np-d1) var(--np-e-in),box-shadow var(--np-d1) var(--np-e-in)}
+html.np-casca-v3 .np-ferr-q:hover{box-shadow:var(--np-sh-pop,0 8px 24px rgba(0,0,0,.18));transform:translateY(-1px)}
+html.np-casca-v3 .np-ferr-q:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-ferr-q .i svg{width:26px;height:26px;display:block}
+html.np-casca-v3 .np-ferr-q .t{font:600 var(--np-fs-4)/1.25 var(--np-ui);margin-top:auto}
+html.np-casca-v3 .np-ferr-q .s{font:400 var(--np-fs-1)/1.3 var(--np-ui);opacity:.75}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-ferr-q{transition:none}html.np-casca-v3 .np-ferr-q:hover{transform:none}}
+@media (max-width:600px){html.np-casca-v3 .np-ferr-g{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}html.np-casca-v3 .np-ferr-q{padding:14px;min-height:104px}}
+html.np-casca-v3 li.np-pub-prox{box-shadow:inset 0 0 0 2px var(--np-ink);border-radius:var(--np-r)}
+/* ============ v2 (26/11) — Hoje: widgets arrastáveis em duas áreas ============ */
+html.np-casca-v3 .np-hoje-wp{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:0 0 16px;align-items:stretch;min-height:8px}
+html.np-casca-v3 .np-wid-zona{border-radius:var(--np-r-lg)}
+html.np-casca-v3 .np-wid-solte{display:none;margin:0;padding:18px;text-align:center;border:1px dashed var(--np-line-2);border-radius:var(--np-r-lg);color:var(--np-text-3);font-size:var(--np-fs-2)}
+html.np-casca-v3 .np-wid-zona.vazia .np-wid-solte{grid-column:1/-1}
+html.np-casca-v3 body.np-wid-arrastando .np-wid-zona.vazia .np-wid-solte,html.np-casca-v3 .np-wid-zona.vazia.alvo .np-wid-solte{display:block}
+html.np-casca-v3 .np-wid-zona.alvo{outline:2px dashed var(--np-line-2);outline-offset:4px}
+html.np-casca-v3 .np-wid.arr{opacity:.45}
+html.np-casca-v3 .np-wid.antes{box-shadow:-3px 0 0 0 var(--np-ink)}
+html.np-casca-v3 .np-hoje-lado .np-wid.antes{box-shadow:0 -3px 0 0 var(--np-ink)}
+html.np-casca-v3 .np-wid-h{cursor:grab}
+html.np-casca-v3 .np-wid-h h2{flex:1}
+html.np-casca-v3 .np-wid-menu{opacity:.55}html.np-casca-v3 .np-wid:hover .np-wid-menu,html.np-casca-v3 .np-wid-menu:focus-visible{opacity:1}
+html.np-casca-v3 .np-hoje-wp .np-wid{display:flex;flex-direction:column;min-width:0}
+html.np-casca-v3 .np-hoje-wp .np-wid-lembretes,html.np-casca-v3 .np-hoje-wp .np-wid-calendario{grid-row:span 2}
+/* relógio */
+html.np-casca-v3 .np-wid-relogio{background:var(--np-ink);border-color:var(--np-ink);color:var(--np-inv)}
+html.np-casca-v3 .np-wid-relogio .np-wid-h h2{color:var(--np-inv);opacity:.7;font-weight:500}
+html.np-casca-v3 .np-wid-relogio .np-ib{color:var(--np-inv)}
+html.np-casca-v3 .np-rel{display:flex;flex-direction:column;gap:6px;margin-top:auto}
+html.np-casca-v3 .np-rel-h{font:600 52px/1 var(--np-ui);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+html.np-casca-v3 .np-hoje-lado .np-rel-h{font-size:44px}
+html.np-casca-v3 .np-rel-d{font:400 var(--np-fs-2)/1.3 var(--np-ui);opacity:.8}
+/* próximo compromisso */
+html.np-casca-v3 .np-prox{appearance:none;border:0;background:var(--np-info-bg);color:var(--np-text);text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;width:100%;padding:12px;border-radius:var(--np-r);font:inherit;min-height:44px}
+html.np-casca-v3 .np-prox:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-prox b{font:600 22px/1.1 var(--np-ui);font-variant-numeric:tabular-nums}
+html.np-casca-v3 .np-prox .t{font:500 var(--np-fs-3)/1.3 var(--np-ui)}html.np-casca-v3 .np-prox .s{font-size:var(--np-fs-1);color:var(--np-text-2)}
+/* atalhos como ícones (na área principal) */
+html.np-casca-v3 .np-apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:10px}
+html.np-casca-v3 .np-app{appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;padding:2px;color:var(--np-text);font:inherit;min-width:0;border-radius:var(--np-r)}
+html.np-casca-v3 .np-app .i{width:48px;height:48px;border-radius:14px;background:var(--np-ink);color:var(--np-inv);display:grid;place-items:center;transition:transform var(--np-d1) var(--np-e-in)}
+html.np-casca-v3 .np-app .i svg{width:22px;height:22px}
+html.np-casca-v3 .np-app:hover .i{transform:translateY(-1px)}
+html.np-casca-v3 .np-app:focus-visible{outline:none}html.np-casca-v3 .np-app:focus-visible .i{box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-app .l{font:500 11.5px/1.2 var(--np-ui);text-align:center;color:var(--np-text-2);overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-app .i{transition:none}html.np-casca-v3 .np-app:hover .i{transform:none}}
+@media (max-width:600px){html.np-casca-v3 .np-hoje-wp{grid-template-columns:minmax(0,1fr)}html.np-casca-v3 .np-rel-h{font-size:44px}}
