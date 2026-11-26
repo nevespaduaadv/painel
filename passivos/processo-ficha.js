@@ -68,7 +68,7 @@
   const SECOES = [["visao", "Prazos e tarefas"], ["registros", "Trabalho do escritório"], ["andamentos", "Andamentos"], ["publicacoes", "Publicações"], ["pasta", "Pasta e relacionados"]];
   async function datajud(p, b, recarregar) {
     b.disabled = true;
-    try { const { error } = await SB.rpc("datajud_atualizar", { p_processo: p.id }); if (error) throw error; toast("DataJud: consulta enviada — as movimentações aparecem em alguns minutos");
+    try { const { error } = await SB.rpc("datajud_atualizar", { p_processo: p.id }); if (error) throw error; toast("Consulta enviada — as movimentações aparecem em alguns minutos");
       setTimeout(async () => { await SB.rpc("datajud_atualizar", { p_processo: null }).catch(() => {}); invalidar(p.id); recarregar(); if (typeof render === "function") render(); }, 20000); }
     catch (err) { toast(err.message || "Não foi possível consultar"); } finally { b.disabled = false; }
   }
@@ -95,8 +95,8 @@
     const meio = Math.ceil(pares.length / 2);
     box.append(el("div", { class: "np-pf-dados" }, U.props(pares.slice(0, meio)), pares.length > meio ? U.props(pares.slice(meio)) : null));
     if (p.observacoes) box.append(U.secao("Observações", el("p", { style: "white-space:pre-wrap" }, p.observacoes)));
-    const bDJ = U.btn("Atualizar no DataJud", { title: "Busca as movimentações no DataJud (CNJ). A consulta automática roda uma vez por dia.", onclick: (e) => datajud(p, e.currentTarget, recarregar) });
-    box.append(U.secao("DataJud", el("p", { class: "np-nota" }, p.datajud_erro ? [m("erro na última consulta", "att"), " ", p.datajud_erro] : p.datajud_atualizado_em ? "Movimentações atualizadas em " + new Date(p.datajud_atualizado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + "." : "Ainda sem consulta registrada para este processo."), ro || !p.numero_cnj ? null : bDJ));
+    const bDJ = U.btn("Atualizar andamentos", { title: "Busca as movimentações do processo. A consulta automática roda uma vez por dia.", onclick: (e) => datajud(p, e.currentTarget, recarregar) });
+    box.append(U.secao("Atualização automática", el("p", { class: "np-nota" }, p.datajud_erro ? [m("erro na última consulta", "att"), " ", p.datajud_erro] : p.datajud_atualizado_em ? "Movimentações atualizadas em " + new Date(p.datajud_atualizado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + "." : "Ainda sem consulta registrada para este processo."), ro || !p.numero_cnj ? null : bDJ));
     // seções (as mesmas cinco abas da V2)
     const aba = C.aba[pid] || "visao"; const cont = { visao: abertas.length, registros: regs.length, andamentos: ands.length, publicacoes: +p.publicacoes_pendentes || 0, pasta: +p.qtd_relacionados || 0 };
     const seg = U.seg(SECOES.map(([k, l]) => [k, l + (cont[k] ? " · " + cont[k] : "")]), aba, (k) => { C.aba[pid] = k; render(); }, "Seções do processo");
@@ -126,8 +126,8 @@
     if (aba === "andamentos") {
       corpo.append(cabSec(`Andamentos do tribunal${carregandoF ? "" : " (" + ands.length + ")"}`, ro ? null : U.btn("Andamento", { icone: "mais", onclick: () => window.PP_CARTEIRA?.openAndamentoForm(p) })));
       if (carregandoF) corpo.append(U.carregando(3));
-      else if (!ands.length) corpo.append(U.vazio({ titulo: "Nenhum andamento registrado", texto: "Os andamentos chegam do DataJud ou são incluídos à mão.", acao: ro ? null : "Incluir andamento", onAcao: () => window.PP_CARTEIRA?.openAndamentoForm(p) }));
-      else corpo.append(U.passos(ands.map((a) => ({ estado: "ok", el: el("span", {}, el("b", {}, fmt(a.data)), a.tipo ? " · " + a.tipo : "", " ", m(a.visivel_cliente ? "visível ao cliente" : "interno", a.visivel_cliente ? "ok" : ""), a.fonte && a.fonte !== "manual" ? [" ", m(/^datajud$/i.test(a.fonte) ? "DataJud" : a.fonte, "info")] : null),
+      else if (!ands.length) corpo.append(U.vazio({ titulo: "Nenhum andamento registrado", texto: "Os andamentos chegam sozinhos ou são incluídos à mão.", acao: ro ? null : "Incluir andamento", onAcao: () => window.PP_CARTEIRA?.openAndamentoForm(p) }));
+      else corpo.append(U.passos(ands.map((a) => ({ estado: "ok", el: el("span", {}, el("b", {}, fmt(a.data)), a.tipo ? " · " + a.tipo : "", " ", m(a.visivel_cliente ? "visível ao cliente" : "interno", a.visivel_cliente ? "ok" : ""), a.fonte && a.fonte !== "manual" ? [" ", m("automático", "info")] : null),
         sub: [el("span", { style: "white-space:pre-wrap" }, a.descricao || ""), ro ? null : el("button", { type: "button", class: "np-link", onclick: () => window.PP_CARTEIRA?.openAndamentoForm(p, a) }, "Editar")].filter(Boolean) }))));
     }
     if (aba === "publicacoes") { corpo.append(cabSec("Publicações deste processo")); const h = el("div", { class: "np-pf-legado" }); corpo.append(h); if (window.PP_PUB_TRAT?.secaoProcesso) window.PP_PUB_TRAT.secaoProcesso(p, h); else h.append(el("p", { class: "np-nota" }, "Módulo de publicações não carregado.")); }

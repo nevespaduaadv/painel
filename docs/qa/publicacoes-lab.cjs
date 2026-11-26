@@ -153,6 +153,10 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     if (u.prov === 'gerou_prazo' && u.prazo === PRAZOS[0].data_sugerida && u.fatal === false && /^Embargos de declaração/.test(u.tit) && !u.sx) ok('“Usar” escolhe “Criar tarefa ou prazo” e preenche data e título com a sugestão; prazo fatal continua desmarcado'); else falha('Tratar com Sync (usar): ' + JSON.stringify(u));
     { const g = escritas.filter((x) => /tarefas|publicacao_prazo|rpc\/publicacao_/.test(JSON.stringify(x))); if (!g.length) ok('usar a sugestão não cria tarefa nem confere prazo: só preenche a tela'); else falha('gravou ao usar a sugestão: ' + JSON.stringify(g).slice(0, 200)); }
     await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-tratar-sync-usado.png') });
+    { /* 26/11: criar a tarefa a partir da sugestão registra a conferência do prazo junto, sem abrir segunda tarefa */
+      await pg.selectOption('#modalHost #tr-resp', { index: 1 }); const nS = escritas.length; await pg.click('#modalHost .np-f-salvar, #modalHost button.btn.primary'); await pg.waitForTimeout(1000);
+      const w = escritas.slice(nS); const conf = w.filter((x) => /rpc\/publicacao_prazo_conferir/.test(x)); const tar = w.filter((x) => /^POST \/rest\/v1\/tarefas/.test(x));
+      if (tar.length === 1 && conf.length === 1 && /"p_prazo":11/.test(conf[0]) && /"p_decisao":"confirmar"/.test(conf[0]) && /"p_tarefa":false/.test(conf[0]) && /"p_fatal":false/.test(conf[0])) ok('criar a tarefa pela sugestão registra a conferência do prazo (confirmado, sem segunda tarefa)'); else falha('conferência junto: ' + JSON.stringify(w.map((x) => x.slice(0, 200)))); }
     if (erros.length) falha('erros de console no Tratar com Sync: ' + erros.slice(0, 2).join(' | '));
     await ctx.close(); }
   { /* 26/11 (0126): análise do ato — quem trata abre UMA tarefa de análise; a cadeia só nasce quando a análise é concluída, com o caminho escolhido */
