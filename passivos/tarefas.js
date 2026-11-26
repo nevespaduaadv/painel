@@ -253,6 +253,7 @@ function mencoes(ta){
 }
 /* concluir a partir da lista: "o que foi feito" é obrigatório (regra da controladoria — toda conclusão alimenta o histórico) */
 function concluirComNota(t){
+  if(t.etapa_codigo==="analise_ato"){concluirAnalise(t);return}   /* a análise do ato conclui escolhendo o caminho (0126) */
   const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:3});const arq=el("input",{type:"file",multiple:""});
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do histórico e do dossiê; quem abriu a tarefa é avisado.")),el("div",{class:"f full"},el("label",{},"Anexar (opcional)"),arq));
   modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída")});
@@ -261,6 +262,7 @@ function concluirComNota(t){
 const comentarConclusao=concluirComNota;
 /* ---------- Tela da tarefa: o que fazer, para quem passar, o que já aconteceu ---------- */
 async function mudarStatus(t,status,nota,files){
+  if(status==="concluida"&&t.etapa_codigo==="analise_ato"){concluirAnalise(t);throw new Error("Para concluir a análise, escolha o caminho")}
   const {error}=await SB.from("tarefas").update({status}).eq("id",t.id);
   /* 0115: tarefa de análise com publicação sem providência — o banco recusa e diz quais faltam */
   if(error){if(error.code==="23514"&&/publica/i.test(error.message||"")){window.PP_TAREFAS?._pendPub?.(t.id);throw new Error(error.message)}throw new Error("Não foi possível atualizar")}
@@ -303,6 +305,108 @@ function decidirCadeia(t){return new Promise(res=>{
     el("div",{class:"actions",style:"justify-content:flex-end"},el("button",{class:"btn danger",onclick:naoCabe},"Não cabe — cancelar etapas"),el("button",{class:"btn primary",onclick:()=>{toast("Cadeia mantida");fim(true)}},"Cabe — manter a cadeia")));
   host.replaceChildren(el("div",{class:"modal"},card));
 })}
+/* ---------- Análise do ato antes da cadeia (26/11, 19h10 — aprovado pela sócia sobre a prévia; migração 0126) ----------
+   A análise de cabimento é UMA tarefa por ato (sentença, decisão interlocutória, acórdão), de quem fará a peça. A cadeia só nasce
+   quando a análise é concluída, com o caminho escolhido; o que não foi escolhido fica registrado como “não cabe”. Quem trata a
+   publicação (controladoria) só define o ato, as datas e para quem vai. O sistema abre as tarefas; ninguém as lança à mão. */
+const ATOS={
+  sentenca:{nome:"Sentença",hip:["ed","apelacao"],comunicar:true,caminhos:[
+    {k:"ed",r:"Só embargos de declaração",abre:["ed"]},{k:"ed_depois",r:"Embargos e depois apelação",abre:["ed"],planeja:"apelacao"},
+    {k:"recurso",r:"Só apelação",abre:["apelacao"]},{k:"nao",r:"Não recorrer",abre:[],revisar:true}]},
+  decisao:{nome:"Decisão interlocutória",hip:["ed","agravo"],caminhos:[
+    {k:"ed",r:"Só embargos de declaração",abre:["ed"]},{k:"ed_depois",r:"Embargos e depois agravo",abre:["ed"],planeja:"agravo"},
+    {k:"recurso",r:"Só agravo",abre:["agravo"]},{k:"nao",r:"Não recorrer",abre:[]}]},
+  acordao:{nome:"Acórdão",hip:["ed","resp","re"],comunicar:true,caminhos:[
+    {k:"ed",r:"Só embargos de declaração",abre:["ed"]},{k:"ed_depois",r:"Embargos e depois recurso especial",abre:["ed"],planeja:"resp"},
+    {k:"resp",r:"Recurso especial",abre:["resp"]},{k:"re",r:"Recurso extraordinário",abre:["re"]},{k:"resp_re",r:"REsp e RE",abre:["resp","re"]},
+    {k:"nao",r:"Não recorrer",abre:[],revisar:true}]}};
+const CAD={
+  ATOS,
+  /* n dias úteis a partir de uma data (negativo = para trás); feriados pelo mesmo calendário do cálculo de prazos */
+  uteis(iso,n,uf){if(!iso)return null;const d=new Date(String(iso).slice(0,10)+"T12:00:00");let c=0;const s=n<0?-1:1;while(c<Math.abs(n)){d.setDate(d.getDate()+s);if(!window.PP_PRAZOS||window.PP_PRAZOS.ehUtil(d,uf||null))c++}return d.toISOString().slice(0,10)},
+  /* etapas de uma cadeia: confeccionar → (custas) → protocolar (meta interna; o prazo legal fica como fatal) → conferir, um dia útil depois da meta */
+  etapas(w,fim,uf){if(!w||!fim)return[];const e=[{codigo:"confeccionar",titulo:"Confeccionar — "+w.nome,prazo:CAD.uteis(fim,w.confeccionar_offset,uf),para:"resp"}];
+    if(w.custas)e.push({codigo:"custas",titulo:"Recolher custas — "+w.nome,prazo:CAD.uteis(fim,-3,uf),para:"resp"});
+    e.push({codigo:"protocolar",titulo:"Protocolar — "+w.nome,prazo:CAD.uteis(fim,w.protocolar_offset,uf),para:"resp",fatalEm:fim});
+    e.push({codigo:"conferir",titulo:"Conferir protocolo — "+w.nome,prazo:CAD.uteis(fim,Math.min(0,Math.max(w.conferir_offset??-1,w.protocolar_offset+1)),uf),para:"confere"});return e},
+  /* prazo da análise: 2 dias úteis da publicação; 1 quando há embargos de declaração entre as hipóteses */
+  prazoAnalise(base,hip,uf){return CAD.uteis(base,(hip||[]).some(h=>h.wf==="ed")?1:2,uf)},
+  curta:iso=>iso?String(iso).slice(8,10)+"/"+String(iso).slice(5,7):"—"
+};
+window.PP_CADEIAS=CAD;
+async function concluirAnalise(t){
+  try{await window.PP_PRAZOS?.pronto?.()}catch(e){}
+  const [tr,wr,er]=await Promise.all([SB.from("tarefas").select("id,titulo,descricao,analise,publicacao_id,processo_id,cliente_id,responsavel_id,prioridade,status").eq("id",t.id).maybeSingle(),
+    SB.from("workflows_prazo").select("*").eq("ativo",true).order("ordem"),SB.from("escritorio").select("dados").eq("id","juridico").maybeSingle()]);
+  const row=tr.data;if(tr.error||!row){toast("Não foi possível abrir a análise");return}
+  const A=row.analise||{},ato=ATOS[A.ato];if(!ato){toast("Esta análise não tem as hipóteses do ato registradas");return}
+  if(row.status==="concluida"||row.status==="cancelada"){toast("Esta análise já foi encerrada");return}
+  const WF=wr.data||[],dados=er.data?.dados||{},confereId=dados.conferencia_protocolo_id||null,revisorId=dados.revisao_pecas_id||null;
+  const hip=(A.hip||[]).map(h=>({...h,w:WF.find(w=>w.codigo===h.wf)})).filter(h=>h.w&&h.fim);
+  const fimDe=c=>hip.find(h=>h.wf===c)?.fim||null,uf=A.uf||null,hoje=hojeISO(),numero=t.numero_cnj||A.numero||"";
+  const respId=row.responsavel_id||meuColab()?.id||null,curta=CAD.curta,primeiro=n=>String(n||"").trim();
+  const nomeResp=respId?primeiro(nomeColab(respId)):"sem responsável",nomeConf=confereId?primeiro(nomeColab(confereId)):nomeResp,nomeRev=revisorId?primeiro(nomeColab(revisorId)):nomeResp;
+  /* publicação (só leitura), quando a tarefa veio de uma */
+  let pub=null,resumo=null;
+  if(row.publicacao_id){try{const [p,f]=await Promise.all([SB.from("publicacoes").select("numero_processo,tribunal,orgao,tipo_documento,tipo_comunicacao,data_disponibilizacao,texto").eq("id",row.publicacao_id).maybeSingle(),
+      SB.from("publicacao_fontes").select("publicacao_id,fonte,resumo:bruto->>resumo").eq("publicacao_id",row.publicacao_id).eq("fonte","sync")]);pub=p.data||null;
+      resumo=(f.data||[]).filter(x=>String(x.publicacao_id)===String(row.publicacao_id)&&String(x.resumo||"").trim()).map(x=>String(x.resumo).trim()).sort((a,b)=>b.length-a.length)[0]||null}catch(e){}}
+  const origem=`Análise de cabimento · ${ato.nome}${pub?.data_disponibilizacao?" de "+fmtD(parseD(String(pub.data_disponibilizacao).slice(0,10))):""} · processo ${numero||pub?.numero_processo||"s/ nº"}${t.cliente_nome?" · "+t.cliente_nome:""}`;
+  const esq=el("section",{class:"np-tp-pub","aria-label":"Ato analisado"},
+    el("div",{class:"np-tp-num"},numero||pub?.numero_processo||"sem número"),
+    el("div",{class:"np-tp-meta"},[pub?.tribunal,pub?.orgao,ato.nome,pub?.data_disponibilizacao?"publicada em "+fmtD(parseD(String(pub.data_disponibilizacao).slice(0,10))):null].filter(Boolean).join(" · ")),
+    t.cliente_nome?el("div",{class:"np-tp-meta"},"Cliente: ",el("b",{},t.cliente_nome)):null,
+    resumo?el("div",{class:"np-tp-sync"},el("div",{class:"r"},"Resumo"),el("p",{},resumo),el("small",{},"Resumo automático. Vale o teor.")):null,
+    el("div",{class:"np-tp-teor",tabindex:"0",role:"document","aria-label":"Teor"},pub?.texto?String(pub.texto).slice(0,6000):(row.descricao||"(sem texto)")));
+  let cam=null;const fund=el("textarea",{rows:3,id:"an-fund",placeholder:"Por que este caminho…"});
+  const seg=el("div",{class:"np-tp-seg np-an-cam",role:"group","aria-label":"Caminho escolhido"},...ato.caminhos.map(c=>el("button",{type:"button","data-o":c.k,"aria-pressed":"false",onclick:()=>{cam=c;desenha()}},c.r)));
+  const prev=el("div",{class:"np-an-prev"}),vazio=el("div",{class:"np-tp-vazio"},"Escolha o caminho. As tarefas só são abertas depois da sua decisão.");
+  const baseRow=(extra)=>({cliente_id:row.cliente_id||null,processo_id:row.processo_id||null,nucleo:"juridico",prioridade:row.prioridade||2,status:"aberta",publicacao_id:row.publicacao_id||null,...extra});
+  /* o que o caminho abre: linhas para gravar + quadros para mostrar */
+  const plano=(c,texto)=>{const rows=[],cx=[],desc=[origem,texto?"Fundamento da análise: "+texto:null].filter(Boolean).join("\n\n");let passada=false;const marca=d=>{if(d&&d<hoje)passada=true;return d};
+    for(const cod of c.abre){const w=WF.find(x=>x.codigo===cod),fim=fimDe(cod);if(!w||!fim)throw new Error("Falta a data de "+(w?.nome||cod)+" nesta análise");
+      const cadeia=crypto.randomUUID(),et=CAD.etapas(w,fim,uf),lin=[];
+      for(const x of et){rows.push(baseRow({titulo:x.titulo,responsavel_id:x.para==="confere"&&confereId?confereId:respId,prazo:marca(x.prazo),prazo_fatal:x.codigo==="protocolar",etapa_codigo:x.codigo,cadeia_id:cadeia,workflow_codigo:w.codigo,
+          descricao:(x.codigo==="protocolar"?`Prazo legal (fatal): ${curta(fim)}. Meta interna: protocolar até ${curta(x.prazo)}.\n\n`:x.codigo==="conferir"?"Conferir nos autos se o protocolo foi feito e juntado corretamente.\n\n":"")+desc}));
+        lin.push({d:curta(x.prazo),t:x.titulo.replace(" — "+w.nome,"")+(x.codigo==="protocolar"?" (meta interna)":""),q:x.para==="confere"?nomeConf:nomeResp})}
+      lin.push({d:curta(fim),t:"Prazo legal",q:"",fat:true});cx.push({h:"Tarefas que serão abertas — "+w.nome,dir:"prazo legal "+curta(fim),lin})}
+    const tb=[];
+    if(c.planeja){const wp=WF.find(x=>x.codigo===c.planeja),d=addD(hoje,15);
+      rows.push(baseRow({titulo:"Aguardar julgamento dos embargos — "+(wp?.nome||"recurso")+" planejada",responsavel_id:respId,prazo:d,prazo_fatal:false,etapa_codigo:"aguardar_ed",workflow_codigo:c.planeja,
+        analise:{planeja:c.planeja,planeja_rotulo:wp?.nome||c.planeja,decidido_por_nome:PP.perfil?.nome||null,decidido_em:new Date().toISOString()},
+        descricao:`Na análise ficou decidido: embargos de declaração e, depois, ${String(wp?.nome||"recurso").toLowerCase()}. Quando chegar a intimação do julgamento dos embargos, abrir a cadeia contando da nova publicação. Enquanto não chegar, conferir os autos e reagendar esta tarefa (lembrete a cada 15 dias).\n\n`+desc}));
+      tb.push({d:curta(d),t:"Aguardar o julgamento dos embargos (lembrete a cada 15 dias)",q:nomeResp})}
+    if(ato.comunicar){const d0=CAD.uteis(A.base||hoje,2,uf),d=d0<hoje?hoje:d0;rows.push(baseRow({titulo:`Comunicar o cliente — ${ato.nome.toLowerCase()}${numero?" · "+numero:""}`,responsavel_id:respId,prazo:d,prazo_fatal:false,descricao:desc}));tb.push({d:curta(d),t:"Comunicar o cliente sobre "+(A.ato==="sentenca"?"a sentença":"o acórdão"),q:nomeResp})}
+    if(c.revisar){const d=CAD.uteis(hoje,1,uf);rows.push(baseRow({titulo:"Revisar decisão de não recorrer"+(numero?" — "+numero:""),responsavel_id:revisorId||respId,prazo:d,prazo_fatal:false,etapa_codigo:"revisar_nao_recorrer",descricao:desc}));tb.push({d:curta(d),t:"Revisar a decisão de não recorrer",q:nomeRev})}
+    const fora=hip.filter(h=>!c.abre.includes(h.wf)&&h.wf!==c.planeja).map(h=>h.w.nome);
+    if(fora.length)tb.push({d:"—",t:fora.join(", ")+": registrado como “não cabe”",q:"com o fundamento"});
+    if(tb.length)cx.push({h:c.abre.length?"Também":"O que acontece",lin:tb});
+    return {rows,cx,fora,passada,aviso:c.planeja?`${WF.find(x=>x.codigo===c.planeja)?.nome||"Recurso"} planejada. A cadeia não é aberta agora: ela nasce quando chegar a intimação do julgamento dos embargos, contando da nova data.`:null}};
+  let btnSalvar=null;
+  function desenha(){for(const b of seg.children)b.setAttribute("aria-pressed",String(!!cam&&b.dataset.o===cam.k));vazio.hidden=!!cam;prev.replaceChildren();
+    if(!cam){if(btnSalvar){btnSalvar.textContent="Escolha o caminho";btnSalvar.classList.add("np-tp-espera")}return}
+    let p;try{p=plano(cam,"")}catch(e){prev.append(el("div",{class:"np-an-av"},e.message));return}
+    for(const c of p.cx)prev.append(el("div",{class:"np-an-cx"},el("h3",{},c.h,c.dir?el("i",{},c.dir):null),el("div",{class:"np-an-lt"},...c.lin.flatMap(l=>[el("span",{class:"d"+(l.fat?" fat":"")},l.d),el("span",{class:l.fat?"fat":""},l.t),el("span",{class:"q"},l.q)]))));
+    if(p.aviso)prev.append(el("div",{class:"np-an-av"},p.aviso));
+    if(p.passada)prev.append(el("div",{class:"np-an-av"},"Há etapas com data que já passou: elas nascem atrasadas. Confira as datas depois de abrir."));
+    if(btnSalvar){btnSalvar.classList.remove("np-tp-espera");btnSalvar.textContent=p.rows.length?`Abrir ${p.rows.length} tarefa${p.rows.length>1?"s":""} e concluir a análise`:"Concluir a análise"}}
+  const dir=el("section",{class:"np-tp-dec","aria-label":"Decisão"},
+    el("div",{class:"np-tp-passo"},el("div",{class:"np-tp-rot"},"1. Prazos deste ato"),el("div",{class:"np-an-hip"},...hip.map(h=>el("span",{},h.w.nome+" · ",el("b",{},curta(h.fim)))),hip.length?null:el("span",{class:"np-tp-nota"},"Sem prazos registrados."))),
+    el("div",{class:"np-tp-passo"},el("div",{class:"np-tp-rot"},"2. Qual caminho?"),seg),vazio,prev,
+    el("div",{class:"np-tp-f"},el("label",{for:"an-fund"},"Fundamento da análise",el("span",{}," (vai para o histórico e para as tarefas abertas)")),fund));
+  modal("Concluir análise de cabimento",el("div",{class:"np-tp"},esq,dir),async()=>{
+    if(!cam)throw new Error("Escolha o caminho");const txt=fund.value.trim();if(txt.length<5)throw new Error("Escreva o fundamento da análise");
+    const p=plano(cam,txt);
+    const nova={...A,caminho:cam.k,caminho_rotulo:cam.r,fundamento:txt,nao_cabe:p.fora,decidido_em:new Date().toISOString()};
+    const u=await SB.from("tarefas").update({status:"concluida",analise:nova}).eq("id",t.id);if(u.error)throw new Error(u.error.message||"Não foi possível concluir a análise");
+    if(p.rows.length){const ins=await SB.from("tarefas").insert(p.rows);
+      if(ins.error){await SB.from("tarefas").update({status:"aberta",analise:A}).eq("id",t.id);throw new Error("Não foi possível abrir as tarefas ("+(ins.error.message||"erro")+"). A análise continua aberta.")}}
+    try{await comentar(t.id,`Análise concluída: ${cam.r}.`+(p.fora.length?` Não cabe: ${p.fora.join(", ")}.`:"")+"\n"+txt)}catch(e){}
+    toast(p.rows.length?`Análise concluída — ${p.rows.length} tarefa${p.rows.length>1?"s":""} aberta${p.rows.length>1?"s":""}`:"Análise concluída");T.ok=false;try{carregar()}catch(e){}
+  },null,{confirmar:"Escolha o caminho"});
+  const host=$("#modalHost");btnSalvar=host?.querySelector(".np-f-salvar")||host?.querySelector("button.btn.primary");if(btnSalvar)btnSalvar.classList.add("np-tp-espera");
+  const card=host?.querySelector(".card.np-modal-v3")||host?.querySelector(".modal > .card");if(card){card.classList.add("np-modal-wide","np-tp-card");if(!card.classList.contains("np-modal-v3"))card.style.maxWidth="1080px"}
+}
 function openTarefa(t){
   const meu=meuColab();const aberta=t.status==="aberta"||t.status==="em_andamento";
   const host=$("#modalHost");host.replaceChildren();const close=()=>{clearInterval(openTarefa._tick);host.replaceChildren()};
@@ -325,6 +429,7 @@ function openTarefa(t){
   let com,arqCom;const btnsConcluir=[];
   let temRegistro=false; // já existe andamento registrado por alguém nesta tarefa? então pode concluir sem escrever de novo
   const concluir=async()=>{
+    if(t.etapa_codigo==="analise_ato"){close();concluirAnalise(t);return}
     const txt=(com?.value||"").trim();if(!txt&&!temRegistro){toast("Escreva na caixa de andamento o que foi feito antes de concluir");com?.focus();return}
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
       await mudarStatus(t,"concluida",txt||null,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();
@@ -380,7 +485,7 @@ function openTarefa(t){
   const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.replaceChildren(ico("clip","Anexar arquivo"));temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))registrar()});
   mencoes(com);
-  const ETAPA_N={analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
+  const ETAPA_N={analise_ato:"Analisar cabimento",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
   const cadeiaBox=t.cadeia_id?el("div",{class:"tf-cadeia"},el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"note"},"Carregando etapas…")):null;
   if(cadeiaBox)SB.from("v_tarefas").select("id,titulo,prazo,prazo_fatal,status,etapa_codigo,responsavel_nome,faixa,dias_para_prazo").eq("cadeia_id",t.cadeia_id).order("prazo").then(({data})=>{const ts=data||[];
     cadeiaBox.replaceChildren(el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"tf-cadeia-l"},...ts.map(x=>el("button",{class:"row"+(x.id===t.id?" atual":""),type:"button",onclick:()=>{if(x.id!==t.id){close();openTarefa({...x,cadeia_id:t.cadeia_id})}}},
@@ -591,7 +696,7 @@ window.PP_MOD.tarefas=renderTarefasCliente;
 const tarefasV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 const V3={painel:null,obra:null,aberta:null,grupos:null,vista:null,tick:null,recem:new Map()};
 const FAIXA_TOM={atrasada:"late",hoje:""};
-const ETAPA_N3={analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
+const ETAPA_N3={analise_ato:"Analisar cabimento",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
 const gruposV3=()=>{if(!V3.grupos){try{V3.grupos=JSON.parse(NPUI.pref.get("np-tarefas-grupos","{}"))||{}}catch(_){V3.grupos={}}}return V3.grupos};
 const vistaV3=()=>{if(!V3.vista)V3.vista=NPUI.pref.get("np-tarefas-vista",null)||(()=>{try{return localStorage.getItem("pp-tarefas-vista")||"lista"}catch(_){return "lista"}})();return V3.vista};
 /* régua e tom do prazo: fatal (vermelho cheio) > atrasada (vermelho 2 px) > vence hoje (âmbar); tarefas fechadas não têm régua */
@@ -785,7 +890,8 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
   /* cronômetro (PP_TS), Feito e Concluir — mesmas regras da V2 */
   let cron=null,ativSel=null;const cronDaTarefa=()=>cron&&cron.tarefa_id===t.id?cron:null;const trabalho=el("div",{class:"np-trab",style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap"});
   const reabrirTela=()=>{T.ok=false;carregar().then(()=>{const n=T.tarefas.find(x=>x.id===t.id);if(n)abrirPainelV3(n,{silencioso:true});else V3.painel.fechar()})};
-  const concluir=async()=>{const txt=com.value.trim();if(!txt&&!temRegistro){com.focus();nota.textContent="Escreva no andamento o que foi feito antes de concluir.";return}
+  const concluir=async()=>{if(t.etapa_codigo==="analise_ato"){V3.aberta=null;V3.painel.fechar();concluirAnalise(t);return}
+    const txt=com.value.trim();if(!txt&&!temRegistro){com.focus();nota.textContent="Escreva no andamento o que foi feito antes de concluir.";return}
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
       await mudarStatus(t,"concluida",txt||null,[...arqCom.files]);V3.recem.set(t.id,{quando:Date.now()});
       const li=V3.obra?.querySelector(`.np-it[data-id="${t.id}"]`);if(li)NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(t.id);toast("Tarefa reaberta");recarregar()}catch(e){toast(e.message)}}});
@@ -828,7 +934,7 @@ document.head.append(el("style",{},`html.np-casca-v3 .np-ta{flex:1;min-width:0;b
   vt.hidden=S.tab!=="tarefas";vh.hidden=S.tab!=="horas";
   if(S.tab==="tarefas")renderTarefas();if(S.tab==="horas"&&!window.PP_TS)renderHoras();}}
 {const _h=window.aplicarHash;window.aplicarHash=function(){const h=(location.hash||"").slice(1);const m=/^tarefas\/([0-9a-f-]{36})$/i.exec(h);if(m){T.abrir=m[1];if(!T.ok)garantir()}return _h.apply(this,arguments)}}
-window.PP_TAREFAS={minhasHoje:()=>{const m=meuColab();return T.ok&&m?T.tarefas.filter(t=>t.responsavel_id===m.id&&(t.status==="aberta"||t.status==="em_andamento")&&t.faixa==="hoje").length:null},lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.respIni=true;T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
+window.PP_TAREFAS={concluirAnalise,minhasHoje:()=>{const m=meuColab();return T.ok&&m?T.tarefas.filter(t=>t.responsavel_id===m.id&&(t.status==="aberta"||t.status==="em_andamento")&&t.faixa==="hoje").length:null},lista:()=>T.tarefas,concluirComNota,filtro:(f)=>{T.respIni=true;T.f={status:"abertas",resp:"",nucleo:"",cliente:"",fatais:false,tickets:"",cadeias:false,...f};render()},filtroAtual:()=>({...T.f}),abrir:id=>{T.abrir=id;S.tab="tarefas";try{localStorage.setItem("pp-tab","tarefas")}catch(_){}if(T.ok)render();else garantir()},nova:(t={})=>{if(!T.ok){garantir();setTimeout(()=>openTarefaForm(t),600);return}openTarefaForm(t)},
   /* ---- contrato público (Fase 4B) ---- */
   estado:()=>({carregado:T.ok,carregando:!!T.carregando,erro:T.erro||null,vazio:T.ok&&!T.tarefas.length}),
   // null = ainda não carregado; [] = carregado e vazio. Filtra só por campos existentes (cliente_id, nucleo, status); nenhuma relação inferida.
