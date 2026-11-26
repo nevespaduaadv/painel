@@ -428,15 +428,48 @@ function openTarefaForm(t={}){
     kon.replaceChildren(el("option",{value:""},"— sem vínculo —"),...S.contratos.filter(k=>k.clienteId===cid).map(k=>el("option",{value:k.id,selected:k.id===t.contrato_id?"":null},shortName(k))));
     pro.replaceChildren(el("option",{value:""},"— sem vínculo —"),...T.processos.filter(p=>p.cliente_id===cid||p.id===t.processo_id).map(p=>el("option",{value:p.id,selected:p.id===t.processo_id?"":null},(p.numero_cnj||"(sem número)")+(p.parte_contraria?" · "+p.parte_contraria:""))));};
   cli.onchange=vincular;vincular();
-  const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{for:"tf-tit"},"Título"),Object.assign(titulo,{id:"tf-tit"})),field("tf-cli","Cliente",cli),field("tf-resp","Responsável",resp),field("tf-nuc","Núcleo",nuc),
-    field("tf-kon","Contrato",kon),field("tf-pro","Processo",pro),field("tf-prazo","Prazo",prazo),field("tf-hora","Horário (opcional)",hora,"Audiência, reunião, perícia… Entra na agenda."),fatal.wrap,
-    window.PP_PRAZOS?(()=>{const d=el("details",{class:"f full"},el("summary",{style:"cursor:pointer;color:var(--muted);font-size:13px"},"Calcular prazo a partir de uma publicação/intimação…"));d.addEventListener("toggle",()=>{if(d.open&&!d.dataset.ok){d.dataset.ok="1";const pr=T.processos.find(x=>x.id===pro.value);d.append(window.PP_PRAZOS.campo({alvo:prazo,base:hojeISO(),uf:window.PP_PRAZOS.ufDoCnj(pr?.numero_cnj),dias:15}))}});return d})():null,field("tf-pri","Prioridade",pri),field("tf-status","Status",status),
-    field("tf-desc","Descrição",desc),t.id?null:field("tf-hr","Horas já gastas (opcional)",hr,"Cria um apontamento de hoje em seu nome."),
-    (()=>{anexoForm=el("input",{type:"file",multiple:""});return el("div",{class:"f full"},el("label",{},"Anexar arquivo (PDF, Word, imagem…)"),anexoForm,el("div",{class:"help"},"Ex.: a petição inicial para o responsável corrigir; o despacho que gerou a tarefa. Fica no histórico da tarefa, visível para quem a recebe."))})());
+  /* 26/11 (16h56, aprovado pela sócia sobre a prévia): janela enxuta — título em destaque; responsável, prazo e horário numa linha;
+     cliente com busca e prioridade em botões; processo e contrato só depois de escolher o cliente; prazo fatal como chave;
+     núcleo, horas e cálculo de prazo em “Mais opções”. Na criação o status não aparece (nasce “A fazer”); na edição, sim.
+     Os mesmos campos e ids de antes (tf-*): nada muda no que é gravado. */
+  Object.assign(titulo,{id:"tf-tit",placeholder:"O que precisa ser feito?"});titulo.classList.add("np-tf-tit");titulo.setAttribute("aria-label","Título da tarefa");
+  // cliente com busca: o <select> continua sendo a fonte (id tf-cli); o campo de texto filtra e escolhe
+  const cliBusca=inp("search","",{placeholder:"Buscar cliente…","aria-label":"Cliente",autocomplete:"off",role:"combobox","aria-expanded":"false","aria-controls":"tf-cli-lista"}),cliLista=el("ul",{class:"np-tf-res",id:"tf-cli-lista",role:"listbox",hidden:""});
+  const nomeCliSel=()=>cli.value?(cli.selectedOptions[0]?.textContent||""):"";const normB=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+  const fecharLista=()=>{cliLista.hidden=true;cliBusca.setAttribute("aria-expanded","false")};
+  const escolherCli=v=>{cli.value=v;cli.dispatchEvent(new Event("change",{bubbles:true}));cliBusca.value=nomeCliSel();fecharLista()};
+  const listarCli=()=>{const q=normB(cliBusca.value.trim());const ops=[...cli.options].filter(o=>o.value&&(!q||normB(o.textContent).includes(q))).slice(0,8);
+    cliLista.replaceChildren(...(cli.value?[el("li",{},el("button",{type:"button",role:"option",class:"lim",onmousedown:e=>e.preventDefault(),onclick:()=>escolherCli("")},"Sem cliente"))]:[]),...ops.map(o=>el("li",{},el("button",{type:"button",role:"option","aria-selected":String(o.value===cli.value),onmousedown:e=>e.preventDefault(),onclick:()=>escolherCli(o.value)},o.textContent))),...(ops.length?[]:[el("li",{class:"vz"},"Nenhum cliente encontrado.")]));
+    cliLista.hidden=false;cliBusca.setAttribute("aria-expanded","true")};
+  cliBusca.value=nomeCliSel();cliBusca.onfocus=()=>{cliBusca.select();listarCli()};cliBusca.oninput=listarCli;cliBusca.onblur=()=>setTimeout(()=>{fecharLista();cliBusca.value=nomeCliSel()},120);
+  cliBusca.onkeydown=e=>{if(e.key==="Escape"&&!cliLista.hidden){e.stopPropagation();fecharLista();cliBusca.value=nomeCliSel()}else if(e.key==="ArrowDown"){e.preventDefault();if(cliLista.hidden)listarCli();cliLista.querySelector("button")?.focus()}else if(e.key==="Enter"){e.preventDefault();const b1=cliLista.querySelector('button:not(.lim)');if(!cliLista.hidden&&b1)b1.click()}};
+  cliLista.addEventListener("keydown",e=>{const bs=[...cliLista.querySelectorAll("button")];const i=bs.indexOf(document.activeElement);if(e.key==="ArrowDown"){e.preventDefault();(bs[i+1]||bs[0])?.focus()}else if(e.key==="ArrowUp"){e.preventDefault();(i<=0?cliBusca:bs[i-1]).focus()}else if(e.key==="Escape"){e.stopPropagation();fecharLista();cliBusca.focus()}});
+  cli.id="tf-cli";cli.classList.add("np-seg-oculto");cli.setAttribute("tabindex","-1");cli.setAttribute("aria-hidden","true");cli.addEventListener("change",()=>{if(document.activeElement!==cliBusca)cliBusca.value=nomeCliSel()});
+  const fCli=el("div",{class:"f np-tf-cli"},el("label",{for:"tf-cli-b"},"Cliente"),Object.assign(cliBusca,{id:"tf-cli-b"}),cli,cliLista);
+  // processo e contrato só fazem sentido com cliente escolhido
+  const linhaVinc=el("div",{class:"np-tf-l c2"},field("tf-pro","Processo",pro),field("tf-kon","Contrato",kon));const verVinc=()=>{linhaVinc.hidden=!cli.value&&!t.processo_id&&!t.contrato_id};cli.addEventListener("change",verVinc);verVinc();
+  // prazo fatal como chave; anexo como botão
+  fatal.input.id="tf-fatal";fatal.input.removeAttribute("style");const chave=el("label",{class:"np-tf-sw",for:"tf-fatal",title:"Prazo processual ou contratual improrrogável."},fatal.input,el("span",{class:"tr","aria-hidden":"true"}),"Prazo fatal");
+  anexoForm=el("input",{type:"file",multiple:"",id:"tf-anexo",class:"np-vh",tabindex:"-1"});const anexoTxt=el("span",{class:"np-tf-anx"});anexoForm.addEventListener("change",()=>{const n=anexoForm.files.length;anexoTxt.textContent=n?(n===1?anexoForm.files[0].name:n+" arquivos"):""});
+  const btAnexo=el("button",{type:"button",class:"btn sm np-tf-bt",title:"Ex.: a petição para o responsável corrigir; o despacho que gerou a tarefa. Fica no histórico da tarefa.",onclick:()=>anexoForm.click()},"+ Anexar arquivo");
+  const calc=window.PP_PRAZOS?(()=>{const d=el("details",{class:"f full np-tf-calc"},el("summary",{},"Calcular prazo a partir de uma publicação ou intimação"));d.addEventListener("toggle",()=>{if(d.open&&!d.dataset.ok){d.dataset.ok="1";const pr=T.processos.find(x=>x.id===pro.value);d.append(window.PP_PRAZOS.campo({alvo:prazo,base:hojeISO(),uf:window.PP_PRAZOS.ufDoCnj(pr?.numero_cnj),dias:15}))}});return d})():null;
+  const maisItens=[field("tf-nuc","Núcleo",nuc,"Vem do responsável; pode trocar."),t.id?null:field("tf-hr","Horas já gastas",hr,"Cria um apontamento de hoje em seu nome."),calc].filter(Boolean);
+  const mais=window.NPUI?.maisCampos?NPUI.maisCampos("Mais opções",maisItens):el("details",{class:"f full"},el("summary",{},"Mais opções"),el("div",{class:"form"},...maisItens));
+  const body=el("div",{class:"form np-tf"},
+    el("div",{class:"f full"},titulo),
+    el("div",{class:"np-tf-l c3"},field("tf-resp","Responsável",resp),field("tf-prazo","Prazo",prazo),field("tf-hora","Horário (opcional)",hora)),
+    el("div",{class:"np-tf-l "+(t.id?"c3":"c2")},fCli,field("tf-pri","Prioridade",pri),t.id?field("tf-status","Status",status):null),
+    linhaVinc,
+    field("tf-desc","Descrição (opcional)",desc),
+    el("div",{class:"np-tf-pe"},chave,btAnexo,anexoTxt,anexoForm),
+    mais);
+  desc.rows=2;
+  // núcleo acompanha o responsável enquanto a pessoa não mexer nele (só na criação)
+  if(!t.id){let nucMexido=false;nuc.addEventListener("change",()=>{nucMexido=true});resp.addEventListener("change",()=>{if(nucMexido)return;const c=T.colab.find(x=>x.id===resp.value);if(c?.nucleo&&[...nuc.options].some(o=>o.value===c.nucleo))nuc.value=c.nucleo})}
   /* reagendar exige justificativa (controladoria): o campo aparece quando o prazo de uma tarefa já salva muda */
   const motivoC=campoMotivo();const motivoWrap=motivoC.wrap;
   if(t.id&&t.prazo){const prazoOrig=t.prazo;const chk=()=>motivoC.mostrar(prazo.value&&prazo.value!==prazoOrig);prazo.addEventListener("input",chk);prazo.addEventListener("change",chk);
-    const pos=body.querySelector("#tf-prazo")?.closest(".f");if(pos)pos.after(motivoWrap);else body.append(motivoWrap)}
+    const pos=body.querySelector("#tf-prazo")?.closest(".f");if(pos)(pos.closest(".np-tf-l")||pos).after(motivoWrap);else body.append(motivoWrap)}
   if(t.id){
     const hist=el("div",{},el("div",{class:"note"},"Carregando histórico…"));const com=el("textarea",{rows:2,placeholder:"Comentar (ex.: liguei para o cliente, aguardando documentos)"});
     const btnCom=el("button",{class:"btn sm",onclick:async()=>{if(!com.value.trim())return;try{await comentar(t.id,com.value.trim());com.value="";toast("Comentário registrado");historico(t.id,hist)}catch(e){toast(e.message)}}},"Comentar");
@@ -457,7 +490,7 @@ function openTarefaForm(t={}){
       if(+hr.value>0){if(!meu)throw new Error("Tarefa salva, mas você não tem registro de colaborador para apontar horas");const {error:e2}=await SB.from("apontamentos_horas").insert({colaborador_id:meu.id,data:hojeISO(),horas:+hr.value,cliente_id:cli.value||null,tarefa_id:id,tipo_atividade:"outro",descricao:titulo.value.trim()});if(e2)throw e2}}
     if(anexoForm&&anexoForm.files.length)await comentar(id,"Arquivo anexado: "+[...anexoForm.files].map(f=>f.name).join(", "),[...anexoForm.files]);
     toast("Tarefa salva");
-  },extra);
+  },extra,{confirmar:t.id?"Salvar":"Criar tarefa"});
 }
 
 /* ---------- Horas (timesheet) ---------- */
