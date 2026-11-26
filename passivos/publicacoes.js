@@ -17,6 +17,8 @@ async function carregar(){
     const [a,b,c,d]=await Promise.all([q,SB.from("v_publicacoes_resumo").select("*").maybeSingle(),npTodas(()=>SB.from("processos").select("id,cliente_id,numero_cnj,tipo_acao,status").order("numero_cnj").order("id")),SB.from("colaboradores").select("id,perfil_id,nome,nucleo,ativo").order("nome")]);
     if(a.error)throw a.error;U.lista=a.data||[];U.resumo=b.data||null;U.procs=c.data||[];U.colab=d.data||[];U.ok=true;U.erro=null;
     await carregarSync();
+    /* 0127: processos com recurso planejado (embargos opostos, recurso a interpor depois do julgamento) — a intimação seguinte ganha a marca na lista */
+    try{const pl=await SB.from("tarefas").select("processo_id,analise").eq("etapa_codigo","aguardar_ed").in("status",["aberta","em_andamento"]);U.planejados=new Map((pl.data||[]).filter(x=>x.processo_id).map(x=>[x.processo_id,x.analise?.planeja_rotulo||"recurso"]))}catch(e){U.planejados=new Map()}
   }catch(e){console.warn("publicacoes",e);U.erro=e;toast("Não foi possível carregar as publicações")}
   finally{U.carregando=false}
   render();
@@ -163,6 +165,7 @@ function abrirPubOuTratar(p,origem){
 function linhaPub(p){
   const st=sitP(p),d=p.dias_para_tratar,m=[];
   if(p.sem_vinculo&&!p.ignorada)m.push(NPUI.marca("sem processo","att"));
+  if(!p.providencia&&!p.ignorada&&p.processo_id&&U.planejados?.has(p.processo_id)){const k=NPUI.marca("recurso planejado","att");k.title="Neste processo ficou decidido interpor "+String(U.planejados.get(p.processo_id)).toLowerCase()+" depois do julgamento dos embargos. Veja se esta intimação é esse julgamento.";m.push(k)}
   const nz=aConferir(p);if(nz){const k=NPUI.marca(nz===1?"prazo a conferir":nz+" prazos a conferir","att");k.title="Prazo sugerido automaticamente. Só vale depois da conferência do Jurídico.";m.push(k)}
   if(emRevisao(p)){const k=NPUI.marca("prazo em revisão","att");k.title="Conferido, aguardando a revisão de quem responde pelo Jurídico";m.push(k)}
   if(divergDe(p).length){const k=NPUI.marca("fontes divergentes","att");k.title="As fontes trazem informações diferentes. Abra para conciliar.";m.push(k)}

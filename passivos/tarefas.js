@@ -256,7 +256,7 @@ function concluirComNota(t){
   if(t.etapa_codigo==="analise_ato"){concluirAnalise(t);return}   /* a análise do ato conclui escolhendo o caminho (0126) */
   const ta=el("textarea",{placeholder:"Ex.: petição protocolada (ID 1234); aguardando intimação. Cliente avisado por WhatsApp.",rows:3});const arq=el("input",{type:"file",multiple:""});
   const body=el("div",{class:"form"},el("div",{class:"f full"},el("label",{},"O que foi feito?"),ta,el("div",{class:"help"},"Obrigatório. Vira o último registro do histórico e do dossiê; quem abriu a tarefa é avisado.")),el("div",{class:"f full"},el("label",{},"Anexar (opcional)"),arq));
-  modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída")});
+  modal("Concluir: "+t.titulo,body,async()=>{if(!ta.value.trim())throw new Error("Escreva o que foi feito");await mudarStatus(t,"concluida",ta.value.trim(),[...arq.files]);toast("Tarefa concluída");if(t.etapa_codigo==="revisar"&&t.cadeia_id)setTimeout(()=>decidirRevisao(t),350)});
   const btn=$("#modalHost button.btn.primary");if(btn)btn.textContent="Concluir tarefa";
 }
 const comentarConclusao=concluirComNota;
@@ -324,11 +324,37 @@ const CAD={
   ATOS,
   /* n dias úteis a partir de uma data (negativo = para trás); feriados pelo mesmo calendário do cálculo de prazos */
   uteis(iso,n,uf){if(!iso)return null;const d=new Date(String(iso).slice(0,10)+"T12:00:00");let c=0;const s=n<0?-1:1;while(c<Math.abs(n)){d.setDate(d.getDate()+s);if(!window.PP_PRAZOS||window.PP_PRAZOS.ehUtil(d,uf||null))c++}return d.toISOString().slice(0,10)},
-  /* etapas de uma cadeia: confeccionar → (custas) → protocolar (meta interna; o prazo legal fica como fatal) → conferir, um dia útil depois da meta */
-  etapas(w,fim,uf){if(!w||!fim)return[];const e=[{codigo:"confeccionar",titulo:"Confeccionar — "+w.nome,prazo:CAD.uteis(fim,w.confeccionar_offset,uf),para:"resp"}];
-    if(w.custas)e.push({codigo:"custas",titulo:"Recolher custas — "+w.nome,prazo:CAD.uteis(fim,-3,uf),para:"resp"});
-    e.push({codigo:"protocolar",titulo:"Protocolar — "+w.nome,prazo:CAD.uteis(fim,w.protocolar_offset,uf),para:"resp",fatalEm:fim});
-    e.push({codigo:"conferir",titulo:"Conferir protocolo — "+w.nome,prazo:CAD.uteis(fim,Math.min(0,Math.max(w.conferir_offset??-1,w.protocolar_offset+1)),uf),para:"confere"});return e},
+  /* etapas de uma cadeia (0127). Com revisão (recursos): confeccionar e enviar → revisar → ajustar → confirmar os ajustes → protocolar (meta interna;
+     o prazo legal fica como fatal) → conferir. Sem revisão: confeccionar → protocolar → conferir. O preparo é uma cadeia à parte (grupo "preparo"):
+     informar o cliente logo depois da análise, acompanhar, e recolher só depois da confirmação dos ajustes. As distâncias vêm do fluxo (dias úteis
+     antes do prazo legal); a conferência cai sempre depois da meta de protocolo e nunca depois do prazo legal. */
+  /* dias úteis entre a data-base e o vencimento (para escolher a régua quando o juiz fixa um prazo diferente do padrão do tipo) */
+  diasEntre(base,fim,uf){if(!base||!fim||fim<=base)return null;let n=0,d=String(base).slice(0,10);while(d<fim&&n<400){d=CAD.uteis(d,1,uf);n++}return n},
+  /* régua efetiva: a do tipo quando o prazo é o padrão dele (ou longo); senão, pela quantidade de dias — até 7: −3/−2/−1, sem revisão (não cabe);
+     de 8 a 12: −4/−3/−2 (com revisão: −7/−2/−1, sem folga) */
+  regua(w,n){const pad={c:w.confeccionar_offset,pr:w.protocolar_offset,cf:w.conferir_offset??-1,rev:!!w.revisao};if(n==null||n>=13||Math.abs(n-w.dias_legais)<=1)return pad;
+    if(n<=7)return {c:Math.max(-3,-(n-1)),pr:Math.max(-2,-(n-2)),cf:-1,rev:false};return w.revisao?{c:-7,pr:-2,cf:-1,rev:true}:{c:-4,pr:-3,cf:-2,rev:false}},
+  etapas(w,fim,uf,o={}){if(!w||!fim)return[];const U=n=>CAD.uteis(fim,n,uf),R=CAD.regua(w,o.dias??CAD.diasEntre(o.base,fim,uf)),c=R.c,pr=Math.min(0,R.pr),e=[];w={...w,revisao:R.rev,conferir_offset:R.cf};
+    if(w.revisao)e.push({codigo:"confeccionar",titulo:"Confeccionar e enviar para revisão — "+w.nome,prazo:U(c),para:"resp"},{codigo:"revisar",titulo:"Revisar a peça — "+w.nome,prazo:U(c+1),para:"revisor"},
+      {codigo:"ajustar",titulo:"Ajustar e reenviar — "+w.nome,prazo:U(c+2),para:"resp",seAjuste:true},{codigo:"confirmar",titulo:"Confirmar os ajustes — "+w.nome,prazo:U(c+3),para:"revisor",seAjuste:true});
+    else e.push({codigo:"confeccionar",titulo:"Confeccionar — "+w.nome,prazo:U(c),para:"resp"});
+    if(w.custas&&!w.revisao)e.push({codigo:"custas",titulo:"Recolher custas — "+w.nome,prazo:U(-3),para:"resp"});
+    e.push({codigo:"protocolar",titulo:"Protocolar — "+w.nome,prazo:U(pr),para:"resp",fatalEm:fim,preparo:!!w.custas});
+    e.push({codigo:"conferir",titulo:"Conferir protocolo — "+w.nome,prazo:U(Math.min(0,Math.max(w.conferir_offset??-1,pr+1))),para:"confere"});
+    if(w.custas&&w.revisao){const hoje=hojeISO(),limite=U(c+3);let inf=o.base?CAD.uteis(o.base,3,uf):hoje;if(inf<hoje)inf=hoje;if(inf>limite)inf=limite;
+      e.push({codigo:"preparo_informar",grupo:"preparo",titulo:"Preparo: calcular o valor e informar o cliente — "+w.nome,prazo:inf,para:"resp"},
+        {codigo:"preparo_acompanhar",grupo:"preparo",titulo:"Preparo: acompanhar com o cliente — "+w.nome,prazo:limite,para:"resp"},
+        {codigo:"preparo_recolher",grupo:"preparo",titulo:"Preparo: recolher — "+w.nome,prazo:U(pr-1),para:"resp",aposConfirmar:true})}
+    return e},
+  /* linhas prontas para gravar: a cadeia principal e a do preparo têm identificadores próprios */
+  linhas(w,fim,uf,o){const et=CAD.etapas(w,fim,uf,{base:o.base}),cad=crypto.randomUUID(),cadP=crypto.randomUUID(),cur=CAD.curta;
+    return et.map(x=>({...o.comum,titulo:x.titulo,responsavel_id:x.para==="confere"&&o.confereId?o.confereId:x.para==="revisor"&&o.revisorId?o.revisorId:o.respId,prazo:x.prazo,prazo_fatal:x.codigo==="protocolar",etapa_codigo:x.codigo,
+      cadeia_id:x.grupo==="preparo"?cadP:cad,workflow_codigo:w.codigo,
+      descricao:(x.codigo==="protocolar"?`Prazo legal (fatal): ${cur(fim)}. Meta interna: protocolar até ${cur(x.prazo)}.`+(x.preparo?" Antes de protocolar, confira se o preparo foi recolhido.":"")+"\n\n"
+        :x.codigo==="conferir"?"Conferir nos autos se o protocolo foi feito e juntado corretamente.\n\n":x.codigo==="revisar"?"Ao concluir, diga se a peça foi aprovada sem ajustes ou se há ajustes a fazer.\n\n"
+        :x.seAjuste?"Só se a revisão pedir ajustes. Aprovada sem ajustes, esta etapa é dispensada sozinha.\n\n":x.aposConfirmar?"Recolher só depois de confirmados os ajustes da peça.\n\n":"")+(o.desc||"")}))},
+  /* como a etapa aparece numa prévia */
+  rotuloEtapa(x,w){return x.titulo.replace(" — "+w.nome,"").replace(/^Preparo: /,"").replace(/^./,c=>c.toUpperCase())+(x.codigo==="protocolar"?" (meta interna)":x.seAjuste?" (se houver ajuste)":x.aposConfirmar?" (depois da confirmação)":"")},
   /* prazo da análise: 2 dias úteis da publicação; 1 quando há embargos de declaração entre as hipóteses */
   prazoAnalise(base,hip,uf){return CAD.uteis(base,(hip||[]).some(h=>h.wf==="ed")?1:2,uf)},
   curta:iso=>iso?String(iso).slice(8,10)+"/"+String(iso).slice(5,7):"—"
@@ -365,11 +391,11 @@ async function concluirAnalise(t){
   /* o que o caminho abre: linhas para gravar + quadros para mostrar */
   const plano=(c,texto)=>{const rows=[],cx=[],desc=[origem,texto?"Fundamento da análise: "+texto:null].filter(Boolean).join("\n\n");let passada=false;const marca=d=>{if(d&&d<hoje)passada=true;return d};
     for(const cod of c.abre){const w=WF.find(x=>x.codigo===cod),fim=fimDe(cod);if(!w||!fim)throw new Error("Falta a data de "+(w?.nome||cod)+" nesta análise");
-      const cadeia=crypto.randomUUID(),et=CAD.etapas(w,fim,uf),lin=[];
-      for(const x of et){rows.push(baseRow({titulo:x.titulo,responsavel_id:x.para==="confere"&&confereId?confereId:respId,prazo:marca(x.prazo),prazo_fatal:x.codigo==="protocolar",etapa_codigo:x.codigo,cadeia_id:cadeia,workflow_codigo:w.codigo,
-          descricao:(x.codigo==="protocolar"?`Prazo legal (fatal): ${curta(fim)}. Meta interna: protocolar até ${curta(x.prazo)}.\n\n`:x.codigo==="conferir"?"Conferir nos autos se o protocolo foi feito e juntado corretamente.\n\n":"")+desc}));
-        lin.push({d:curta(x.prazo),t:x.titulo.replace(" — "+w.nome,"")+(x.codigo==="protocolar"?" (meta interna)":""),q:x.para==="confere"?nomeConf:nomeResp})}
-      lin.push({d:curta(fim),t:"Prazo legal",q:"",fat:true});cx.push({h:"Tarefas que serão abertas — "+w.nome,dir:"prazo legal "+curta(fim),lin})}
+      const et=CAD.etapas(w,fim,uf,{base:A.base}),quem=x=>x.para==="confere"?nomeConf:x.para==="revisor"?nomeRev:nomeResp;
+      for(const r of CAD.linhas(w,fim,uf,{base:A.base,comum:baseRow({}),respId,confereId,revisorId,desc})){marca(r.prazo);rows.push(r)}
+      const lin=et.filter(x=>x.grupo!=="preparo").map(x=>({d:curta(x.prazo),t:CAD.rotuloEtapa(x,w),q:quem(x)}));lin.push({d:curta(fim),t:"Prazo legal",q:"",fat:true});
+      cx.push({h:"Tarefas que serão abertas — "+w.nome,dir:"prazo legal "+curta(fim),lin});
+      const pp=et.filter(x=>x.grupo==="preparo");if(pp.length)cx.push({h:"Preparo — "+w.nome,dir:"corre em paralelo",lin:pp.map(x=>({d:curta(x.prazo),t:CAD.rotuloEtapa(x,w),q:quem(x)}))})}
     const tb=[];
     if(c.planeja){const wp=WF.find(x=>x.codigo===c.planeja),d=addD(hoje,15);
       rows.push(baseRow({titulo:"Aguardar julgamento dos embargos — "+(wp?.nome||"recurso")+" planejada",responsavel_id:respId,prazo:d,prazo_fatal:false,etapa_codigo:"aguardar_ed",workflow_codigo:c.planeja,
@@ -407,6 +433,17 @@ async function concluirAnalise(t){
   const host=$("#modalHost");btnSalvar=host?.querySelector(".np-f-salvar")||host?.querySelector("button.btn.primary");if(btnSalvar)btnSalvar.classList.add("np-tp-espera");
   const card=host?.querySelector(".card.np-modal-v3")||host?.querySelector(".modal > .card");if(card){card.classList.add("np-modal-wide","np-tp-card");if(!card.classList.contains("np-modal-v3"))card.style.maxWidth="1080px"}
 }
+/* Ao concluir “Revisar a peça”: aprovada sem ajustes dispensa as etapas “Ajustar” e “Confirmar os ajustes” da mesma cadeia (ficam no histórico). */
+function decidirRevisao(t){return new Promise(res=>{
+  const host=$("#modalHost"),fim=v=>{host.replaceChildren();res(v)};
+  const semAjuste=async()=>{try{const {data}=await SB.from("tarefas").select("id").eq("cadeia_id",t.cadeia_id).in("etapa_codigo",["ajustar","confirmar"]).in("status",["aberta","em_andamento"]);
+      const ids=(data||[]).map(x=>x.id);if(ids.length){const {error}=await SB.from("tarefas").update({status:"cancelada"}).in("id",ids);if(error)throw new Error(error.message);for(const id of ids)await comentar(id,"Dispensada: a revisão aprovou a peça sem ajustes.")}
+      toast("Peça aprovada sem ajustes");fim(false)}catch(e){toast(e.message);fim(null)}};
+  const card=el("div",{class:"card",role:"dialog","aria-modal":"true",style:"max-width:520px"},el("h2",{},"A peça precisa de ajustes?"),
+    el("p",{class:"sub",style:"margin:8px 0 14px"},"Com ajustes, seguem abertas as etapas “Ajustar e reenviar” e “Confirmar os ajustes”. Aprovada sem ajustes, as duas são dispensadas e a cadeia segue para o protocolo."),
+    el("div",{class:"actions",style:"justify-content:flex-end"},el("button",{class:"btn",onclick:()=>{toast("Ajustes pedidos: a etapa “Ajustar e reenviar” segue aberta");fim(true)}},"Há ajustes a fazer"),el("button",{class:"btn primary",onclick:semAjuste},"Aprovada sem ajustes")));
+  host.replaceChildren(el("div",{class:"modal"},card));
+})}
 function openTarefa(t){
   const meu=meuColab();const aberta=t.status==="aberta"||t.status==="em_andamento";
   const host=$("#modalHost");host.replaceChildren();const close=()=>{clearInterval(openTarefa._tick);host.replaceChildren()};
@@ -434,6 +471,7 @@ function openTarefa(t){
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
       await mudarStatus(t,"concluida",txt||null,[...(arqCom?.files||[])]);toast("Tarefa concluída");close();
       if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);
+      if(t.etapa_codigo==="revisar"&&t.cadeia_id)await decidirRevisao(t);
       T.ok=false;await carregar()}catch(e){toast(e.message)}
   };
   const btnConcluir=(cls)=>{const b=el("button",{class:cls,disabled:"",title:"Escreva o que foi feito na caixa de andamento para liberar",onclick:concluir},"✓ Concluir");btnsConcluir.push(b);return b};
@@ -485,7 +523,7 @@ function openTarefa(t){
   const registrar=async()=>{if(!com.value.trim()&&!arqCom.files.length)return;try{await comentar(t.id,com.value.trim()||"(anexo)",[...arqCom.files]);com.value="";arqCom.value="";btnArq.replaceChildren(ico("clip","Anexar arquivo"));temRegistro=true;liberar();toast("Registrado");historico(t.id,hist)}catch(e){toast(e.message)}};
   com.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))registrar()});
   mencoes(com);
-  const ETAPA_N={analise_ato:"Analisar cabimento",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
+  const ETAPA_N={analise_ato:"Analisar cabimento",revisar:"Revisar a peça",ajustar:"Ajustar e reenviar",confirmar:"Confirmar ajustes",preparo_informar:"Preparo: informar o cliente",preparo_acompanhar:"Preparo: acompanhar",preparo_recolher:"Preparo: recolher",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
   const cadeiaBox=t.cadeia_id?el("div",{class:"tf-cadeia"},el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"note"},"Carregando etapas…")):null;
   if(cadeiaBox)SB.from("v_tarefas").select("id,titulo,prazo,prazo_fatal,status,etapa_codigo,responsavel_nome,faixa,dias_para_prazo").eq("cadeia_id",t.cadeia_id).order("prazo").then(({data})=>{const ts=data||[];
     cadeiaBox.replaceChildren(el("div",{class:"tf-h"},"Cadeia do prazo"),el("div",{class:"tf-cadeia-l"},...ts.map(x=>el("button",{class:"row"+(x.id===t.id?" atual":""),type:"button",onclick:()=>{if(x.id!==t.id){close();openTarefa({...x,cadeia_id:t.cadeia_id})}}},
@@ -696,7 +734,7 @@ window.PP_MOD.tarefas=renderTarefasCliente;
 const tarefasV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 const V3={painel:null,obra:null,aberta:null,grupos:null,vista:null,tick:null,recem:new Map()};
 const FAIXA_TOM={atrasada:"late",hoje:""};
-const ETAPA_N3={analise_ato:"Analisar cabimento",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
+const ETAPA_N3={analise_ato:"Analisar cabimento",revisar:"Revisar a peça",ajustar:"Ajustar e reenviar",confirmar:"Confirmar ajustes",preparo_informar:"Preparo: informar o cliente",preparo_acompanhar:"Preparo: acompanhar",preparo_recolher:"Preparo: recolher",aguardar_ed:"Aguardar embargos",revisar_nao_recorrer:"Revisar",analisar:"Analisar cabimento",confeccionar:"Confeccionar",custas:"Recolher custas",protocolar:"Protocolar",conferir:"Conferir protocolo"};
 const gruposV3=()=>{if(!V3.grupos){try{V3.grupos=JSON.parse(NPUI.pref.get("np-tarefas-grupos","{}"))||{}}catch(_){V3.grupos={}}}return V3.grupos};
 const vistaV3=()=>{if(!V3.vista)V3.vista=NPUI.pref.get("np-tarefas-vista",null)||(()=>{try{return localStorage.getItem("pp-tarefas-vista")||"lista"}catch(_){return "lista"}})();return V3.vista};
 /* régua e tom do prazo: fatal (vermelho cheio) > atrasada (vermelho 2 px) > vence hoje (âmbar); tarefas fechadas não têm régua */
@@ -895,7 +933,7 @@ function abrirPainelV3(t,{origem,focoAndamento,silencioso}={}){
     try{if(window.PP_TS&&cronDaTarefa())await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
       await mudarStatus(t,"concluida",txt||null,[...arqCom.files]);V3.recem.set(t.id,{quando:Date.now()});
       const li=V3.obra?.querySelector(`.np-it[data-id="${t.id}"]`);if(li)NPUI.feito(li,{texto:"feita · "+t.titulo,acao:"Reabrir",onAcao:async()=>{try{await mudarStatus(t,"aberta");V3.recem.delete(t.id);toast("Tarefa reaberta");recarregar()}catch(e){toast(e.message)}}});
-      V3.aberta=null;V3.painel.fechar();if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);recarregar()}catch(e){toast(e.message)}};
+      V3.aberta=null;V3.painel.fechar();if(t.etapa_codigo==="analisar"&&t.cadeia_id)await decidirCadeia(t);if(t.etapa_codigo==="revisar"&&t.cadeia_id)await decidirRevisao(t);recarregar()}catch(e){toast(e.message)}};
   const temOQueGravar=()=>!!(com.value.trim()||arqCom.files.length||cronDaTarefa());
   const feito=async()=>{if(!temOQueGravar()){nota.textContent="Nada a gravar: escreva um andamento, anexe um arquivo ou use o cronômetro.";com.focus();return}
     try{const txt=com.value.trim(),anexos=arqCom.files.length,tempo=!!(window.PP_TS&&cronDaTarefa());if(tempo)await window.PP_TS.pararDireto({descricao:t.titulo,atividade:ativSel?.value||null});
