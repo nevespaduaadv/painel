@@ -2255,6 +2255,52 @@ html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox],html.np-casca-v3 
 @media (max-width:600px){html.np-casca-v3 .np-modal-v3 :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select){min-height:44px;height:44px}html.np-casca-v3 .np-modal-v3 .np-m-corpo .btn,html.np-casca-v3 .np-modal-v3 .np-f-acoes .btn{min-height:44px}html.np-casca-v3 .np-modal-v3 input[type=file]{min-height:44px}}
 html.np-casca-v3[data-theme="dark"] .np-modal-v3 select:not([multiple]):not([size]){background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A9B0B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important}
 
+/* ---------- Janelas no visual do sistema (26/11, 2ª versão da camada 1) ----------
+   A sócia achou a 1ª versão discreta demais. Esta aproxima as janelas das telas novas: fundo de papel com o formulário
+   numa folha branca, campos preenchidos (sem contorno até o foco), seletores curtos como botões, título maior e rodapé limpo. */
+html.np-casca-v3 .modal.np-form-fundo{background:rgba(24,27,30,.42);backdrop-filter:blur(2px)}
+html.np-casca-v3 .card.np-form.np-modal-v3{border-radius:14px;border-color:transparent;background:var(--np-bg);box-shadow:0 24px 64px rgba(15,17,19,.28)}
+html.np-casca-v3 .np-modal-v3 .np-f-cab{padding:16px 20px 10px;border-bottom:0;background:var(--np-bg)}
+html.np-casca-v3 .np-modal-v3 .np-f-cab h2{font:600 19px/1.25 var(--np-ui);letter-spacing:-.01em}
+html.np-casca-v3 .np-modal-v3 .np-f-x{border-radius:999px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo{padding:4px 20px 6px;background:var(--np-bg)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form,html.np-casca-v3 .np-modal-v3 .np-m-corpo>div:not(.form):not(.np-tp):only-child{background:var(--np-surface);border:1px solid var(--np-line);border-radius:12px;padding:14px 16px;box-shadow:var(--np-sh-ctrl)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{gap:12px 14px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo>.np-tp{margin:0 -20px -6px;background:var(--np-surface);border-top:1px solid var(--np-line)}
+html.np-casca-v3 .np-modal-v3 .np-f-acoes{padding:12px 20px 16px;border-top:0;margin:0;background:var(--np-bg)}
+html.np-casca-v3 .np-modal-v3 .np-f-acoes .btn{min-height:38px;border-radius:8px;padding-inline:16px}
+html.np-casca-v3 .np-modal-v3 .f label{font:500 var(--np-fs-1)/1.3 var(--np-ui);color:var(--np-text-2)}
+html.np-casca-v3 .np-modal-v3 .f:focus-within>label{color:var(--np-text)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea){background-color:var(--np-surface-2);border-color:transparent;border-radius:8px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select){min-height:36px;height:36px;padding:0 12px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo textarea{padding:8px 12px;min-height:72px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(input,select,textarea):hover:not(:disabled):not(:focus-visible){border-color:var(--np-line)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus-visible{background-color:var(--np-surface);border-color:var(--np-ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--np-ink) 14%,transparent)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo ::placeholder{color:var(--np-text-3);opacity:.8}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=file]{background:var(--np-surface-2);border:1px dashed var(--np-line);border-radius:8px;min-height:36px!important;height:36px;padding:4px!important}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox]{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:1.5px solid var(--np-text-3);border-radius:5px;background:var(--np-surface);display:inline-grid;place-content:center;cursor:pointer;flex:none;margin:0}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox]:checked{background:var(--np-ink);border-color:var(--np-ink)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox]:checked::after{content:"";width:5px;height:9px;border:solid var(--np-surface);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox]:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo input[type=checkbox]:disabled{opacity:.5;cursor:default}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo details:not(.np-tp-mais){border-top:1px solid var(--np-line);padding-top:8px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo details>summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:32px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo details>summary::-webkit-details-marker{display:none}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo details:not(.np-f-mais)>summary::before{content:"";width:7px;height:7px;border:solid var(--np-text-3);border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .15s;margin-left:2px}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo details[open]:not(.np-f-mais)>summary::before{transform:rotate(45deg)}
+html.np-casca-v3 .np-modal-v3 .np-m-corpo [style*="dashed"]{border:0!important;background:var(--np-surface-2);border-radius:10px}
+/* seletor curto como botões (segmentarSelects em np-ui.js) */
+html.np-casca-v3 .np-seg-oculto{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden}
+html.np-casca-v3 .f:has(>.np-seg-oculto),html.np-casca-v3 :has(>.np-seg-oculto){position:relative}
+html.np-casca-v3 .np-segs{display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:3px;background:var(--np-surface-2);border-radius:8px;min-height:36px;width:100%;box-sizing:border-box}
+html.np-casca-v3 .np-segs button{appearance:none;border:0;background:transparent;border-radius:6px;font:500 var(--np-fs-1)/1.2 var(--np-ui);color:var(--np-text-2);padding:0 8px;min-height:30px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.np-casca-v3 .np-segs button:hover:not(:disabled){color:var(--np-text)}
+html.np-casca-v3 .np-segs button[aria-checked=true]{background:var(--np-surface);color:var(--np-text);box-shadow:0 1px 2px rgba(20,22,24,.12),0 0 0 1px var(--np-line)}
+html.np-casca-v3 .np-segs button:focus-visible{outline:none;box-shadow:var(--np-focus)}
+html.np-casca-v3 .np-segs button:disabled{opacity:.5;cursor:default}
+@media (max-width:600px){html.np-casca-v3 .card.np-form.np-modal-v3{border-radius:0}html.np-casca-v3 .np-modal-v3 .np-m-corpo :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select){min-height:44px;height:44px}html.np-casca-v3 .np-segs{min-height:44px}html.np-casca-v3 .np-segs button{min-height:38px}html.np-casca-v3 .np-modal-v3 .np-f-acoes .btn{min-height:44px}html.np-casca-v3 .np-modal-v3 .np-m-corpo{padding-inline:12px}html.np-casca-v3 .np-modal-v3 .np-m-corpo>.form{padding:12px}}
+@media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-modal-v3 .np-m-corpo details>summary::before{transition:none}}
+
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14.5px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--body);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
@@ -4118,7 +4164,7 @@ async function renderUsuarios(){
 </script>
 <script>{const _r=render;render=function(){if(PP.perfil&&PP.temAcesso&&!PP.temAcesso(S.tab)){S.tab="painel";try{localStorage.setItem("pp-tab","painel")}catch(_){}}_r()}}</script>
 <script>
-PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes","ferramentas"],["marketing","marketing"],["marketing-producao","marketing"],["ferramentas","core"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico","ferramentas"],["pecas","juridico","superendividamento","ferramentas"],["superendividamento","juridico","superendividamento","ferramentas"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwxyjvh1";PP.modulosCarregados=new Set();
+PP.MODULOS=[["carteira","core","cliente"],["tarefas","core"],["prazos","core"],["feriados","core"],["agenda","core"],["notificacoes","core"],["painel","core"],["equipe","equipe"],["rh","equipe"],["dnd","core"],["ficha","core","cliente"],["acompanhamento-pj","clientes"],["fluxo","juridico"],["monitoramento-sync","juridico"],["publicacoes","juridico"],["processos","juridico"],["pastas","juridico","clientes"],["publicacoes-tratamento","juridico"],["processo-ficha","juridico","clientes"],["processo-sync","juridico","clientes"],["timesheet","core"],["autenticador","juridico","clientes","ferramentas"],["marketing","marketing"],["marketing-producao","marketing"],["ferramentas","core"],["growth","growth"],["financeiro","financeiro"],["central-cobrancas","financeiro"],["financeiro-controle","financeiro"],["faturamento","financeiro"],["dossie","core"],["estoque","financeiro"],["inventario","financeiro"],["perfil","core"],["avisos","core"],["ponto","core"],["requisicoes","core"],["providencias","clientes"],["config-gestao","core"],["protecao","clientes"],["chat","core"],["gestao","admin"],["docx-contrato","comercial"],["fechamento","comercial"],["revisional","juridico","ferramentas"],["pecas","juridico","superendividamento","ferramentas"],["superendividamento","juridico","superendividamento","ferramentas"],["documentos","core"],["conhecimento","core"],["espelho","admin"],["importar-advbox","admin"],["clientes-visao","clientes"],["carteira-v3","clientes"],["ficha-v3","clientes"],["ficha-pf","core"],["hubs","core"],["np-ui","core"],["casca","core"]];PP.MODULOS_V="?v=mwxyre5k";PP.modulosCarregados=new Set();
 PP.carregarModulos=async function(extra){
   const p=PP.perfil||{};const areas=new Set(extra||[]);
   if(p.papel==="cliente")areas.add("cliente");
