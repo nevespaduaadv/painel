@@ -26,7 +26,7 @@ const PUB_SYNC = [
   { ...b0, id: -2, data_disponibilizacao: dia(-6), numero_processo: '1000001-11.2026.8.26.0196', processo_id: 'p1', cliente_id: 'c1', cliente_nome: 'Empresa Alfa Ltda', dias_para_tratar: 1, prazo_tratamento: dia(1), resumo: 'Mesmo processo e dia, texto diferente.', texto: 'Texto fictício diferente.', link: null },
 ];
 const FONTES = [
-  { id: 1, publicacao_id: -1, fonte: 'sync', casamento: 'origem', divergencias: [], conciliada_em: null, primeira_vez: new Date().toISOString() },
+  { id: 1, publicacao_id: -1, fonte: 'sync', casamento: 'origem', divergencias: [], conciliada_em: null, primeira_vez: new Date().toISOString(), resumo: 'O juiz rejeitou a impugnação e determinou o prosseguimento da execução. A parte executada pode recorrer.', tipo_ato: 'Decisão interlocutória' },
   { id: 2, publicacao_id: 105, fonte: 'sync', casamento: 'identica', divergencias: [], conciliada_em: null, primeira_vez: new Date().toISOString() },
   { id: 3, publicacao_id: -2, fonte: 'sync', casamento: 'provavel', divergencias: [{ campo: 'possivel_duplicata', nosso: 101, fonte: 'x-2' }], conciliada_em: null, primeira_vez: new Date().toISOString() },
 ];
@@ -141,6 +141,19 @@ const lateral = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
     await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(600); p = await painel(pg);
     if (p && !p.todosBotoes.some(x => /Tratar|Atribuir|Confirmar|Vincular|Marcar/.test(x))) ok('só leitura: painel sem ações'); else falha('só leitura: ' + JSON.stringify(p && p.todosBotoes));
     if (!erros.length) ok('sem erro de script'); else falha('erros: ' + JSON.stringify(erros.slice(0, 3)));
+    await ctx.close(); }
+  { /* 26/11: a tela Tratar mostra a leitura do Sync (resumo + prazos sugeridos); nada vem marcado e “Usar” só preenche */
+    const { ctx, pg, erros, escritas } = await abrir(b, { sync: true });
+    await pg.evaluate(() => window.PP_PUB_TRAT.modalTratar(window.PP_PUBLICACOES.lista().find(x => String(x.id) === '-1'))); await pg.waitForTimeout(900);
+    const a = await pg.evaluate(() => { const c = document.querySelector('#modalHost .modal .card'); const vis = (e) => !!e && !e.hidden && e.getClientRects().length > 0; return { resumo: vis(c.querySelector('.np-tp-sync')) && /rejeitou a impugnação/.test(c.querySelector('.np-tp-sync').textContent), usar: [...c.querySelectorAll('.np-tp-sug button')].length, marcado: [...c.querySelectorAll('.np-tp-seg button')].filter(x => x.getAttribute('aria-pressed') === 'true').length }; });
+    if (a.resumo && a.usar === 2 && a.marcado === 0) ok('Tratar com Sync: resumo da plataforma e 2 prazos sugeridos à vista; nenhuma providência vem marcada'); else falha('Tratar com Sync (abrir): ' + JSON.stringify(a));
+    await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-tratar-sync.png') });
+    await pg.click('#modalHost .np-tp-sug li:first-child button'); await pg.waitForTimeout(500);
+    const u = await pg.evaluate(() => { const c = document.querySelector('#modalHost .modal .card'); return { prov: c.querySelector('.np-tp-seg button[aria-pressed="true"]')?.dataset.o, prazo: c.querySelector('#tr-prazo').value, fatal: c.querySelector('#tr-fatal').checked, tit: c.querySelector('#tr-tit').value, sx: c.scrollWidth > c.clientWidth + 1 }; });
+    if (u.prov === 'gerou_prazo' && u.prazo === PRAZOS[0].data_sugerida && u.fatal === false && /^Embargos de declaração/.test(u.tit) && !u.sx) ok('“Usar” escolhe “Criar tarefa ou prazo” e preenche data e título com a sugestão; prazo fatal continua desmarcado'); else falha('Tratar com Sync (usar): ' + JSON.stringify(u));
+    { const g = escritas.filter((x) => /tarefas|publicacao_prazo|rpc\/publicacao_/.test(JSON.stringify(x))); if (!g.length) ok('usar a sugestão não cria tarefa nem confere prazo: só preenche a tela'); else falha('gravou ao usar a sugestão: ' + JSON.stringify(g).slice(0, 200)); }
+    await pg.screenshot({ path: path.join(OUT, 'publicacoes-1440-light-tratar-sync-usado.png') });
+    if (erros.length) falha('erros de console no Tratar com Sync: ' + erros.slice(0, 2).join(' | '));
     await ctx.close(); }
   { const { ctx, pg, escritas } = await abrir(b, { sync: true, semAtribuicao: true });
     await pg.evaluate(() => window.PP_PUBLICACOES.abrirDetalhe("-1")); /* 26/11: o clique na linha pendente abre o tratamento; o detalhe abre por aqui */ await pg.waitForTimeout(1200); const p = await painel(pg);

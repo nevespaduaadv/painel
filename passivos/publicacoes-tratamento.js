@@ -39,12 +39,16 @@
     const teor = el("div", { class: "np-tp-teor", tabindex: "0", role: "document", "aria-label": "Teor da publicação" });
     { const re = /\bprazo\s+(?:comum\s+|sucessivo\s+|legal\s+|improrrogável\s+)?de\s+\d{1,3}\s*(?:\([^)]{1,30}\)\s*)?(?:dias?|horas?)(?:\s+(?:úteis|corridos))?/gi; let i = 0, m; while ((m = re.exec(bruto))) { if (m.index > i) teor.append(bruto.slice(i, m.index)); teor.append(el("mark", {}, m[0])); i = m.index + m[0].length; } teor.append(bruto.slice(i)); }
     const d = p.dias_para_tratar;
+    /* 26/11 (18h02, pedido da sócia): a leitura que o AtendeDireito Sync já faz do ato aparece aqui — o resumo em linguagem simples, na coluna
+       da publicação, e os prazos que ele sugere, junto da decisão. É só apoio: nada vem marcado, nenhum prazo vira fatal sozinho, e “Usar” apenas
+       preenche a data e o título para quem trata conferir. A conferência formal do prazo sugerido continua onde sempre esteve (Ver detalhes). */
+    const caixaSync = el("div", { class: "np-tp-sync", hidden: "" }), sugBox = el("div", { class: "np-tp-sug", hidden: "" });
     const pub = el("section", { class: "np-tp-pub", "aria-label": "Publicação" },
       el("div", { class: "np-tp-num" }, p.numero_processo || "sem número"),
       el("div", { class: "np-tp-meta" }, [p.tribunal, p.orgao, p.tipo_comunicacao, p.tipo_documento, p.classe].filter(Boolean).join(" · ")),
       el("div", { class: "np-tp-fichas" }, el("span", { class: "np-tp-m" }, "disponibilizada " + fmtD2(p.data_disponibilizacao)), p.prazo_tratamento ? el("span", { class: "np-tp-m" + (d != null && d <= 0 ? " late" : "") }, "tratar até " + fmtD2(p.prazo_tratamento)) : null, p.link ? el("a", { href: p.link, target: "_blank", rel: "noopener", class: "lnk" }, "↗ abrir no tribunal") : null),
       p.cliente_nome ? el("div", { class: "np-tp-meta" }, "Cliente: ", el("b", {}, p.cliente_nome)) : null,
-      (p.destinatarios || []).length ? el("div", { class: "np-tp-meta" }, "Partes: " + p.destinatarios.map((x) => x.nome + (x.polo ? ` (${x.polo})` : "")).join(" · ")) : null, teor);
+      (p.destinatarios || []).length ? el("div", { class: "np-tp-meta" }, "Partes: " + p.destinatarios.map((x) => x.nome + (x.polo ? ` (${x.polo})` : "")).join(" · ")) : null, caixaSync, teor);
     // ----- 1. processo (só quando falta) -----
     const E = { vinc: null, prov: p.providencia || null, dataManual: false };
     let passoProc = null;
@@ -109,7 +113,7 @@
     const blocoEnc = el("div", { class: "np-tp-passo", "data-v": "encaminhada" }, el("div", { class: "np-tp-grade" }, campo("tr-para", "Encaminhar para", para, true)));
     const rotTxt = el("label", { for: "tr-obs" }); const fTxt = el("div", { class: "np-tp-f", hidden: "" }, rotTxt, txt);
     const vazio = el("div", { class: "np-tp-vazio" }, "Escolha uma opção acima. Só aparecem os campos da opção escolhida.");
-    const dec = el("section", { class: "np-tp-dec", "aria-label": "Decisão" }, passoProc, el("div", { class: "np-tp-passo" }, el("div", { class: "np-tp-rot" }, nP + ". O que fazer com esta publicação"), seg), vazio, blocoPrazo, blocoEnc, fTxt);
+    const dec = el("section", { class: "np-tp-dec", "aria-label": "Decisão" }, passoProc, el("div", { class: "np-tp-passo" }, el("div", { class: "np-tp-rot" }, nP + ". O que fazer com esta publicação"), seg, sugBox), vazio, blocoPrazo, blocoEnc, fTxt);
     const body = el("div", { class: "np-tp" }, pub, dec);
     // rótulo do botão diz o que vai acontecer
     let btnSalvar = null;
@@ -119,6 +123,20 @@
       rotTxt.replaceChildren(E.prov === "gerou_prazo" ? "Instruções e observação" : "Observação", el("span", {}, E.prov === "gerou_prazo" ? ` (opcional · vai para a tarefa${meu ? ", como vinda de " + meu.nome + "," : ""} e para o histórico da publicação)` : " (opcional)"));
       txt.placeholder = E.prov === "encaminhada" ? "O que a pessoa precisa decidir…" : E.prov === "gerou_prazo" ? "O que precisa ser feito…" : "O que foi feito ou por quê…";
       if (E.prov === "gerou_prazo" && !prazo.value && !E.dataManual) recalc(); atualizarBotao(); }
+    const usarSugestao = (z) => { E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = String(z.rotulo || "Cumprir prazo").trim();
+      if (!wfSel.value) { titulo.value = rot + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "0"; }
+      ajustar(); resE.replaceChildren("data sugerida pelo Sync (" + rot + ") — confira nos autos · ", lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
+    (async () => { try {
+      const [f, z] = await Promise.all([SB.from("publicacao_fontes").select("publicacao_id,fonte,resumo:bruto->>resumo,tipo_ato:bruto->>tipo_ato").eq("publicacao_id", p.id).eq("fonte", "sync"),
+        SB.from("publicacao_prazos").select("id,publicacao_id,origem,rotulo,data_sugerida,estado,data_conferida,tarefa_id").eq("publicacao_id", p.id).order("data_sugerida")]);
+      const fonte = (f.data || []).filter((x) => String(x.publicacao_id) === String(p.id) && x.fonte === "sync" && String(x.resumo || "").trim()).sort((a, b) => String(b.resumo).length - String(a.resumo).length)[0];
+      if (fonte) { caixaSync.replaceChildren(el("div", { class: "r" }, "Resumo do Sync", fonte.tipo_ato ? el("span", {}, " · " + fonte.tipo_ato) : null), el("p", {}, String(fonte.resumo).trim()), el("small", {}, "Leitura automática da plataforma. Vale o teor abaixo.")); caixaSync.hidden = false; }
+      const pz = (z.data || []).filter((x) => String(x.publicacao_id) === String(p.id) && x.estado !== "descartado" && x.data_sugerida);
+      if (pz.length) { sugBox.replaceChildren(el("div", { class: "r" }, pz.length === 1 ? "Prazo sugerido pelo Sync" : "Prazos sugeridos pelo Sync"),
+          el("ul", {}, ...pz.map((x) => { const conf = x.estado !== "sugerido"; return el("li", {}, el("span", { class: "n" }, x.rotulo || "Prazo"), el("span", { class: "d" }, fmtD2(conf && x.data_conferida ? x.data_conferida : x.data_sugerida)),
+            conf ? el("span", { class: "np-tp-nota" }, x.tarefa_id ? "já conferido, com tarefa" : "já conferido") : el("button", { type: "button", class: "btn sm", "data-z": String(x.id), "aria-pressed": "false", title: "Preenche a data e o título da tarefa com esta sugestão. Você confere e pode alterar.", onclick: () => usarSugestao(x) }, "Usar")); })),
+          el("small", {}, "Sugestão automática, não é prazo do escritório. “Usar” só preenche; confira o ato, a regra e o calendário do juízo.")); sugBox.hidden = false; }
+    } catch (e) { /* sem o Sync (ou sem permissão de leitura) a tela segue como sempre */ } })();
     modal("Tratar publicação", body, async () => {
       if (!E.prov) throw new Error("Escolha o que fazer com esta publicação");
       const obsTxt = txt.value.trim();

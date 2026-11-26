@@ -1954,3 +1954,15 @@ html.np-casca-v3 .np-tf .np-tf-calc{border-top:0!important;padding-top:0!importa
 html.np-casca-v3 .np-vh{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden;clip-path:inset(50%);white-space:nowrap;opacity:0}
 @media (max-width:600px){html.np-casca-v3 .np-tf-l.c2{grid-template-columns:1fr}html.np-casca-v3 .np-tf-l.c3{grid-template-columns:1fr 1fr}html.np-casca-v3 .np-tf-l.c3>:first-child{grid-column:1/-1}html.np-casca-v3 .np-tf-sw{min-height:44px}}
 @media (prefers-reduced-motion:reduce){html.np-casca-v3 .np-tf-sw .tr,html.np-casca-v3 .np-tf-sw .tr::after{transition:none}}
+
+/* ---------- Tratar publicação: leitura do Sync (26/11) ---------- */
+.np-tp-sync{border-left:3px solid var(--np-info,#2F5C8F);background:var(--np-surface-2,#F4F4F1);border-radius:0 var(--np-r,6px) var(--np-r,6px) 0;padding:9px 12px;display:flex;flex-direction:column;gap:3px}
+.np-tp-sync .r,.np-tp-sug .r{font:600 var(--np-fs-1,12.5px)/1.3 var(--np-ui,inherit);color:var(--np-text-2,#4D545C)}.np-tp-sync .r span{font-weight:400;color:var(--np-text-3,#5F666E)}
+.np-tp-sync p{margin:0;font:400 var(--np-fs-2,13.5px)/1.5 var(--np-ui,inherit);color:var(--np-text,#1D2125)}
+.np-tp-sync small,.np-tp-sug small{font-size:var(--np-fs-1,12.5px);color:var(--np-text-3,#5F666E)}
+.np-tp-sug{margin-top:10px;border:1px solid var(--np-line,#E3E3DF);border-radius:var(--np-r,6px);padding:9px 12px;display:flex;flex-direction:column;gap:6px}
+.np-tp-sug ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.np-tp-sug li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;font-size:var(--np-fs-2,13.5px);min-height:30px}
+.np-tp-sug li .n{min-width:0;overflow-wrap:anywhere}.np-tp-sug li .d{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+html .np-tp-sug button[aria-pressed=true]{background:var(--np-ink,#1D2125)!important;color:var(--np-surface,#fff)!important;border-color:var(--np-ink,#1D2125)!important}
+@media (max-width:600px){.np-tp-sug li{grid-template-columns:minmax(0,1fr) auto}.np-tp-sug li .n{grid-column:1/-1}.np-tp-sug li button{min-height:40px}}
