@@ -104,14 +104,14 @@
       notas.replaceChildren(r.notas.length ? el("div", {}, "Considerado: " + r.notas.join("; ")) : el("div", {}, "Sem feriados ou suspensões no período."), el("div", {}, "A contagem exclui o dia da publicação e inclui o do vencimento (CPC 224). Confira o prazo específico da intimação.")); mostraFim(); }); };
     for (const x of [nDias, sTipo, dBase, sUf]) x.onchange = recalc;
     prazo.addEventListener("change", () => { E.dataManual = true; resE.replaceChildren("data informada à mão · ", lnkData); mostraFim(); });
-    wfSel.onchange = () => { const eraAto = !atoBox.hidden; montaAto(); if (atoDe()) return; if (eraAto) recalc(); const w = WF.find((x) => x.codigo === wfSel.value); if (w) { nDias.value = w.dias_legais; titulo.value = w.nome + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "1"; fatal.checked = true; recalc(); } fTipo.hidden = fTit.hidden = !!w; renderCadeia(); atualizarBotao(); };
+    wfSel.onchange = () => { const eraAto = !atoBox.hidden; montaAto(); if (atoDe()) { E.usada = null; for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", "false"); return; } if (eraAto) recalc(); const w = WF.find((x) => x.codigo === wfSel.value); if (w) { nDias.value = w.dias_legais; titulo.value = w.nome + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "1"; fatal.checked = true; recalc(); } fTipo.hidden = fTit.hidden = !!w; renderCadeia(); atualizarBotao(); };
     const campo = (id, rot, ctl, obrig) => { ctl.id = ctl.id || id; return el("div", { class: "np-tp-f" }, el("label", { for: ctl.id }, rot, obrig ? el("b", { title: "obrigatório" }, " *") : null), ctl); };
     const fTipo = campo("tr-tipo", "Tipo da tarefa", tipo), fTit = campo("tr-tit", "Título da tarefa", titulo);
     const fConta = el("div", { class: "np-tp-f" }, el("span", { class: "np-tp-lab" }, "Contagem"), el("div", { class: "np-tp-conta" }, nDias, sTipo, dBase, sUf));
     const boxRes = el("div", { class: "np-tp-resb" }, el("div", {}, resD, resE), el("label", { class: "ck", for: "tr-fatal" }, fatal, "Prazo fatal"));
     const maisBox = el("details", { class: "np-tp-mais" }, el("summary", {}, "Mais opções ", el("i", {}, "(título, prioridade)")), el("div", { class: "np-tp-grade" }, fTipo, fTit, campo("tr-pri", "Prioridade", pri)));
     /* análise do ato (0126): quem trata só diz qual é o ato, confere as datas das hipóteses e para quem vai; a cadeia nasce quando a análise é concluída */
-    const atoBox = el("div", { class: "np-tp-ato", hidden: "" }); const hipIn = new Map();
+    const atoBox = el("div", { class: "np-tp-ato", hidden: "" }); const hipIn = new Map(), hipSug = new Map();
     const atoKey = () => (wfSel.value.startsWith("ato:") ? wfSel.value.slice(4) : null); const atoDe = () => ATOS[atoKey()] || null;
     const hojeI = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
     const normR = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -119,9 +119,9 @@
     const prazoDaAnalise = () => { const d = window.PP_CADEIAS.prazoAnalise(dBase.value || hojeI(), hipAtual(), sUf.value || uf || null); return d && d < hojeI() ? hojeI() : d; };
     const montaAto = async () => { const a = atoDe(); atoBox.hidden = !a; for (const x of [fConta, boxRes, maisBox]) x.hidden = !!a; if (a) { notas.hidden = true; fData.hidden = true; cadeiaBox.hidden = true; } if (!a) return;
       try { await window.PP_PRAZOS?.pronto?.(); } catch (e) {}
-      hipIn.clear(); const linhas = [];
+      hipIn.clear(); hipSug.clear(); const linhas = [];
       for (const cod of a.hip) { const w = WF.find((x) => x.codigo === cod); if (!w) continue;
-        const sg = (E.sug || []).find((z) => z.estado !== "descartado" && normR(z.rotulo).startsWith(normR(w.nome)));
+        const sg = (E.sug || []).find((z) => z.estado !== "descartado" && normR(z.rotulo).startsWith(normR(w.nome))); if (sg) hipSug.set(cod, sg);
         const calc = window.PP_PRAZOS?.calcular({ base: dBase.value, dias: w.dias_legais, tipo: w.tipo_contagem || "uteis", uf: sUf.value || null });
         const i = inp("date", sg?.data_sugerida || calc?.fim || "", { "aria-label": "Prazo de " + w.nome }); i.onchange = () => { atualizaAto(); }; hipIn.set(cod, i);
         linhas.push(el("li", {}, el("span", { class: "n" }, w.nome), i, el("span", { class: "np-tp-nota" }, sg ? "data sugerida" : w.dias_legais + " dias úteis"))); }
@@ -144,7 +144,13 @@
       rotTxt.replaceChildren(E.prov === "gerou_prazo" ? "Instruções e observação" : "Observação", el("span", {}, E.prov === "gerou_prazo" ? ` (opcional · vai para a tarefa${meu ? ", como vinda de " + meu.nome + "," : ""} e para o histórico da publicação)` : " (opcional)"));
       txt.placeholder = E.prov === "encaminhada" ? "O que a pessoa precisa decidir…" : E.prov === "gerou_prazo" ? "O que precisa ser feito…" : "O que foi feito ou por quê…";
       if (E.prov === "gerou_prazo" && !prazo.value && !E.dataManual) recalc(); atualizarBotao(); }
-    const usarSugestao = (z) => { E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = String(z.rotulo || "Cumprir prazo").trim();
+    /* 26/11 (19h58, sócia): quando a tarefa nasce aqui a partir de um prazo sugerido, a conferência desse prazo é registrada junto (mesma regra de
+       sempre: data igual = confirmado; data diferente = corrigido; fatal ou data posterior entram em revisão). Sem isso o prazo ficava “a conferir”
+       e a conferência antiga abriria uma segunda tarefa. A conferência é registrada sem criar tarefa: as tarefas são as desta tela. */
+    const conferirSugestao = async (z, data, ehFatal, nota) => { if (!z || z.estado !== "sugerido") return null; const igual = data === z.data_sugerida;
+      const { error } = await SB.rpc("publicacao_prazo_conferir", { p_prazo: z.id, p_decisao: igual ? "confirmar" : "corrigir", p_data: igual ? null : data, p_fatal: !!ehFatal, p_obs: nota, p_tarefa: false, p_responsavel: null });
+      return error ? (error.message || "erro") : null; };
+    const usarSugestao = (z) => { E.usada = z; E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = String(z.rotulo || "Cumprir prazo").trim();
       if (!wfSel.value) { titulo.value = rot + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "0"; }
       ajustar(); resE.replaceChildren("data sugerida (" + rot + ") — confira nos autos · ", lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
     (async () => { try {
@@ -178,6 +184,7 @@
           const rowA = { titulo: `Analisar cabimento — ${ato.nome.toLowerCase()} · ${p.numero_processo || "publicação"}`, descricao, cliente_id: cliente_id || null, processo_id: processo_id || null, responsavel_id: resp.value, nucleo: "juridico", prazo: prazoDaAnalise(), prazo_fatal: false, prioridade: 1, status: "aberta", publicacao_id: p.id, etapa_codigo: "analise_ato",
             analise: { ato: atoKey(), base: dBase.value || null, uf: sUf.value || uf || null, numero: p.numero_processo || null, hip } };
           const { error } = await SB.from("tarefas").insert(rowA); if (error) throw new Error("Não foi possível abrir a análise: " + error.message);
+          for (const h of hip) { const z = hipSug.get(h.wf); if (z) await conferirSugestao(z, h.fim, false, "Prazo levado para a análise de cabimento, na tela de tratamento."); }
           toast("Análise aberta para " + (colab.find((c) => c.id === resp.value)?.nome || "o responsável"));
         } else if (w) {
           const cadeia = crypto.randomUUID(); const et = etapasDe(w, prazo.value); const base = { descricao, cliente_id: cliente_id || null, processo_id: processo_id || null, nucleo: "juridico", prioridade: +pri.value, status: "aberta", publicacao_id: p.id, cadeia_id: cadeia, workflow_codigo: w.codigo };
@@ -191,7 +198,8 @@
           const { error } = await SB.from("tarefas").insert(row); if (error) throw new Error("Não foi possível criar a tarefa");
         }
         if (obsTxt) await SB.from("publicacoes").update({ observacao_tratamento: obsTxt }).eq("id", p.id);
-        if (!ato) toast("Tarefa criada e publicação tratada");
+        let pend = null; if (!ato && E.usada && prazo.value) pend = await conferirSugestao(E.usada, prazo.value, w ? true : fatal.checked, "Conferido na tela de tratamento, ao criar a tarefa." + (obsTxt ? " " + obsTxt.slice(0, 200) : ""));
+        if (!ato) toast(pend ? "Tarefa criada. O prazo sugerido continua a conferir: " + pend : "Tarefa criada e publicação tratada");
       } else {
         const { error } = await SB.rpc("publicacao_tratar", { p_id: p.id, p_providencia: E.prov, p_obs: obsTxt || null, p_encaminhar: E.prov === "encaminhada" ? para.value : null }); if (error) throw new Error(error.message);
         toast("Publicação tratada");
