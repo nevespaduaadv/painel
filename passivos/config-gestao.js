@@ -11,16 +11,25 @@ const check=(label,checked,help)=>{const i=el("input",{type:"checkbox",style:"wi
 const pode=()=>PP.perfil?.papel==="admin"||(PP.perfil?.acessos||[]).includes("equipe");
 async function carregar(){
   if(G.carregando)return;G.carregando=true;
-  try{const [m,s,md,wf]=await Promise.all([SB.from("motivos_reagendamento").select("*").order("ordem").order("motivo"),SB.from("sla_tickets").select("*"),SB.from("medidas_operacionais").select("*").order("ordem"),SB.from("workflows_prazo").select("*").order("ordem")]);G.motivos=m.data||[];G.slas=s.data||[];G.medidas=md.data||[];G.wf=wf.error?[]:(wf.data||[]);G.wfErro=wf.error?.message||null;if(m.error||s.error)toast((m.error||s.error).message)}
+  try{const [m,s,md,wf]=await Promise.all([SB.from("motivos_reagendamento").select("*").order("ordem").order("motivo"),SB.from("sla_tickets").select("*"),SB.from("medidas_operacionais").select("*").order("ordem"),SB.from("workflows_prazo").select("*").order("ordem")]);{const tt=await SB.from("tipos_tarefa").select("*").order("ordem").order("nome");G.tipos=tt.error?[]:(tt.data||[]);G.tiposErro=tt.error?"A lista de tipos de tarefa ainda não foi criada no banco (migração 0121).":null}G.motivos=m.data||[];G.slas=s.data||[];G.medidas=md.data||[];G.wf=wf.error?[]:(wf.data||[]);G.wfErro=wf.error?.message||null;if(m.error||s.error)toast((m.error||s.error).message)}
   finally{G.carregando=false}render();
 }
-const invalidar=()=>{G.motivos=null;G.slas=null;G.medidas=null;G.wf=null;render()};
+const invalidar=()=>{window.PP_TIPOS_TAREFA?.invalidar?.();G.motivos=null;G.slas=null;G.medidas=null;G.wf=null;render()};
 function formMotivo(m){
   const txt=inp("text",m?.motivo||"",{placeholder:"Ex.: Aguardando documentos do cliente"}),comp=check("Exige complemento escrito (ex.: “Outro”)",!!m?.exige_complemento),ativo=check("Ativo (aparece na lista)",m?m.ativo!==false:true),ordem=inp("number",m?.ordem??((G.motivos||[]).length+1)*10,{min:0});
   const body=el("div",{class:"form"},field("mt-txt","Motivo",txt),field("mt-ord","Ordem",ordem),el("div",{class:"f full"},comp.wrap),el("div",{class:"f full"},ativo.wrap));
   const extra=m?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir motivo de reagendamento?",mensagem:`Excluir o motivo “${m.motivo}”? Os reagendamentos antigos continuam com o texto salvo.`,confirmar:"Excluir motivo",perigo:true,onSim:async()=>{const {error}=await SB.from("motivos_reagendamento").delete().eq("id",m.id);if(error){toast(error.message);throw error}$("#modalHost").replaceChildren();toast("Excluído");invalidar()}})}},"Excluir"):null;
   modal(m?"Editar motivo":"Novo motivo de reagendamento",body,async()=>{if(!txt.value.trim())throw new Error("Informe o motivo");const row={motivo:txt.value.trim(),exige_complemento:comp.input.checked,ativo:ativo.input.checked,ordem:+ordem.value||0};
     const q=m?SB.from("motivos_reagendamento").update(row).eq("id",m.id):SB.from("motivos_reagendamento").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar()},extra);
+}
+/* 25/11 (sócia): tipos de tarefa — títulos-padrão sugeridos em “Nova tarefa” */
+const NUC_TT={"":"Todos os núcleos",juridico:"Jurídico",acordos:"Acordos",acompanhamento:"Acompanhamento PJ",administrativo:"Administrativo",financeiro:"Financeiro",comercial:"Comercial"};
+function formTipoTarefa(t){
+  const nome=inp("text",t?.nome||"",{placeholder:"Ex.: Elaborar contestação"}),nuc=sel(NUC_TT,t?.nucleo||""),ordem=inp("number",t?.ordem??((G.tipos||[]).length+1)*10,{min:0}),ativo=check("Ativo (aparece como sugestão)",t?t.ativo!==false:true);
+  const body=el("div",{class:"form"},field("tt-nome","Tipo de tarefa",nome),field("tt-nuc","Núcleo",nuc,"Só para organizar a lista."),field("tt-ord","Ordem",ordem),el("div",{class:"f full"},ativo.wrap));
+  const extra=t?el("button",{class:"btn danger",onclick:()=>{npConfirmar({titulo:"Excluir tipo de tarefa?",mensagem:`Excluir “${t.nome}”? As tarefas já criadas com esse título não mudam.`,confirmar:"Excluir tipo",perigo:true,onSim:async()=>{const {error}=await SB.from("tipos_tarefa").delete().eq("id",t.id);if(error){toast(error.message);throw error}$("#modalHost").replaceChildren();toast("Excluído");invalidar()}})}},"Excluir"):null;
+  modal(t?"Editar tipo de tarefa":"Novo tipo de tarefa",body,async()=>{if(!nome.value.trim())throw new Error("Informe o nome");const row={nome:nome.value.trim(),nucleo:nuc.value||null,ordem:+ordem.value||0,ativo:ativo.input.checked};
+    const q=t?SB.from("tipos_tarefa").update(row).eq("id",t.id):SB.from("tipos_tarefa").insert(row);const {error}=await q;if(error)throw new Error(/duplicate|unique/i.test(error.message)?"Já existe um tipo com esse nome.":error.message);toast("Salvo");invalidar()},extra);
 }
 const cfgV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 const C3={aba:"motivos"};
@@ -45,9 +54,9 @@ function renderTelaV3(v){
   v.classList.add("np-v3");
   if(!pode()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"configurações"}])}),NPUI.vazio({titulo:"Acesso restrito",texto:"Configurações restritas à gestão e controladoria."}));return}
   if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"carregando"}])}),NPUI.carregando(5));return}
-  const ctaCfg={motivos:["+ Motivo",()=>formMotivo()],medidas:["+ Medida",()=>formMedida()],wf:["+ Tipo de prazo",()=>formWf(null)]}[C3.aba];
+  const ctaCfg={motivos:["+ Motivo",()=>formMotivo()],medidas:["+ Medida",()=>formMedida()],wf:["+ Tipo de prazo",()=>formWf(null)],tipos:["+ Tipo de tarefa",()=>formTipoTarefa(null)]}[C3.aba];
   const btnCta=NPUI.btn(ctaCfg[0],{variante:"pri",onclick:ctaCfg[1]});
-  const abas=[["motivos","Motivos de reagendamento"],["medidas","Medidas de proteção"],["wf","Tipos de prazo (cadeias)"]];
+  const abas=[["motivos","Motivos de reagendamento"],["medidas","Medidas de proteção"],["wf","Tipos de prazo (cadeias)"],["tipos","Tipos de tarefa"]];
   v.append(NPUI.toolbar({
     resumo:NPUI.resumo([
       {n:String((G.motivos||[]).filter(m=>m.ativo).length),label:"motivos"},
@@ -77,6 +86,14 @@ function renderTelaV3(v){
       el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
         el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Tipo"),el("th",{class:"r"},"Legal"),el("th",{class:"r"},"Interno"),el("th",{class:"r"},"Confec."),el("th",{},"Custas"),el("th",{class:"r"},"Protoc."),el("th",{class:"r"},"Conferir"),el("th",{},"Análise antes"),el("th",{},"Situação"),el("th",{class:"r"},""))),
         el("tbody",{},(G.wf||[]).length?G.wf.map(w=>el("tr",{},el("td",{class:"np-num"},String(w.ordem)),el("td",{},el("b",{},w.nome),el("div",{class:"np-ts-sub"},w.codigo)),el("td",{class:"r"},w.dias_legais+" "+(w.tipo_contagem==="corridos"?"corr.":"úteis")),el("td",{class:"r"},String(w.dias_internos)),el("td",{class:"r"},D(w.confeccionar_offset)),el("td",{class:"np-num"},w.custas?"D-3":"—"),el("td",{class:"r"},D(w.protocolar_offset)),el("td",{class:"r"},D(w.conferir_offset)),el("td",{class:"np-ts-sub"},w.decisao_inicial||"—"),el("td",{},NPUI.marca(w.ativo?"ativo":"inativo",w.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formWf(w)})))):el("tr",{},el("td",{colspan:11,class:"np-ts-sub"},"Nenhum tipo cadastrado.")))))));
+  }
+  if(C3.aba==="tipos"){
+    v.append(el("section",{class:"np-cfg-sec"},
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de tarefa"),el("div",{class:"desc"},"Títulos-padrão que aparecem como sugestão ao criar uma tarefa. O título continua livre: quem cria pode escolher um tipo ou escrever outro."))),
+      G.tiposErro?NPUI.vazio({titulo:"Tipos de tarefa indisponíveis",texto:G.tiposErro}):
+      el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
+        el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Tipo de tarefa"),el("th",{},"Núcleo"),el("th",{},"Situação"),el("th",{class:"r"},""))),
+        el("tbody",{},(G.tipos||[]).length?G.tipos.map(t=>el("tr",{},el("td",{class:"np-num"},String(t.ordem)),el("td",{},el("b",{},t.nome)),el("td",{},NUC_TT[t.nucleo||""]||t.nucleo||"—"),el("td",{},NPUI.marca(t.ativo?"ativo":"inativo",t.ativo?"ok":"")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formTipoTarefa(t)})))):el("tr",{},el("td",{colspan:5,class:"np-ts-sub"},"Nenhum tipo cadastrado. Use “+ Tipo de tarefa”.")))))));
   }
 }
 function renderTela(){
