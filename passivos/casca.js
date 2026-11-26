@@ -99,7 +99,7 @@
     revisional: { grupo: "Ferramentas", grupoId: null, label: "Revisional de contratos", tabAcesso: "revisional", cls: "area-juridico" },
     superendividamento: { grupo: "Ferramentas", grupoId: null, label: "Superendividamento", tabAcesso: "superendividamento", cls: "area-superendividamento" },
     pecas: { grupo: "Ferramentas", grupoId: null, label: "Modelos de peças", tabAcesso: "pecas", cls: "area-juridico" },
-    monitoramento: { grupo: "Ferramentas", grupoId: null, label: "Monitoramento", tabAcesso: "monitoramento", cls: "area-juridico" },
+    monitoramento: { grupo: "Jurídico", grupoId: "juridico", label: "Monitoramento", tabAcesso: "monitoramento", cls: "area-juridico" },
     autenticador: { grupo: "Ferramentas", grupoId: null, label: "Autenticador (2FA)", tabAcesso: "autenticador", cls: "area-juridico" },
     conhecimento: { grupo: "Ferramentas", grupoId: null, label: "Base de conhecimento", tabAcesso: "conhecimento", cls: "" },
     // 26/11 (sócia): Marketing é um grupo próprio — Pauta de conteúdo, Automações e Produção de conteúdo
@@ -228,7 +228,7 @@
     const gs = [gCli, hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
       { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
       { id: "marketing", label: "Marketing", icone: "marketing", cls: "", itens: deGrupos(["marketing"]).filter(i => i.tab === "marketing").map(i => ({ ...i, label: "Pauta de conteúdo" })) }].filter(g => g && g.itens.length);
-    const FERR_TABS = ["revisional", "superendividamento", "pecas", "monitoramento", "autenticador", "conhecimento"];
+    const FERR_TABS = ["revisional", "superendividamento", "pecas", "autenticador", "conhecimento"]; // 26/11 (11h30): Monitoramento volta para o grupo Jurídico
     // Financeiro (19/11, 12h — decisão das sócias): só as quatro páginas da especificação do setor. Estoque e Inventário passam para o grupo
     // Administrativo, com a mesma regra de acesso de antes. As telas do Asaas e Contratos e faturamento saem da navegação da casca nova
     // (a integração com o Asaas continua; na casca antiga nada muda). Nenhuma permissão foi alterada.
@@ -253,6 +253,7 @@
     const LEGADO_CRM = new Set(["leads", "comercial", "atendimento", "automacoes"]);
     for (const t of ["historico", "regras", "calibracao"]) addAoGrupo("equipe", t, true);
     for (const t of ["mkt-automacoes", "mkt-producao"]) addAoGrupo("marketing", t, true);
+    addAoGrupo("juridico", "monitoramento", true);
     // Rota direta atualmente aberta fora de NAV/hubs (ex.: fin-visao, financeiro-controle): entra no grupo correto se permitida,
     // exceto rotas legadas de CRM/Atendimento (grupoId: null e guardadas em LEGADO_CRM).
     const curTab = tabAtual();
