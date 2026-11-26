@@ -13,7 +13,7 @@ const IC={
   conhecimento:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   area:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
 };
-const FERR=[["superendividamento","Superendividamento","Plano de pagamento e cálculo"],["pecas","Modelos de peças","Modelos e papel timbrado"],["monitoramento","Monitoramento","Processos acompanhados"],["autenticador","Autenticador (2FA)","Códigos de acesso do escritório"],["revisional","Revisional de contratos","Revisão e recálculo"],["conhecimento","Base de conhecimento","Procedimentos e materiais por área"]];
+const FERR=[["superendividamento","Superendividamento","Plano de pagamento e cálculo"],["pecas","Modelos de peças","Modelos e papel timbrado"],["autenticador","Autenticador (2FA)","Códigos de acesso do escritório"],["revisional","Revisional de contratos","Revisão e recálculo"],["conhecimento","Base de conhecimento","Procedimentos e materiais por área"]];
 const AREAS_KB=[["geral","Geral"],["comercial","Comercial"],["financeiro","Financeiro"],["juridico","Jurídico"],["administrativo","Administrativo"],["marketing","Marketing"]];
 const podeTab=t=>{try{return !!document.getElementById("view-"+t)&&(!PP.temAcesso||PP.temAcesso(t)===true)}catch(_){return false}};
 const podeAreaKB=a=>{const p=PP.perfil||{};if(p.papel==="admin"||a==="geral")return true;const ac=p.acessos||[];if(a==="administrativo")return ac.includes("financeiro")||ac.includes("equipe");return ac.includes(a)};
