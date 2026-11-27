@@ -105,6 +105,14 @@ function cartao(c){
 }
 /* cartões arquivados: restaurar ou excluir de vez */
 async function carregarArq(){const {data}=await SB.from("mkt_producao").select("id,titulo,coluna,anexos,updated_at").eq("arquivado",true).order("updated_at",{ascending:false});P.arq=data||[];if(S.tab==="mkt-producao")render()}
+/* 26/11 (23h20, sócia): excluir o cartão de vez, direto do cartão aberto (antes só dava para excluir depois de arquivar). Apaga os comentários
+   (em cascata no banco) e os arquivos anexados; pede confirmação e não tem volta. Cartão que já foi para a pauta: a pauta continua, só o cartão sai. */
+async function excluirCartao(c,depois){
+  NPUI.confirmar({titulo:"Excluir cartão de vez?",texto:`“${c.titulo}” será apagado com os comentários e os arquivos anexados.`+(c.pauta_id?" O item que já está na pauta de conteúdo continua lá.":"")+" Não dá para desfazer. Para tirar do quadro sem apagar, use “Arquivar cartão”.",rotuloSim:"Excluir",perigo:true,onSim:async()=>{
+    const arqs=(c.anexos||[]).filter(x=>x.caminho_storage).map(x=>x.caminho_storage);if(arqs.length)await SB.storage.from("anexos").remove(arqs).then(()=>{},()=>{});
+    const {error}=await SB.from("mkt_producao").delete().eq("id",c.id);if(error){toast("Não foi possível excluir");return}
+    toast("Cartão excluído");depois?.()}});
+}
 function renderArquivados(v){
   v.append(NPUI.toolbar({resumo:el("h2",{class:"np-mp-h2"},"Cartões arquivados"),direita:[NPUI.btn("Voltar ao quadro",{onclick:()=>{P.verArq=false;P.arq=null;render()}})]}));
   if(!P.arq){v.append(NPUI.carregando(4));carregarArq();return}
@@ -244,7 +252,8 @@ function abrirCartao(id,origem,silencioso){
     el("aside",{class:"np-mp-l","aria-label":"Comentários e atividade"},el("h3",{},"Comentários e atividade"),leit?null:el("div",{class:"np-mp-add col"},ta,btCom),coments));
   const btnMover=leit?null:NPUI.btn("Mover para…",{onclick:e=>NPUI.pop(e.currentTarget,COLS.filter(([k])=>k!==colDe(c)).map(([k,l])=>({label:l,onclick:()=>mover(c,k)})),{label:"Mover para"})});if(btnMover){btnMover.setAttribute("aria-haspopup","menu");btnMover.setAttribute("aria-expanded","false")}
   const btnPauta=!leit&&colDe(c)==="aprovacao"&&!c.pauta_id?NPUI.btn("Enviar para a pauta",{variante:"pri",onclick:()=>enviarParaPauta(c)}):null;
-  const mais=leit?null:NPUI.btn("Mais ações",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,[{label:"Copiar cartão",onclick:()=>copiarCartao(c)},{label:"Arquivar cartão",onclick:()=>NPUI.confirmar({titulo:"Arquivar cartão?",texto:"O cartão sai do quadro e fica em “Arquivados”, de onde pode ser restaurado.",rotuloSim:"Arquivar",onSim:async()=>{await salvar(c.id,{arquivado:true});registrar(c.id,"arquivou este cartão");P.lista=P.lista.filter(x=>x.id!==c.id);P.aberto=null;P.painel?.fechar?.();render()}})}],{label:"Mais ações",alinhar:"dir"})});if(mais){mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false")}
+  const mais=leit?null:NPUI.btn("Mais ações",{variante:"ghost",onclick:e=>NPUI.pop(e.currentTarget,[{label:"Copiar cartão",onclick:()=>copiarCartao(c)},{label:"Arquivar cartão",onclick:()=>NPUI.confirmar({titulo:"Arquivar cartão?",texto:"O cartão sai do quadro e fica em “Arquivados”, de onde pode ser restaurado.",rotuloSim:"Arquivar",onSim:async()=>{await salvar(c.id,{arquivado:true});registrar(c.id,"arquivou este cartão");P.lista=P.lista.filter(x=>x.id!==c.id);P.aberto=null;P.painel?.fechar?.();render()}})},
+    {label:"Excluir cartão",perigo:true,onclick:()=>excluirCartao(c,()=>{P.lista=P.lista.filter(x=>x.id!==c.id);P.aberto=null;P.painel?.fechar?.();render()})}],{label:"Mais ações",alinhar:"dir"})});if(mais){mais.setAttribute("aria-haspopup","menu");mais.setAttribute("aria-expanded","false")}
   P.painel.abrir({id:c.id,trilha:"Marketing · Produção de conteúdo",titulo:COL_R[colDe(c)]||"Cartão",corpo,pe:[btnPauta,btnMover,mais].filter(Boolean),origem:silencioso?null:origem});
   const foco=P.sec==="chk"?".np-mp-novoit":P.sec==="etq-ed"?"#mp-en":null;if(foco){const i=corpo.querySelector(foco);if(i)setTimeout(()=>i.focus(),0)}
 }

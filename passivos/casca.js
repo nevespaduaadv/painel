@@ -268,6 +268,9 @@
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
     const soltos = itens.filter(i => i.tab && !i.tabs && !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab)).concat(grupos.filter(g => !["equipe", "gestao", "juridico-ferr", "comercial", "marketing"].includes(g.grupo)).flatMap(g => g.itens.filter(i => !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab))));
     if (soltos.length) gs.push({ id: "outros", label: "Outros", icone: "ferramentas", cls: "", itens: soltos });
+    /* 26/11 (23h20, sócia): Marketing fica logo abaixo de Administrativo (sem Administrativo para o perfil, abaixo de Financeiro; sem os dois, antes de Equipe e gestão) */
+    { const m = gs.findIndex(g => g.id === "marketing"); if (m >= 0) { const [mk] = gs.splice(m, 1); let a = gs.findIndex(g => g.id === "administrativo"); if (a < 0) a = gs.findIndex(g => g.id === "financeiro");
+        if (a >= 0) gs.splice(a + 1, 0, mk); else { const e = gs.findIndex(g => g.id === "equipe"); gs.splice(e >= 0 ? e : gs.length, 0, mk); } } }
     // item único “Ferramentas” (fica aceso também dentro de cada ferramenta)
     const finais = !ro && $("#view-ferramentas") && acesso("ferramentas") && FERR_TABS.some(t => $("#view-" + t) && acesso(t)) ? [{ tab: "ferramentas", label: "Ferramentas", cls: "edit-only", alt: FERR_TABS }] : [];
     return { fixos: FIXOS.map(byTab).filter(Boolean), perfil: byTab("perfil"), grupos: gs, finais, links: itens.filter(i => i.link) };
