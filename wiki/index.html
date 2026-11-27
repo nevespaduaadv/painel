@@ -388,6 +388,8 @@ ${tabela(['Antes','Agora'],[
  ['Comercial (leads) e Atendimento','Saíram do sistema; do comercial fica só a '+ir('conhecimento','Base de conhecimento')]])}
 <h2>Novo</h2>
 <ul>
+<li><b>Roteiro do primeiro dia</b> (27/11, à tarde): ${ir('primeiro-dia','Seu primeiro dia no sistema')}, com o passo a passo de 15 minutos para o primeiro acesso.</li>
+<li><b>Financeiro só para quem tem a área</b> (27/11, à tarde): os dados de cobrança deixaram de aparecer para quem não tem acesso ao Financeiro, inclusive a marca de adimplência no cabeçalho da ficha do cliente.</li>
 <li><b>Grupo Marketing</b> no menu: ${ir('pauta','Pauta de conteúdo')}, ${ir('producao','Produção de conteúdo')} (quadro no estilo Trello, com envio para a pauta) e ${ir('automacoes','Automações')}.</li>
 <li><b>Hoje com widgets</b>: relógio, calendário, atalhos personalizáveis e blocos que você arrasta e organiza. ${ir('hoje','Ver Hoje')}.</li>
 <li><b>Tratar publicação em uma tela só</b>: teor à esquerda, tratamento à direita, com resumo e prazos sugeridos. ${ir('tratar','Ver Tratar publicação')}.</li>
@@ -411,7 +413,7 @@ ${nota('Este manual foi refeito em 27/11/2026 a partir de um tour completo pelo 
 `});
 
 /* ───────── COMECE AQUI ───────── */
-P.push({id:'entrar',g:'Comece aqui',t:'Entrar no sistema',lead:'Onde o sistema fica, como entrar e o que fazer se o acesso não funcionar.',sys:'painel',kw:'login senha acesso entrar e-mail endereço url primeiro acesso',rel:['tela','perfil','perfis'],h:`
+P.push({id:'entrar',g:'Comece aqui',t:'Entrar no sistema',lead:'Onde o sistema fica, como entrar e o que fazer se o acesso não funcionar.',sys:'painel',kw:'login senha acesso entrar e-mail endereço url primeiro acesso',rel:['primeiro-dia','tela','perfil'],h:`
 <h2>Endereço</h2>
 <p>O sistema abre no navegador, em <b>sistema.nevespaduaadvocacia.com.br</b>. Não há nada para instalar. Ele funciona no computador e no celular.</p>
 <h2>Primeiro acesso</h2>
@@ -424,6 +426,58 @@ ${dupla(shot('login',['Seu e-mail do escritório.','Sua senha.','Entrar abre a t
 ${dica('Veja no '+ir('perfis','Guia do seu cargo')+' o que a sua função usa no dia a dia.')}
 <h2>Esqueci a senha</h2>
 <p>Não há recuperação automática. Fale com o escritório, que libera uma nova senha. Depois de entrar, troque-a em ${ir('perfil','Meu perfil')}.</p>
+`});
+
+P.push({id:'primeiro-dia',g:'Comece aqui',t:'Seu primeiro dia no sistema',novo:true,lead:'Um roteiro de 15 minutos para o primeiro acesso: entrar, conferir o que é seu e fazer a primeira tarefa.',sys:'painel',kw:'primeiro dia primeiro acesso roteiro começar treinamento liberação equipe 30/11 o que fazer passo a passo',rel:['entrar','tela','perfis'],h:`
+<h2>Antes de começar</h2>
+<ul>
+<li>Entre com o seu e-mail do escritório e a senha que você recebeu, e troque a senha em ${ir('perfil','Meu perfil')} › Segurança e senha. O passo a passo está em ${ir('entrar','Entrar no sistema')}.</li>
+<li>A senha é pessoal. Ninguém compartilha senha nem entra com a conta de outra pessoa: tudo o que é feito fica registrado em nome de quem fez.</li>
+</ul>
+<h2>O roteiro</h2>
+${fluxo([
+ {t:'1 · Entrar',s:'E-mail e senha. Você cai na tela Hoje.'},
+ {t:'2 · Conferir o seu acesso',s:'Em Meu perfil, veja o seu cargo e as áreas liberadas.'},
+ {t:'3 · Conhecer a tela',s:'Menu, busca e botão principal.'},
+ {t:'4 · Olhar a tela Hoje',s:'O que vence hoje, os atrasados e os avisos.',c:'a'},
+ {t:'5 · Fazer uma tarefa',s:'Abrir, iniciar o trabalho, registrar e concluir.',c:'a'},
+ {t:'6 · Abrir a tela do seu setor',s:'Veja a tabela abaixo.',c:'o'}])}
+${passos([
+ 'Entre no sistema e troque a senha.',
+ 'Abra '+ir('perfil','Meu perfil')+' e confira o cargo e as áreas em “Meu acesso”. Faltou ou sobrou algo? Avise as sócias.',
+ 'Passe pelo menu e teste a busca com a tecla '+ui('/')+'. Veja '+ir('tela','Conhecendo a tela')+'.',
+ 'Na tela '+ir('hoje','Hoje')+', veja o que vence hoje e o que está atrasado em seu nome.',
+ 'Em '+ir('tarefas','Tarefas e prazos')+', abra uma tarefa sua, clique em '+ui('Iniciar trabalho')+', escreva o andamento e conclua.',
+ 'Abra a tela principal do seu setor e leia a página dela neste manual.'])}
+<h2>A tela do seu setor</h2>
+${tabela(['Setor','Comece por','O que conferir no primeiro dia'],[
+ ['Controladoria',ir('publicacoes','Publicações')+' e '+ir('tratar','Tratar publicação'),'As publicações pendentes da semana e as cadeias em andamento.'],
+ ['Jurídico',ir('tarefas','Tarefas e prazos')+' e '+ir('f-cabimento','Análise de cabimento'),'As suas tarefas, os seus processos e como concluir uma análise.'],
+ ['Acompanhamento PJ',ir('ficha','Ficha do cliente'),'O dossiê, as atas e o ciclo dos seus clientes.'],
+ ['Acordos',ir('negociacoes','Negociações'),'As negociações em andamento e a agenda de audiências.'],
+ ['Financeiro e Administrativo',ir('fin-visao','Visão geral do financeiro'),'Os números do mês, a régua e o inventário.'],
+ ['Marketing',ir('producao','Produção de conteúdo'),'O quadro, as listas e o envio para a pauta.']])}
+${dica('O '+ir('perfis','Guia do seu cargo')+' mostra, função por função, o que se usa no dia a dia.')}
+<h2>O que você pode encontrar</h2>
+<ul>
+<li><b>Tarefas antigas em atraso.</b> Parte das tarefas veio do ADVBox na importação, e algumas chegaram marcadas como fatais sem serem prazo legal. Confira as suas uma a uma: se já foi feita, conclua registrando o que foi feito; se não é sua, avise a controladoria.</li>
+<li><b>Processos sem responsável.</b> A maioria dos processos importados está sem responsável. A atribuição é feita aos poucos.</li>
+<li><b>Telas que você não vê.</b> O menu mostra só as áreas do seu cargo. Os dados do Financeiro aparecem apenas para quem tem essa área.</li>
+</ul>
+${nota('As sócias vão comunicar se, no início, o controle dos prazos processuais fica no sistema ou continua no ADVBox. Até esse aviso, não deixe de olhar o ADVBox.','Prazos processuais')}
+<h2>O que está desligado</h2>
+<ul>
+<li>A régua automática de cobrança. A cobrança continua manual.</li>
+<li>As mensagens automáticas de WhatsApp para clientes.</li>
+<li>O Comercial e o Atendimento, que não fazem parte deste sistema.</li>
+</ul>
+<h2>Se algo der errado</h2>
+${passos([
+ '<b>Não consegui entrar:</b> fale com o escritório, que libera uma nova senha.',
+ '<b>Tela com erro ou dado estranho:</b> não insista na ação. Anote o que estava fazendo e o horário, e avise as sócias.',
+ '<b>Uma área inteira com problema:</b> volte ao procedimento anterior daquele setor e registre depois.',
+ '<b>Dúvida de como fazer:</b> procure neste manual pela busca, ou veja as '+ir('faq','Perguntas frequentes')+'.'])}
+${regra('Concluir tarefa exige registrar o que foi feito. Prazo fatal do dia se protocola até 12h e se confirma na tela Hoje. Na dúvida sobre um prazo, pergunte à controladoria antes de alterar.','Três regras do primeiro dia')}
 `});
 
 P.push({id:'tela',g:'Comece aqui',t:'Conhecendo a tela',lead:'As partes que aparecem em todas as telas: menu lateral, barra de cima, busca, sino, chat e menu da conta.',sys:'painel',kw:'menu lateral barra superior busca global sino notificações chat discord tema escuro claro recolher atalho barra conta sair',rel:['entrar','hoje','perfil'],h:`
@@ -573,6 +627,7 @@ P.push({id:'ficha',g:'Clientes',t:'Ficha do cliente — Dossiê',m:'Ficha: Dossi
 <h2>Cabeçalho e abas</h2>
 ${shot('ficha-dossie',['Voltar para Clientes.','Nome e situação do cliente.','Copiar o documento.','Saldo em contratos ativos.','Situação com os bancos.','Link do cliente (área do cliente).','Abas: Dossiê, Cadastro, Acompanhamento PJ, Passivos, Jurídico, Negocial, Tarefas, Financeiro.','Registrar reunião.','Registrar um fato na linha do tempo.','Último registro de cada frente e o responsável.','Linha do tempo e o total de registros.'],'Dossiê do cliente PJ')}
 ${nota('Clientes PF têm uma ficha mais curta: Cadastro (dados pessoais e serviço contratado), Jurídico, Tarefas e Dossiê.')}
+${nota('A marca “adimplente” ou “inadimplente com o escritório”, no cabeçalho, e a aba Financeiro aparecem só para quem tem acesso ao Financeiro.','Dados do Financeiro')}
 <h2>As três frentes</h2>
 ${caminhos([{t:'Estratégico / Consultivo',s:'Onboarding, reuniões, direcionamento e reserva. Trabalha na aba Acompanhamento PJ.'},{t:'Jurídico / Contencioso',s:'Processos, prazos e peças. Trabalha na aba Jurídico e em Processos e pastas.'},{t:'Negocial / Acordos',s:'Negociação com os bancos e monitoramento. Trabalha na aba Negocial e em Negociações.'}])}
 <p>As três se encontram no Dossiê, que mostra o último registro de cada frente lado a lado. O responsável por frente é fixo por pessoa, com exceção por cliente quando necessário.</p>
