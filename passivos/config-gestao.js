@@ -50,38 +50,48 @@ function formWf(w){
     if(!w){row.codigo=(cod.value.trim()||nome.value.trim()).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");if(!row.codigo)throw new Error("Informe o código")}
     const q=w?SB.from("workflows_prazo").update(row).eq("codigo",w.codigo):SB.from("workflows_prazo").insert(row);const {error}=await q;if(error)throw new Error(error.message);toast("Salvo");invalidar()},extra);
 }
+/* 26/11 (22h21, sócia): Base de acordos, Regras de projeção e Calibração passam a ser seções de Configurações. As três continuam sendo as telas
+   de sempre; a faixa de seções de Configurações aparece no topo delas, para ir e voltar sem passar pelo menu. */
+const ABAS_CFG=[["motivos","Motivos de reagendamento"],["medidas","Medidas de proteção"],["wf","Tipos de prazo (cadeias)"],["tipos","Tipos de tarefa"]];
+const SECOES_FORA=[["historico","Base de acordos"],["regras","Regras de projeção"],["calibracao","Calibração"]];
+function faixaNasSecoes(){
+  const k=S.tab;if(!SECOES_FORA.some(([x])=>x===k)||!cfgV3()||!window.NPUI||PP.perfil?.papel!=="admin")return;
+  const v=$("#view-"+k);if(!v||v.hidden||v.querySelector(":scope > .np-cfg-faixa"))return;
+  v.prepend(el("div",{class:"np-cfg-faixa"},el("div",{class:"t"},"Configurações"),NPUI.seg([...ABAS_CFG,...SECOES_FORA],k,x=>{if(x===k)return;if(SECOES_FORA.some(([y])=>y===x)){irPara(x);return}C3.aba=x;irPara("config-gestao")},"Seções de configurações")));
+}
 function renderTelaV3(v){
   v.classList.add("np-v3");
   if(!pode()){v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"configurações"}])}),NPUI.vazio({titulo:"Acesso restrito",texto:"Configurações restritas à gestão e controladoria."}));return}
   if(!G.motivos||!G.slas||!G.medidas){if(!G.carregando)carregar();v.append(NPUI.toolbar({resumo:NPUI.resumo([{n:"—",label:"carregando"}])}),NPUI.carregando(5));return}
   const ctaCfg={motivos:["+ Motivo",()=>formMotivo()],medidas:["+ Medida",()=>formMedida()],wf:["+ Tipo de prazo",()=>formWf(null)],tipos:["+ Tipo de tarefa",()=>formTipoTarefa(null)]}[C3.aba];
   const btnCta=NPUI.btn(ctaCfg[0],{variante:"pri",onclick:ctaCfg[1]});
-  const abas=[["motivos","Motivos de reagendamento"],["medidas","Medidas de proteção"],["wf","Tipos de prazo (cadeias)"],["tipos","Tipos de tarefa"]];
+  const abas=[...ABAS_CFG,...SECOES_FORA];
+  const novoNaSecao=NPUI.btn(ctaCfg[0],{variante:"pri",onclick:ctaCfg[1]});   /* 26/11: o botão de cadastrar item novo fica também no cabeçalho de cada seção, à vista */
   v.append(NPUI.toolbar({
     resumo:NPUI.resumo([
       {n:String((G.motivos||[]).filter(m=>m.ativo).length),label:"motivos"},
       {n:String((G.medidas||[]).filter(m=>m.ativo).length),label:"medidas"},
       {n:String((G.wf||[]).filter(w=>w.ativo).length),label:"cadeias"}
     ]),
-    filtros:[NPUI.seg(abas,C3.aba,k=>{C3.aba=k;render()},"Seções de configurações")],
+    filtros:[NPUI.seg(abas,C3.aba,k=>{if(SECOES_FORA.some(([x])=>x===k)){irPara(k);return}C3.aba=k;render()},"Seções de configurações")],
     direita:[btnCta]
   }));
   const D=n=>n>0?"D+"+n:"D"+n;
   if(C3.aba==="motivos"){
     v.append(el("section",{class:"np-cfg-sec"},
-      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Motivos de reagendamento"),el("div",{class:"desc"},"Ao alterar o prazo de uma tarefa, o colaborador escolhe um destes motivos. Gestão e controladoria recebem o aviso."))),
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Motivos de reagendamento"),el("div",{class:"desc"},"Ao alterar o prazo de uma tarefa, o colaborador escolhe um destes motivos. Gestão e controladoria recebem o aviso.")),novoNaSecao),
       el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
         el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Motivo"),el("th",{},"Complemento"),el("th",{},"Situação"),el("th",{class:"r"},""))),
         el("tbody",{},G.motivos.length?G.motivos.map(m=>el("tr",{},el("td",{class:"np-num"},String(m.ordem)),el("td",{},m.motivo),el("td",{class:"np-ts-sub"},m.exige_complemento?"obrigatório":"opcional"),el("td",{},NPUI.marca(m.ativo?"ativo":"inativo",m.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formMotivo(m)})))):el("tr",{},el("td",{colspan:5,class:"np-ts-sub"},"Nenhum motivo cadastrado.")))))));
   }else if(C3.aba==="medidas"){
     v.append(el("section",{class:"np-cfg-sec"},
-      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"desc"},"Checklist exibido em Cadastro → Proteção patrimonial e operacional de cada cliente PJ. Desativar esconde sem apagar o histórico."))),
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Medidas de proteção operacional"),el("div",{class:"desc"},"Checklist exibido em Cadastro → Proteção patrimonial e operacional de cada cliente PJ. Desativar esconde sem apagar o histórico.")),novoNaSecao),
       el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
         el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Medida"),el("th",{},"Descrição"),el("th",{},"Situação"),el("th",{class:"r"},""))),
         el("tbody",{},(G.medidas||[]).length?G.medidas.map(m=>el("tr",{},el("td",{class:"np-num"},String(m.ordem)),el("td",{},el("b",{},m.nome),el("div",{class:"np-ts-sub"},m.codigo)),el("td",{class:"np-ts-sub"},m.descricao||"—"),el("td",{},NPUI.marca(m.ativo?"ativa":"inativa",m.ativo?"ok":"muted")),el("td",{class:"r"},NPUI.btn("Editar",{variante:"ghost",onclick:()=>formMedida(m)})))):el("tr",{},el("td",{colspan:5,class:"np-ts-sub"},"Nenhuma medida cadastrada.")))))));
   }else{
     v.append(el("section",{class:"np-cfg-sec"},
-      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de prazo (cadeias)"),el("div",{class:"desc"},"Ao tratar uma publicação com “Gerou prazo”, o tipo abre a cadeia completa em dias úteis a partir do prazo legal."))),
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de prazo (cadeias)"),el("div",{class:"desc"},"Ao tratar uma publicação com “Gerou prazo”, o tipo abre a cadeia completa em dias úteis a partir do prazo legal.")),novoNaSecao),
       G.wfErro?NPUI.vazio({titulo:"Workflows indisponíveis",texto:G.wfErro}):
       el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
         el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Tipo"),el("th",{class:"r"},"Legal"),el("th",{class:"r"},"Interno"),el("th",{class:"r"},"Confec."),el("th",{},"Custas"),el("th",{class:"r"},"Protoc."),el("th",{class:"r"},"Conferir"),el("th",{},"Análise antes"),el("th",{},"Situação"),el("th",{class:"r"},""))),
@@ -89,7 +99,7 @@ function renderTelaV3(v){
   }
   if(C3.aba==="tipos"){
     v.append(el("section",{class:"np-cfg-sec"},
-      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de tarefa"),el("div",{class:"desc"},"Títulos-padrão que aparecem como sugestão ao criar uma tarefa. O título continua livre: quem cria pode escolher um tipo ou escrever outro."))),
+      el("div",{class:"np-cfg-sh"},el("div",{},el("h2",{},"Tipos de tarefa"),el("div",{class:"desc"},"Títulos-padrão que aparecem como sugestão ao criar uma tarefa. O título continua livre: quem cria pode escolher um tipo ou escrever outro.")),novoNaSecao),
       G.tiposErro?NPUI.vazio({titulo:"Tipos de tarefa indisponíveis",texto:G.tiposErro}):
       el("div",{class:"np-ts-tbl-wrap"},el("table",{class:"np-ts-tbl"},
         el("thead",{},el("tr",{},el("th",{},"Ordem"),el("th",{},"Tipo de tarefa"),el("th",{},"Núcleo"),el("th",{},"Situação"),el("th",{class:"r"},""))),
@@ -119,6 +129,6 @@ function renderTela(){
       el("tbody",{},(G.wf||[]).length?G.wf.map(w=>el("tr",{},el("td",{class:"num"},String(w.ordem)),el("td",{},el("b",{},w.nome),el("div",{class:"note"},w.codigo)),el("td",{class:"num"},w.dias_legais+" "+(w.tipo_contagem==="corridos"?"corr.":"úteis")),el("td",{class:"num"},String(w.dias_internos)),el("td",{class:"num"},D(w.confeccionar_offset)),el("td",{},w.custas?"D-3":"—"),el("td",{class:"num"},D(w.protocolar_offset)),el("td",{class:"num"},D(w.conferir_offset)),el("td",{class:"note"},w.decisao_inicial||"—"),el("td",{},el("span",{class:"pill "+(w.ativo?"g":"")},w.ativo?"Ativo":"Inativo")),el("td",{class:"r"},el("button",{class:"btn sm",onclick:()=>formWf(w)},"Editar")))):el("tr",{},el("td",{colspan:"11",class:"note"},"Nenhum tipo cadastrado. Use “+ Tipo de prazo”.")))))));
   // SLAs dos tickets: seção ocultada (tickets desativados em 05/11/2026)
 }
-{const _r=render;render=function(){_r();const v=$("#view-config-gestao");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="config-gestao")S.tab="clientes";v.hidden=S.tab!=="config-gestao";if(S.tab==="config-gestao")renderTela()}}
+{const _r=render;render=function(){_r();try{faixaNasSecoes()}catch(_){}const v=$("#view-config-gestao");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="config-gestao")S.tab="clientes";v.hidden=S.tab!=="config-gestao";if(S.tab==="config-gestao")renderTela()}}
 window.PP_CONFIG_GESTAO={invalidar};
 })();
