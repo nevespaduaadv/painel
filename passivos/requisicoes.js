@@ -169,6 +169,14 @@ function renderTela(){
   }
   if(!gestor||minhas.length)v.append(el("section",{class:"card section"},el("div",{class:"section-h"},el("h2",{},"Minhas requisições"),el("span",{class:"note"},String(minhas.length))),minhas.length?el("div",{class:"list"},minhas.map(r=>linha(r))):el("div",{class:"empty"},"Você ainda não fez nenhuma requisição.")));
 }
+/* 26/11 (22h21, sócia): a gestão aprova as requisições no próprio perfil; a tela “Requisições (gestão)” saiu do menu (a rota continua, para o histórico) */
+function secaoAprovar(){
+  if(!aprova()||!R.ok)return null;const pend=R.lista.filter(r=>r.status==="pendente");
+  const sec=el("section",{class:"card section rq-perfil rq-aprovar"});
+  sec.append(el("div",{class:"section-h"},el("div",{},el("h2",{},"Requisições para aprovar"),el("div",{class:"note"},pend.length?"Pedidos da equipe aguardando a sua decisão.":"Nenhum pedido aguardando decisão.")),el("div",{class:"actions"},el("button",{class:"btn sm",onclick:()=>{R.filtro="historico";irPara("requisicoes")}},"Ver histórico"))));
+  if(pend.length)sec.append(el("div",{class:"list"},pend.slice(0,30).map(r=>linha(r,{gestor:true}))));
+  return sec;
+}
 /* seção em Meu perfil: as requisições da própria pessoa */
 function secaoPerfil(){
   const meu=meuColab();const sec=el("section",{class:"card section rq-perfil"});
@@ -183,10 +191,10 @@ function cardHoje(){
   if(!aprova())return null;if(!R.ok){if(!R.carregando&&!R.erro)carregar();return null}
   const pend=R.lista.filter(r=>r.status==="pendente");if(!pend.length)return null;
   return el("div",{class:"card rq-hoje",style:"grid-column:1 / -1"},el("div",{class:"section-h",style:"padding:14px 18px;border-bottom:1px solid var(--line)"},el("h2",{},"Requisições para aprovar"),el("span",{class:"note"},String(pend.length))),
-    el("div",{class:"list"},pend.slice(0,6).map(r=>el("button",{class:"row",onclick:()=>{S.tab="requisicoes";try{localStorage.setItem("pp-tab","requisicoes")}catch(_){}render()}},el("div",{style:"min-width:0"},el("div",{class:"n"},r.colaborador_nome+" · "+r.tipo_nome),el("div",{class:"s"},periodo(r)+(r.detalhe?" — "+r.detalhe.slice(0,120):""))),el("span",{class:"note num"},fmtDT(r.created_at).slice(0,5))))));
+    el("div",{class:"list"},pend.slice(0,6).map(r=>el("button",{class:"row",onclick:()=>{irPara("perfil")}},el("div",{style:"min-width:0"},el("div",{class:"n"},r.colaborador_nome+" · "+r.tipo_nome),el("div",{class:"s"},periodo(r)+(r.detalhe?" — "+r.detalhe.slice(0,120):""))),el("span",{class:"note num"},fmtDT(r.created_at).slice(0,5))))));
 }
 {const _r=render;render=function(){_r();const v=$("#view-requisicoes");if(!v)return;const eq=typeof equipe==="function"&&equipe();if(!eq&&S.tab==="requisicoes")S.tab="clientes";v.hidden=S.tab!=="requisicoes";if(S.tab==="requisicoes")renderTela();
   if(S.tab==="painel"&&eq){const vp=$("#view-painel");const old=vp?.querySelector(".rq-hoje");if(old)old.remove();const c=cardHoje();const grid=vp?.querySelector(".kpis");if(c&&grid)grid.after(c)}
-  if(S.tab==="perfil"&&eq){const vp=$("#view-perfil");if(vp&&!vp.querySelector(".note")?.textContent?.startsWith("Carregando")){vp.querySelector(".rq-perfil")?.remove();vp.append(secaoPerfil())}}}}
+  if(S.tab==="perfil"&&eq){const vp=$("#view-perfil");if(vp&&!vp.querySelector(".note")?.textContent?.startsWith("Carregando")){vp.querySelectorAll(".rq-perfil").forEach(x=>x.remove());const sa=secaoAprovar();if(sa)vp.append(sa);vp.append(secaoPerfil())}}}}
 window.PP_REQUISICOES={invalidar,nova};
 })();

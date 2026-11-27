@@ -27,6 +27,9 @@
         ? "Você está usando a nova navegação (V3.1): menu em árvore, trilho recolhível e barra compacta. A preferência vale só neste navegador" + (BETA ? " e só aqui no beta" : "") + " e não muda nenhum acesso."
         : "Experimente a nova navegação (V3.1): menu em árvore, trilho recolhível e barra compacta. A preferência vale só neste navegador" + (BETA ? " e só aqui no beta" : "") + " e não muda nenhum acesso.")),
       el("button", { class: "btn" + (nova ? "" : " primary"), type: "button", onclick: () => { gravarChave(nova ? "v2" : "v3"); location.reload(); } }, nova ? "Voltar à navegação atual" : "Experimentar a nova navegação"));
+    /* 26/11 (22h21, sócia): o bloco “Navegação” sai do perfil de quem já usa a navegação nova. Para quem ainda está na antiga, ele continua visível,
+       como caminho de vinda. (O elemento fica no DOM, escondido, porque os laboratórios trocam de casca por ele.) */
+    if (nova) card.hidden = true;
     v.append(card);
   }
   { const _r = render; render = function () { _r(); try { cardPerfil(); } catch (_) {} }; }
@@ -225,8 +228,11 @@
     const ro = soLeitura(); const FIXOS = ro ? [...FIXOS_BASE, "clientes", "acompanhamento"] : FIXOS_BASE;
     const cart = byTab("clientes"), acomp = byTab("acompanhamento");
     const gCli = ro || !cart ? null : { id: "clientes", label: "Clientes", icone: "clientes", cls: "", itens: [{ ...cart, label: "Carteira" }, acomp].filter(Boolean) };
+    const FORA_MENU = new Set(["requisicoes", "historico", "regras", "calibracao"]), CFG_SECOES = ["historico", "regras", "calibracao"];
     const gs = [gCli, hub("juridico", "Jurídico", "juridico"), hub("financeiro", "Financeiro", "financeiro"),
-      { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]) },
+      /* 26/11 (22h21, sócia): Requisições sai do menu (a gestão aprova em Meu perfil); Base de acordos, Regras de projeção e Calibração passam a ser
+         seções de Configurações — as rotas continuam existindo, só não são itens da árvore; Configurações fica aceso dentro delas. */
+      { id: "equipe", label: "Equipe e gestão", icone: "equipe", cls: "", itens: deGrupos(["equipe", "gestao"]).filter(i => !FORA_MENU.has(i.tab) && !PP.TABS_DESLIGADAS?.has(i.tab)).map(i => (i.tab === "config-gestao" ? { ...i, alt: CFG_SECOES } : i)) },
       { id: "marketing", label: "Marketing", icone: "marketing", cls: "", itens: deGrupos(["marketing"]).filter(i => i.tab === "marketing").map(i => ({ ...i, label: "Pauta de conteúdo" })) }].filter(g => g && g.itens.length);
     const FERR_TABS = ["revisional", "superendividamento", "pecas", "autenticador", "conhecimento"]; // 26/11 (11h30): Monitoramento volta para o grupo Jurídico
     // Financeiro (19/11, 12h — decisão das sócias): só as quatro páginas da especificação do setor. Estoque e Inventário passam para o grupo
@@ -251,15 +257,14 @@
     // Ferramentas mantém apenas os destinos aprovados do NAV (ex.: Base de conhecimento em Comercial), preservando
     // apenas o fallback silencioso de breadcrumb/título em ROTAS_META para rotas legadas abertas diretamente.
     const LEGADO_CRM = new Set(["leads", "comercial", "atendimento", "automacoes"]);
-    for (const t of ["historico", "regras", "calibracao"]) addAoGrupo("equipe", t, true);
     for (const t of ["mkt-automacoes", "mkt-producao"]) addAoGrupo("marketing", t, true);
     addAoGrupo("juridico", "monitoramento", true);
     // Rota direta atualmente aberta fora de NAV/hubs (ex.: fin-visao, financeiro-controle): entra no grupo correto se permitida,
     // exceto rotas legadas de CRM/Atendimento (grupoId: null e guardadas em LEGADO_CRM).
     const curTab = tabAtual();
-    if (curTab && !LEGADO_CRM.has(curTab) && ROTAS_META[curTab]?.grupoId && !FIXOS.includes(curTab) && curTab !== "perfil") addAoGrupo(ROTAS_META[curTab].grupoId, curTab, false);
+    if (curTab && !LEGADO_CRM.has(curTab) && !FORA_MENU.has(curTab) && ROTAS_META[curTab]?.grupoId && !FIXOS.includes(curTab) && curTab !== "perfil") addAoGrupo(ROTAS_META[curTab].grupoId, curTab, false);
     // itens do NAV que não entraram em fixos, hubs ou grupos conhecidos: grupo "Outros" (nunca se perde destino)
-    const cobertos = new Set([...FIXOS, ...FERR_TABS, "ferramentas", "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
+    const cobertos = new Set([...FIXOS, ...FERR_TABS, ...FORA_MENU, "ferramentas", "clientes", "acompanhamento", "perfil", ...gs.flatMap(g => g.itens.map(i => i.tab)), ...gs.map(g => g.hubTab).filter(Boolean)]);
     // itens com `tabs` são hubs (filhos já avaliados por acesso); nunca caem em "Outros"
     const soltos = itens.filter(i => i.tab && !i.tabs && !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab)).concat(grupos.filter(g => !["equipe", "gestao", "juridico-ferr", "comercial", "marketing"].includes(g.grupo)).flatMap(g => g.itens.filter(i => !cobertos.has(i.tab) && !LEGADO_CRM.has(i.tab))));
     if (soltos.length) gs.push({ id: "outros", label: "Outros", icone: "ferramentas", cls: "", itens: soltos });
