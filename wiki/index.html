@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Manual de uso do sistema interno do Neves Pádua Advocacia: telas, passo a passo e fluxos.">
+<meta property="og:title" content="Wiki Neves Pádua Interno">
+<meta property="og:description" content="Manual de uso do sistema interno do Neves Pádua Advocacia: telas, passo a passo e fluxos.">
+<meta property="og:type" content="website">
+<title>Wiki Neves Pádua Interno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Wiki em três colunas (menu em árvore · artigo · nesta página), no visual do sistema: grafite único sobre papel, sem serifa e sem itálico. */
+:root{
+  --papel:#f3f2ef; --folha:#ffffff; --fio:#dedcd6; --fio2:#cfccc4; --tinta:#23272a; --tinta2:#5d6368; --tinta3:#868b8f;
+  --grafite:#2a2e31; --sobre-grafite:#f3f2ef; --lateral:#eae9e5; --realce:#e2e0d9;
+  --fatal:#a3282d; --alerta:#9a6a12; --ok:#1f7a4d; --info:#2f5f8a;
+  --fatal-bg:#f7e9e9; --alerta-bg:#f6eedd; --ok-bg:#e5f1ea; --info-bg:#e8eef4;
+  --sombra:0 1px 2px rgba(20,22,24,.06),0 8px 24px rgba(20,22,24,.06);
+  --fonte:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+:root[data-tema="escuro"]{
+  --papel:#17191b; --folha:#1f2224; --fio:#34383b; --fio2:#43474a; --tinta:#eceae5; --tinta2:#a8adb1; --tinta3:#7f8488;
+  --grafite:#eceae5; --sobre-grafite:#17191b; --lateral:#1b1d1f; --realce:#2b2f32;
+  --fatal:#e3777b; --alerta:#dba64c; --ok:#5fc08f; --info:#86b3d9;
+  --fatal-bg:#3a2224; --alerta-bg:#3a3020; --ok-bg:#1f3329; --info-bg:#212d38;
+  --sombra:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--papel);color:var(--tinta);font-family:var(--fonte);font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;font-style:normal}
+em,i,cite{font-style:normal}
+a{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:4px}
+.app{display:grid;grid-template-columns:276px minmax(0,1fr);height:100%}
+/* lateral */
+.lat{background:var(--lateral);border-right:1px solid var(--fio);display:flex;flex-direction:column;min-height:0}
+.marca{padding:20px 20px 10px;display:flex;flex-direction:column;align-items:center;text-decoration:none;gap:2px}
+.marca .lg{font-weight:600;font-size:21px;letter-spacing:.06em;color:var(--grafite)}
+.marca .sb{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--tinta2)}
+.marca .vs{margin-top:6px;font-size:11.5px;font-weight:600;color:var(--tinta2);border:1px solid var(--fio2);border-radius:999px;padding:1px 9px}
+.busca{margin:8px 14px 8px;display:flex;align-items:center;gap:8px;background:var(--folha);border:1px solid var(--fio);border-radius:9px;padding:8px 10px;color:var(--tinta2);width:calc(100% - 28px);text-align:left}
+.busca svg{flex:none}
+.busca kbd{margin-left:auto;font:inherit;font-size:11.5px;border:1px solid var(--fio);border-radius:5px;padding:0 6px;color:var(--tinta3)}
+.arv{overflow:auto;padding:2px 10px 24px;flex:1;min-height:0}
+.arv a,.arv .grp{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:7px;text-decoration:none;border:0;background:none;text-align:left;line-height:1.35}
+.arv .grp{font-weight:700;font-size:13px;margin-top:8px;color:var(--tinta)}
+.arv .grp::before{content:"";width:6px;height:6px;border-right:1.6px solid var(--tinta2);border-bottom:1.6px solid var(--tinta2);transform:rotate(-45deg);transition:transform .15s;margin-right:3px;flex:none}
+.arv .grp[aria-expanded="true"]::before{transform:rotate(45deg)}
+.arv .sub{display:none;flex-direction:column;margin:1px 0 4px}
+.arv .grp[aria-expanded="true"] + .sub{display:flex}
+.arv a{color:var(--tinta2);font-size:14.3px}
+.arv .sub a{padding-left:27px}
+.arv a:hover{background:var(--realce);color:var(--tinta)}
+.arv a[aria-current="page"]{background:var(--folha);color:var(--tinta);font-weight:600;box-shadow:inset 3px 0 0 var(--grafite),0 1px 2px rgba(0,0,0,.05)}
+.arv .novo{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:0 7px}
+.lat-pe{border-top:1px solid var(--fio);padding:10px 14px;display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--tinta2)}
+.lat-pe .tema{margin-left:auto;display:flex;border:1px solid var(--fio);border-radius:8px;overflow:hidden;background:var(--folha)}
+.lat-pe .tema button{border:0;background:none;padding:4px 8px;font-size:12px;color:var(--tinta2)}
+.lat-pe .tema button[aria-pressed="true"]{background:var(--grafite);color:var(--sobre-grafite)}
+/* conteúdo */
+.cont{overflow:auto;min-height:0;scroll-behavior:smooth}
+.topo{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--papel) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--fio);display:flex;align-items:center;gap:10px;padding:10px 28px;font-size:14px;color:var(--tinta2);min-height:50px}
+.topo .cami b{color:var(--tinta);font-weight:600}
+.topo .dir{margin-left:auto;display:flex;gap:8px;align-items:center}
+.menu-btn{display:none;border:1px solid var(--fio);background:var(--folha);border-radius:7px;padding:4px 10px}
+.grade{display:grid;grid-template-columns:minmax(0,800px) 210px;gap:44px;padding:30px 28px 90px;max-width:1110px;margin:0 auto}
+article h1{font-weight:700;font-size:34px;line-height:1.15;margin:0 0 8px;letter-spacing:-.015em;text-wrap:balance}
+article h2{font-weight:700;font-size:21px;margin:40px 0 10px;letter-spacing:-.01em;text-wrap:balance;scroll-margin-top:70px;padding-top:14px;border-top:1px solid var(--fio)}
+article h2:first-of-type{border-top:0;padding-top:0}
+article h3{font-size:16px;margin:24px 0 6px;font-weight:700}
+.lead{font-size:17px;color:var(--tinta2);margin:0 0 16px;max-width:64ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 24px;font-size:13.5px}
+.cam{border:1px solid var(--fio);background:var(--folha);border-radius:999px;padding:3px 11px;color:var(--tinta2)}
+.cam b{color:var(--tinta);font-weight:600}
+.abrir{display:inline-flex;align-items:center;gap:6px;background:var(--grafite);color:var(--sobre-grafite);border-radius:999px;padding:4px 13px;text-decoration:none;font-weight:600;font-size:13.5px;white-space:nowrap}
+.abrir:hover{opacity:.9}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;border-radius:999px;padding:1px 8px;vertical-align:1px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.f{background:var(--fatal-bg);color:var(--fatal)} .tag.a{background:var(--alerta-bg);color:var(--alerta)} .tag.i{background:var(--info-bg);color:var(--info)} .tag.n{background:var(--realce);color:var(--tinta2)}
+article p{margin:0 0 12px;max-width:70ch}
+article ul,article ol{margin:0 0 14px;padding-left:22px;max-width:70ch}
+article li{margin:4px 0}
+article a{text-decoration:underline;text-decoration-color:var(--fio2);text-underline-offset:3px}
+article a:hover{text-decoration-color:var(--tinta)}
+article a.abrir,article a.card,article a.pn,article a.perfil{text-decoration:none}
+.ui{font-weight:600;white-space:nowrap;background:var(--folha);border:1px solid var(--fio);border-radius:6px;padding:0 6px;font-size:.93em}
+.k{font-variant-numeric:tabular-nums}
+/* caixas */
+.nota,.aviso,.dica,.regra{border:1px solid var(--fio);border-left:3px solid var(--info);background:var(--info-bg);padding:11px 14px;border-radius:0 9px 9px 0;margin:14px 0 18px;max-width:70ch}
+.aviso{border-left-color:var(--fatal);background:var(--fatal-bg)}
+.dica{border-left-color:var(--ok);background:var(--ok-bg)}
+.regra{border-left-color:var(--grafite);background:var(--folha)}
+.nota>b:first-child,.aviso>b:first-child,.dica>b:first-child,.regra>b:first-child{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.nota p:last-child,.aviso p:last-child,.dica p:last-child{margin:0}
+/* passos */
+.passos{list-style:none;padding:0;margin:10px 0 20px;counter-reset:p;max-width:72ch}
+.passos>li{counter-increment:p;position:relative;padding:2px 0 12px 42px;margin:0}
+.passos>li::before{content:counter(p);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--grafite);color:var(--sobre-grafite);font-weight:700;font-size:13.5px;display:grid;place-items:center}
+.passos>li:not(:last-child)::after{content:"";position:absolute;left:13.5px;top:31px;bottom:2px;width:1px;background:var(--fio2)}
+/* prints */
+.shot{margin:10px 0 26px}
+.tela{position:relative;border:1px solid var(--fio);border-radius:11px;background:var(--folha);box-shadow:var(--sombra);cursor:zoom-in}
+.tela img{display:block;width:100%;height:auto;border-radius:10px}
+.box{position:absolute;border:2px solid transparent;border-radius:6px;pointer-events:none;transition:border-color .12s,background .12s}
+.box.on{border-color:var(--alerta);background:rgba(219,166,76,.12)}
+.pin{position:absolute;width:23px;height:23px;margin:0;border:2px solid var(--folha);border-radius:50%;background:var(--grafite);color:var(--sobre-grafite);font-size:11.5px;font-weight:800;display:grid;place-items:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:2;line-height:1}
+.pin.on,.pin:hover{background:var(--alerta);color:#fff}
+.shot figcaption{display:flex;gap:10px;align-items:baseline;font-size:13.5px;color:var(--tinta2);padding:8px 2px 0}
+.shot figcaption button{margin-left:auto;border:1px solid var(--fio);background:var(--folha);border-radius:7px;padding:1px 9px;font-size:12.5px;color:var(--tinta2);white-space:nowrap}
+.leg{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px 18px;max-width:none}
+.leg li{display:flex;gap:9px;align-items:flex-start;font-size:14px;line-height:1.45;padding:4px 6px;border-radius:7px;margin:0}
+.leg li i{flex:none;width:21px;height:21px;border-radius:50%;background:var(--grafite);color:var(--sobre-grafite);font-weight:800;font-size:11px;display:grid;place-items:center;margin-top:1px}
+.leg li.on{background:var(--alerta-bg)}
+.leg li.on i{background:var(--alerta);color:#fff}
+.dupla{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.dupla .shot{margin-bottom:10px}
+.estreita{max-width:620px}
+/* fluxo horizontal */
+.fluxo{display:flex;flex-wrap:wrap;gap:10px 26px;margin:12px 0 22px}
+.fluxo .et{position:relative;flex:1 1 140px;min-width:132px;border:1px solid var(--fio);border-top:3px solid var(--grafite);background:var(--folha);border-radius:0 0 10px 10px;padding:10px 12px}
+.fluxo .et:not(:last-child)::after{content:"";position:absolute;right:-20px;top:50%;width:12px;height:12px;border-top:1.6px solid var(--tinta3);border-right:1.6px solid var(--tinta3);transform:translateY(-50%) rotate(45deg)}
+.fluxo .et b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25}
+.fluxo .et span{font-size:13.3px;color:var(--tinta2);display:block;line-height:1.4;margin-top:2px}
+.fluxo .et small{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;color:var(--tinta2);background:var(--realce);border-radius:999px;padding:0 8px}
+.fluxo .et.f{border-top-color:var(--fatal)} .fluxo .et.a{border-top-color:var(--alerta)} .fluxo .et.o{border-top-color:var(--ok)} .fluxo .et.i{border-top-color:var(--info)}
+/* linha do tempo vertical */
+.trilho{position:relative;margin:12px 0 24px;padding-left:94px;max-width:720px}
+.trilho::before{content:"";position:absolute;left:79px;top:8px;bottom:8px;width:2px;background:var(--fio2)}
+.trilho .m{position:relative;margin:0 0 12px;background:var(--folha);border:1px solid var(--fio);border-radius:10px;padding:9px 13px}
+.trilho .m::before{content:"";position:absolute;left:-20px;top:14px;width:12px;height:12px;border-radius:50%;background:var(--folha);border:2.5px solid var(--grafite)}
+.trilho .m.f::before{border-color:var(--fatal);background:var(--fatal)} .trilho .m.a::before{border-color:var(--alerta)} .trilho .m.o::before{border-color:var(--ok)} .trilho .m.i::before{border-color:var(--info)}
+.trilho .m .d{position:absolute;left:-94px;top:9px;width:62px;text-align:right;font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
+.trilho .m.f .d{color:var(--fatal)}
+.trilho .m b{display:block;font-size:15px}
+.trilho .m span{display:block;font-size:13.5px;color:var(--tinta2);line-height:1.45}
+.trilho .m small{font-size:11.5px;font-weight:700;color:var(--tinta2);background:var(--realce);border-radius:999px;padding:0 8px;margin-top:4px;display:inline-block}
+/* caminhos de decisão */
+.caminhos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0 22px}
+.caminhos>div{border:1px solid var(--fio);background:var(--folha);border-radius:11px;padding:13px 15px;border-top:3px solid var(--grafite)}
+.caminhos>div.f{border-top-color:var(--fatal)} .caminhos>div.a{border-top-color:var(--alerta)} .caminhos>div.o{border-top-color:var(--ok)} .caminhos>div.i{border-top-color:var(--info)}
+.caminhos b{display:block;font-size:15.5px;margin-bottom:3px}
+.caminhos span{font-size:13.8px;color:var(--tinta2);display:block;line-height:1.5}
+.caminhos ol,.caminhos ul{margin:6px 0 0;padding-left:18px;font-size:13.8px;color:var(--tinta2)}
+/* raias (swimlane) */
+.raias{border:1px solid var(--fio);border-radius:11px;overflow:hidden;margin:12px 0 22px;background:var(--folha)}
+.raia{display:grid;grid-template-columns:150px 1fr;border-top:1px solid var(--fio)}
+.raia:first-child{border-top:0}
+.raia>b{background:var(--lateral);padding:12px 14px;font-size:13.5px;border-right:1px solid var(--fio);display:flex;align-items:center}
+.raia>div{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;align-items:center}
+.raia .p{border:1px solid var(--fio2);border-radius:8px;padding:5px 10px;font-size:13.5px;background:var(--papel)}
+.raia .p i{font-weight:800;margin-right:6px;font-variant-numeric:tabular-nums}
+.raia .p.f{border-color:var(--fatal);background:var(--fatal-bg)} .raia .p.a{border-color:var(--alerta);background:var(--alerta-bg)} .raia .p.o{border-color:var(--ok);background:var(--ok-bg)}
+/* cartões */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:12px;margin:10px 0 26px}
+.card{display:flex;flex-direction:column;gap:3px;border:1px solid var(--fio);background:var(--folha);border-radius:11px;padding:14px 16px;transition:border-color .12s,transform .12s}
+.card:hover{border-color:var(--tinta2);transform:translateY(-1px)}
+.card .ic{width:30px;height:30px;border-radius:8px;background:var(--grafite);color:var(--sobre-grafite);display:grid;place-items:center;margin-bottom:6px}
+.card b{font-size:16.5px;font-weight:700}
+.card span{font-size:13.8px;color:var(--tinta2);line-height:1.45}
+.heroi{border:1px solid var(--fio);background:var(--folha);border-radius:14px;padding:26px 28px;margin:0 0 24px;box-shadow:var(--sombra);display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:center}
+.heroi h1{font-size:32px;margin-bottom:6px}
+.heroi .lead{margin-bottom:14px}
+.heroi .acoes{display:flex;gap:8px;flex-wrap:wrap}
+.heroi .acoes a.sec{display:inline-flex;align-items:center;border:1px solid var(--fio2);border-radius:999px;padding:4px 13px;text-decoration:none;font-weight:600;font-size:13.5px;background:var(--papel)}
+.heroi img{width:100%;height:auto;border-radius:10px;border:1px solid var(--fio);box-shadow:var(--sombra)}
+.perfis{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:12px 0 24px}
+.perfil{display:block;border:1px solid var(--fio);background:var(--folha);border-radius:11px;padding:14px 16px}
+.perfil:hover{border-color:var(--tinta2)}
+.perfil b{display:block;font-size:16px}
+.perfil span{display:block;font-size:13.5px;color:var(--tinta2);line-height:1.45}
+.perfil ul{margin:8px 0 0;padding-left:18px;font-size:13.8px}
+/* tabelas */
+.tw{overflow-x:auto;margin:8px 0 20px;border:1px solid var(--fio);border-radius:10px;background:var(--folha)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--fio);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta2);font-weight:700;background:var(--lateral)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* faq */
+details.faq{border:1px solid var(--fio);background:var(--folha);border-radius:10px;margin:8px 0;max-width:76ch}
+details.faq summary{cursor:pointer;padding:11px 14px;font-weight:600;list-style:none;display:flex;gap:10px}
+details.faq summary::-webkit-details-marker{display:none}
+details.faq summary::before{content:"+";font-weight:800;color:var(--tinta2);width:12px}
+details.faq[open] summary::before{content:"–"}
+details.faq>div{padding:0 14px 12px 36px;color:var(--tinta2)}
+details.faq>div p{margin:0 0 8px}
+dl.glos{display:grid;grid-template-columns:200px 1fr;gap:0;border:1px solid var(--fio);border-radius:10px;overflow:hidden;background:var(--folha);margin:8px 0 22px}
+dl.glos dt{font-weight:700;padding:9px 12px;border-top:1px solid var(--fio);background:var(--lateral);font-size:14px}
+dl.glos dd{margin:0;padding:9px 12px;border-top:1px solid var(--fio);font-size:14.3px;color:var(--tinta2)}
+dl.glos dt:first-of-type,dl.glos dt:first-of-type + dd{border-top:0}
+/* navegação */
+.pn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:46px}
+.pn{border:1px solid var(--fio);background:var(--folha);border-radius:11px;padding:12px 16px;display:block}
+.pn:hover{border-color:var(--tinta2)}
+.pn small{display:block;color:var(--tinta2);font-size:12.5px}
+.pn b{font-weight:700;font-size:16px}
+.pn.r{text-align:right}
+.rod{margin-top:26px;font-size:12.8px;color:var(--tinta3);display:flex;flex-wrap:wrap;gap:6px 16px}
+/* nesta página */
+.np{position:sticky;top:70px;align-self:start;font-size:13.5px}
+.np>b{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tinta2);margin-bottom:8px}
+.np button{display:block;border:0;background:none;padding:4px 0 4px 11px;border-left:2px solid var(--fio);color:var(--tinta2);text-align:left;width:100%;line-height:1.35}
+.np button:hover,.np button.on{color:var(--tinta);border-left-color:var(--grafite)}
+.np .rel{margin-top:22px}
+.np .rel a{display:block;padding:3px 0;color:var(--tinta2);text-decoration:none}
+.np .rel a:hover{color:var(--tinta)}
+/* busca */
+.modal{position:fixed;inset:0;background:rgba(20,22,24,.5);display:none;align-items:flex-start;justify-content:center;padding:9vh 16px;z-index:30}
+.modal.on{display:flex}
+.cx{background:var(--folha);border:1px solid var(--fio);border-radius:13px;width:min(660px,100%);max-height:74vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.cx input{border:0;border-bottom:1px solid var(--fio);padding:15px 18px;font:inherit;font-size:16.5px;background:transparent;color:var(--tinta);outline:none}
+.res{overflow:auto;padding:6px}
+.res a{display:block;padding:9px 12px;border-radius:8px;text-decoration:none}
+.res a small{display:block;color:var(--tinta2);font-size:12.8px;line-height:1.4}
+.res a b{font-weight:600}
+.res a .g{font-size:11.5px;color:var(--tinta3);margin-left:6px;font-weight:600}
+.res a.sel,.res a:hover{background:var(--realce)}
+.res mark{background:var(--alerta-bg);color:inherit;border-radius:3px;padding:0 1px}
+.res .vazio{padding:18px;color:var(--tinta2);font-size:14px}
+.cx .pe{border-top:1px solid var(--fio);padding:7px 14px;font-size:12px;color:var(--tinta3);display:flex;gap:14px}
+/* lightbox */
+.lb{position:fixed;inset:0;background:rgba(14,15,17,.86);display:none;z-index:40;padding:22px;gap:18px;align-items:center;justify-content:center}
+.lb.on{display:flex}
+.lb .pal{position:relative;max-width:min(1500px,calc(100vw - 420px));max-height:calc(100vh - 44px)}
+.lb .pal .tela{cursor:default;box-shadow:none;border-color:#444}
+.lb .pal img{width:100%}
+.lb .lado{width:330px;max-height:calc(100vh - 44px);overflow:auto;background:var(--folha);border-radius:12px;padding:16px 16px 12px;color:var(--tinta)}
+.lb .lado h4{margin:0 0 4px;font-size:15px}
+.lb .lado p{margin:0 0 10px;font-size:13.5px;color:var(--tinta2)}
+.lb .lado .leg{grid-template-columns:1fr}
+.lb .ctl{display:flex;gap:6px;margin-top:10px}
+.lb .ctl button{flex:1;border:1px solid var(--fio);background:var(--papel);border-radius:8px;padding:5px 8px;font-size:13px}
+.lb .fechar{position:fixed;top:14px;right:16px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:20px;line-height:1}
+@media (max-width:1180px){.grade{grid-template-columns:minmax(0,1fr)}.np{display:none}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .lat{position:fixed;inset:0 auto 0 0;width:290px;z-index:25;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.25)}
+  body.menu-on .lat{transform:none}
+  .menu-btn{display:inline-block}
+  .grade{padding:22px 16px 70px}
+  .heroi{grid-template-columns:1fr}
+  .dupla{grid-template-columns:1fr}
+  article h1{font-size:28px}
+  .lb{flex-direction:column;padding:56px 10px 10px;overflow:auto;align-items:stretch}
+  .lb .pal{max-width:100%}
+  .lb .lado{width:auto}
+  dl.glos{grid-template-columns:1fr}
+  .raia{grid-template-columns:1fr}.raia>b{border-right:0}
+  .trilho{padding-left:78px}.trilho::before{left:63px}.trilho .m .d{left:-78px;width:48px;font-size:13px}
+}
+@media print{.lat,.topo,.np,.pn-row,.shot figcaption button{display:none}.app{display:block}.cont{overflow:visible}.grade{display:block;padding:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="lat" aria-label="Menu do wiki">
+    <a class="marca" href="#/inicio" aria-label="Início do wiki">
+      <span class="lg">NEVES PÁDUA</span><span class="sb">wiki interno</span><span class="vs">versão 2 · 27/11/2026</span>
+    </a>
+    <button class="busca" id="abrirBusca" aria-label="Buscar no wiki">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Buscar no wiki<kbd>Ctrl K</kbd>
+    </button>
+    <nav class="arv" id="arv"></nav>
+    <div class="lat-pe">Tema
+      <div class="tema" role="group" aria-label="Tema">
+        <button data-t="auto" aria-pressed="false">Auto</button><button data-t="claro" aria-pressed="false">Claro</button><button data-t="escuro" aria-pressed="false">Escuro</button>
+      </div>
+    </div>
+  </aside>
+  <main class="cont" id="cont">
+    <div class="topo">
+      <button class="menu-btn" id="menuBtn" aria-label="Abrir o menu">Menu</button>
+      <div class="cami" id="cami"></div>
+      <div class="dir" id="topoDir"></div>
+    </div>
+    <div class="grade">
+      <article id="art"></article>
+      <aside class="np" id="np" aria-label="Nesta página"></aside>
+    </div>
+  </main>
+</div>
+<div class="modal" id="mBusca" role="dialog" aria-modal="true" aria-label="Buscar">
+  <div class="cx">
+    <input id="qBusca" placeholder="Buscar telas, botões, fluxos, regras…" autocomplete="off" aria-label="Termo de busca">
+    <div class="res" id="rBusca"></div>
+    <div class="pe"><span>↑ ↓ navegar</span><span>Enter abrir</span><span>Esc fechar</span></div>
+  </div>
+</div>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Print ampliado">
+  <button class="fechar" id="lbFechar" aria-label="Fechar">×</button>
+  <div class="pal" id="lbPal"></div>
+  <div class="lado" id="lbLado"></div>
+</div>
+<script>
+const CAPS = {"acompanhamento":{"w":1229,"h":584,"pins":[[1,17.45,10.03,41.72,3.77],[2,39.32,14.79,10.11,4.11],[3,65.39,14.79,6.66,4.11],[4,91.73,14.79,5.72,4.11],[5,25.65,28.74,65.33,6.36],[6,91.64,30.53,5.16,2.77]]},"adm-estoque":{"w":1229,"h":539,"pins":[[1,17.5,10.8,38.2,4.1],[2,82.8,16.3,15.6,4.8],[3,17.5,26.5,21.4,4.6],[4,17.5,36.0,33.6,4.5],[5,0.8,20.8,14.2,5.2],[6,37.3,49.4,41.3,6.9]]},"adm-inventario":{"w":1229,"h":539,"pins":[[1,17.5,10.8,30.8,4.1],[2,72.6,16.3,24.8,4.8],[3,17.5,26.5,22.6,4.6],[4,17.5,36.0,29.5,4.5],[5,17.5,44.2,40.6,9.5],[6,17.5,59.0,79.9,11.5],[7,0.8,20.8,14.2,5.2]]},"adm-novo-produto":{"w":609,"h":418,"pins":[[1,4.93,15.42,90.54,10.98],[2,4.93,28.59,28.7,10.59],[3,66.17,28.59,29.1,17.69],[4,4.93,48.74,28.7,17.69],[5,35.65,48.74,28.9,17.69],[6,74.66,89.93,22.64,7.23]]},"agenda-dia":{"w":1229,"h":584,"pins":[[1,75.95,9.89,3.6,4.33]]},"agenda-mes":{"w":1229,"h":584,"pins":[[1,17.45,10.17,26.77,3.77],[2,75.95,9.89,10.67,4.33],[3,89.22,10,3.54,4.11],[4,95.36,9.86,2.08,4.38],[5,72.46,14.79,24.99,4.66],[6,80.77,1.21,9.39,4.05],[7,27.77,25.21,9.66,2.23],[8,52,50.78,10.84,3.27],[9,0.78,19.04,14.27,4.93]]},"agenda-semana":{"w":1229,"h":584,"pins":[[1,78.74,10.27,4.63,3.56],[2,77.29,15.07,6.86,4.11],[3,17.45,24.77,10.24,2.68]]},"avisos":{"w":1229,"h":584,"pins":[[1,17.45,10.03,18.35,3.77],[2,82.57,14.52,15.87,4.66],[3,93.61,9.86,4.83,4.11],[4,0.78,19.04,14.27,4.93]]},"busca":{"w":528,"h":156,"pins":[]},"cabimento-concluir":{"w":1100,"h":832,"pins":[[1,1.44,10.1,47.93,22.6],[2,51.62,10.1,31.11,8.17],[3,51.62,18.51,45.75,16.58],[4,51.62,35.82,45.75,35.33],[5,51.62,71.4,45.75,18.63],[6,51.62,90.27,45.75,9.6]]},"carteira":{"w":1229,"h":584,"pins":[[1,17.45,9.86,26.15,14.55],[2,71.3,9.86,26.15,14.55],[3,72.84,26.88,22.14,4.66],[4,95.36,27.01,2.08,4.38],[5,94.32,32.36,2.74,4.11],[6,35.36,39.59,11.25,2.77],[7,18.23,45.49,70.89,6.36],[8,89.77,47.02,7.03,3.29],[9,0.78,19.04,14.27,4.93]]},"carteira-acoes":{"w":312,"h":88,"pins":[]},"casca":{"w":1229,"h":584,"pins":[[1,13.36,4.45,1.82,3.84],[2,0.78,13.29,14.27,4.66],[3,0.78,19.04,14.27,4.93],[4,0.52,25.62,14.79,4.38],[5,0.52,50.68,14.79,3.84],[6,16.54,1.79,4.08,2.88],[7,90.68,1.18,1.95,4.11],[8,93.15,1.04,2.08,4.38],[9,95.89,1.04,2.08,4.38],[10,13.36,93.13,1.95,4.11]]},"cfg-acordos-lista":{"w":1229,"h":539,"pins":[[1,17.5,21.0,79.9,2.8],[2,23.8,31.9,13.0,18.2],[3,37.9,31.9,22.3,6.1],[4,63.9,31.9,16.3,3.3],[5,81.4,31.9,10.1,3.3],[6,93.4,32.7,2.8,2.6]]},"cfg-base-acordos":{"w":1229,"h":539,"pins":[[1,17.5,10.0,70.9,4.6],[2,17.5,22.4,36.8,3.9],[3,17.5,31.9,28.6,5.2],[4,59.4,40.3,37.4,2.8],[5,17.5,95.0,79.9,3.4]]},"cfg-calibracao":{"w":1229,"h":539,"pins":[[1,17.5,31.4,79.9,11.7],[2,17.5,48.6,36.2,8.0],[3,82.8,64.4,9.9,3.2],[4,56.3,59.4,15.7,8.2],[5,17.5,77.9,79.9,13.7]]},"cfg-medidas":{"w":1229,"h":539,"pins":[[1,17.5,26.9,32.2,8.3],[2,22.6,43.2,15.0,5.0],[3,44.6,43.2,40.0,2.8],[4,86.9,42.7,9.5,4.1],[5,92.0,26.2,5.4,4.6]]},"cfg-motivos":{"w":1229,"h":539,"pins":[[1,17.5,10.8,17.7,4.1],[2,33.4,15.8,64.0,4.6],[3,17.5,26.9,31.3,8.3],[4,92.2,26.2,5.2,4.6],[5,58.7,43.0,6.5,3.0],[6,75.3,42.7,21.1,4.1]]},"cfg-prazo-editar":{"w":609,"h":498,"pins":[[1,4.88,13.16,90.14,8.67],[2,4.88,24.0,28.29,8.89],[3,35.4,24.0,28.9,12.68],[4,4.88,40.9,90.14,14.85],[5,4.88,59.43,90.14,10.84],[6,4.88,72.11,90.14,5.85],[7,4.88,81.54,34.96,3.25],[8,2.66,91.4,94.59,6.07]]},"cfg-prazos":{"w":1229,"h":539,"pins":[[1,17.5,26.9,33.4,8.3],[2,46.2,38.0,9.0,2.8],[3,58.4,38.0,17.7,2.8],[4,77.9,38.0,7.0,2.8],[5,18.1,50.1,78.4,6.5],[6,89.5,26.2,7.9,4.6]]},"cfg-projecao":{"w":1229,"h":539,"pins":[[1,17.5,22.4,20.2,3.9],[2,89.5,23.0,7.3,2.6],[3,70.4,27.8,27.0,4.5],[4,17.5,38.0,35.4,10.6],[5,17.5,50.5,39.3,13.5],[6,58.0,82.0,39.4,13.5]]},"chat":{"w":616,"h":452,"pins":[[1,2.44,6.07,78.79,3.45],[2,1.4,17.76,24.32,5.93],[4,27.89,87.1,59.88,10.28],[5,88.83,87.1,9.0,10.28]]},"conta":{"w":336,"h":152,"pins":[]},"equipe-cargos":{"w":1229,"h":539,"pins":[[1,17.5,20.4,51.1,3.9],[2,92.2,20.0,5.2,4.5],[3,17.5,30.8,6.1,2.6],[4,25.6,76.3,71.2,6.1],[5,87.9,36.9,9.0,3.0],[6,0.8,20.8,14.2,5.2]]},"equipe-lista":{"w":1229,"h":539,"pins":[[1,88.0,25.2,8.2,2.6],[2,18.6,32.5,77.6,2.8],[3,48.0,38.0,13.8,6.5],[4,48.0,72.0,4.9,3.2],[5,94.5,39.5,2.0,4.3],[6,68.0,38.0,25.6,58.4]]},"equipe-pessoas":{"w":1229,"h":539,"pins":[[1,17.5,9.6,17.1,4.6],[2,17.5,20.4,9.3,4.5],[3,85.9,30.1,11.5,5.0],[4,17.5,43.2,79.9,13.6],[5,17.5,59.7,79.9,32.7]]},"fer-autenticador":{"w":1229,"h":539,"pins":[[1,17.5,11.1,19.2,4.1],[2,87.7,10.8,9.7,4.8],[3,17.5,20.8,79.9,2.8],[4,17.7,27.8,8.5,5.8],[5,68.8,27.5,12.2,5.9],[6,81.7,26.9,6.8,7.1],[7,90.2,29.1,6.3,2.8]]},"fer-blocos":{"w":1229,"h":539,"pins":[[1,32.0,21.5,34.2,4.5],[2,82.2,21.5,15.2,4.5],[3,18.1,33.0,12.7,2.6],[4,20.1,37.1,77.3,7.1],[5,91.9,39.0,4.9,3.3]]},"fer-campos":{"w":1229,"h":539,"pins":[[1,17.5,21.3,49.3,4.6],[2,18.1,37.1,8.2,3.0],[3,46.9,37.1,5.1,3.0]]},"fer-conhecimento":{"w":1229,"h":539,"pins":[[1,17.5,11.1,18.6,4.1],[2,74.6,10.8,22.8,4.8],[3,61.0,21.5,36.4,4.1],[4,17.5,27.3,79.9,4.5],[5,18.1,40.4,7.8,2.6],[6,20.1,44.5,76.7,7.4],[7,0.8,20.8,14.2,5.2]]},"fer-pecas":{"w":1229,"h":539,"pins":[[1,17.5,11.1,23.2,4.1],[2,75.7,10.9,22.8,4.5],[3,20.1,26.3,74.3,6.3],[4,20.1,27.8,3.5,2.8],[5,94.6,27.8,3.3,3.0]]},"fer-revisao":{"w":1229,"h":539,"pins":[[1,17.5,10.8,36.2,5.6],[2,71.5,11.5,25.9,4.5],[3,17.5,29.3,16.3,11.5],[4,17.5,43.2,50.7,8.2],[5,51.8,53.4,16.4,13.7],[6,51.8,69.2,16.4,8.7],[7,0.8,20.8,14.2,5.2]]},"fer-revisao-resultado":{"w":1229,"h":539,"pins":[[1,17.5,31.5,79.9,18.6],[2,17.5,62.2,35.0,8.0],[3,18.6,78.1,41.6,3.2],[4,18.3,91.8,49.9,8.2],[5,78.5,8.5,14.5,4.5]]},"fer-revisional":{"w":1229,"h":539,"pins":[[1,17.5,11.1,19.7,3.7],[2,18.1,21.3,11.4,2.8],[3,20.1,25.6,77.5,7.1],[4,42.3,29.1,12.2,2.4],[5,92.8,27.3,5.1,3.0],[6,0.8,20.8,14.2,5.2]]},"fer-superendividamento":{"w":1229,"h":539,"pins":[[1,17.5,11.1,12.0,3.7],[2,18.1,21.3,18.4,2.8],[3,17.5,25.6,79.9,7.1],[4,83.8,27.1,11.4,3.2],[5,96.2,27.3,1.1,2.8],[6,0.8,20.8,14.2,5.2]]},"feriados":{"w":1229,"h":584,"pins":[[1,17.45,10.14,26.01,3.77],[2,67.1,10.25,10,3.56],[3,77.68,9.97,4.38,4.11],[4,90.49,9.97,6.96,4.11],[5,0.78,19.04,14.27,4.93],[6,87.96,32.98,8.84,3.03]]},"ferramentas":{"w":1034,"h":216,"pins":[[1,1.92,45.39,18.31,43.44],[2,21.3,45.39,18.31,43.44],[3,40.8,45.39,18.31,43.44],[4,60.29,45.39,18.31,43.44],[5,79.79,45.39,18.31,43.44]]},"ficha-acompanhamento":{"w":1229,"h":584,"pins":[[1,18.54,52.93,30,19.93],[2,18.54,74.78,77.81,16.71]]},"ficha-cadastro":{"w":1229,"h":584,"pins":[[1,18.67,53.21,13.42,2.58],[2,76.63,53.21,12.79,4.38],[3,89.95,53.21,6.28,4.38],[4,19.64,74.99,11.63,12.68]]},"ficha-cadastro-2":{"w":1229,"h":584,"pins":[[1,18.67,8.9,8.01,2.58],[2,90.42,8.9,5.81,4.38],[3,18.67,56.23,13.63,2.58],[4,18.67,68.22,31.27,2.58],[5,90.77,68.22,5.46,4.38],[6,17.45,84.5,15,3],[7,18.67,93.66,6.29,2.4]]},"ficha-contratos":{"w":1229,"h":584,"pins":[[1,41.18,19.56,55.05,2.77],[2,38.22,25.73,4.6,3.03],[3,19.77,47.08,11.07,2.77],[4,19.77,72.05,23.06,2.4],[5,30.61,9.59,9.89,4.38]]},"ficha-dossie":{"w":1229,"h":584,"pins":[[1,17.45,9.32,4.75,3.84],[2,17.45,15.1,20.66,2.96],[3,27.12,18.92,3.72,3.84],[4,17.45,24.4,15.63,13.1],[5,23.73,38.59,10.85,3.03],[6,75.74,15.07,7.51,4.38],[7,17.45,43.53,80,5.45],[8,81.69,53.6,8.62,4.38],[9,90.83,53.6,5.39,4.38],[10,19.77,70.17,23.86,3.84],[11,18.67,96.96,7.92,2.4]]},"ficha-financeiro":{"w":1229,"h":539,"pins":[[1,89.78,13.9,6.44,4.75],[2,18.67,23.38,12.13,3.28],[3,31.5,21.51,11.35,7.01],[4,18.67,32.73,5.47,3.28],[5,90.93,39.22,2.36,3],[6,93.81,38.35,2.41,4.75]]},"ficha-fluxo-pj":{"w":1229,"h":584,"pins":[[1,18.67,10.95,13.65,2.4],[2,18.67,20.51,77.55,3.03],[3,18.67,25.4,8.21,2.3],[4,81,11.34,8.43,4.38],[5,89.95,11.34,6.27,4.38],[6,18.67,43.67,26.89,2.4],[7,78.15,44.07,4.29,4.38],[8,82.96,44.07,13.27,4.38],[9,18.67,51.5,20,2.6],[10,18.67,73.6,20,2.6]]},"ficha-juridico":{"w":1229,"h":584,"pins":[[1,89.73,24.77,6.75,4.38],[2,78.72,36.89,9.79,4.38],[3,89.04,36.89,7.19,4.38],[4,82.38,62.38,12.88,4.38],[5,89.97,74.1,6.25,4.38],[6,82.13,74.1,3.49,4.38]]},"ficha-linha-tempo":{"w":1229,"h":584,"pins":[[1,66.37,9.5,10.57,4.38],[2,77.34,9.5,11.3,4.38],[3,92.91,9.5,3.31,4.38],[4,78.14,15.25,7,4.11],[5,25.1,28.42,4.66,2.4]]},"ficha-negocial":{"w":1229,"h":584,"pins":[[1,89.73,20.93,6.75,4.38],[2,88.96,33.05,7.26,4.38],[3,19.61,50.72,17.13,5.55],[4,18.67,67.55,31.74,2.4],[5,84.34,67.95,7.27,4.38],[6,92.14,67.95,4.08,4.38],[7,18.67,78.36,8.85,3.03]]},"ficha-onboarding":{"w":1229,"h":584,"pins":[[1,18.67,7.64,37.19,2.4],[2,49.01,34.53,11.64,4.38],[3,61.04,34.53,10.39,4.38],[4,71.82,34.53,13.72,4.38],[5,85.93,34.53,10.29,4.38],[6,18.67,45.43,23.55,2.58],[7,18.41,70.78,37.55,2.4],[8,89.95,45.43,6.28,4.38]]},"ficha-passivos":{"w":1229,"h":584,"pins":[[1,17.45,7.4,6,4.2],[2,18.54,19.01,17.84,2.4],[3,78.51,19.01,17.84,2.4],[4,18.54,36.18,24.51,2.4],[5,71.85,36.18,24.51,2.4],[6,18.93,54.62,20,2.4],[7,18.93,72.66,6.97,2.47],[8,18.93,82.47,20,2.4]]},"ficha-raiox":{"w":1229,"h":584,"pins":[[1,18.54,52.15,15,2.88],[2,43.95,85.36,11.53,4.38],[3,18.54,67.16,20,2.88],[4,18.54,75.93,10,2.88],[5,18.54,85.36,6.87,4.38],[6,25.94,85.36,6.85,4.38],[7,33.31,85.36,10.12,4.38],[8,56.01,85.36,7.56,4.38],[9,17.45,30.5,80,8]]},"ficha-reserva":{"w":1229,"h":584,"pins":[[1,83.08,33.48,13.15,4.38],[2,19.77,41.26,17.23,2.4],[3,77.9,41.26,17.23,2.4],[4,32.58,59.14,11.56,4.47],[5,33.23,66.03,8.89,3.03],[6,17.45,85.23,80,8.08]]},"fin-cobrancas":{"w":1229,"h":539,"pins":[[1,17.5,21.9,19.4,15.8],[2,38.0,21.9,19.4,15.8],[3,58.5,21.9,19.4,15.8],[4,79.0,21.9,19.4,15.8],[5,17.5,43.8,42.4,4.8],[6,76.4,43.6,22.1,5.2],[7,17.5,54.0,81,9.5]]},"fin-grafico":{"w":1229,"h":539,"pins":[[1,18.6,53.8,77.8,22.3],[2,18.6,75.7,77.8,5.0],[3,18.6,36.2,37.5,3.2],[4,18.6,81.6,77.8,6.0]]},"fin-recuperacao":{"w":1229,"h":539,"pins":[[1,18.6,28.8,37.1,15.4],[2,18.6,46.9,37.1,19.3],[3,18.6,69.2,37.1,28.2],[4,59.2,24.5,37.1,19.7],[5,59.2,46.9,37.1,6.5]]},"fin-regua":{"w":1229,"h":539,"pins":[[1,17.5,21.9,48.8,5.0],[2,17.5,32.5,14.2,21.7],[3,33.4,45.5,12.8,13.5],[4,62.8,34.3,14.2,6.1],[5,17.5,71.1,81,1.7],[6,70.6,11.1,27.8,4.8]]},"fin-visao":{"w":1229,"h":539,"pins":[[1,69.6,11.1,11.0,4.8],[2,81.0,11.1,16.4,4.8],[3,17.5,21.9,25.9,15.8],[4,44.5,21.9,25.9,15.8],[5,71.5,21.9,25.9,15.8],[6,17.5,40.3,25.9,15.8],[7,44.5,40.3,25.9,15.8],[8,71.5,40.3,25.9,15.8],[9,17.5,62.2,39.3,37.8],[10,58.0,62.2,39.4,12.8]]},"gestao-equipe":{"w":1229,"h":539,"pins":[[1,17.5,30.8,79.9,11.5],[2,57.4,31.9,19.9,9.3],[3,77.5,31.9,19.9,9.3],[4,17.5,44.5,39.5,27.8],[5,57.9,44.5,39.5,27.8],[6,17.5,74.6,39.5,25.4],[7,57.9,74.6,39.5,25.4]]},"gestao-movimentacoes":{"w":1229,"h":539,"pins":[[1,79.7,21.0,17.7,3.5],[2,18.6,30.6,77.6,2.8],[3,24.6,35.4,5.1,3.3],[4,31.0,35.6,27.8,6.1],[5,78.1,30.6,12.9,8.3]]},"gestao-visao":{"w":1229,"h":539,"pins":[[1,17.5,10.8,28.6,4.1],[2,82.3,10.8,15.1,4.5],[3,68.6,16.1,28.8,4.5],[4,17.5,26.2,79.9,2.9],[5,18.1,32.1,10.3,2.8],[6,17.5,36.4,79.9,7.0],[7,90.3,38.0,6.1,3.2]]},"growth":{"w":1229,"h":539,"pins":[[1,17.5,10.8,29.1,4.1],[2,83.4,11.5,13.5,2.8],[3,83.6,16.1,13.8,4.5],[4,17.5,25.8,79.9,17.3],[5,17.5,46.8,79.9,19.7],[6,31.7,59.7,3.6,3.3],[7,17.5,73.8,79.9,16.9]]},"hoje":{"w":1229,"h":584,"pins":[[1,17.45,9.32,80,9.91],[2,17.45,23.61,60.69,10.38],[3,79.05,23.61,18.4,4.66],[4,89.08,34.53,8.36,4.66],[5,17.45,43.68,29.06,21.53],[6,47.29,43.68,29.06,21.53],[7,77.92,43.68,19.53,19.06],[8,77.92,64.39,19.53,46.14],[9,17.45,67.41,58.91,4.52],[10,17.45,84.53,58.91,2.68],[11,17.45,87.76,58.91,4.52],[12,66.39,94.48,9.58,2.57],[13,0.78,19.04,14.27,4.93]]},"hoje-atalhos":{"w":530,"h":329,"pins":[]},"hoje-equipe":{"w":1229,"h":584,"pins":[[1,17.45,23.61,60.69,10.38],[2,89.08,34.53,8.36,4.66],[3,17.45,67.41,58.91,4.41],[4,65.72,73.47,9.98,4.38],[5,64.18,88.59,11.52,4.38]]},"hoje-lista":{"w":1229,"h":584,"pins":[[1,20.31,23.61,4.69,2.18],[2,25.65,21.52,39.71,6.36],[3,66.01,23.18,2.84,3.03],[4,69.5,23.05,6.21,3.29],[5,77.92,76.71,19.53,29.98]]},"hoje-widget":{"w":349,"h":144,"pins":[]},"horas-aprovacao":{"w":1229,"h":539,"pins":[[1,17.5,10.8,6.5,4.1],[2,18.3,26.9,12.2,4.8],[3,31.4,26.9,37.8,4.8],[4,70.1,26.9,15.2,4.8],[5,86.4,26.9,10.0,4.8],[6,18.1,43.8,1.3,3.0],[7,91.9,44.2,4.9,3.3]]},"horas-config":{"w":1229,"h":539,"pins":[[1,18.6,28.2,36.6,8.2],[2,58.5,41.2,9.8,55.3],[3,87.1,41.2,2.4,55.3],[4,19.4,46.9,10.9,6.1]]},"horas-relatorios":{"w":1229,"h":539,"pins":[[1,17.5,26.9,40.3,4.6],[2,59.4,27.3,21.0,4.1],[3,18.1,33.0,36.4,4.6],[4,17.5,43.4,79.9,11.7],[5,78.4,44.5,19.0,9.3],[6,17.5,59.7,25.9,36.2],[7,44.5,59.7,26.0,36.2],[8,71.4,59.7,26.0,36.2]]},"horas-semana":{"w":1229,"h":539,"pins":[[1,17.5,10.8,18.5,4.1],[2,71.6,15.8,25.8,4.6],[3,17.5,25.6,79.9,7.2],[4,17.5,37.1,31.3,5.2],[5,80.6,37.7,16.8,4.3],[6,17.5,71.1,79.9,8.0],[7,84.2,72.4,12.2,4.1],[8,94.9,52.9,1.5,2.8],[9,0.8,20.8,14.2,5.2]]},"login":{"w":526,"h":605,"pins":[[1,14.45,42.98,71.1,10.74],[2,14.45,56.2,71.1,10.74],[3,14.45,74.21,71.1,7.6],[4,15.21,83.97,69.39,6.12]]},"mkt-automacoes":{"w":1034,"h":200,"pins":[[1,1.92,63.04,94.99,28.31]]},"mkt-cartao":{"w":688,"h":473,"pins":[[1,2.91,16.53,10.01,4.21],[2,2.91,24.5,49.89,11.61],[3,2.91,38.96,55.43,14.35],[4,2.91,56.03,37.19,14.12],[5,60.85,15.84,34.69,73.32],[6,2.91,92.58,40.95,5.24]]},"mkt-nova-pauta":{"w":607,"h":517,"pins":[[1,4.85,12.67,90.26,8.66],[2,4.85,23.11,90.26,8.56],[3,4.85,33.75,90.26,8.56],[4,4.85,54.93,83.38,6.16],[5,4.85,63.8,90.26,17.22],[6,4.85,83.2,59.7,8.66]]},"mkt-pauta":{"w":1229,"h":539,"pins":[[1,78.5,1.5,11.4,4.1],[2,17.5,11.3,27.1,3.9],[3,92.8,11.9,4.1,2.4],[4,54.3,16.1,43.1,4.6],[5,17.5,26.9,27.3,3.2],[6,81.0,26.5,16.4,4.1],[7,0.8,20.8,14.2,5.2]]},"mkt-pauta-lista":{"w":1229,"h":539,"pins":[[1,18.1,27.1,7.2,2.6],[2,17.5,30.8,79.9,7.6],[3,91.3,33.4,6.4,2.8]]},"mkt-pauta-quadro":{"w":1229,"h":539,"pins":[[1,17.5,26.0,79.9,4.3],[2,17.5,44.5,81.0,1.5],[3,17.5,48.4,19.3,2.2],[4,84.6,48.4,13.4,2.2]]},"mkt-producao":{"w":1229,"h":539,"pins":[[1,17.5,10.8,29.3,11.1],[2,86.2,11.9,11.4,2.6],[3,18.3,29.1,15.5,3.0],[4,18.6,37.3,9.2,2.6],[5,72.2,34.5,15.6,6.5],[6,89.4,27.3,9.4,6.1],[7,0.8,20.8,14.2,5.2]]},"monitoramento":{"w":1229,"h":539,"pins":[[1,17.4,10.2,79.9,10.2],[2,17.4,21.7,5.9,2.4],[3,17.4,25.6,79.9,5.9],[4,17.4,40.1,79.9,5.8],[5,89.5,41.7,7.3,2.6]]},"monitoramento-grupo":{"w":1229,"h":539,"pins":[[1,17.4,40.4,79.9,5.0],[2,18.5,47.3,19.5,4.6],[3,18.5,55.1,41.7,8.5],[4,84.4,55.7,12.2,5.0]]},"negociacao-detalhe":{"w":687,"h":472,"pins":[[1,18.15,16.13,27.72,2.74],[2,65.18,20.58,28.97,2.97],[3,18.15,30.18,22.35,3.2],[4,2.95,36.23,92.45,8.68],[5,2.95,47.54,92.45,8.45],[6,3.67,69.82,18.78,4.0],[7,2.95,77.59,92.45,8.0],[8,2.95,93.12,13.23,5.14],[9,17.08,93.12,18.6,5.14]]},"negociacao-mover":{"w":687,"h":472,"pins":[[1,2.95,49.14,24.85,41.7],[2,2.95,93.12,13.23,5.14]]},"negociacoes":{"w":1229,"h":539,"pins":[[1,17.45,10.68,14.32,11.24],[2,47.4,10.68,14.32,11.24],[3,43.72,22.51,47.62,5.04],[4,73.58,22.81,8.79,4.45],[5,82.15,1.31,8,4.39],[6,91.21,10.98,6.24,4.45],[7,17.45,32.43,20,4.78],[8,83.33,64.29,6.18,3.28],[9,0.78,20.62,14.27,5.34]]},"negociacoes-quadro":{"w":1229,"h":539,"pins":[[1,82.8,1.7,7.1,3.5],[2,47.4,10.8,14.2,11.1],[3,74.2,23.6,17.0,3.0],[4,17.7,33.9,12.5,2.6],[5,35.15,48.6,6.35,2.6],[6,83.0,51.0,9.0,2.6],[7,28.3,53.2,1.5,3.3]]},"notificacoes":{"w":325,"h":384,"pins":[]},"nova-tarefa":{"w":640,"h":468,"pins":[[1,7.24,16.37,85.59,7.52],[2,7.24,25.95,32.01,2.78],[3,41.0,25.95,27.82,2.78],[4,70.58,25.95,22.27,2.78],[5,7.24,41.07,41.93,6.15],[6,50.92,37.62,41.93,2.78],[7,7.24,49.27,85.59,2.78],[8,7.24,66.11,13.52,6.15],[9,22.28,66.44,16.82,5.47],[10,7.24,76.84,85.59,5.47],[11,81.8,87.92,13.15,6.5]]},"nova-tarefa-calculo":{"w":640,"h":560,"pins":[[1,6.3,50.43,85.59,4.57],[2,6.3,55.57,85.59,2.33],[3,6.67,65.18,42.24,4.29],[4,58.16,71.32,10.2,4.57],[5,6.3,76.9,15.28,2.17],[6,80.86,92.27,13.15,5.43]]},"nova-tarefa-cliente":{"w":640,"h":436,"pins":[[1,6.3,40.38,41.93,2.99],[2,6.3,52.89,41.93,2.99],[3,49.98,52.89,41.93,2.99]]},"nova-tarefa-mais":{"w":640,"h":572,"pins":[[1,6.3,62.87,85.59,4.47],[2,6.3,68.19,41.8,2.28],[3,50.04,68.19,41.8,2.28],[4,6.3,82.13,57.6,3.06]]},"novo-aviso":{"w":624,"h":464,"pins":[]},"novo-compromisso":{"w":624,"h":512,"pins":[[1,6.15,14.18,87.79,2.54],[2,6.15,24.84,28.06,2.54],[3,36.02,24.84,28.06,2.54],[4,36.02,34.41,28.06,7.6],[5,6.15,43.89,28.06,2.54],[6,36.02,43.89,28.06,2.54],[7,6.15,58.93,28.06,2.54],[8,86.87,89.49,9.24,5.94]]},"perfil":{"w":1229,"h":539,"pins":[[1,17.5,11.1,22.0,16.3],[2,30.1,22.8,9.2,4.6],[3,17.5,35.8,50.7,33.8],[4,17.5,76.1,14.0,12.2],[5,17.5,95.4,50.7,4.6]]},"perfil-nova-requisicao":{"w":607,"h":366,"pins":[[1,4.85,17.91,90.26,11.8],[2,4.85,32.66,90.26,28.46],[3,4.85,64.52,90.26,16.08],[4,74.87,88.26,22.46,8.26]]},"perfil-requisicoes":{"w":1229,"h":539,"pins":[[1,17.5,11.5,34.2,3.0],[2,17.5,21.7,50.7,19.5],[3,17.5,47.7,50.7,11.1],[4,17.5,63.5,50.7,13.7]]},"processo":{"w":1229,"h":539,"pins":[[1,17.45,10.09,6.89,4.75],[2,19.06,18.4,25,3],[3,19.06,26.66,20,3.07],[4,19.06,31.5,26,3.28],[5,60.2,22.37,8.9,4.75],[6,69.72,22.37,7.23,4.75],[7,77.47,22.37,5.39,4.75],[8,83.38,22.37,4.08,4.75],[9,87.99,22.37,7.84,4.75],[10,19.06,79.55,10,3.12],[11,19.06,91.32,10.56,4.75]]},"processo-abas":{"w":1229,"h":539,"pins":[[1,19.24,13.28,8.73,3.86],[2,27.97,13.28,11.74,3.86],[3,39.71,13.28,7.65,3.86],[4,47.36,13.28,7.12,3.86],[5,54.49,13.28,9.69,3.86],[6,85.18,19.93,10.65,3.28],[7,19.06,46.84,10,3.12],[8,19.06,51.14,60,3]]},"processo-trabalho":{"w":1229,"h":539,"pins":[[1,27.97,13.28,11.74,3.86],[2,89.3,19.6,7,4.4]]},"processos":{"w":1229,"h":539,"pins":[[1,17.45,10.68,26.15,12.16],[2,17.45,27.59,26.15,30.36],[3,44.38,27.59,26.15,30.36],[4,71.3,27.59,26.15,30.36],[5,79.35,63.29,15.63,5.04],[6,95.36,63.44,2.08,4.75],[7,18.23,73.92,70.51,6.88],[8,84.5,75.5,12,4],[9,0.78,20.62,14.27,5.34]]},"publicacoes":{"w":1229,"h":539,"pins":[[1,17.5,10.7,14.3,11.2],[2,32.5,10.7,14.3,11.2],[3,47.5,10.7,14.3,11.2],[4,62.4,10.7,14.3,11.2],[5,80.53,11.01,14.44,4.69],[6,95.36,10.98,2.08,4.75],[7,50.92,22.51,40.42,5.04],[8,17.45,32.57,33,3.28],[9,17.45,41.5,12,3.5],[10,25.65,53.7,55,6.5],[11,82.5,53.5,14,4],[12,0.78,20.62,14.27,5.34]]},"publicacoes-acoes":{"w":184,"h":128,"pins":[]},"publicacoes-tempestividade":{"w":1229,"h":539,"pins":[[1,80.53,9.5,14.44,4.69],[2,18.67,30.9,50,3.5],[3,18.67,35.6,62,2.6]]},"registrar":{"w":624,"h":568,"pins":[[1,35.04,12.78,28.06,2.29],[2,64.91,12.78,28.06,2.29],[3,5.18,29.95,28.06,2.29],[4,5.18,49.18,87.79,2.29],[5,5.18,61.52,87.79,2.29],[6,5.18,85.18,28.06,5.36],[7,35.04,84.04,28.06,5.36]]},"registrar-ata":{"w":620,"h":500,"pins":[]},"tarefa-detalhe":{"w":712,"h":536,"pins":[[1,3.96,3.15,87.47,8.72],[2,3.96,15.85,13.48,3.3],[3,49.3,15.85,13.48,3.3],[4,49.3,20.05,13.48,3.58],[5,3.96,33.85,89.35,3.14],[6,3.96,58.18,13.31,4.77],[7,3.96,69.68,85.08,11.4],[8,5.93,84.46,87.38,4.18],[9,3.96,91.2,26.7,4.77],[10,31.54,91.2,6.37,4.77],[11,85.15,91.2,10.77,4.77]]},"tarefa-mais-acoes":{"w":240,"h":160,"pins":[]},"tarefa-reagendar":{"w":640,"h":572,"pins":[[1,40.06,21.23,27.82,2.28],[2,7.86,30.78,84.06,2.28],[3,7.86,40.04,84.06,7.75],[4,7.86,48.48,84.06,2.27],[5,69.64,52.43,22.27,2.28],[6,6.3,85.29,13.52,5.03]]},"tarefas":{"w":1229,"h":584,"pins":[[1,17.45,9.86,74.23,10.38],[2,34.02,20.79,36.6,4.66],[3,71.01,21.06,26.44,4.11],[4,91.73,21.06,5.72,4.11],[5,82.15,1.21,8,4.05],[6,92.59,10.14,4.86,4.11],[7,18.23,36.95,1.43,2.47],[8,25.65,35.01,57.6,6.36]]},"tarefas-filtros":{"w":304,"h":216,"pins":[]},"tarefas-quadro":{"w":1229,"h":584,"pins":[[1,17.45,31.42,9,2.22],[2,44.77,31.42,3.58,2.22],[3,71.69,31.42,5.82,2.22],[4,41.2,41.94,1.69,3.56]]},"tratar":{"w":872,"h":448,"pins":[[1,2.22,15.27,47.29,3.6],[2,18.35,28.43,12.6,4.31],[3,31.5,28.71,10.26,3.76],[4,2.22,34.16,47.29,3.35],[5,2.22,43.71,47.29,40.28],[6,52.89,15.27,44.95,3.13],[7,52.89,19.84,8.55,8.73],[8,89.3,19.84,8.55,8.73],[9,2.4,88.99,16.5,6.79],[10,83.53,88.99,14.13,6.79]]},"tratar-cabimento":{"w":876,"h":519,"pins":[[1,52.87,30.74,21.83,2.5],[2,54.04,42.14,42.42,15.58],[3,54.04,58.52,42.42,2.89],[4,54.04,69.34,42.42,3.55],[5,75.8,30.74,21.83,2.5]]},"tratar-cadeia":{"w":876,"h":539,"pins":[[1,52.87,23.46,21.83,2.41],[2,54.19,44.12,32.01,3.03],[3,88.04,44.36,8.42,5.34],[4,52.87,53.5,21.04,2.6],[5,53.94,60.8,28.05,2.6],[6,53.94,73.4,28.05,2.6],[7,53.94,76.9,35.07,2.6]]},"tratar-prazo":{"w":876,"h":512,"pins":[[1,52.87,27.18,44.75,2.74],[2,52.87,31.17,21.83,2.54],[3,75.8,31.17,21.83,2.54],[4,52.87,41.21,44.75,8.79],[5,54.19,52.93,32.01,3.19],[6,88.04,53.18,8.42,5.62],[7,52.87,61.99,44.75,5.0],[8,52.87,69.18,44.75,5.08],[9,82.05,90.86,15.39,5.94]]},"tratar-recurso":{"w":1100,"h":502,"pins":[[1,1.44,16.73,47.93,28.89],[2,1.44,47.4,47.93,19.3],[3,51.62,16.73,45.75,29.89],[4,51.62,47.6,45.75,16.94],[5,51.62,65.93,45.75,32.48]]},"usuarios-acessos":{"w":1229,"h":539,"pins":[[1,17.5,10.8,17.1,4.1],[2,64.4,15.8,33.0,4.6],[3,17.5,26.0,33.4,8.0],[4,36.0,41.9,9.8,4.5],[5,47.0,41.9,14.8,4.5],[6,63.1,41.9,28.3,4.5]]},"usuarios-areas":{"w":1229,"h":539,"pins":[[1,68.6,41.9,23.0,19.3],[2,68.6,73.8,13.6,2.8],[3,92.6,41.9,4.2,4.6],[4,25.5,41.9,15.0,4.5]]}};
+const SYS = 'https://sistema.nevespaduaadvocacia.com.br/#';
+const P = [];
+/* ───────── auxiliares de conteúdo ───────── */
+function ui(t){return `<span class="ui">${t}</span>`}
+function ir(id,t){return `<a href="#/${id}">${t}</a>`}
+function abrir(rota,t){return `<a class="abrir" href="${SYS}${rota}" target="_blank" rel="noopener">${t||'Abrir no sistema'} <span aria-hidden="true">↗</span></a>`}
+function caixa(cl,tit,t){return `<div class="${cl}"><b>${tit}</b>${t}</div>`}
+function nota(t,tit){return caixa('nota',tit||'Nota',t)}
+function aviso(t,tit){return caixa('aviso',tit||'Atenção',t)}
+function dica(t,tit){return caixa('dica',tit||'Dica',t)}
+function regra(t,tit){return caixa('regra',tit||'Regra da casa',t)}
+function tag(t,c){return `<span class="tag ${c||'n'}">${t}</span>`}
+function passos(a){return `<ol class="passos">${a.map(x=>`<li>${x}</li>`).join('')}</ol>`}
+function fluxo(a){return `<div class="fluxo">${a.map(e=>`<div class="et ${e.c||''}"><b>${e.t}</b>${e.s?`<span>${e.s}</span>`:''}${e.q?`<small>${e.q}</small>`:''}</div>`).join('')}</div>`}
+function trilho(a){return `<div class="trilho">${a.map(e=>`<div class="m ${e.c||''}"><span class="d">${e.d||''}</span><b>${e.t}</b>${e.s?`<span>${e.s}</span>`:''}${e.q?`<small>${e.q}</small>`:''}</div>`).join('')}</div>`}
+function caminhos(a){return `<div class="caminhos">${a.map(e=>`<div class="${e.c||''}"><b>${e.t}</b>${e.s?`<span>${e.s}</span>`:''}${e.l?`<ol>${e.l.map(x=>`<li>${x}</li>`).join('')}</ol>`:''}</div>`).join('')}</div>`}
+function raias(a){return `<div class="raias">${a.map(r=>`<div class="raia"><b>${r.q}</b><div>${r.p.map(p=>`<span class="p ${p.c||''}">${p.n?`<i>${p.n}</i>`:''}${p.t}</span>`).join('')}</div></div>`).join('')}</div>`}
+function tabela(cab,linhas,num){num=num||[];return `<div class="tw"><table><thead><tr>${cab.map((c,i)=>`<th class="${num.includes(i)?'n':''}">${c}</th>`).join('')}</tr></thead><tbody>${linhas.map(l=>`<tr>${l.map((c,i)=>`<td class="${num.includes(i)?'n':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+function cards(a){return `<div class="cards">${a.map(c=>`<a class="card" href="#/${c.id}">${c.ic?`<span class="ic">${c.ic}</span>`:''}<b>${c.t}</b><span>${c.s}</span></a>`).join('')}</div>`}
+function faq(a){return a.map(f=>`<details class="faq"><summary>${f.q}</summary><div>${f.r}</div></details>`).join('')}
+let _shotN=0;
+function shot(nome,leg,cap,cl){
+  const c=CAPS[nome]; if(!c) return `<p class="aviso">Print “${nome}” não encontrado.</p>`;
+  leg=leg||[]; const id='s'+(++_shotN);
+  const pins=(c.pins||[]).filter(p=>p[1]!=null && leg[p[0]-1]);
+  const boxes=pins.map(p=>`<span class="box" data-n="${p[0]}" style="left:${p[1]}%;top:${p[2]}%;width:${p[3]}%;height:${p[4]}%"></span>`).join('');
+  const bad=pins.map(p=>{const tx=p[1]<2.5?'-10%':'-55%',ty=p[2]<4?'-10%':'-55%';return `<button class="pin" data-n="${p[0]}" style="left:${p[1]}%;top:${p[2]}%;transform:translate(${tx},${ty})" aria-label="Ponto ${p[0]}: ${String(leg[p[0]-1]).replace(/<[^>]+>/g,'').replace(/"/g,'')}">${p[0]}</button>`}).join('');
+  const lg=leg.length?`<ol class="leg">${leg.map((t,i)=>`<li data-n="${i+1}"><i>${i+1}</i><span>${t}</span></li>`).join('')}</ol>`:'';
+  return `<figure class="shot ${cl||''}" id="${id}" data-nome="${nome}" data-cap="${(cap||'').replace(/"/g,'&quot;')}"${c.w<760?` style="max-width:${Math.round(c.w*1.15)}px"`:''}><div class="tela" style="aspect-ratio:${c.w}/${c.h}"><img src="img/${nome}.jpg" alt="${(cap||nome).replace(/"/g,'')}" loading="lazy" width="${c.w}" height="${c.h}">${boxes}${bad}</div><figcaption><span>${cap||''}</span><button type="button" class="amp">Ampliar</button></figcaption>${lg}</figure>`;
+}
+function dupla(a,b){return `<div class="dupla">${a}${b}</div>`}
+</script>
+<script>
+/* ───────── INÍCIO ───────── */
+P.push({id:'inicio',g:'Início',t:'Início',sem_titulo:true,destaque:true,lead:'O manual do sistema interno: cada tela, cada botão e cada fluxo, com prints e passo a passo.',kw:'home começo manual wiki',h:`
+<div class="heroi">
+  <div>
+    <h1>Wiki Neves Pádua Interno</h1>
+    <p class="lead">O manual do sistema do escritório. Cada tela, cada botão e cada fluxo, com prints numerados e passo a passo, do jeito que o sistema está hoje.</p>
+    <div class="acoes">${abrir('painel','Abrir o sistema')}<a class="sec" href="#/novidades">O que mudou nesta versão</a><a class="sec" href="#/perfis">Guia do meu cargo</a></div>
+  </div>
+  <img src="img/hoje.jpg" alt="Tela Hoje do sistema" width="1229" height="584">
+</div>
+<h2>Por onde começar</h2>
+${cards([
+ {id:'entrar',ic:'1',t:'Entrar no sistema',s:'Endereço, login, liberação de acesso e troca de senha.'},
+ {id:'tela',ic:'2',t:'Conhecendo a tela',s:'Menu lateral, busca, botão principal, sino, chat e tema.'},
+ {id:'perfis',ic:'3',t:'Guia do seu cargo',s:'O que cada função usa no dia a dia, com os atalhos certos.'},
+ {id:'regras',ic:'4',t:'Regras da casa',s:'Prazos, publicações, clientes e acessos: o que vale sempre.'}])}
+<h2>Áreas do sistema</h2>
+${cards([
+ {id:'hoje',ic:'◷',t:'Meu dia',s:'Hoje, Tarefas e prazos, Agenda e Avisos.'},
+ {id:'carteira',ic:'◎',t:'Clientes',s:'Carteira PF e PJ e a ficha completa de cada cliente.'},
+ {id:'publicacoes',ic:'§',t:'Jurídico',s:'Processos, publicações, negociações e monitoramento.'},
+ {id:'fin-visao',ic:'$',t:'Financeiro',s:'Visão geral, régua de cobrança, retornos e recuperação.'},
+ {id:'estoque',ic:'▤',t:'Administrativo',s:'Estoque de consumo e inventário de equipamentos.'},
+ {id:'equipe',ic:'⚇',t:'Equipe e gestão',s:'Pessoas, cargos, acessos, horas, visão geral, Growth e configurações.'},
+ {id:'pauta',ic:'✎',t:'Marketing',s:'Pauta de conteúdo, produção em quadro e automações.'},
+ {id:'ferramentas',ic:'⚒',t:'Ferramentas',s:'Superendividamento, modelos de peças, 2FA, revisional e base de conhecimento.'}])}
+<h2>Fluxos mais usados</h2>
+${cards([
+ {id:'tratar',ic:'→',t:'Tratar uma publicação',s:'Da intimação à tarefa certa, com prazo e responsável.'},
+ {id:'f-cadeia',ic:'→',t:'Cadeia de prazo',s:'Confecção, revisão, preparo, protocolo e conferência.'},
+ {id:'f-cabimento',ic:'→',t:'Análise de cabimento',s:'ED, apelação, ED e depois apelação ou não recorrer.'},
+ {id:'f-pj',ic:'→',t:'Jornada do cliente PJ',s:'Da assinatura ao acompanhamento mensal.'}])}
+<h2>Como ler este manual</h2>
+<ul>
+<li><b>Prints numerados.</b> Cada número no print corresponde a um item da legenda logo abaixo. Passe o mouse no número ou no item para destacar o ponto na tela.</li>
+<li><b>Ampliar.</b> Clique no print (ou em ${ui('Ampliar')}) para abrir em tela cheia. As setas do teclado passam para o próximo print da página.</li>
+<li><b>Buscar.</b> Use ${ui('Ctrl K')} ou ${ui('/')} para achar qualquer tela, botão, regra ou termo.</li>
+<li><b>Abrir no sistema.</b> O botão escuro no topo de cada página abre a mesma tela no sistema, em outra aba.</li>
+<li><b>O seu menu pode ser menor.</b> Os prints foram feitos com o acesso de uma sócia. Você vê as áreas liberadas para o seu cargo.</li>
+</ul>
+${nota('Os prints usam <b>nomes de clientes fictícios</b>. CPF, CNPJ, valores, e-mails, telefones e códigos de acesso aparecem borrados. Números de processo também foram trocados.','Sobre os prints')}
+`});
+
+P.push({id:'novidades',g:'Início',t:'O que mudou',novo:true,destaque:true,lead:'Tudo o que o sistema ganhou, perdeu ou mudou de lugar desde a primeira versão deste manual.',kw:'novidades mudanças versão 2 changelog onde foi parar',rel:['tela','perfis','regras'],h:`
+<h2>Onde foi parar</h2>
+${tabela(['Antes','Agora'],[
+ ['Acompanhamento PJ (item próprio no menu)','Dentro da '+ir('carteira','Carteira PJ')+', em '+ui('⋮')+' › Acompanhamento PJ'],
+ ['Monitoramento (em Ferramentas)',ir('monitoramento','Jurídico › Monitoramento')],
+ ['Ferramentas (vários itens no menu)','Um item só, que abre uma '+ir('ferramentas','página de botões')],
+ ['Requisições (em Equipe e gestão)','Pedido e aprovação em '+ir('perfil','Meu perfil')],
+ ['Base de acordos, Regras de projeção e Calibração','Dentro de '+ir('configuracoes','Equipe e gestão › Configurações')],
+ ['Espelho (beta) e Importar do ADVBox','Saíram do menu'],
+ ['Ponto','Desligado — o escritório não usa mais'],
+ ['Comercial (leads) e Atendimento','Saíram do sistema; do comercial fica só a '+ir('conhecimento','Base de conhecimento')]])}
+<h2>Novo</h2>
+<ul>
+<li><b>Grupo Marketing</b> no menu: ${ir('pauta','Pauta de conteúdo')}, ${ir('producao','Produção de conteúdo')} (quadro no estilo Trello, com envio para a pauta) e ${ir('automacoes','Automações')}.</li>
+<li><b>Hoje com widgets</b>: relógio, calendário, atalhos personalizáveis e blocos que você arrasta e organiza. ${ir('hoje','Ver Hoje')}.</li>
+<li><b>Tratar publicação em uma tela só</b>: teor à esquerda, tratamento à direita, com resumo e prazos sugeridos. ${ir('tratar','Ver Tratar publicação')}.</li>
+<li><b>Análise de cabimento e cadeias de prazo</b>: 25 tipos de prazo configurados, revisão da peça, preparo e conferência de protocolo. ${ir('f-cadeia','Ver a cadeia')}.</li>
+<li><b>Monitoramento pelo Sync</b>: processos novos dos CPFs e CNPJs monitorados, para cadastrar ou dispensar. ${ir('monitoramento','Ver Monitoramento')}.</li>
+<li><b>Cargos funcionais</b>: as tarefas podem ir para o cargo; se ele estiver vago, entram na fila. ${ir('equipe','Ver Cargos')}.</li>
+<li><b>Janelas novas</b>: os pop-ups (nova tarefa, compromisso, aviso, requisição) abrem no centro, com o visual do sistema.</li>
+</ul>
+<h2>Mudou o jeito de usar</h2>
+<ul>
+<li><b>Tarefas e prazos abre só com as suas tarefas.</b> Quem pode ver as dos colegas escolhe em ${ui('Ver tarefas de')}. A visão da equipe fica em ${ir('gestao-visao','Gestão › Visão geral')}.</li>
+<li><b>Só os últimos 30 dias</b> carregam nas listas de tarefas. O histórico mais antigo fica disponível sob pedido.</li>
+<li><b>Clientes e Processos são listas simples</b>, paginadas de 40 em 40, com clientes em ordem alfabética e filtro PF/PJ. Clicar abre direto a ficha.</li>
+<li><b>Reagendar exige motivo.</b> A gestão e a controladoria recebem o aviso. ${ir('nova-tarefa','Ver como reagendar')}.</li>
+<li><b>Nova tarefa enxuta</b>: os campos essenciais na frente e o resto em ${ui('Mais opções')}.</li>
+<li><b>Cores de prazo</b>: fatal em vermelho, atrasado em amarelo.</li>
+<li><b>Acordos alimenta a Base de acordos</b>; a consulta da base fica com a gestão.</li>
+<li><b>Sem letra cursiva</b> em nenhuma tela.</li>
+</ul>
+${nota('Este manual foi refeito em 27/11/2026 a partir de um tour completo pelo sistema. Se algo na tela estiver diferente do print, a tela vale: avise a gestão para atualizarmos o manual.')}
+`});
+
+/* ───────── COMECE AQUI ───────── */
+P.push({id:'entrar',g:'Comece aqui',t:'Entrar no sistema',lead:'Onde o sistema fica, como entrar e o que fazer se o acesso não funcionar.',sys:'painel',kw:'login senha acesso entrar e-mail endereço url primeiro acesso',rel:['tela','perfil','perfis'],h:`
+<h2>Endereço</h2>
+<p>O sistema abre no navegador, em <b>sistema.nevespaduaadvocacia.com.br</b>. Não há nada para instalar. Ele funciona no computador e no celular.</p>
+<h2>Primeiro acesso</h2>
+${dupla(shot('login',['Seu e-mail do escritório.','Sua senha.','Entrar abre a tela Hoje.','Esqueceu a senha? Fale com o escritório.'],'Tela de entrada'),`<div>${passos(['Abra <b>sistema.nevespaduaadvocacia.com.br</b>.','Digite o seu <b>e-mail do escritório</b> e a <b>senha</b> que você recebeu.','Clique em '+ui('Entrar')+'. Você cai na tela '+ir('hoje','Hoje')+'.','Troque a senha em '+ir('perfil','Meu perfil')+' › Segurança e senha.'])}</div>`)}
+<h2>Liberação de acesso</h2>
+<p>O login de cada pessoa é liberado pelas sócias. Se o sistema recusar a entrada com e-mail e senha corretos, a conta ainda não foi liberada: fale com a administração.</p>
+<h2>O que aparece para você</h2>
+<p>O sistema é organizado por <b>cargos</b>. Cada pessoa ocupa um ou mais cargos, e são eles que definem as áreas do seu menu. Por isso o seu menu pode ter menos itens que os prints deste manual.</p>
+<ul><li><b>Para todos:</b> Hoje, Tarefas e prazos, Agenda, Avisos e Meu perfil.</li><li><b>Por cargo:</b> Clientes, Jurídico, Financeiro, Administrativo, Equipe e gestão, Marketing e Ferramentas.</li></ul>
+${dica('Veja no '+ir('perfis','Guia do seu cargo')+' o que a sua função usa no dia a dia.')}
+<h2>Esqueci a senha</h2>
+<p>Não há recuperação automática. Fale com o escritório, que libera uma nova senha. Depois de entrar, troque-a em ${ir('perfil','Meu perfil')}.</p>
+`});
+
+P.push({id:'tela',g:'Comece aqui',t:'Conhecendo a tela',lead:'As partes que aparecem em todas as telas: menu lateral, barra de cima, busca, sino, chat e menu da conta.',sys:'painel',kw:'menu lateral barra superior busca global sino notificações chat discord tema escuro claro recolher atalho barra conta sair',rel:['entrar','hoje','perfil'],h:`
+<h2>A casca do sistema</h2>
+${shot('casca',['Recolhe ou abre o menu lateral.','Busca global — atalho '+ui('/')+'.','Botão principal da página. Muda conforme a tela: “Nova tarefa”, “Novo cliente”, “Compromisso”…','Itens soltos do menu: Hoje, Tarefas e prazos, Agenda, Avisos.','Grupos que abrem e fecham (Clientes, Jurídico, Financeiro…).','Onde você está: grupo e tela.','Tema claro ou escuro.','Chat da equipe.','Notificações (sino).','Menu da conta.'],'Partes fixas da tela')}
+<h2>Menu lateral</h2>
+<p>Os itens do dia a dia ficam soltos no alto (${ui('Hoje')}, ${ui('Tarefas e prazos')}, ${ui('Agenda')}, ${ui('Avisos')}). As áreas ficam em grupos que abrem com um clique: Clientes, Jurídico, Financeiro, Administrativo, Marketing, Equipe e gestão. ${ui('Ferramentas')} é um item único que abre uma página de botões.</p>
+<h2>Botão principal</h2>
+<p>O botão escuro abaixo da busca é sempre a ação mais comum da tela aberta. Em Hoje e Tarefas ele cria uma tarefa; em Clientes, um cliente; em Agenda, um compromisso; em Negociações, uma negociação. Em telas com várias opções ele aparece como ${ui('+ Novo ▾')}.</p>
+<h2>Busca global</h2>
+${shot('busca',[],'Resultados da busca global','estreita')}
+<p>Digite o nome do cliente, CNPJ, número do processo ou nome de lead. Os resultados vêm agrupados (Clientes, Negociações, Acompanhamento PJ). Alguns grupos carregam só quando você pede, em “carregar para buscar”.</p>
+<h2>Notificações</h2>
+${dupla(shot('notificacoes',[],'Sino de notificações'),`<div><p>O sino avisa o que precisa de você: tarefa nova atribuída, publicação para analisar, compromisso que começa em 60 minutos, requisição respondida.</p><p>Avisos de atendimento e do comercial não aparecem mais no sino.</p></div>`)}
+<h2>Chat da equipe</h2>
+${dupla(shot('chat',['Espelhado no Discord do escritório: o que você escreve aqui vai para lá, e o que escrevem lá aparece aqui.','Canal da conversa.','Campo de mensagem — Enter envia, Shift+Enter quebra linha.','Enviar.'],'Chat da equipe'),`<div>${nota('O chat é para recados rápidos. Pedido de trabalho vira '+ir('nova-tarefa','tarefa')+'; comunicado para todos vira '+ir('avisos','aviso')+'.')}</div>`)}
+<h2>Menu da conta</h2>
+${dupla(shot('conta',[],'Menu da conta (…)'),`<div><p>No ${ui('…')} ao lado do seu nome ficam atalhos (como Horas e Growth, conforme o cargo), a opção ${ui('Ver como o cliente')} para quem cuida da área do cliente e a saída do sistema.</p><p>O seu nome abre ${ir('perfil','Meu perfil')}.</p></div>`)}
+<h2>Janelas</h2>
+<p>Formulários abrem numa janela no centro da tela. ${ui('Esc')} ou ${ui('×')} fecham sem salvar. Campos opcionais ficam recolhidos em ${ui('Mais opções')}. Nada é gravado até você clicar no botão de salvar da janela.</p>
+`});
+
+P.push({id:'perfil',g:'Comece aqui',t:'Meu perfil e requisições',m:'Meu perfil e requisições',lead:'Seus dados, o tema da tela, a troca de senha e os pedidos de folga, férias e home office.',cam:'Menu lateral > seu nome > Meu perfil',sys:'perfil',kw:'perfil senha trocar tema aparência requisição férias folga home office atestado ausência horário reduzido aprovar aprovação',rel:['entrar','f-requisicao','horas'],h:`
+<h2>Seus dados</h2>
+${shot('perfil',['Seu nome, cargo, núcleo e e-mail.','Editar meus dados — apelido, telefone, cidade, aniversário e afins.','Dados pessoais e contato. Cargo, núcleo e admissão só a administração altera.','Aparência: Automático, Claro ou Escuro.','Meu acesso: as áreas liberadas para você.'],'Meu perfil')}
+<h2>Senha e acesso</h2>
+${shot('perfil-requisicoes',['As áreas do seu acesso.','Trocar senha: mínimo de 8 caracteres, repita e confirme.','Requisições para aprovar (só para quem aprova) e o histórico.','Minhas requisições: seus pedidos e as respostas.'],'Segurança, senha e requisições')}
+<h2>Pedir folga, férias ou home office</h2>
+${dupla(shot('perfil-nova-requisicao',['Tipo, data de início e de fim.','Detalhe do pedido.','Anexo (atestado, comprovante, declaração da faculdade…).','Enviar para aprovação.'],'Nova requisição'),`<div>${passos(['Em Meu perfil, clique em '+ui('+ Requisição')+'.','Escolha o tipo: Férias, Folga, Horário reduzido, Ausência, Atestado, Home office ou Outro.','Informe as datas e o detalhe. Anexe o comprovante, se houver.','Clique em '+ui('Enviar')+'. A resposta chega no sino e em Minhas requisições.'])}</div>`)}
+${nota('Férias, folga, ausência, atestado e home office aprovados entram na sua agenda. O anexo só é visto por você e por quem aprova.')}
+${regra('Folga só nos feriados nacionais. Em feriados estaduais e municipais o escritório trabalha — eles valem apenas para a contagem de prazos.')}
+<h2>Aprovar requisições</h2>
+<p>Quem aprova vê os pedidos em ${ui('Requisições para aprovar')}, no próprio perfil. Não existe mais uma tela de requisições em Equipe e gestão.</p>
+`});
+
+P.push({id:'perfis',g:'Comece aqui',t:'Guia do seu cargo',m:'Guia do seu cargo',destaque:true,lead:'O que cada função usa no dia a dia, com os atalhos para as páginas certas deste manual.',kw:'perfil cargo função controladoria jurídico acordos acompanhamento pj financeiro marketing gestão sócia estagiário rotina',rel:['regras','tela'],h:`
+<p>Todos usam ${ir('hoje','Hoje')}, ${ir('tarefas','Tarefas e prazos')}, ${ir('agenda','Agenda')}, ${ir('avisos','Avisos')} e ${ir('perfil','Meu perfil')}. Abaixo, o que muda por função.</p>
+<div class="perfis">
+<div class="perfil"><b>Controladoria jurídica</b><span>Recebe as publicações, abre as cadeias de prazo e confere os protocolos.</span><ul><li>${ir('publicacoes','Publicações')} e ${ir('tratar','Tratar publicação')}</li><li>${ir('f-cadeia','Cadeia de prazo')} e ${ir('f-cabimento','Análise de cabimento')}</li><li>${ir('hoje','Hoje')}: confirmar protocolos do dia</li><li>${ir('monitoramento','Monitoramento')}</li></ul></div>
+<div class="perfil"><b>Jurídico — iniciais e prazos</b><span>Analisa o cabimento, faz a peça, protocola e registra o andamento.</span><ul><li>${ir('tarefas','Tarefas e prazos')}</li><li>${ir('f-cabimento','Análise de cabimento')}</li><li>${ir('processos','Processos e pastas')}</li><li>${ir('modelos','Modelos de peças')}</li></ul></div>
+<div class="perfil"><b>Revisão de peças</b><span>Revisa a peça e confirma os ajustes antes do protocolo.</span><ul><li>Tarefa ${ui('Revisar a peça')} em ${ir('tarefas','Tarefas')}</li><li>${ir('f-cadeia','Cadeia com revisão')}</li></ul></div>
+<div class="perfil"><b>Acordos (Negocial)</b><span>Negocia com os bancos, registra propostas e alimenta a base.</span><ul><li>${ir('negociacoes','Negociações')}</li><li>${ir('ficha-negocial','Aba Negocial da ficha')}</li><li>${ir('base-acordos','Base de acordos')}: registrar o acordo fechado</li><li>Audiências na sua ${ir('agenda','Agenda')}</li></ul></div>
+<div class="perfil"><b>Acompanhamento PJ</b><span>Onboarding, reuniões R1–R3, atas e acompanhamento mensal.</span><ul><li>${ir('acompanhamento','Panorama do Acompanhamento PJ')}</li><li>${ir('ficha-acompanhamento','Aba Acompanhamento PJ')}</li><li>${ir('f-pj','Jornada do cliente PJ')}</li></ul></div>
+<div class="perfil"><b>Suporte ao cliente PF</b><span>Cadastro, processos e tarefas dos clientes pessoa física.</span><ul><li>${ir('carteira','Carteira')} com filtro PF</li><li>${ir('ficha-cadastro','Cadastro')} e ${ir('ficha-juridico','Jurídico')} da ficha</li><li>${ir('superendividamento','Superendividamento')}</li></ul></div>
+<div class="perfil"><b>Financeiro e Administrativo</b><span>Cobrança, retornos, recuperação, estoque e inventário.</span><ul><li>${ir('fin-visao','Visão geral')} e ${ir('regua','Régua de cobrança')}</li><li>${ir('cobrancas','Cobranças e retornos')}</li><li>${ir('estoque','Estoque')} e ${ir('inventario','Inventário')}</li></ul></div>
+<div class="perfil"><b>Marketing</b><span>Pauta, produção de conteúdo e aprovação.</span><ul><li>${ir('producao','Produção de conteúdo')}</li><li>${ir('pauta','Pauta de conteúdo')}</li><li>${ir('f-conteudo','Fluxo: do cartão à pauta')}</li></ul></div>
+<div class="perfil"><b>Gestão e sócias</b><span>Acompanha a operação, aprova e configura.</span><ul><li>${ir('gestao-visao','Visão geral da gestão')} e ${ir('growth','Growth')}</li><li>${ir('equipe','Colaboradores, cargos e acessos')}</li><li>${ir('horas','Aprovação de horas')}</li><li>${ir('configuracoes','Configurações')}</li></ul></div>
+<div class="perfil"><b>Acesso só às Ferramentas</b><span>Calculadora e materiais, sem o restante do Jurídico.</span><ul><li>${ir('ferramentas','Página de Ferramentas')}</li><li>${ir('superendividamento','Superendividamento')}</li></ul></div>
+</div>
+${nota('Comercial (SDR) mantém acesso a Avisos, Requisições, Tarefas e Meu perfil, além da '+ir('conhecimento','Base de conhecimento')+'. Leads e atendimento ficam fora do sistema.')}
+`});
+
+/* ───────── MEU DIA ───────── */
+P.push({id:'hoje',g:'Meu dia',t:'Hoje',lead:'A primeira tela do dia: o que está atrasado, o que vence hoje, os próximos compromissos e os atalhos que você mais usa.',cam:'Menu lateral > Hoje',sys:'painel',quem:'toda a equipe',kw:'hoje painel início dia widgets relógio calendário atalhos lembretes equipe minhas atrasadas fatal protocolo',rel:['tarefas','agenda','regras'],h:`
+<h2>Visão geral</h2>
+${shot('hoje',['Saudação e data de hoje.','Quadros do dia: atrasadas e tarefas para hoje.','Navegar entre Hoje, Semana e Mês.','Minhas ou Equipe (Equipe só para quem tem acesso).','Atalhos — '+ui('Personalizar')+' escolhe quais aparecem.','Próximo compromisso da agenda.','Relógio.','Calendário do mês.','Atrasados — resolver primeiro.','Resumo da equipe: prazos que vencem hoje e fatais dos próximos 7 dias.','Atividade recente.','Legenda: fatal em vermelho, atrasado em amarelo, hoje.','Botão principal: nova tarefa.'],'Tela Hoje')}
+<h2>A sua lista do dia</h2>
+${shot('hoje-lista',['Data do prazo.','Tarefa e cliente — clique para abrir.','Marca de prazo fatal.','Responsável.','Lembretes: anote o que não pode esquecer.'],'Lista do dia e lembretes')}
+<p>Os atrasados aparecem primeiro, em bloco próprio. Depois vêm as tarefas de hoje e as próximas. Clique na tarefa para abrir a janela com prazo, descrição, histórico e as ações.</p>
+<h2>Visão da equipe</h2>
+${shot('hoje-equipe',['Quadros da equipe: prazos fatais hoje, atrasadas, tarefas e compromissos de hoje.','Alterna entre Minhas e Equipe.','Prazos fatais de hoje — protocolar até 12h e confirmar.','Confirmar protocolo direto da lista.','Atalhos para o cliente e o processo.'],'Hoje na visão da equipe')}
+${regra('No dia do prazo fatal, protocolar até 12h e confirmar o protocolo na tela Hoje.')}
+<h2>Organizar os widgets</h2>
+${dupla(shot('hoje-atalhos',[],'Atalhos personalizáveis'),shot('hoje-widget',[],'Menu de um widget'))}
+${passos(['Arraste um bloco (relógio, calendário, próximo compromisso, atalhos) para mudar a ordem.','No menu do bloco, '+ui('Mover para a área principal')+' leva o widget para a coluna larga.','Em Atalhos, '+ui('Personalizar')+' escolhe as telas que aparecem como botão.'])}
+${dica('A arrumação fica guardada no seu navegador. Em outro computador a tela volta ao padrão.')}
+`});
+
+P.push({id:'tarefas',g:'Meu dia',t:'Tarefas e prazos',lead:'Todas as suas tarefas, com prazo, prioridade e cliente, em lista ou em quadro.',cam:'Menu lateral > Tarefas e prazos',sys:'tarefas',quem:'toda a equipe',kw:'tarefas prazos lista quadro kanban filtros ver tarefas de colaborador fatal atrasada cadeias csv concluir feito andamento protocolo',rel:['nova-tarefa','f-cadeia','hoje'],h:`
+<h2>A lista</h2>
+${shot('tarefas',['Quadros: atrasadas, fatais hoje, para hoje, em até 7 dias e abertas. Clique para filtrar.','Filtros rápidos: Abertas, Feitas, Todas, Fatais, Atrasadas, Cadeias, por núcleo.','Ver tarefas de: escolha um colaborador ou um cargo.','Mais filtros: status, núcleo e cliente.','Lista ou Quadro.','Exportar a lista em CSV.','Marcar a tarefa.','Linha da tarefa: título, cliente, núcleo e processo.'],'Tarefas e prazos em lista')}
+${regra('A tela abre só com as <b>suas</b> tarefas. Quem pode ver as dos colegas escolhe a pessoa em '+ui('Ver tarefas de')+'. A visão de toda a equipe fica em '+ir('gestao-visao','Gestão › Visão geral')+'.')}
+${nota('Para o sistema ficar leve, a lista carrega os últimos 30 dias. Precisa de algo mais antigo? Peça à gestão.')}
+<h2>Mais filtros</h2>
+${dupla(shot('tarefas-filtros',[],'Painel Mais filtros'),`<div><p>Filtre por <b>status</b>, <b>núcleo</b> e <b>cliente</b>. Os filtros somam com os quadros e os filtros rápidos do alto.</p></div>`)}
+<h2>O quadro</h2>
+${shot('tarefas-quadro',['A fazer.','Fazendo — tarefas com trabalho iniciado.','Feitas nos últimos 7 dias.','Prioridade e o menu da tarefa.'],'Tarefas em quadro')}
+<p>Arraste o cartão entre as colunas para mudar o estado. O cartão mostra prazo, cliente, prioridade e o menu ${ui('⋮')}.</p>
+<h2>Abrir uma tarefa</h2>
+${shot('tarefa-detalhe',['Cliente, núcleo e título.','Prazo, com marca de fatal.','Estado e prioridade.','Cliente e processo vinculados.','Descrição.','Iniciar trabalho: liga o cronômetro e marca como em andamento.','Andamento: o que você fez. Vai para o histórico ao concluir.','Histórico da tarefa.','Concluir e confirmar protocolo (em tarefas de protocolo).','Feito.','Mais ações.'],'Janela da tarefa','estreita')}
+${passos(['Clique na tarefa (em Hoje, na lista ou no quadro).','Clique em '+ui('Iniciar trabalho')+' quando começar. O cronômetro registra as horas.','Escreva no campo de andamento o que foi feito.','Clique em '+ui('Feito')+' ou, em tarefas de protocolo, '+ui('Concluir e confirmar protocolo')+'.'])}
+${aviso('Concluir exige o andamento preenchido. Sem andamento, o sistema não deixa fechar a tarefa.')}
+<h2>Mais ações</h2>
+${dupla(shot('tarefa-mais-acoes',[],'Menu Mais ações'),`<div><ul><li>${ui('Editar / reagendar…')} — muda dados e prazo (com motivo). ${ir('nova-tarefa','Ver como reagendar')}.</li><li>${ui('Horas manuais…')} — lança horas sem cronômetro.</li><li>${ui('Registrar no dossiê do cliente…')} — leva o que foi feito para a linha do tempo.</li><li>${ui('Abrir em janela')}.</li></ul></div>`)}
+`});
+
+P.push({id:'nova-tarefa',g:'Meu dia',t:'Criar e reagendar tarefas',m:'Criar e reagendar',lead:'Como abrir uma tarefa ou prazo, calcular a data a partir de uma intimação e mudar um prazo com motivo.',cam:'Botão principal > Nova tarefa',sys:'tarefas',quem:'toda a equipe',kw:'nova tarefa criar prazo calcular prazo dias úteis cpc intimação reagendar motivo complemento prioridade responsável anexar núcleo horas',rel:['tarefas','tratar','motivos'],h:`
+<h2>Nova tarefa</h2>
+${shot('nova-tarefa',['O que precisa ser feito.','Responsável — uma pessoa ou um cargo.','Prazo.','Horário (opcional).','Cliente.','Prioridade.','Descrição (opcional).','Prazo fatal — marque quando a data é o prazo legal.','Anexar arquivo.','Mais opções.','Criar tarefa.'],'Janela Nova tarefa','estreita')}
+${passos(['Clique no botão principal '+ui('+ Nova tarefa')+'.','Escreva o que precisa ser feito, escolha o responsável e o prazo.','Vincule o cliente (e, se houver, processo e contrato).','Marque '+ui('Prazo fatal')+' só quando a data for o prazo legal.','Clique em '+ui('Criar tarefa')+'. O responsável recebe no sino.'])}
+${dupla(shot('nova-tarefa-cliente',['Cliente.','Processo do cliente.','Contrato do cliente.'],'Vínculos da tarefa'),shot('nova-tarefa-mais',['Mais opções.','Núcleo.','Horas já gastas.','Calcular prazo a partir de uma publicação.'],'Mais opções'))}
+<h2>Calcular o prazo</h2>
+${shot('nova-tarefa-calculo',['Abrir o cálculo a partir da intimação.','Contagem do prazo.','Dias úteis (CPC) ou corridos.','Calcular.','Data de vencimento calculada.'],'Cálculo do prazo','estreita')}
+<p>Informe a data da disponibilização ou intimação e a quantidade de dias. O sistema conta em dias úteis pelo CPC, descontando feriados e suspensões cadastrados em ${ir('feriados','Feriados')}.</p>
+${aviso('Prazo calculado ou sugerido pelo sistema nunca vira fatal sem conferência humana. Confira a data antes de marcar '+ui('Prazo fatal')+'.')}
+<h2>Reagendar um prazo</h2>
+${dupla(shot('tarefa-reagendar',['Novo prazo.','Motivo do reagendamento (obrigatório).','Complemento — obrigatório para “Outro”.','O motivo fica no histórico; gestão e controladoria recebem aviso.','Status.','Prazo fatal.'],'Editar / reagendar'),`<div>${passos(['Abra a tarefa e vá em '+ui('Mais ações')+' › '+ui('Editar / reagendar…')+'.','Escolha a nova data.','Selecione o motivo da lista.','Se escolheu “Outro”, explique no complemento.','Salve. O motivo fica no histórico da tarefa.'])}</div>`)}
+${nota('Os motivos da lista são definidos pela gestão em '+ir('motivos','Configurações › Motivos de reagendamento')+'.')}
+`});
+
+P.push({id:'agenda',g:'Meu dia',t:'Agenda',lead:'Compromissos, audiências e prazos no calendário, com a agenda da equipe e a sincronização com o Google.',cam:'Menu lateral > Agenda',sys:'agenda',quem:'toda a equipe',kw:'agenda calendário compromisso audiência reunião google sincronização semana mês dia lista equipe',rel:['feriados','hoje','tarefas'],h:`
+<h2>Mês</h2>
+${shot('agenda-mes',['Quadros: fatais, atrasados, prazos e compromissos do período.','Dia, Semana ou Mês.','Voltar para hoje.','Mais ações.','Minha agenda, Toda a equipe ou uma pessoa.','Lista ou Calendário.','Situação da sincronização com o Google.','Compromisso no calendário — clique para abrir.','Botão principal: novo compromisso.'],'Agenda no mês')}
+${dupla(shot('agenda-semana',['Semana.','Agenda escolhida.','Período mostrado.'],'Semana'),shot('agenda-dia',['Visão do dia.'],'Dia'))}
+<h2>Novo compromisso</h2>
+${dupla(shot('novo-compromisso',['Título.','Tipo (reunião, audiência…).','Responsável — a agenda de quem.','Vai para o Google Calendar da pessoa, se a sincronização dela estiver ligada.','Data e horário.','Cliente.','Local ou link.','Salvar.'],'Novo compromisso'),`<div>${passos(['Clique em '+ui('+ Compromisso')+'.','Preencha título, tipo e responsável.','Escolha data e horário; vincule o cliente.','Informe o local ou o link da reunião.','Salve. O compromisso entra na agenda do responsável.'])}</div>`)}
+${nota('As audiências que chegam pelas publicações vão para a agenda de quem cuida de Acordos.')}
+`});
+
+P.push({id:'feriados',g:'Meu dia',t:'Feriados e suspensões',m:'Feriados e suspensões',lead:'Os feriados e as suspensões de prazo que o sistema usa para contar os dias úteis.',cam:'Agenda > Feriados',sys:'feriados',quem:'controladoria e gestão',kw:'feriado suspensão prazo forense nacional estadual municipal comarca contagem dias úteis',rel:['agenda','nova-tarefa','regras'],h:`
+${shot('feriados',['Resumo: nacionais, forenses, estaduais e municipais.','Suspensões de prazo.','Ano.','Nova suspensão.','Botão principal: novo feriado.','Abrangência municipal ou da comarca.'],'Feriados e suspensões')}
+<h2>Para que serve</h2>
+<p>A contagem de prazo em dias úteis desconta os feriados e as suspensões cadastrados aqui. Feriado municipal vale para a comarca indicada; suspensão vale para o tribunal e o período informados.</p>
+${passos(['Clique em '+ui('+ Feriado')+' ou '+ui('+ Suspensão')+'.','Informe a data (ou o período), o nome e a abrangência.','Salve. As próximas contagens já consideram a data.'])}
+${regra('Folga da equipe só em feriados nacionais. Estaduais e municipais contam apenas para os prazos.')}
+`});
+
+P.push({id:'avisos',g:'Meu dia',t:'Avisos',lead:'O mural do escritório: comunicados para todos ou para setores, com fixação e data de validade.',cam:'Menu lateral > Avisos',sys:'avisos',quem:'toda a equipe',kw:'aviso mural comunicado fixar expira setor discord lido não lido',rel:['tela','hoje'],h:`
+${shot('avisos',['Quadros: não lidos, fixados e publicados.','Filtros: Não lidos, Fixados, Todos.','Espelho no Discord do escritório.','Botão principal: novo aviso.'],'Avisos')}
+<h2>Publicar um aviso</h2>
+${dupla(shot('novo-aviso',[],'Novo aviso'),`<div>${passos(['Clique em '+ui('+ Aviso')+'.','Escreva título e texto.','Em “Para quem”, marque os setores. Sem marcar nada, vai para todo o escritório.','Marque '+ui('Fixado no topo')+' para manter em destaque.','Se quiser, defina '+ui('Expira em')+': depois dessa data o aviso some da lista.','Publique.'])}</div>`)}
+${dica('Avisos internos também são espelhados no Discord do escritório.')}
+`});
+
+/* ───────── CLIENTES ───────── */
+P.push({id:'carteira',g:'Clientes',t:'Carteira',lead:'A lista de todos os clientes do escritório, PF e PJ, em ordem alfabética. Clicar no cliente abre direto a ficha.',cam:'Clientes > Carteira',sys:'clientes',quem:'quem atende clientes',kw:'clientes carteira lista pf pj busca cnpj sócio novo cliente exportar csv ordem alfabética paginação',rel:['ficha','acompanhamento','f-pj'],h:`
+${shot('carteira',['Todos os clientes — abre ou fecha a lista completa.','Carteira PJ — os clientes de Gestão de Passivos PJ.','Buscar por nome, CNPJ, sócio ou processo.','Mais ações: exportar CSV e abrir o Acompanhamento PJ.','Ordem A–Z ou Z–A.','Atalho para o Acompanhamento PJ.','Cliente: nome, cidade e atividade. Clique para abrir a ficha.','Tipo (PF ou PJ) e responsável.','Botão principal: novo cliente.'],'Carteira de clientes')}
+<h2>Como usar</h2>
+<ul>
+<li><b>Lista simples.</b> Sem indicadores de atraso ou de valores: os totais ficam na ${ir('gestao-visao','Gestão')} e os detalhes na ficha de cada cliente.</li>
+<li><b>Filtro PF/PJ</b> e ordem alfabética crescente ou decrescente.</li>
+<li><b>40 clientes por página</b>, com ${ui('Próxima')} e ${ui('Anterior')} no fim da lista.</li>
+<li><b>Um clique</b> no nome abre a ${ir('ficha','ficha do cliente')}.</li>
+</ul>
+${dupla(shot('carteira-acoes',[],'Menu ⋮ da Carteira'),`<div><p>${ui('Exportar CSV (lista filtrada)')} baixa a lista como está na tela. ${ui('Acompanhamento PJ')} abre o ${ir('acompanhamento','panorama')} de todos os clientes PJ por etapa.</p></div>`)}
+${regra('O cadastro do cliente — tudo o que foi escrito na ficha — não pode ser perdido em nenhuma mudança do sistema. Na dúvida, não apague: fale com a gestão.')}
+`});
+
+P.push({id:'acompanhamento',g:'Clientes',t:'Panorama do Acompanhamento PJ',m:'Acompanhamento PJ',lead:'Todos os clientes PJ por etapa do ciclo, com reuniões vencidas, agendamentos e pendências.',cam:'Clientes > Carteira > ⋮ > Acompanhamento PJ',sys:'acompanhamento',quem:'Acompanhamento PJ e gestão',kw:'acompanhamento pj panorama ciclo onboarding r1 r2 r3 mensal reunião vencida pendências responsável',rel:['ficha-acompanhamento','f-pj','carteira'],h:`
+${shot('acompanhamento',['Quadros: reuniões vencidas, desta semana, sem agendamento, pendências e sem mensal.','Situação: em acompanhamento ou encerrados.','Etapa do ciclo (inicial, mensal…).','Mais filtros.','Cliente e cidade — clique para abrir a aba Acompanhamento PJ.','Responsável pelo acompanhamento.'],'Panorama do Acompanhamento PJ')}
+<h2>Para que serve</h2>
+<p>É a visão transversal da carteira PJ. Mostra quem está em cada etapa (${ir('f-pj','Onboarding, R1, R2, R3 e Mensal')}), quem está com reunião vencida e quem ficou sem agendamento. O trabalho de cada cliente acontece na ${ir('ficha-acompanhamento','aba Acompanhamento PJ da ficha')}.</p>
+${nota('O panorama saiu do menu e agora fica dentro da Carteira PJ, no menu '+ui('⋮')+'.')}
+`});
+
+P.push({id:'ficha',g:'Clientes',t:'Ficha do cliente — Dossiê',m:'Ficha: Dossiê',lead:'A página do cliente. O Dossiê reúne as três frentes de trabalho e a linha do tempo do que o escritório fez.',cam:'Clientes > Carteira > cliente',sys:'clientes',quem:'quem atende o cliente',kw:'ficha cliente dossiê linha do tempo registrar reunião frentes estratégico consultivo jurídico contencioso negocial acordos link do cliente abas',rel:['ficha-cadastro','ficha-acompanhamento','ficha-passivos'],h:`
+<h2>Cabeçalho e abas</h2>
+${shot('ficha-dossie',['Voltar para Clientes.','Nome e situação do cliente.','Copiar o documento.','Saldo em contratos ativos.','Situação com os bancos.','Link do cliente (área do cliente).','Abas: Dossiê, Cadastro, Acompanhamento PJ, Passivos, Jurídico, Negocial, Tarefas, Financeiro.','Registrar reunião.','Registrar um fato na linha do tempo.','Último registro de cada frente e o responsável.','Linha do tempo e o total de registros.'],'Dossiê do cliente PJ')}
+${nota('Clientes PF têm uma ficha mais curta: Cadastro (dados pessoais e serviço contratado), Jurídico, Tarefas e Dossiê.')}
+<h2>As três frentes</h2>
+${caminhos([{t:'Estratégico / Consultivo',s:'Onboarding, reuniões, direcionamento e reserva. Trabalha na aba Acompanhamento PJ.'},{t:'Jurídico / Contencioso',s:'Processos, prazos e peças. Trabalha na aba Jurídico e em Processos e pastas.'},{t:'Negocial / Acordos',s:'Negociação com os bancos e monitoramento. Trabalha na aba Negocial e em Negociações.'}])}
+<p>As três se encontram no Dossiê, que mostra o último registro de cada frente lado a lado. O responsável por frente é fixo por pessoa, com exceção por cliente quando necessário.</p>
+<h2>Linha do tempo</h2>
+${shot('ficha-linha-tempo',['Filtrar por tipo de registro.','Ordem: mais recentes primeiro.','Exportar em PDF.','Filtrar por frente.','Abrir tarefa a partir do registro.'],'Linha do tempo')}
+${regra('A linha do tempo guarda o que o escritório faz pelo cliente (registros, reuniões, tarefas). Andamentos e publicações ficam na página do processo.')}
+<h2>Registrar</h2>
+${dupla(shot('registrar',['Tipo de registro.','Frente.','Responsável.','Descrição do que aconteceu.','Links (Drive, ata, gravação).','Visível ao cliente.','Fixar no perfil do cliente.'],'Registrar na linha do tempo'),`<div>${passos(['Na ficha, clique em '+ui('Registrar')+'.','Escolha o tipo e a frente.','Descreva o fato e cole os links.','Marque '+ui('Visível ao cliente')+' só quando o cliente puder ver na área dele.','Salve.'])}</div>`)}
+`});
+
+P.push({id:'ficha-cadastro',g:'Clientes',t:'Ficha — Cadastro',m:'Ficha: Cadastro',lead:'Os dados do cliente, a qualificação para as peças, sócios e contatos, documentos, acessos e notas internas.',cam:'Ficha do cliente > Cadastro',sys:'clientes',quem:'quem atende o cliente',kw:'cadastro qualificação jurídica copiar qualificação peça editar ficha sócios contatos documentos acessos gov senha cofre notas internas onboarding',rel:['ficha','modelos','ficha-acompanhamento'],h:`
+${shot('ficha-cadastro',['Qualificação jurídica.','Copiar a qualificação pronta para a peça.','Editar ficha.','Razão social ou nome.'],'Cadastro — qualificação')}
+${shot('ficha-cadastro-2',['Sócios e contatos.','Adicionar contato.','Documentos.','Acessos a sistemas do cliente (gov.br e outros).','Adicionar acesso.','Contexto empresarial e onboarding.','Notas internas — só a equipe vê.'],'Cadastro — contatos, documentos e acessos')}
+<h2>Boas práticas</h2>
+<ul>
+<li>Use ${ui('Copiar qualificação p/ peça')} em vez de redigitar os dados na petição.</li>
+<li>Os acessos do cliente (como o gov.br) ficam guardados aqui, para todos os clientes.</li>
+<li>Notas internas nunca aparecem para o cliente.</li>
+</ul>
+${regra('O que foi escrito na ficha não pode ser perdido. Ao editar, confira antes de salvar e não apague informação sem falar com a gestão.')}
+`});
+
+P.push({id:'ficha-acompanhamento',g:'Clientes',t:'Ficha — Acompanhamento PJ',m:'Ficha: Acompanhamento PJ',lead:'O ciclo do cliente PJ: onboarding, reuniões R1 a R3 e mensal, atas, Raio-X das dívidas e proteção patrimonial.',cam:'Ficha do cliente > Acompanhamento PJ',sys:'clientes',quem:'Acompanhamento PJ e Estratégico',kw:'acompanhamento pj ciclo onboarding r1 r2 r3 mensal ata reunião raio-x dívidas proteção patrimonial bens operação escrow fluxo pj formulário boas-vindas',rel:['f-pj','acompanhamento','medidas'],h:`
+<h2>Ciclo de acompanhamento</h2>
+${shot('ficha-acompanhamento',['Fase, próxima reunião e responsável.','Ciclo: Onboarding, R1, R2, R3 e Mensal.'],'Ciclo de acompanhamento')}
+<h2>Onboarding</h2>
+${shot('ficha-onboarding',['Etapa de onboarding.','Copiar o link do formulário de mapeamento.','Copiar o link da agenda.','Confirmar a entrada paga e liberar a R1.','Reenviar a mensagem de boas-vindas.','Dados da empresa.','O que aconteceu até aqui.','Editar ficha.'],'Onboarding')}
+${regra('O formulário de mapeamento vai logo que o cliente assina. A R1 só acontece depois de confirmado o pagamento da entrada — use '+ui('Confirmar entrada e liberar R1')+'.')}
+<h2>Fluxo PJ e proteção patrimonial</h2>
+${shot('ficha-fluxo-pj',['Fluxo PJ do cliente.','Sinais do caso: dívida em atraso, honorários em dia, processos.','Dívidas mapeadas.','Avançar etapa.','Editar fluxo.','Proteção patrimonial e operacional.','Adicionar bem.','Concluir o ciclo de onboarding.','Bens: protegidos, em proteção e expostos.','Medidas de operação: implementadas, em andamento e pendentes.'],'Fluxo PJ')}
+<p>As medidas de proteção (conta escrow, empresa gestora, CNPJ espelho, recebíveis…) vêm do checklist de ${ir('medidas','Configurações › Medidas de proteção')}.</p>
+<h2>Raio-X, pendências e atas</h2>
+${shot('ficha-raiox',['Raio-X das dívidas.','Incluir dívida no Raio-X.','Pendências — tarefas do núcleo.','Atas das reuniões.','Registrar ata.','Definir as datas do ciclo.','Criar as tarefas do ciclo.','Ver o cliente na carteira.','Linha do Raio-X: credor, saldo e situação.'],'Raio-X, pendências e atas')}
+${dupla(shot('registrar-ata',[],'Registrar ata'),`<div>${passos(['Clique em '+ui('Registrar ata')+'.','Escolha a reunião (R1, R2, R3, mensal) e a data.','Informe os participantes.','Escreva o resumo: o que foi tratado, combinado e os próximos passos.','Cole o link da pasta e o da gravação.','Salve.'])}${nota('O resumo é obrigatório quando não houver link do documento da ata nem da gravação.')}</div>`)}
+<h3>Quem faz o quê nas atas</h3>
+${tabela(['Ação','Quem'],[['Ler','Quem vê o cliente'],['Criar','Administração, Acompanhamento PJ, Estratégico e Acordos'],['Editar','O autor ou o responsável'],['Excluir','Só a administração']])}
+`});
+
+P.push({id:'ficha-passivos',g:'Clientes',t:'Ficha — Passivos',m:'Ficha: Passivos',lead:'As dívidas do cliente com os bancos, a projeção de acordo, a economia e a reserva de quitação.',cam:'Ficha do cliente > Passivos',sys:'clientes',quem:'Estratégico, Acordos e gestão',kw:'passivos contratos dívida banco saldo acordo projetado reserva mensal economia estágio atraso janela de acordo quitação projeção',rel:['projecao','calibracao','base-acordos'],h:`
+<h2>Resumo dos passivos</h2>
+${shot('ficha-passivos',['','Saldo total em aberto.','Acordo projetado.','Reserva mensal sugerida.','Economia projetada.','Onde está a dívida (por banco).','Estágio de cada dívida.','Hoje × acordo projetado.'],'Passivos')}
+<h2>Contratos e projeção</h2>
+${shot('ficha-contratos',['A projeção usa os acordos reais do escritório.','Estágio do contrato.','Dias de atraso.','Previsão do acordo e em quantos meses.','Reserva de quitação.'],'Contrato e previsão de acordo')}
+<h2>Reserva de quitação</h2>
+${shot('ficha-reserva',['Atualizar a reserva acumulada.','Reserva acumulada.','Aporte mensal necessário.','Janela de acordo.','Quando a janela abre.','Aviso: valores são projeções.'],'Reserva de quitação')}
+${aviso('Os valores de acordo e de reserva são projeções para visualização. Desconto, alçada e êxito seguem os contratos e as regras reais — nunca percentuais presumidos.')}
+${regra('Dívida com garantia real (alienação fiduciária de imóvel, carro, moto) dificilmente tem acordo bom e traz risco alto de perda do bem.')}
+<p>Como a projeção é calculada: ${ir('projecao','Regras de projeção')}. Como ela é ajustada com os acordos reais: ${ir('calibracao','Calibração')}.</p>
+`});
+
+P.push({id:'ficha-juridico',g:'Clientes',t:'Ficha — Jurídico e Tarefas',m:'Ficha: Jurídico',lead:'Os processos e pastas do cliente, as providências do checklist e as tarefas ligadas a ele.',cam:'Ficha do cliente > Jurídico',sys:'clientes',quem:'Jurídico',kw:'jurídico ficha processos pasta providência checklist padrão pj tarefas do cliente',rel:['processos','tarefas','ficha'],h:`
+${shot('ficha-juridico',['Ver detalhes.','Checklist padrão PJ.','Nova providência.','Abrir pasta sem processo (negociação, administrativo, consultoria).','Novo processo.','Exportar CSV.'],'Aba Jurídico')}
+<ul>
+<li><b>Processos</b> do cliente, com acesso à página de cada um em ${ir('processos','Processos e pastas')}.</li>
+<li><b>Pasta sem processo</b> para o que é negociação, administrativo ou consultoria sem ação judicial.</li>
+<li><b>Providências</b>: itens do checklist padrão PJ e os que você incluir.</li>
+</ul>
+<h2>Aba Tarefas</h2>
+<p>Mostra as tarefas do cliente, de todas as frentes, com prazo e responsável. Criar por aqui já vincula o cliente.</p>
+`});
+
+P.push({id:'ficha-negocial',g:'Clientes',t:'Ficha — Negocial',m:'Ficha: Negocial',lead:'As negociações do cliente com cada banco, o próximo passo e o monitoramento processual.',cam:'Ficha do cliente > Negocial',sys:'clientes',quem:'Acordos',kw:'negocial negociação banco proposta monitoramento processual checado movimentação',rel:['negociacoes','base-acordos','monitoramento'],h:`
+${shot('ficha-negocial',['Ver detalhes.','Nova negociação.','Próximo passo da negociação.','Monitoramento processual do cliente.','Checado hoje — registra a conferência do dia.','Editar.','Nova movimentação.'],'Aba Negocial')}
+${passos(['Abra a aba Negocial e clique em '+ui('+ Negociação')+' para cada banco.','Mantenha o próximo passo sempre preenchido.','Registre cada contato ou proposta em '+ui('Nova movimentação')+'.','Acordo fechado? Registre na '+ir('base-acordos','Base de acordos')+'.'])}
+${nota('A visão de todas as negociações, em lista ou quadro, fica em '+ir('negociacoes','Jurídico › Negociações')+'.')}
+`});
+
+P.push({id:'ficha-financeiro',g:'Clientes',t:'Ficha — Financeiro',m:'Ficha: Financeiro',lead:'As cobranças do cliente com o escritório: parcelas, situação e faturas.',cam:'Ficha do cliente > Financeiro',sys:'clientes',quem:'Financeiro',kw:'financeiro ficha cobrança parcela fatura asaas adimplente atraso',rel:['fin-visao','regua','cobrancas'],h:`
+${shot('ficha-financeiro',['Nova cobrança.','Situação com o escritório (adimplente ou não).','Parcelas pagas e a última parcela.','Sem atraso.','Link da fatura.','Menu da cobrança.'],'Aba Financeiro')}
+<p>As cobranças vêm do Asaas. Cada parcela mostra vencimento, valor e situação, com o link da fatura para enviar ao cliente.</p>
+`});
+
+/* ───────── JURÍDICO ───────── */
+P.push({id:'processos',g:'Jurídico',t:'Processos e pastas',lead:'Todos os processos do escritório com a respectiva pasta, e a página completa de cada processo.',cam:'Jurídico > Processos e pastas',sys:'processos',quem:'Jurídico e controladoria',kw:'processos pastas processo número cnj tribunal fase andamentos autos publicações trabalho do escritório prazo tarefa registrar novo processo',rel:['publicacoes','ficha-juridico','monitoramento'],h:`
+<h2>A lista</h2>
+${shot('processos',['Processos ativos.','Por tribunal.','Por fase processual.','Por tipo de processo.','Buscar por número, cliente, parte ou pasta.','Mais ações.','Processo: número, cliente e parte contrária.','Pasta do processo.','Botão principal: novo processo.'],'Processos e pastas')}
+<p>A lista mostra 40 processos por página. Clique no número para abrir a página do processo.</p>
+<h2>A página do processo</h2>
+${shot('processo',['Voltar para Processos.','Cliente e pasta.','Número do processo.','Área e partes.','Novo prazo ou tarefa.','Novo andamento.','Registrar trabalho do escritório.','Editar.','Abrir no cliente.','Atualização automática dos andamentos.','Atualizar andamentos agora.'],'Página do processo')}
+${shot('processo-abas',['Prazos e tarefas do processo.','Trabalho do escritório.','Andamentos.','Publicações.','Pasta e relacionados.','Próximo prazo.','Autos no tribunal.','Última leitura automática dos autos.'],'Abas do processo')}
+<h2>Trabalho do escritório</h2>
+${dupla(shot('processo-trabalho',['Trabalho do escritório.','Registrar.'],'Registros do escritório no processo'),`<div><p>Andamentos do tribunal e publicações ficam no processo. O que o escritório fez (peça, protocolo, reunião, diligência) é registrado em ${ui('+ Registrar')} e aparece também no ${ir('ficha','Dossiê do cliente')}.</p></div>`)}
+`});
+
+P.push({id:'publicacoes',g:'Jurídico',t:'Publicações',lead:'As intimações e publicações captadas automaticamente, para analisar e tratar dentro do prazo.',cam:'Jurídico > Publicações',sys:'publicacoes',quem:'controladoria',kw:'publicações intimações analisar tratar não lidas sem processo prazo a conferir fontes divergentes ciência em lote tempestividade fora do prazo de análise',rel:['tratar','f-publicacao','processos'],h:`
+<h2>A lista</h2>
+${shot('publicacoes',['A analisar.','Fora do prazo de análise.','Sem processo vinculado.','Prazos a conferir.','Publicações ou Tempestividade.','Mais ações.','Filtros: A analisar, Sem processo, Não lidas, Prazo a conferir, Fontes divergentes…','Situação das buscas automáticas.','Grupo: análise fora do prazo.','Publicação: processo e data.','Marcas da publicação.','Atualizar agora.'],'Publicações')}
+${regra('“Lida” não é “tratada”. Uma publicação só sai da fila depois de tratada. Intimações diferentes do mesmo processo e do mesmo dia são analisadas uma a uma.')}
+<h2>O que cada marca quer dizer</h2>
+${tabela(['Marca','O que fazer'],[
+ [tag('a analisar','a'),'Abrir e tratar até a data “tratar até”.'],
+ [tag('fora do prazo de análise','f'),'Passou da data de análise: tratar primeiro.'],
+ [tag('sem processo','n'),'Vincular ao processo certo (ou cadastrar) antes de tratar.'],
+ [tag('prazo a conferir','i'),'O sistema sugeriu um prazo: conferir antes de confirmar.'],
+ [tag('fontes divergentes','a'),'As fontes trouxeram dados diferentes: conferir no tribunal.']])}
+<h2>Mais ações</h2>
+${dupla(shot('publicacoes-acoes',[],'Menu ⋮ das Publicações'),`<div><ul><li>${ui('Ver integrações')} — situação das buscas.</li><li>${ui('Exportar CSV (lista filtrada)')}.</li><li>${ui('Dar ciência em lote…')} — para publicações que não exigem providência.</li></ul></div>`)}
+<h2>Tempestividade</h2>
+${shot('publicacoes-tempestividade',['Publicações ou Tempestividade.','Situação das fontes.','Tempestividade por mês.'],'Tempestividade')}
+<p>Mostra, mês a mês, quantas publicações foram tratadas dentro do prazo de análise.</p>
+${nota('Publicações anteriores a 16/11/2026 aparecem como “Acompanhamento externo — ADVBox”: foram acompanhadas fora do sistema e não contam como providência cumprida aqui.')}
+`});
+
+P.push({id:'tratar',g:'Jurídico',t:'Tratar publicação',destaque:true,lead:'A tela única de tratamento: o teor da intimação de um lado e, do outro, o que fazer, o prazo, o responsável e as tarefas que serão abertas.',cam:'Jurídico > Publicações > publicação',sys:'publicacoes',quem:'controladoria',kw:'tratar publicação intimação teor providência criar tarefa prazo não é nosso tipo de prazo para quem contagem dias úteis vence fatal cadeia análise de cabimento revisar peça preparo conferir protocolo instruções',rel:['f-publicacao','f-cabimento','f-cadeia'],h:`
+<h2>1. O que fazer com a publicação</h2>
+${shot('tratar',['Número do processo.','Data limite para tratar.','Abrir no tribunal.','Cliente.','Teor da publicação.','Primeiro passo: o que fazer.','Criar tarefa ou prazo.','Não é nosso.','Ver detalhes e histórico.','Escolha uma opção para continuar.'],'Tratar publicação')}
+${nota('A tela abre sem nenhuma providência marcada. Leia o teor e escolha o caminho.')}
+${tabela(['Opção','Quando usar'],[
+ [ui('Criar tarefa ou prazo'),'A publicação pede providência: abre o passo 2, com prazo e responsável.'],
+ [ui('Só ciência'),'Basta registrar que o escritório tomou ciência.'],
+ [ui('Nada a fazer'),'A publicação não exige providência.'],
+ [ui('Encaminhar'),'Outra pessoa deve analisar.'],
+ [ui('Não é nosso'),'A publicação não é de cliente do escritório.']])}
+<h2>2. Prazo e responsável</h2>
+${shot('tratar-prazo',['Segundo passo: prazo e responsável.','Tipo de prazo (contestação, réplica, manifestação…).','Para quem.','Contagem: dias úteis (CPC), data de início e UF.','Data de vencimento.','Prazo fatal.','Mais opções: título e prioridade.','Instruções e observação — vão para a tarefa.','Criar a tarefa e concluir o tratamento.'],'Prazo e responsável')}
+${passos(['Escolha '+ui('Criar tarefa ou prazo')+'.','Selecione o '+ui('Tipo de prazo')+'. Em contestação, réplica, contrarrazões e provas, quem trata escolhe o tipo e só então abrem as datas.','Escolha '+ui('Para quem')+' (pessoa ou cargo).','Confira a contagem e a data de vencimento. Marque '+ui('Prazo fatal')+' só depois de conferir.','Escreva as instruções no campo único de observação.','Clique em '+ui('Criar tarefa e concluir')+'.'])}
+${aviso('O resumo e o prazo sugeridos ajudam, mas não substituem a leitura. Prazo sugerido nunca vira fatal sem conferência humana.')}
+<h2>Quando o ato pede análise de cabimento</h2>
+${shot('tratar-cabimento',['Tipo de prazo.','Prazos deste ato (embargos de declaração, agravo, apelação…), com as datas.','A análise vai para quem você escolher, com prazo curto.','Já analisei: escolher o caminho agora.','Para quem.'],'Análise de cabimento')}
+<p>Sentenças, decisões e acórdãos abrem primeiro uma <b>análise de cabimento</b> para quem vai fazer a peça. Ela decide o caminho: só ED, ED e depois apelação, só apelação ou não recorrer. ${ir('f-cabimento','Ver os caminhos')}.</p>
+<h2>As tarefas que serão abertas</h2>
+${shot('tratar-cadeia',['Tipo de prazo.','Data de vencimento.','Prazo fatal.','Tarefas que serão abertas, com as datas.','Revisar a peça.','Conferir protocolo.','Preparo: calcular o valor e informar o cliente.'],'Prévia da cadeia')}
+<p>Antes de concluir, a tela mostra toda a cadeia que será criada. As datas seguem a configuração de cada ${ir('tipos-prazo','tipo de prazo')}. A prioridade padrão é Normal.</p>
+`});
+
+P.push({id:'negociacoes',g:'Jurídico',t:'Negociações',lead:'As negociações com os bancos, em lista ou quadro, por etapa, com alerta de paradas e de acordos que faltam registrar na base.',cam:'Jurídico > Negociações',sys:'negociacoes',quem:'Acordos',kw:'negociações acordo banco kanban quadro etapa parada mover etapa minuta formalizado pagamento pendente base de acordos reserva valores próximo passo',rel:['ficha-negocial','base-acordos','f-acordo'],h:`
+<h2>Lista</h2>
+${shot('negociacoes',['Abertas.','Paradas (sem movimentação).','Filtros: abertas, concluídas, todas, atrasadas, paradas e por banco.','Filtro de banco.','Lista ou Quadro.','Mais ações.','Etapa e o total de negociações nela.','Parada há N dias.','Botão principal: nova negociação.'],'Negociações em lista')}
+<h2>Quadro</h2>
+${shot('negociacoes-quadro',['Lista ou Quadro.','Paradas.','Filtro por banco.','Coluna da etapa, com o total.','Parada há N dias.','Falta registrar na base.','Menu do cartão.'],'Negociações em quadro')}
+<h2>As etapas</h2>
+${fluxo([{t:'Iniciar acompanhamento',s:'Levantar valor e situação da dívida.'},{t:'Negociação extrajudicial',s:'Propostas com o banco.'},{t:'Acordo após judicialização',s:'Negociação com processo em curso.'},{t:'Elaboração de minuta',s:'Termos do acordo.'},{t:'Acordo formalizado',s:'Assinado. Registrar na base.',c:'o'},{t:'Pagamento pendente',s:'Acompanhar o pagamento.',c:'a'},{t:'Concluído',s:'Encerrado.',c:'o'}])}
+<h2>A negociação aberta</h2>
+${shot('negociacao-detalhe',['Etapa atual.','Cliente — abre a ficha.','Parada: tempo sem movimentação.','Valores.','Reserva financeira do cliente.','Abrir o acompanhamento PJ.','Próximo passo.','Mover etapa…','Editar e Mais ações (abrir cliente, Base de acordos).'],'Janela da negociação')}
+${dupla(shot('negociacao-mover',['As sete etapas.','Mover etapa.'],'Mover etapa'),`<div>${passos(['Abra a negociação.','Clique em '+ui('Mover etapa…')+' e escolha a nova etapa.','Atualize o '+ui('Próximo passo')+'.','Em “Acordo formalizado”, registre o acordo na '+ir('base-acordos','Base de acordos')+' — a marca “falta registrar na base” some.'])}</div>`)}
+${regra('Acordos alimenta a Base de acordos com cada acordo fechado. A consulta da base fica com a gestão.')}
+`});
+
+P.push({id:'monitoramento',g:'Jurídico',t:'Monitoramento',novo:true,lead:'Os processos encontrados para os CPFs e CNPJs monitorados que ainda não estão cadastrados no sistema.',cam:'Jurídico > Monitoramento',sys:'monitoramento',quem:'controladoria e Jurídico',kw:'monitoramento sync cpf cnpj processo novo cadastrar dispensar oab escritório monitorados',rel:['processos','publicacoes','ficha-negocial'],h:`
+${shot('monitoramento',['Processos encontrados pelo monitoramento — e como funciona.','Total a decidir.','Processos da OAB do escritório sem cliente identificado.','Cliente monitorado.','Quantidade de processos — clique para abrir o grupo.'],'Monitoramento')}
+<h2>Decidir os processos de um cliente</h2>
+${shot('monitoramento-grupo',['Grupo do cliente, aberto.','Cadastrar todos ou dispensar todos.','Processo: número, tribunal, partes, classe e datas.','Cadastrar ou dispensar um a um.'],'Processos de um cliente')}
+${passos(['Abra o grupo do cliente.','Confira cada processo: número, tribunal, partes e classe.','Clique em '+ui('Cadastrar')+' para criar o processo no cliente — ele passa a aparecer em Processos e pastas.','Clique em '+ui('Dispensar')+' quando o processo não interessa: ele só sai da lista.'])}
+${nota('Os grupos mostram os CPFs e CNPJs cadastrados para monitoramento — inclusive os sócios ligados ao CNPJ do cliente. Processos novos chegam com aviso, e audiências novas entram na agenda.')}
+`});
+
+/* ───────── FINANCEIRO ───────── */
+P.push({id:'fin-visao',g:'Financeiro',t:'Visão geral do financeiro',m:'Visão geral',lead:'O mês em números: previsto, recebido, aguardando, vencido, recuperado e o que sobrou do mês anterior.',cam:'Financeiro > Visão geral',sys:'financeiro',quem:'Financeiro e gestão',kw:'financeiro visão geral faturamento previsto recebido aguardando vencido recuperado remanescente asaas mês gráfico',rel:['regua','cobrancas','recuperacao'],h:`
+${shot('fin-visao',['Mês.','Última atualização com o Asaas e '+ui('Atualizar agora')+'.','Faturamento previsto do mês.','Recebido e o percentual do previsto.','Aguardando pagamento.','Vencido — inclui quem remarcou.','Recuperado após cobrança.','Remanescente do mês anterior.','Clientes por etapa da régua.','Pendências de hoje.'],'Visão geral')}
+${shot('fin-grafico',['Previsto e recebido por mês.','Percentual recebido sobre o previsto.','Fim da régua: remarcados.','Legenda.'],'Previsto × recebido')}
+${nota('Os números vêm do Asaas. Se algo parecer desatualizado, use '+ui('Atualizar agora')+'.')}
+`});
+
+P.push({id:'regua',g:'Financeiro',t:'Régua de cobrança',lead:'Os clientes em cada etapa da régua, do relatório mensal ao contato do supervisor.',cam:'Financeiro > Régua de cobrança',sys:'financeiro',quem:'Financeiro',kw:'régua cobrança d-5 d-2 d-0 d+1 d+3 d+7 boleto lembrete chatguru mensagem pendente vencidos tarefa aberta',rel:['f-cobranca','cobrancas','fin-visao'],h:`
+${shot('fin-regua',['Buscar cliente e filtros: só com mensagem pendente, só vencidos, só com tarefa aberta.','Etapa da régua: clientes e valor.','Filtros do envio: Todos, Enviados, Não enviados, Não encontrados no Chatguru.','Primeiro contato de cobrança.','Role para ver as demais etapas.','Mês e atualização com o Asaas.'],'Régua de cobrança')}
+<h2>As etapas</h2>
+${fluxo([{t:'D-5',s:'Relatório mensal'},{t:'D-2',s:'Aviso de vencimento e boleto'},{t:'D-0',s:'Lembrete',c:'a'},{t:'D+1',s:'Primeiro contato de cobrança',c:'f'},{t:'D+3',s:'Solicitar previsão de pagamento',c:'f'},{t:'D+7',s:'Contato do supervisor',c:'f'}])}
+<p>Cada coluna mostra quem está na etapa <b>hoje</b>. As mensagens saem pelo Chatguru; “Não encontrados no Chatguru” indica cliente sem contato localizado.</p>
+`});
+
+P.push({id:'cobrancas',g:'Financeiro',t:'Cobranças e retornos',lead:'Quem venceu, quem recebeu a cobrança, quem respondeu e quem remarcou.',cam:'Financeiro > Cobranças e retornos',sys:'financeiro',quem:'Financeiro',kw:'cobranças retornos vencidos remarcou remarcação sem retorno venceu de novo exportar xlsx',rel:['regua','recuperacao','f-cobranca'],h:`
+${shot('fin-cobrancas',['Clientes vencidos e o valor.','Já receberam cobrança (e quantos ainda sem mensagem).','Responderam (e quantos sem retorno).','Remarcações no mês e para o mês seguinte.','Filtros: Todos, Mensagem não enviada, Sem retorno, Remarcou pagamento, Venceu de novo.','Buscar cliente e exportar (.xlsx).','Clientes vencidos do mês.'],'Cobranças e retornos')}
+<p>Quem combina uma nova data vai para “Remarcou pagamento”. Se a nova data também passar, aparece em “Venceu de novo”. O que foi remarcado para o mês seguinte volta como remanescente.</p>
+`});
+
+P.push({id:'recuperacao',g:'Financeiro',t:'Recuperação',lead:'Quanto da cobrança voltou, em que etapa o cliente pagou e o que sobrou do mês anterior.',cam:'Financeiro > Recuperação',sys:'financeiro',quem:'Financeiro e gestão',kw:'recuperação recuperado taxa de recuperação remanescente mês anterior etapa d+1 d+3 d+7 remarcação',rel:['cobrancas','fin-visao'],h:`
+${shot('fin-recuperacao',['Valores recuperados: cobrado, recuperado e a taxa.','Cobrado: recuperado, recuperado em parte e ainda em aberto.','Recuperado por etapa em que o cliente pagou.','Remanescentes do mês anterior: remarcado, já recebido e a receber.','Remarcados do mês anterior para este.'],'Recuperação')}
+`});
+
+/* ───────── ADMINISTRATIVO ───────── */
+P.push({id:'estoque',g:'Administrativo',t:'Estoque',lead:'Os itens de consumo do escritório, com saldo, mínimo e lista de compras.',cam:'Administrativo > Estoque',sys:'estoque',quem:'Administrativo',kw:'estoque produto consumo café saldo mínimo reposição lista de compras movimentações alimentícios escritório',rel:['inventario'],h:`
+${shot('adm-estoque',['Quadros: sem estoque, abaixo do mínimo, reposições abertas, produtos a comprar.','Buscar produto.','Produtos, Lista de compras e Movimentações.','Filtros por situação e categoria.','Botão principal: novo produto.','Comece cadastrando os itens de consumo.'],'Estoque')}
+${dupla(shot('adm-novo-produto',['Nome do produto.','Categoria.','Saldo inicial — o que há hoje.','Estoque mínimo — ao chegar nele, abre tarefa de reposição.','Quantidade desejada depois de repor.','Salvar.'],'Novo produto'),`<div>${passos(['Clique em '+ui('Novo produto')+'.','Informe nome, categoria e unidade.','Digite o saldo de hoje e o estoque mínimo.','Salve. Depois disso o saldo só muda por entrada ou retirada.'])}</div>`)}
+`});
+
+P.push({id:'inventario',g:'Administrativo',t:'Inventário',lead:'Os equipamentos do escritório: quem usa, onde está e a revisão periódica.',cam:'Administrativo > Inventário',sys:'inventario',quem:'Administrativo',kw:'inventário equipamento patrimônio notebook mouse teclado em uso disponível manutenção baixado revisão periódica trimestral por pessoa',rel:['estoque'],h:`
+${shot('adm-inventario',['Quadros: equipamentos, em uso, disponíveis e em manutenção.','Buscar e Revisão periódica.','Equipamentos, Por pessoa, Revisão e Histórico.','Filtro por situação.','Tipo, responsável e departamento.','Equipamento: patrimônio, responsável e departamento.','Botão principal: novo equipamento.'],'Inventário')}
+<h2>Revisão periódica</h2>
+<p>A revisão é trimestral e abre sozinha no início de cada ciclo, na aba ${ui('Revisão')}. Pelo botão ${ui('Revisão periódica')} também dá para configurar ou abrir uma revisão antes.</p>
+`});
+
+/* ───────── EQUIPE E GESTÃO ───────── */
+P.push({id:'equipe',g:'Equipe e gestão',t:'Colaboradores, cargos e acessos',m:'Colaboradores e usuários',lead:'Quem é quem, quais cargos existem, quem os ocupa e o que cada usuário pode acessar.',cam:'Equipe e gestão > Colaboradores e usuários',sys:'equipe',quem:'gestão e sócias',kw:'colaboradores pessoas cargos usuários acessos permissões perfil administrador colaborador áreas fila vago login núcleo',rel:['perfis','regras','horas'],h:`
+<h2>Pessoas</h2>
+${shot('equipe-pessoas',['Colaboradores ou Usuários e acessos.','Pessoas ou Cargos.','Exportar CSV e novo colaborador.','Usuário da equipe sem cadastro de colaborador — cadastrar.','Quadros por núcleo.'],'Equipe — pessoas')}
+${shot('equipe-lista',['Mostrar inativos.','Colunas: nome, cargo, núcleo, admissão, usuário e indicadores.','Usuário e perfil de acesso.','Sem login.','Abrir a ficha do colaborador.','Indicadores dos últimos 30 dias (borrados no print).'],'Lista de colaboradores')}
+<h2>Cargos</h2>
+${shot('equipe-cargos',['Resumo: cargos ativos, pessoas em cargos, vagos, na fila e itens sem responsável.','Atualizar.','Cargos vagos.','Cargo com tarefas na fila.','Situação e ocupantes.','Botão principal: novo cargo.'],'Cargos')}
+${regra('Pessoas ocupam cargos. Cargos têm responsabilidades e permissões. Ações têm autores individuais. Uma pessoa pode ter vários cargos e um cargo pode ter vários ocupantes.')}
+<p>Quando uma tarefa vai para um cargo vago, ela entra na <b>fila</b> do cargo e espera alguém assumir. As sócias têm privilégios administrativos, mas não viram responsáveis operacionais automaticamente.</p>
+<h2>Usuários e acessos</h2>
+${shot('usuarios-acessos',['Resumo de usuários.','Filtros e busca.','Administradores têm acesso integral; Tarefas, Agenda e Hoje ficam para toda a equipe.','Nome.','Perfil de acesso.','Empresa — só para usuário cliente.'],'Usuários e permissões')}
+${shot('usuarios-areas',['Áreas liberadas para o colaborador.','Acesso restrito a uma parte (ex.: só a calculadora).','Salvar a linha.','Perfil.'],'Áreas de acesso')}
+${passos(['Em '+ui('Usuários e acessos')+', ache a pessoa pelo nome ou e-mail.','Escolha o '+ui('Perfil')+' (Administrador ou Colaborador).','Marque as áreas do colaborador.','Clique em '+ui('Salvar')+' na linha.'])}
+${aviso('Liberar login e mudar perfis é decisão das sócias. Funções críticas (papel de administradora, integrações, automações financeiras) são reservadas a elas.')}
+`});
+
+P.push({id:'horas',g:'Equipe e gestão',t:'Horas',lead:'O registro de horas da equipe: cronômetro, lançamentos da semana, relatórios e aprovação.',cam:'Equipe e gestão > Horas',sys:'horas',quem:'toda a equipe (lançar) e gestão (aprovar)',kw:'horas timesheet cronômetro lançar horas semana relatórios aprovação devolver cobrável atividade frente de trabalho',rel:['tarefas','gestao-visao'],h:`
+<h2>Minha semana</h2>
+${shot('horas-semana',['Horas da semana e situação do cronômetro.','Minha semana, Relatórios, Aprovação e Configurações.','Cronômetro: iniciar e parar.','Semana e pessoa.','Totais: na semana e cobráveis.','Lançamento: horário, cliente ou processo, atividade, descrição e horas.','Status e Editar.','Lançar horas no dia.','Botão principal: lançar horas.'],'Minha semana')}
+<p>O cronômetro também liga quando você clica em ${ui('Iniciar trabalho')} numa tarefa. Sem cronômetro, lance pelo ${ui('+')} do dia ou por ${ui('Horas manuais…')} na tarefa.</p>
+<h2>Relatórios</h2>
+${shot('horas-relatorios',['Período: mês atual, mês anterior ou datas.','Colaboradores e clientes.','Atividade, cobráveis e status.','Totais: horas, cobráveis, valor e pendentes.','Pendentes de aprovação.','Por frente de trabalho.','Por colaborador.','Por atividade.'],'Relatórios de horas')}
+<h2>Aprovação</h2>
+${shot('horas-aprovacao',['Pendentes.','Filtrar por colaborador.','Observação para correção — obrigatória ao devolver.','Aprovar marcados ou devolver.','Aprovar o mês fechado.','Marcar lançamentos.','Status.'],'Aprovação de horas')}
+${passos(['Marque os lançamentos conferidos.','Clique em '+ui('Aprovar marcados')+'.','Para devolver, escreva a observação e clique em '+ui('Devolver')+'. O colaborador corrige e reenvia.','No fim do mês, use '+ui('Aprovar mês fechado')+'.'])}
+<h2>Configurações</h2>
+${shot('horas-config',['Catálogo de atividades.','Cobrável por padrão.','Ativa.','Atividade e código.'],'Atividades')}
+`});
+
+P.push({id:'gestao-visao',g:'Equipe e gestão',t:'Visão geral da gestão',m:'Visão geral',lead:'O painel da gestão: alertas da operação, produtividade da equipe e as movimentações de tarefas.',cam:'Equipe e gestão > Visão geral',sys:'visao',quem:'gestão e sócias',kw:'gestão visão geral alertas prazos vencidos carteira jurídico financeiro equipe produtividade horas movimentações tarefas canceladas prazo alterado responsável trocado',rel:['equipe','growth','horas'],h:`
+<h2>Alertas</h2>
+${shot('gestao-visao',['Resumo: clientes ativos, passivo sob gestão e alertas.','Período e Atualizar.','Recortes: Tudo, Alertas, Carteira, Jurídico, Financeiro, Equipe.','Alertas — pontos de atenção.','Grupo: prazos vencidos.','Alerta: data, título, cliente e responsável.','Gravidade e Ver.'],'Visão geral — alertas')}
+<h2>Equipe e produtividade</h2>
+${shot('gestao-equipe',['Horas, registros, tarefas abertas e concluídas no prazo.','Tarefas abertas e atrasadas.','Concluídas no prazo.','Horas por colaborador.','Horas por tipo de atividade.','Horas por cliente.','Atividade registrada por tipo.'],'Visão geral — equipe')}
+<h2>Movimentações de tarefas</h2>
+${shot('gestao-movimentacoes',['Filtros: tipo e pessoa.','Quando, o quê, tarefa, cliente, de → para, motivo e por quem.','Tipo: cancelada, prazo alterado ou responsável trocado.','Tarefa — abre a janela.','De → para e motivo.'],'Movimentações de tarefas')}
+<p>Mostra os últimos 30 dias de prazos alterados, cancelamentos e trocas de responsável, com o motivo informado. É aqui que a gestão acompanha os ${ir('nova-tarefa','reagendamentos')}.</p>
+`});
+
+P.push({id:'growth',g:'Equipe e gestão',t:'Growth',lead:'Aquisição e qualidade comercial: investimento, leads, custo por lead e qualificação.',cam:'Equipe e gestão > Growth',sys:'growth',quem:'sócias e marketing',kw:'growth meta ads investimento leads cpl ctr cpm frequência mql qualificação crm reuniões contratos',rel:['gestao-visao'],h:`
+${shot('growth',['Resumo: investido, leads, custo por lead e MQL.','Definições e Atualizar agora.','Período: 7, 14, 30, 60 ou 90 dias.','Qualidade dos dados.','Aquisição: investimento, leads, CPL, CTR, CPM e frequência.','Variação contra o período anterior.','Qualidade comercial: leads, qualificados, desqualificados e pendentes.'],'Growth')}
+${dica('Use '+ui('? Definições')+' para ver como cada indicador é calculado.')}
+`});
+
+P.push({id:'configuracoes',g:'Equipe e gestão',t:'Configurações',lead:'As regras que o sistema usa: motivos de reagendamento, medidas de proteção, tipos de prazo, tipos de tarefa, base de acordos, regras de projeção e calibração.',cam:'Equipe e gestão > Configurações',sys:'config-gestao',quem:'gestão e sócias',kw:'configurações motivos medidas tipos de prazo cadeias tipos de tarefa base de acordos regras de projeção calibração',rel:['motivos','tipos-prazo','base-acordos'],h:`
+${cards([
+ {id:'motivos',t:'Motivos de reagendamento',s:'A lista que aparece ao mudar o prazo de uma tarefa.'},
+ {id:'medidas',t:'Medidas de proteção',s:'O checklist de proteção patrimonial do cliente PJ.'},
+ {id:'tipos-prazo',t:'Tipos de prazo (cadeias)',s:'As 25 cadeias que nascem ao tratar uma publicação.'},
+ {id:'base-acordos',t:'Base de acordos',s:'Os acordos fechados que alimentam a projeção.'},
+ {id:'projecao',t:'Regras de projeção',s:'Os parâmetros do motor que projeta os acordos.'},
+ {id:'calibracao',t:'Calibração',s:'Real × projetado, por banco.'}])}
+${nota('Em Configurações dá para cadastrar itens novos, e não só editar os existentes. A aba Tipos de tarefa reúne os tipos usados nas tarefas.')}
+`});
+
+P.push({id:'motivos',g:'Equipe e gestão',t:'Motivos de reagendamento',m:'Configurações: motivos',lead:'A lista de motivos que o colaborador escolhe ao mudar o prazo de uma tarefa.',cam:'Equipe e gestão > Configurações > Motivos de reagendamento',sys:'config-gestao',quem:'gestão',kw:'motivo reagendamento complemento aguardando documentos retorno do banco prazo alterado juízo audiência remarcada',rel:['nova-tarefa','gestao-visao','configuracoes'],h:`
+${shot('cfg-motivos',['Resumo: motivos, medidas e cadeias.','Abas das configurações.','Para que serve.','Novo motivo.','Complemento opcional.','Situação e Editar.'],'Motivos de reagendamento')}
+<p>Motivos atuais: aguardando documentos do cliente; aguardando retorno do banco; prazo processual alterado pelo juízo; audiência ou reunião remarcada; dependência de outra área; priorização de prazo fatal; não houve tempo hábil; ausência ou férias do responsável; outro (com complemento obrigatório).</p>
+`});
+
+P.push({id:'medidas',g:'Equipe e gestão',t:'Medidas de proteção',m:'Configurações: medidas',lead:'O checklist de proteção patrimonial e operacional que aparece no Cadastro de cada cliente PJ.',cam:'Equipe e gestão > Configurações > Medidas de proteção',sys:'config-gestao',quem:'gestão',kw:'medidas proteção patrimonial operacional conta escrow empresa gestora cnpj espelho maquininha recebíveis migração de contas pró-labore folha contratos',rel:['ficha-acompanhamento','configuracoes'],h:`
+${shot('cfg-medidas',['Checklist exibido no Cadastro do cliente PJ; desativar esconde sem apagar o histórico.','Medida e código.','Descrição.','Situação e Editar.','Nova medida.'],'Medidas de proteção')}
+`});
+
+P.push({id:'tipos-prazo',g:'Equipe e gestão',t:'Tipos de prazo (cadeias)',m:'Configurações: tipos de prazo',lead:'Cada tipo de prazo define a cadeia de tarefas que nasce ao tratar a publicação: confecção, revisão, preparo, protocolo e conferência.',cam:'Equipe e gestão > Configurações > Tipos de prazo',sys:'config-gestao',quem:'gestão e controladoria',kw:'tipos de prazo cadeias legal interno confecção custas protocolo conferir análise antes revisão preparo dias úteis corridos',rel:['f-cadeia','tratar','f-cabimento'],h:`
+${shot('cfg-prazos',['O tipo abre a cadeia completa a partir do prazo legal, em dias úteis.','Prazo legal e prazo interno.','Confecção, custas, protocolo e conferência, em D-dias úteis.','Análise antes.','Exemplo: apelação, com custas.','Novo tipo de prazo.'],'Tipos de prazo')}
+<h2>Editar um tipo</h2>
+${shot('cfg-prazo-editar',['Nome, código e prazo legal.','Contagem em dias úteis ou corridos.','Prazo interno — referência para a equipe.','Confeccionar, protocolar e conferir (D).','Com revisão da peça.','Tem preparo ou custas.','Ativo — aparece ao tratar publicação.','Excluir, Cancelar e Salvar.'],'Editar tipo de prazo','estreita')}
+<h2>Tabela atual</h2>
+${tabela(['Tipo','Legal','Interno','Confecção','Custas','Protocolo','Conferir'],[
+['Embargos de declaração','5 úteis','3','D-3','—','D-2','D-1'],
+['Apelação','15 úteis','10','D-8','D-3','D-3','D-2'],
+['Contrarrazões','15 úteis','10','D-6','—','D-4','D-3'],
+['Contestação','15 úteis','10','D-6','—','D-4','D-3'],
+['Embargos à execução','15 úteis','10','D-6','—','D-4','D-3'],
+['Embargos monitórios','15 úteis','10','D-6','—','D-4','D-3'],
+['Agravo de instrumento','15 úteis','10','D-8','D-3','D-3','D-2'],
+['Recurso especial','15 úteis','10','D-8','D-3','D-3','D-2'],
+['Recurso extraordinário','15 úteis','10','D-8','D-3','D-3','D-2'],
+['Agravo interno','15 úteis','10','D-8','—','D-3','D-2'],
+['Recurso inominado (juizado)','10 úteis','6','D-7','D-3','D-2','D-1'],
+['Manifestação (15 dias)','15 úteis','10','D-6','—','D-4','D-3'],
+['Manifestação (10 dias)','10 úteis','6','D-4','—','D-3','D-2'],
+['Manifestação (5 dias)','5 úteis','3','D-3','—','D-2','D-1'],
+['Cumprimento de sentença / impugnação','15 úteis','10','D-6','—','D-4','D-3'],
+['Réplica','15 úteis','10','D-6','—','D-4','D-3'],
+['Especificação de provas','15 úteis','10','D-6','—','D-4','D-3'],
+['Emenda à inicial','15 úteis','10','D-6','—','D-4','D-3'],
+['Alegações finais / memoriais','15 úteis','10','D-6','—','D-4','D-3'],
+['Manifestação sobre laudo pericial','15 úteis','10','D-6','—','D-4','D-3'],
+['Recolhimento de custas','15 úteis','10','D-6','—','D-4','D-3'],
+['Pagamento voluntário (cumprimento de sentença)','15 úteis','10','D-6','—','D-4','D-3'],
+['Iniciar cumprimento de sentença','15 úteis','10','D-6','—','D-4','D-3'],
+['Exceção de pré-executividade','15 úteis','10','D-6','—','D-4','D-3'],
+['Outro prazo processual','15 úteis','10','D-6','—','D-4','D-3']],[1,2,3,4,5,6])}
+${nota('D-8 significa 8 dias úteis antes do prazo legal. Os valores podem ser ajustados pela gestão; a tela de Configurações sempre mostra os atuais.')}
+<p>Para recursos com revisão, a orientação da própria tela é: Confeccionar −8, Protocolar −3 e Conferir −2 nos prazos de 15 dias. A análise de cabimento não é configurada aqui: ela é aberta por ato (sentença, decisão, acórdão) ao tratar a publicação.</p>
+`});
+
+P.push({id:'base-acordos',g:'Equipe e gestão',t:'Base de acordos',m:'Configurações: base de acordos',lead:'Os acordos fechados pelo escritório, por credor, que alimentam a projeção de cada cliente.',cam:'Equipe e gestão > Configurações > Base de acordos',sys:'historico',quem:'Acordos (registra) e gestão (consulta)',kw:'base de acordos credor banco mediana desconto à vista parcelado proposta fechado titular fase dívida',rel:['f-acordo','projecao','calibracao'],h:`
+${shot('cfg-base-acordos',['Abas das configurações.','Resumo: acordos fechados, propostas, credores e mediana à vista.','Resumo por credor.','Medianas e faixas de desconto.','Todos os acordos.'],'Base de acordos — resumo por credor')}
+${shot('cfg-acordos-lista',['Todos os acordos e o total de registros.','Credor e anotações (borradas no print).','Produto, titular e fase.','Dívida, acordo e desconto.','Forma e status.','Editar.'],'Base de acordos — todos os acordos')}
+${regra('Acordos registra cada acordo fechado aqui. A consulta da base fica com a gestão.')}
+`});
+
+P.push({id:'projecao',g:'Equipe e gestão',t:'Regras de projeção',m:'Configurações: projeção',lead:'Os parâmetros do motor que projeta o acordo e a reserva de cada cliente.',cam:'Equipe e gestão > Configurações > Regras de projeção',sys:'regras',quem:'gestão e sócias',kw:'regras de projeção motor parâmetros fatores de ajuste tabela regulatória mediana grupo provisão desconto base teto faixa reserva',rel:['calibracao','base-acordos','ficha-passivos'],h:`
+${shot('cfg-projecao',['Resumo: parâmetros, bancos e pendentes.','Restaurar padrão.','Parâmetros do motor, Fatores de ajuste e Tabela regulatória.','Como o painel projeta.','Mínimo de dias de atraso para projetar.','Teto de desconto.'],'Regras de projeção')}
+<h2>Como o painel projeta</h2>
+${fluxo([{t:'1. Histórico do credor',s:'Com acordos reais do credor, parte da mediana à vista dele.',c:'o'},{t:'2. Histórico do grupo',s:'Sem histórico do credor, usa a mediana do grupo (banco de varejo, cooperativa…).',c:'i'},{t:'3. Sem histórico',s:'Aplica a provisão regulatória e o desconto base, somando fatores de garantia, produto, situação, titular e banco.',c:'a'}])}
+${tabela(['Parâmetro','Atual','Para que serve'],[
+['Mínimo de dias de atraso para projetar','180','Antes disso o painel mostra só a data de abertura da janela.'],
+['Mínimo de acordos do credor','2','Abaixo disso usa a mediana do grupo.'],
+['Desconto base regulatório','−15 p.p.','Só quando não há histórico.'],
+['Cenário parcelado','−15 p.p.','Quando o credor não tem acordo parcelado na base.'],
+['Amplitude da faixa','±10 p.p.','Com 3 ou mais referências, a faixa vira o intervalo interquartil.'],
+['Teto de desconto','97%','Limite máximo da projeção.']])}
+${aviso('Mudanças aqui alteram a projeção de todos os clientes. Ajuste só com aprovação das sócias; '+ui('Restaurar padrão')+' volta aos valores originais.')}
+`});
+
+P.push({id:'calibracao',g:'Equipe e gestão',t:'Calibração',m:'Configurações: calibração',lead:'A comparação entre o desconto real dos acordos e o que o sistema tinha projetado, por banco.',cam:'Equipe e gestão > Configurações > Calibração',sys:'calibracao',quem:'gestão e sócias',kw:'calibração desvio real projetado fator sugestão ajuste banco desconto médio',rel:['projecao','base-acordos'],h:`
+${shot('cfg-calibracao',['Acordos fechados, desconto médio real, desvio médio e ajustes sugeridos.','Como ler: real × projetado. Ajustes alteram o fator global do banco nas Regras de projeção.','Sugestão — o sistema espera um mínimo de acordos antes de sugerir.','Desvio médio por banco.','Acordos fechados nos clientes.'],'Calibração')}
+${fluxo([{t:'Acordo fechado',s:'Acordos registra na base.'},{t:'Base de acordos',s:'Atualiza medianas e faixas.'},{t:'Calibração',s:'Compara real × projetado.'},{t:'Regras de projeção',s:'A gestão aplica o ajuste sugerido.',c:'o'}])}
+`});
+
+/* ───────── MARKETING ───────── */
+P.push({id:'pauta',g:'Marketing',t:'Pauta de conteúdo',novo:true,lead:'O calendário editorial: o que vai ao ar, quando, em qual canal e em que fase está.',cam:'Marketing > Pauta de conteúdo',sys:'marketing',quem:'Marketing e sócias',kw:'pauta conteúdo calendário editorial grade quadro lista aprovação ajustar agendado publicado instagram carrossel canal pilar legenda hashtags ideias ia',rel:['producao','f-conteudo','automacoes'],h:`
+<h2>Grade (calendário)</h2>
+${shot('mkt-pauta',['Grade, Quadro ou Lista.','Resumo: pautas, em aprovação, atrasadas e publicadas.','Ideias IA.','Filtros e busca.','Mês — clique num dia ou numa pauta para abrir.','Mês ou Semana e navegação.','Botão principal: nova pauta.'],'Pauta em grade')}
+${dupla(shot('mkt-pauta-quadro',['Colunas: Ideia, Aguardando aprovação, Ajustar, Aprovado para postar, Em produção, Agendado…','Role para ver as demais.','Arraste entre colunas para mudar o status.','Legenda: ajuste ou atrasada e em aprovação.'],'Pauta em quadro'),shot('mkt-pauta-lista',['Grupo por status.','Pauta: data, título, formato e canal.','Responsável.'],'Pauta em lista'))}
+<h2>Nova pauta</h2>
+${dupla(shot('mkt-nova-pauta',['Título.','Formato, data prevista e horário.','Responsável, status e pilar.','Canais.','Ideia e roteiro.','Link do criativo e link publicado.'],'Nova pauta'),`<div>${passos(['Clique em '+ui('+ Nova pauta')+'.','Dê um título e escolha o formato (carrossel, reel…).','Defina data, responsável, status e pilar.','Marque os canais (Instagram, LinkedIn, YouTube, TikTok, Blog, WhatsApp, E-mail).','Escreva a ideia ou o roteiro; depois, legenda e hashtags.','Cole o link do criativo (Drive, Canva) e, ao publicar, o link do post.'])}</div>`)}
+`});
+
+P.push({id:'producao',g:'Marketing',t:'Produção de conteúdo',novo:true,lead:'O quadro de produção no estilo Trello: cartões com etiquetas, datas, checklist, membros e comentários, e envio para a pauta.',cam:'Marketing > Produção de conteúdo',sys:'mkt-producao',quem:'Marketing',kw:'produção conteúdo trello quadro cartão lista etiquetas datas checklist membros anexo comentários concluir enviar para a pauta arquivados',rel:['pauta','f-conteudo'],h:`
+${shot('mkt-producao',['Quadros: cartões e aguardando aprovação.','Arquivados e Ver a pauta.','Lista e o menu da lista.','Adicionar um cartão.','Cartão — a bolinha marca como concluído.','Adicionar outra lista.','Botão principal: novo cartão.'],'Quadro de produção')}
+<p>As listas são livres, como no Trello: crie, renomeie e reorganize. A última lista, <b>Aguardando aprovação</b>, é fixa.</p>
+<h2>O cartão</h2>
+${shot('mkt-cartao',['Título e a bolinha de concluir.','Adicionar: etiquetas, datas, checklist, membros e anexo.','Descrição.','Responsável pela gestão — quem acompanha e aprova.','Comentários e o histórico de atividade.','Enviar para a pauta, Mover para… e Mais ações.'],'Cartão aberto')}
+${passos(['Crie o cartão na lista Ideias — a data não é obrigatória.','Use etiquetas, checklist e membros conforme a peça avança.','Comente no cartão: tudo fica no histórico.','Quando estiver pronto, mova para Aguardando aprovação.','Aprovado, clique em '+ui('Enviar para a pauta')+' para levá-lo ao calendário.'])}
+`});
+
+P.push({id:'automacoes',g:'Marketing',t:'Automações',novo:true,lead:'O espaço reservado para as automações do marketing.',cam:'Marketing > Automações',sys:'mkt-automacoes',quem:'Marketing',kw:'automações marketing motor de conteúdo carrosséis radar de notícias',rel:['producao','pauta'],h:`
+${shot('mkt-automacoes',['Em preparação: as rotinas do marketing serão trazidas para cá.'],'Automações')}
+<p>As rotinas já desenvolvidas para o marketing (motor de conteúdo, carrosséis, radar de notícias) serão trazidas para esta tela. Por enquanto, a produção acontece no ${ir('producao','quadro de Produção de conteúdo')} e a aprovação na ${ir('pauta','Pauta')}.</p>
+`});
+
+/* ───────── FERRAMENTAS ───────── */
+P.push({id:'ferramentas',g:'Ferramentas',t:'Ferramentas',m:'Página de ferramentas',lead:'A página de botões com as ferramentas do escritório.',cam:'Menu lateral > Ferramentas',sys:'ferramentas',quem:'conforme o acesso',kw:'ferramentas superendividamento modelos de peças autenticador 2fa revisional base de conhecimento',rel:['superendividamento','modelos','autenticador'],h:`
+${shot('ferramentas',['Superendividamento — plano de pagamento e cálculo.','Modelos de peças — modelos e papel timbrado.','Autenticador (2FA) — códigos de acesso do escritório.','Revisional de contratos — revisão e recálculo.','Base de conhecimento — procedimentos e materiais por área.'],'Página de Ferramentas')}
+${nota('Há quem tenha acesso só a esta página (sem o restante do Jurídico). Nesse caso, o menu mostra apenas o dia a dia e as Ferramentas liberadas.')}
+`});
+
+P.push({id:'superendividamento',g:'Ferramentas',t:'Superendividamento',lead:'Os planos de pagamento da Lei 14.181/2021: devedor, renda, dívidas e o resultado, que recalcula sozinho.',cam:'Ferramentas > Superendividamento',sys:'superendividamento',quem:'Jurídico PF e acesso às Ferramentas',kw:'superendividamento plano de pagamento lei 14.181 repactuação renda líquida dívidas credor cálculo rascunho concluir',rel:['ferramentas','modelos'],h:`
+${shot('fer-superendividamento',['Resumo: planos e concluídos.','Planos de pagamento (Lei 14.181/2021).','Plano: data, devedor, número de dívidas e renda.','Valor e situação.','Excluir o plano.','Botão principal: novo plano.'],'Planos de pagamento')}
+<h2>Montar um plano</h2>
+${passos(['Clique em '+ui('+ Novo plano')+'.','Em <b>1. Devedor</b>, escolha o cliente da base ou informe os dados de quem está fora dela.','Em <b>2. Situação atual</b>, informe a renda mensal líquida (salário ou benefício, após descontos obrigatórios), a data do cálculo e, se houver, a comarca e o número do processo.','Inclua as <b>dívidas</b>, credor a credor.','Acompanhe o resultado: ele recalcula automaticamente.','Use '+ui('Salvar rascunho')+' para continuar depois e '+ui('Concluir')+' quando o plano estiver pronto.'])}
+${regra('No plano e nos relatórios, as dívidas do mesmo credor viram uma parcela só (por exemplo, quatro operações do mesmo banco somam uma).')}
+${nota('O plano tem dados pessoais do devedor (CPF, RG, endereço). Por isso não há print do formulário neste manual.')}
+`});
+
+P.push({id:'modelos',g:'Ferramentas',t:'Modelos de peças',lead:'Os modelos de petição do escritório, os blocos por tese, a qualificação do escritório e os campos que preenchem o .docx.',cam:'Ferramentas > Modelos de peças',sys:'pecas',quem:'Jurídico',kw:'modelos de peças petição revisional embargos contestação parecer blocos teses rascunho revisado campos chaves duplas docx papel timbrado qualificação do escritório',rel:['revisional','ficha-cadastro'],h:`
+<h2>Modelos</h2>
+${shot('fer-pecas',['Resumo: modelos, blocos revisados e rascunhos.','Modelos, Blocos por tese, Escritório e Campos.','Modelo: nome e o que contém.','Número de seções.','Situação.'],'Modelos de peça')}
+<p>Modelos atuais: ação revisional de contrato bancário com tutela de urgência; embargos à execução (título bancário); embargos monitórios; contestação (ação de cobrança bancária); parecer ao cliente (revisão contratual).</p>
+<h2>Blocos por tese</h2>
+${shot('fer-blocos',['Tipo de peça.','Todos, Revisados ou Rascunhos.','Teses do tipo escolhido.','Bloco: código e título da tese.','Situação do bloco.'],'Blocos por tese')}
+<p>Cada tese é um bloco reutilizável. Blocos em ${tag('Rascunho','a')} ainda precisam de revisão antes de entrar nas peças.</p>
+<h2>Campos</h2>
+${shot('fer-campos',['Filtrar campos — use entre chaves duplas; campo sem valor sai destacado em « » no .docx.','Campo.','O que ele insere.'],'Campos dos modelos')}
+<h2>Escritório</h2>
+<p>A aba ${ui('Escritório')} guarda a qualificação do escritório (razão social, CNPJ, endereço, e-mail, advogado signatário e OAB), preenchida automaticamente nas peças e pareceres gerados em .docx. Só altere com autorização das sócias.</p>
+`});
+
+P.push({id:'autenticador',g:'Ferramentas',t:'Autenticador (2FA)',lead:'Os códigos de verificação em duas etapas das contas do escritório nos tribunais e sistemas.',cam:'Ferramentas > Autenticador (2FA)',sys:'autenticador',quem:'Jurídico',kw:'autenticador 2fa código verificação duas etapas tribunais eproc esaj pje copiar importar do google',rel:['ferramentas'],h:`
+${shot('fer-autenticador',['Contas do escritório e quantas têm 2FA ativo.','Importar do Google Authenticator.','Grupo e número de contas.','Conta e titular.','Código atual (borrado no print) e o tempo até renovar.','Copiar o código.','Editar e 2FA.'],'Autenticador')}
+${passos(['Ache a conta (tribunal ou sistema).','Clique em '+ui('Copiar')+' e cole o código na tela de login do tribunal.','Se o círculo estiver quase no fim, espere o próximo código.'])}
+${aviso('Os códigos não saem do sistema: não envie por chat, e-mail ou WhatsApp.')}
+`});
+
+P.push({id:'revisional',g:'Ferramentas',t:'Revisional de contratos',lead:'A revisão de contratos bancários: dados do contrato, encargos, tarifas, comparação com a taxa média do BACEN e as teses cabíveis.',cam:'Ferramentas > Revisional de contratos',sys:'revisional',quem:'Jurídico e Estratégico',kw:'revisional revisão contratual taxa média bacen juros capitalização encargos tarifas teses indícios parecer gerar peça docx',rel:['modelos','ficha-passivos'],h:`
+${shot('fer-revisional',['Resumo: revisões, concluídas e rascunhos.','Revisões contratuais.','Revisão: cliente, banco, produto, indícios e responsável.','Indícios encontrados e quem fez.','Situação.','Botão principal: nova revisão.'],'Revisões')}
+<h2>A revisão</h2>
+${shot('fer-revisao',['Voltar para Revisões; cliente, banco e produto.','Abrir cliente, Parecer, Gerar peça (.docx) e Salvar.','Série do BACEN (modalidade).','Sistema de amortização, prazo e taxas.','Valor financiado — liberado mais IOF, tarifas e seguro.','Cláusula de capitalização.','Botão principal: concluir revisão.'],'Dados do contrato')}
+${shot('fer-revisao-resultado',['Resultado: taxa contratada, média do BACEN, razão e capitalização.','Teses revisionais: as automáticas vêm da calculadora; as demais o advogado marca.','Situação da tese, origem automática e tendência.','Atenção: alertas da jurisprudência sobre a tese.','Parecer e Gerar peça (.docx).'],'Resultado e teses')}
+<h2>Passo a passo</h2>
+${passos(['Crie a revisão e escolha a série do BACEN da modalidade.','Preencha os dados do contrato: data, valor, sistema, prazo e taxas.','Informe encargos de inadimplência e tarifas embutidas.','Confira o resultado: até 1,2× a média está dentro dela; de 1,2× a 1,5× é indício; acima de 1,5× é indício forte.','Revise as teses: as automáticas podem ser alteradas manualmente.','Gere o parecer ou a peça em .docx e conclua a revisão.'])}
+${aviso('Leia os alertas de cada tese. Exemplo: a tese da taxa média não deve ser usada sozinha — combine com teses formais e de tarifas.')}
+`});
+
+P.push({id:'conhecimento',g:'Ferramentas',t:'Base de conhecimento',lead:'Os procedimentos, manuais e materiais do escritório, por área e por tema.',cam:'Ferramentas > Base de conhecimento',sys:'conhecimento',quem:'toda a equipe',kw:'base de conhecimento artigos procedimentos pop manual temas áreas documentos base comercial sdr closer holding',rel:['ferramentas','perfis'],h:`
+${shot('fer-conhecimento',['Resumo: artigos, temas e documentos base.','Buscar artigos e Documentos base.','Filtrar por área.','Filtrar por tema.','Grupo da área.','Artigo: versão, título e início do texto.','Botão principal: novo artigo.'],'Base de conhecimento')}
+${dica('O tema “Manuais do sistema” reúne orientações de uso. Este wiki é o manual completo, com os prints atualizados.')}
+`});
+
+/* ───────── FLUXOS ───────── */
+P.push({id:'f-publicacao',g:'Fluxos',t:'Da publicação à tarefa',lead:'O caminho de uma intimação: captura, análise, tratamento, tarefa e conferência.',kw:'fluxo publicação intimação tratar análise controladoria responsável tarefa conferir protocolo raias',rel:['publicacoes','tratar','f-cabimento'],h:`
+${raias([
+ {q:'Sistema',p:[{n:'1',t:'Capta a publicação'},{n:'2',t:'Entra em “A analisar” com a data “tratar até”',c:'a'},{n:'3',t:'Sugere resumo e prazo'}]},
+ {q:'Controladoria',p:[{n:'4',t:'Abre Tratar publicação'},{n:'5',t:'Lê o teor e escolhe o que fazer'},{n:'6',t:'Tipo de prazo e para quem'},{n:'7',t:'Confere a data e o fatal',c:'f'},{n:'8',t:'Cria a tarefa ou a cadeia'}]},
+ {q:'Quem faz a peça',p:[{n:'9',t:'Análise de cabimento (atos decisórios)',c:'a'},{n:'10',t:'Confecção'},{n:'11',t:'Protocolo até a meta interna'}]},
+ {q:'Revisão',p:[{n:'12',t:'Revisar a peça (recursos)'},{n:'13',t:'Confirmar os ajustes'}]},
+ {q:'Controladoria',p:[{n:'14',t:'Conferir protocolo',c:'o'},{n:'15',t:'Acompanha atrasos e reagendamentos'}]}])}
+<h2>Pontos de controle</h2>
+<ul>
+<li><b>“Lida” não é “tratada”.</b> A publicação só sai da fila depois do tratamento.</li>
+<li><b>Uma a uma.</b> Intimações diferentes do mesmo processo e do mesmo dia têm tratamento próprio.</li>
+<li><b>Conferência humana.</b> Prazo sugerido só vira fatal depois de conferido.</li>
+<li><b>Aviso à controladoria</b> quando a análise de cabimento é concluída e quando passa do prazo sem resposta.</li>
+</ul>
+`});
+
+P.push({id:'f-cabimento',g:'Fluxos',t:'Análise de cabimento',destaque:true,lead:'Sentenças, decisões e acórdãos passam primeiro por uma análise de quem vai fazer a peça. Ela escolhe um de quatro caminhos.',kw:'análise de cabimento sentença decisão acórdão embargos de declaração apelação recurso não recorrer comunicar cliente motivo revisão',rel:['tratar','f-cadeia','f-publicacao'],h:`
+${fluxo([{t:'Ato decisório',s:'Sentença, decisão ou acórdão publicado.'},{t:'Análise de cabimento',s:'Para quem fará a peça. Pode ter prazo de 1 dia quando cabe ED.',c:'a'},{t:'Caminho escolhido',s:'O sistema abre as tarefas do caminho.',c:'o'}])}
+${caminhos([
+ {t:'Só embargos de declaração',c:'i',l:['Abre a cadeia de ED, sem revisão.','Depois do protocolo, tarefa de espera pelo julgamento, com lembrete a cada 15 dias.']},
+ {t:'ED e depois apelação',c:'a',l:['Abre a cadeia de ED agora.','A apelação não entra na data original.','Quando chegar a intimação do julgamento dos embargos, o sistema avisa que o caminho escolhido foi ED + apelação e que a apelação tem de ser feita.']},
+ {t:'Só apelação (ou outro recurso)',c:'o',l:['Abre a cadeia do recurso, com revisão da peça.','Se houver preparo, abre também a cadeia do preparo.']},
+ {t:'Não recorrer',c:'f',l:['Exige o motivo.','Passa pela revisão de quem responde pelo jurídico.','Abre a tarefa “Comunicar o cliente”.']}])}
+<h2>Concluir a análise</h2>
+<p>Quem fará a peça abre a tarefa de análise em ${ir('tarefas','Tarefas e prazos')} e conclui escolhendo o caminho. Antes de confirmar, a tela mostra todas as tarefas que serão abertas, com datas e responsáveis.</p>
+${shot('cabimento-concluir',['O ato, o cliente e o resumo.','Prazos deste ato, com as datas.','Qual caminho: só ED, ED e depois apelação, só apelação ou não recorrer.','Tarefas que serão abertas no caminho escolhido, até o prazo legal.','Preparo, que corre em paralelo à peça.','Também: comunicar o cliente e registrar o que não cabe, com o fundamento.'],'Concluir análise de cabimento (exemplo com dados fictícios)')}
+<h2>Quando chega o julgamento dos embargos</h2>
+<p>Se a análise escolheu ED e depois apelação, a intimação seguinte do processo abre com o lembrete do recurso planejado. Clique em ${ui('Sim, abrir a apelação')} para abrir a cadeia do recurso, ou em ${ui('Não é')} se aquela intimação não for o julgamento dos embargos.</p>
+${shot('tratar-recurso',['O ato, as datas de disponibilização e de tratamento e o cliente.','Resumo da intimação. Vale sempre o teor.','Recurso planejado: o sistema lembra o caminho escolhido na análise anterior.','O que fazer com a publicação.','Prazos sugeridos: “Usar” só preenche a data; confira o ato, a regra e o calendário do juízo.'],'Recurso planejado (exemplo com dados fictícios)')}
+${nota('Quando o prazo não depende de juízo de cabimento — contestação, réplica, contrarrazões, provas — o sistema não sugere o tipo: quem trata escolhe o tipo de tarefa e só então abrem as datas.')}
+`});
+
+P.push({id:'f-cadeia',g:'Fluxos',t:'Cadeia de prazo',destaque:true,lead:'Todo prazo processual vira uma cadeia de tarefas, contada em dias úteis para trás a partir do prazo legal.',kw:'cadeia de prazo confeccionar protocolar conferir protocolo revisão da peça preparo custas fatal meta interna d-8 d-6 d-3 dias úteis folga',rel:['tipos-prazo','tratar','f-cabimento'],h:`
+<h2>Sem revisão — ex.: contestação (15 dias úteis)</h2>
+${trilho([{d:'D-6',t:'Confeccionar a peça',s:'Quem foi escolhido em “Para quem”.'},{d:'D-4',t:'Protocolar',s:'Meta interna de protocolo.',c:'a'},{d:'D-3',t:'Conferir protocolo',s:'Vai para a controladoria, um dia depois da meta.',c:'o'},{d:'D0',t:'Prazo legal',s:'O prazo fatal. Fica como marca, nunca como meta.',c:'f'}])}
+<h2>Com revisão e preparo — ex.: apelação (15 dias úteis)</h2>
+${trilho([{d:'D-8',t:'Confeccionar e enviar a peça',s:'Quem fará a peça (o mesmo da análise de cabimento).'},{d:'+1 dia',t:'Revisar a peça',s:'Líder jurídico, um dia útil após o envio.',q:'revisão'},{d:'',t:'Ajustar a peça',s:'Quem fez a peça faz os ajustes.'},{d:'',t:'Confirmar os ajustes',s:'A peça volta à revisão para confirmar.',q:'revisão'},{d:'D-3',t:'Recolher o preparo',s:'Só depois da confirmação dos ajustes.',c:'a'},{d:'D-3',t:'Protocolar',s:'Meta interna de protocolo.',c:'a'},{d:'D-2',t:'Conferir protocolo',s:'Controladoria.',c:'o'},{d:'D-1',t:'Folga',s:'Um dia útil de folga antes do prazo legal.'},{d:'D0',t:'Prazo legal',s:'Fatal.',c:'f'}])}
+<h3>Cadeia do preparo (em paralelo)</h3>
+${fluxo([{t:'Calcular e informar',s:'Logo após a análise de cabimento: calcular o valor e informar o cliente.',c:'a'},{t:'Acompanhar com o cliente',s:'Até o recolhimento.'},{t:'Recolher',s:'D-3, depois dos ajustes confirmados.',c:'o'}])}
+<h2>Prazo curto — ex.: embargos de declaração (5 dias úteis)</h2>
+${trilho([{d:'D-3',t:'Confeccionar'},{d:'D-2',t:'Protocolar',c:'a'},{d:'D-1',t:'Conferir protocolo',c:'o'},{d:'D0',t:'Prazo legal',c:'f'}])}
+${regra('O prazo legal fica como fatal; a meta interna é sempre anterior. No dia fatal, protocolar até 12h e confirmar na tela Hoje. Embargos de declaração não têm etapa de revisão.')}
+${nota('As datas de cada tipo estão em '+ir('tipos-prazo','Configurações › Tipos de prazo')+'. Enquanto o cargo de revisão não tiver ocupante, as tarefas de revisão vão para a sócia responsável pelo jurídico.')}
+`});
+
+P.push({id:'f-pj',g:'Fluxos',t:'Jornada do cliente PJ',lead:'Do contrato assinado ao acompanhamento mensal, com as três frentes que trabalham o mesmo cliente.',kw:'jornada cliente pj ciclo assinatura formulário entrada r1 r2 r3 mensal onboarding frentes ata',rel:['ficha-acompanhamento','acompanhamento','ficha'],h:`
+${fluxo([{t:'Assinatura',s:'O formulário de mapeamento vai para o cliente.'},{t:'Entrada paga',s:'Confirmar entrada e liberar a R1.',c:'a'},{t:'Onboarding',s:'Cadastro, dívidas e boas-vindas.'},{t:'R1 · R2 · R3',s:'Reuniões do ciclo inicial, cada uma com ata.'},{t:'Mensal',s:'Acompanhamento recorrente.',c:'o'}])}
+${regra('A R1 só acontece depois de verificado o pagamento da entrada.')}
+<h2>Onde cada parte acontece</h2>
+${tabela(['Etapa','Tela'],[
+ ['Formulário e boas-vindas',ir('ficha-acompanhamento','Ficha › Acompanhamento PJ › Onboarding')],
+ ['Liberação da R1',ui('Confirmar entrada e liberar R1')],
+ ['Datas do ciclo e tarefas',ui('Definir datas')+' e '+ui('Criar tarefas do ciclo')],
+ ['Atas',ui('Registrar ata')],
+ ['Dívidas e proteção','Raio-X, Fluxo PJ e '+ir('ficha-passivos','Passivos')],
+ ['Visão de todos os clientes',ir('acompanhamento','Panorama do Acompanhamento PJ')]])}
+<h2>As três frentes</h2>
+${caminhos([{t:'Estratégico / Consultivo',s:'Onboarding, reuniões, direcionamento e reserva.'},{t:'Jurídico / Contencioso',s:'Processos, prazos e peças.'},{t:'Negocial / Acordos',s:'Negociação com os bancos e monitoramento.'}])}
+<p>As três se encontram no ${ir('ficha','Dossiê')}, sem duplicar nem perder informação.</p>
+`});
+
+P.push({id:'f-cobranca',g:'Fluxos',t:'Régua de cobrança',m:'Régua de cobrança',lead:'A sequência de contatos com o cliente em torno do vencimento do boleto.',kw:'fluxo régua cobrança boleto vencimento d-5 d-2 d-0 d+1 d+3 d+7 remarcado remanescente asaas chatguru',rel:['regua','cobrancas','recuperacao'],h:`
+${fluxo([{t:'D-5',s:'Relatório mensal'},{t:'D-2',s:'Aviso de vencimento e boleto'},{t:'D-0',s:'Lembrete',c:'a'},{t:'D+1',s:'Primeiro contato de cobrança',c:'f'},{t:'D+3',s:'Solicitar previsão de pagamento',c:'f'},{t:'D+7',s:'Contato do supervisor',c:'f'}])}
+<p>Quem combina uma nova data vai para <b>Remarcados</b>. O que foi remarcado para o mês seguinte aparece como <b>remanescente</b>.</p>
+${tabela(['Onde','O que mostra'],[[ir('regua','Régua de cobrança'),'Os clientes em cada etapa hoje.'],[ir('cobrancas','Cobranças e retornos'),'Quem recebeu a mensagem, quem respondeu e quem remarcou.'],[ir('recuperacao','Recuperação'),'Quanto voltou e em que etapa.'],[ir('fin-visao','Visão geral'),'O resumo do mês.']])}
+${nota('Boletos e pagamentos vêm do Asaas. As mensagens saem pelo Chatguru.')}
+`});
+
+P.push({id:'f-conteudo',g:'Fluxos',t:'Do cartão à pauta',lead:'Como uma ideia vira conteúdo publicado: produção no quadro, aprovação e calendário.',kw:'fluxo conteúdo cartão produção aprovação pauta publicado marketing',rel:['producao','pauta'],h:`
+${fluxo([{t:'Ideia',s:'Cartão na Produção de conteúdo.'},{t:'Planejamento',s:'Etiquetas, datas, checklist e membros.'},{t:'Em produção',s:'Criativo e legenda.'},{t:'Aguardando aprovação',s:'Lista fixa do quadro.',c:'a'},{t:'Enviar para a pauta',s:'O cartão vira pauta no calendário.',c:'i'},{t:'Aprovado e agendado',s:'Pauta: aprovado para postar, agendado, publicado.',c:'o'}])}
+${dica('Comentários e mudanças ficam no histórico do cartão: a conversa sobre a peça acontece ali, não no chat.')}
+`});
+
+P.push({id:'f-requisicao',g:'Fluxos',t:'Requisição e aprovação',lead:'Como um pedido de folga, férias ou home office chega a quem aprova e volta com a resposta.',kw:'fluxo requisição aprovação folga férias home office atestado ausência',rel:['perfil'],h:`
+${fluxo([{t:'Pedido',s:'Colaborador: Meu perfil › + Requisição.'},{t:'Aprovação',s:'Administração ou sócias: Requisições para aprovar.',c:'a'},{t:'Resposta',s:'No sino e em Minhas requisições.',c:'i'},{t:'Agenda',s:'Férias, folga, ausência, atestado e home office aprovados entram na agenda.',c:'o'}])}
+`});
+
+P.push({id:'f-acordo',g:'Fluxos',t:'Do acordo à projeção',lead:'Como cada acordo fechado melhora a projeção dos próximos clientes.',kw:'fluxo acordo base de acordos projeção calibração mediana',rel:['base-acordos','projecao','calibracao'],h:`
+${fluxo([{t:'Negociação',s:'Acordos negocia com o banco.'},{t:'Acordo formalizado',s:'Etapa do quadro de Negociações.',c:'o'},{t:'Base de acordos',s:'Acordos registra o acordo fechado.',c:'a'},{t:'Projeção',s:'As medianas por credor e grupo se atualizam.'},{t:'Calibração',s:'Compara real × projetado.'},{t:'Ajuste',s:'A gestão aplica o fator sugerido.',c:'i'}])}
+`});
+
+/* ───────── REFERÊNCIA ───────── */
+P.push({id:'regras',g:'Referência',t:'Regras da casa',destaque:true,lead:'As regras do escritório que valem dentro do sistema, reunidas em um lugar.',kw:'regras da casa prazo fatal meta interna protocolo 12h lida tratada cadastro cliente r1 entrada garantia real cargos folga feriado',rel:['perfis','f-cadeia','glossario'],h:`
+<h2>Prazos</h2>
+<ul>
+<li>Todo prazo processual vira cadeia de tarefas. O prazo legal fica como <b>fatal</b>; a meta interna é sempre anterior.</li>
+<li>Prazo interno padrão de 10 dias quando o legal é de 15.</li>
+<li>Conferir o protocolo é sempre da controladoria, um dia depois da meta.</li>
+<li>No dia fatal: protocolar até 12h e confirmar na tela Hoje.</li>
+<li>Prazo sugerido pelo sistema nunca vira fatal sem conferência humana.</li>
+<li>Mudar prazo exige motivo; gestão e controladoria são avisadas.</li>
+<li>Cores: fatal em vermelho, atrasado em amarelo.</li>
+</ul>
+<h2>Publicações</h2>
+<ul>
+<li>“Lida” não é “tratada”.</li>
+<li>Intimações distintas do mesmo processo e do mesmo dia são analisadas uma a uma.</li>
+<li>Atos decisórios passam por análise de cabimento de quem fará a peça. “Não recorrer” exige motivo, revisão e comunicação ao cliente.</li>
+</ul>
+<h2>Clientes</h2>
+<ul>
+<li>O cadastro do cliente não pode ser perdido em nenhuma mudança do sistema.</li>
+<li>A linha do tempo guarda o que o escritório faz. Andamentos e publicações ficam no processo.</li>
+<li>O formulário de mapeamento vai na assinatura. A R1 só acontece com a entrada paga.</li>
+<li>No superendividamento, dívidas do mesmo credor viram uma parcela só.</li>
+</ul>
+<h2>Negociação</h2>
+<ul>
+<li>Dívida com garantia real dificilmente tem acordo bom e traz risco alto de perda do bem.</li>
+<li>Alçada, desconto e êxito seguem os contratos e as regras reais, nunca percentuais presumidos.</li>
+<li>Acordos registra cada acordo fechado na Base de acordos; a consulta é da gestão.</li>
+</ul>
+<h2>Acessos</h2>
+<ul>
+<li>Pessoas ocupam cargos. Cargos têm responsabilidades e permissões. Ações têm autores individuais.</li>
+<li>O login é liberado pelas sócias.</li>
+<li>Os códigos do Autenticador não saem do sistema.</li>
+</ul>
+<h2>Expediente</h2>
+<ul><li>Folga só em feriados nacionais. Estaduais e municipais contam apenas para prazos.</li></ul>
+`});
+
+P.push({id:'glossario',g:'Referência',t:'Glossário',lead:'Os termos que aparecem nas telas, em ordem alfabética.',kw:'glossário termos significado dicionário',rel:['regras','faq'],h:`
+<dl class="glos">
+<dt>Análise de cabimento</dt><dd>Tarefa de quem fará a peça para decidir o caminho diante de sentença, decisão ou acórdão: ED, ED e depois apelação, apelação ou não recorrer.</dd>
+<dt>Andamento</dt><dd>Movimentação do processo no tribunal. Fica na página do processo. Também é o texto “o que foi feito” exigido para concluir uma tarefa.</dd>
+<dt>Ata</dt><dd>Registro de reunião com o cliente (R1, R2, R3, mensal), com resumo, participantes e links.</dd>
+<dt>Base de acordos</dt><dd>Os acordos fechados pelo escritório, que alimentam a projeção.</dd>
+<dt>Cadeia</dt><dd>Conjunto de tarefas criado a partir de um prazo: confeccionar, revisar, preparo, protocolar e conferir.</dd>
+<dt>Calibração</dt><dd>Comparação entre o desconto real e o projetado, por banco, com sugestão de ajuste.</dd>
+<dt>Cargo</dt><dd>Função com responsabilidades e permissões. Pessoas ocupam cargos; um cargo vago acumula tarefas na fila.</dd>
+<dt>Carteira PJ</dt><dd>Os clientes de Gestão de Passivos Bancários PJ.</dd>
+<dt>Conferir protocolo</dt><dd>Tarefa da controladoria que confirma que a peça foi protocolada.</dd>
+<dt>Dossiê</dt><dd>Aba inicial da ficha do cliente: as três frentes e a linha do tempo.</dd>
+<dt>Fatal</dt><dd>O prazo legal. Aparece em vermelho.</dd>
+<dt>Fila</dt><dd>Tarefas de um cargo que ainda não foram assumidas por um ocupante.</dd>
+<dt>Frente</dt><dd>Estratégico/Consultivo, Jurídico/Contencioso ou Negocial/Acordos.</dd>
+<dt>Janela de acordo</dt><dd>Período projetado em que o acordo fica viável, a partir dos dias de atraso.</dd>
+<dt>Meta interna</dt><dd>A data em que o escritório quer protocolar, sempre antes do fatal.</dd>
+<dt>Monitoramento</dt><dd>Busca de processos novos pelos CPFs e CNPJs dos clientes e sócios.</dd>
+<dt>Núcleo</dt><dd>Setor da tarefa ou do colaborador (Jurídico, Acordos, Financeiro…).</dd>
+<dt>Pasta</dt><dd>Agrupador do processo e dos documentos; existe também pasta sem processo.</dd>
+<dt>Preparo</dt><dd>Custas do recurso. Tem cadeia própria: calcular, informar o cliente, acompanhar e recolher.</dd>
+<dt>Prazo a conferir</dt><dd>Prazo sugerido pelo sistema que ainda precisa de conferência humana.</dd>
+<dt>Projeção</dt><dd>Estimativa de acordo e de reserva de cada dívida, a partir da base e das regras.</dd>
+<dt>R1, R2, R3</dt><dd>As três reuniões do ciclo inicial do cliente PJ.</dd>
+<dt>Raio-X</dt><dd>Quadro das dívidas do cliente PJ na aba Acompanhamento PJ.</dd>
+<dt>Régua de cobrança</dt><dd>A sequência de contatos de D-5 a D+7 em torno do vencimento do boleto.</dd>
+<dt>Remanescente</dt><dd>Cobrança do mês anterior remarcada para o mês atual.</dd>
+<dt>Requisição</dt><dd>Pedido de férias, folga, horário reduzido, ausência, atestado ou home office.</dd>
+<dt>Reserva de quitação</dt><dd>Valor que o cliente junta todo mês para pagar o acordo projetado.</dd>
+<dt>Tempestividade</dt><dd>Se as publicações foram tratadas dentro do prazo de análise.</dd>
+<dt>Tratar</dt><dd>Decidir o que fazer com a publicação e criar as tarefas. Diferente de apenas ler.</dd>
+</dl>
+`});
+
+P.push({id:'faq',g:'Referência',t:'Perguntas frequentes',destaque:true,lead:'As dúvidas mais comuns, com a resposta curta e o atalho para a tela.',kw:'faq perguntas dúvidas ajuda problema não vejo esqueci',rel:['regras','glossario','perfis'],h:`
+<h2>Acesso</h2>
+${faq([
+ {q:'Não vejo um item do menu que aparece no manual.',r:'<p>O menu depende do seu cargo. Os prints foram feitos com acesso de sócia. Para liberar outra área, fale com a administração. '+ir('entrar','Ver acesso')+'.</p>'},
+ {q:'Esqueci a senha.',r:'<p>Fale com o escritório para receber uma nova. Depois troque em Meu perfil › Segurança e senha.</p>'},
+ {q:'Como mudo para o tema escuro?',r:'<p>No ícone de lua, na barra de cima, ou em Meu perfil › Aparência.</p>'}])}
+<h2>Tarefas e prazos</h2>
+${faq([
+ {q:'Por que não vejo as tarefas dos colegas?',r:'<p>A tela abre só com as suas. Se você tem acesso, escolha a pessoa em '+ui('Ver tarefas de')+'. A visão de todos fica em Gestão › Visão geral.</p>'},
+ {q:'Como mudo o prazo de uma tarefa?',r:'<p>Abra a tarefa › '+ui('Mais ações')+' › '+ui('Editar / reagendar…')+'. O motivo é obrigatório. '+ir('nova-tarefa','Ver passo a passo')+'.</p>'},
+ {q:'O sistema não deixa concluir a tarefa.',r:'<p>Preencha o andamento (o que foi feito). Concluir exige andamento.</p>'},
+ {q:'Onde estão as tarefas antigas?',r:'<p>As listas carregam os últimos 30 dias. Para histórico mais antigo, peça à gestão.</p>'},
+ {q:'Feriado municipal conta?',r:'<p>Para a contagem do prazo, sim — na comarca cadastrada. Para o expediente, não: folga só em feriado nacional.</p>'}])}
+<h2>Publicações</h2>
+${faq([
+ {q:'Li a publicação. Ela já está tratada?',r:'<p>Não. “Lida” não é “tratada”. Ela só sai da fila depois de escolher o que fazer e concluir. '+ir('tratar','Ver Tratar publicação')+'.</p>'},
+ {q:'O prazo sugerido pode ser marcado como fatal direto?',r:'<p>Só depois de conferir a contagem. Prazo sugerido nunca é fatal sem conferência humana.</p>'},
+ {q:'A publicação está sem processo.',r:'<p>Vincule ao processo certo ou cadastre o processo antes de tratar.</p>'},
+ {q:'Decidimos não recorrer. O que acontece?',r:'<p>O sistema pede o motivo, envia para revisão de quem responde pelo jurídico e abre “Comunicar o cliente”. '+ir('f-cabimento','Ver caminhos')+'.</p>'}])}
+<h2>Clientes e acordos</h2>
+${faq([
+ {q:'Onde registro uma reunião com o cliente?',r:'<p>Na ficha: '+ui('Registrar reunião')+' no Dossiê ou '+ui('Registrar ata')+' na aba Acompanhamento PJ.</p>'},
+ {q:'Fechei um acordo. O que mais preciso fazer?',r:'<p>Mova a negociação para “Acordo formalizado” e registre o acordo na Base de acordos. '+ir('f-acordo','Ver fluxo')+'.</p>'},
+ {q:'Os valores de projeção são garantidos?',r:'<p>Não. São projeções para visualização; o que vale são os contratos e as regras reais.</p>'}])}
+<h2>Pessoal</h2>
+${faq([
+ {q:'Como peço folga ou férias?',r:'<p>Meu perfil › '+ui('+ Requisição')+'. A resposta chega no sino. '+ir('perfil','Ver passo a passo')+'.</p>'},
+ {q:'Como lanço horas sem cronômetro?',r:'<p>Em Horas › Minha semana, pelo '+ui('+')+' do dia, ou na tarefa › Mais ações › Horas manuais.</p>'},
+ {q:'Onde copio o código de 2FA de um tribunal?',r:'<p>Ferramentas › Autenticador › '+ui('Copiar')+'. Não envie o código por mensagem.</p>'}])}
+`});
+
+P.push({id:'sobre',g:'Referência',t:'Sobre este manual',lead:'Como o manual foi feito, como os prints foram protegidos e como pedir uma atualização.',kw:'sobre manual versão atualização prints anonimização',rel:['novidades','inicio'],h:`
+<h2>Versão</h2>
+<p>Versão 2, de 27/11/2026, feita a partir de um tour completo pelo sistema em 26 e 27/11/2026. Substitui a versão 1 (esqueleto de 24/11/2026). O que mudou está em ${ir('novidades','O que mudou')}.</p>
+<h2>Prints e privacidade</h2>
+<ul>
+<li>Os nomes de clientes são fictícios e consistentes entre os prints (o mesmo cliente tem sempre o mesmo nome inventado).</li>
+<li>CPF, CNPJ, valores em reais, e-mails, telefones e códigos de acesso aparecem borrados.</li>
+<li>Números de processo foram trocados por números inventados.</li>
+<li>Telas com dados pessoais sensíveis (como o formulário do plano de superendividamento) foram descritas sem print.</li>
+<li>Nenhum dado foi alterado no sistema durante as capturas: janelas foram abertas só para leitura e canceladas.</li>
+</ul>
+<h2>Pedir atualização</h2>
+<p>Se uma tela mudou ou um passo não funciona como descrito, avise a gestão com o nome da página deste manual e o que está diferente.</p>
+`});
+
+</script>
+<script>
+/* ───────── aplicação ───────── */
+const GRUPOS=[]; P.forEach(p=>{if(!GRUPOS.includes(p.g))GRUPOS.push(p.g)});
+const $=s=>document.querySelector(s);
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const slug=s=>norm(s).replace(/<[^>]+>/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);
+const texto=h=>String(h).replace(/<script[\s\S]*?<\/script>/g,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();
+function guardar(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function ler(k){try{return localStorage.getItem(k)}catch(e){return null}}
+/* tema */
+function aplicaTema(t){const esc=t==='escuro'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.tema=esc?'escuro':'claro';document.querySelectorAll('.tema button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===t))}
+let tema=ler('wiki-np-tema')||'auto'; aplicaTema(tema);
+document.querySelectorAll('.tema button').forEach(b=>b.onclick=()=>{tema=b.dataset.t;guardar('wiki-np-tema',tema);aplicaTema(tema)});
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>tema==='auto'&&aplicaTema('auto'));
+/* menu */
+function montaMenu(){
+  const arv=$('#arv');let h='';
+  GRUPOS.forEach((g,gi)=>{const ps=P.filter(p=>p.g===g);
+    if(g==='Início'){h+=ps.map(p=>`<a href="#/${p.id}" data-id="${p.id}">${p.t}${p.novo?'<span class="novo">novo</span>':''}</a>`).join('');return}
+    h+=`<button class="grp" aria-expanded="false" data-g="${gi}">${g}</button><div class="sub">${ps.map(p=>`<a href="#/${p.id}" data-id="${p.id}">${p.m||p.t}${p.novo?'<span class="novo">novo</span>':''}</a>`).join('')}</div>`});
+  arv.innerHTML=h;
+  arv.querySelectorAll('.grp').forEach(b=>b.onclick=()=>b.setAttribute('aria-expanded',b.getAttribute('aria-expanded')!=='true'));
+  arv.addEventListener('click',e=>{if(e.target.closest('a'))document.body.classList.remove('menu-on')});
+}
+/* render */
+let atual=null;
+function render(){
+  const hs=decodeURIComponent(location.hash.replace(/^#\/?/,'')).split('/');
+  const p=P.find(x=>x.id===hs[0])||P[0];
+  _shotN=0;
+  const html=typeof p.h==='function'?p.h():p.h;
+  const art=$('#art');
+  const meta=[];
+  if(p.cam)meta.push(`<span class="cam">${p.cam.split('>').map(x=>x.trim()).map((x,i,a)=>i===a.length-1?`<b>${x}</b>`:x).join(' › ')}</span>`);
+  if(p.sys)meta.push(abrir(p.sys));
+  if(p.quem)meta.push(`<span class="cam">Quem usa: <b>${p.quem}</b></span>`);
+  art.innerHTML=(p.sem_titulo?'':`<h1>${p.t}</h1>${p.lead?`<p class="lead">${p.lead}</p>`:''}${meta.length?`<div class="meta">${meta.join('')}</div>`:''}`)+html+navPN(p)+`<div class="rod"><span>Wiki Neves Pádua Interno · versão 2</span><span>Prints de 26 e 27/11/2026 com nomes de clientes fictícios; documentos, valores e códigos borrados.</span></div>`;
+  art.querySelectorAll('h2').forEach(h=>{if(!h.id)h.id=slug(h.textContent)});
+  $('#cami').innerHTML=p.g==='Início'?`<b>${p.t}</b>`:`${p.g} / <b>${p.m||p.t}</b>`;
+  $('#topoDir').innerHTML=p.sys?abrir(p.sys):'';
+  montaNP(p);
+  document.querySelectorAll('#arv a').forEach(a=>{const on=a.dataset.id===p.id;a.toggleAttribute('aria-current',false);if(on){a.setAttribute('aria-current','page');const sub=a.closest('.sub');if(sub)sub.previousElementSibling.setAttribute('aria-expanded','true')}});
+  document.title=(p.id==='inicio'?'':p.t+' · ')+'Wiki Neves Pádua Interno';
+  const cont=$('#cont');
+  if(hs[1]){const alvo=document.getElementById(hs[1]);if(alvo){alvo.scrollIntoView();return}}
+  if(atual!==p.id)cont.scrollTop=0;
+  atual=p.id;
+}
+function navPN(p){const i=P.indexOf(p),a=P[i-1],b=P[i+1];return `<div class="pn-row">${a?`<a class="pn" href="#/${a.id}"><small>← Anterior</small><b>${a.m||a.t}</b></a>`:'<span></span>'}${b?`<a class="pn r" href="#/${b.id}"><small>Próxima →</small><b>${b.m||b.t}</b></a>`:'<span></span>'}</div>`}
+function montaNP(p){
+  const hs=[...document.querySelectorAll('#art h2')];
+  let h='';
+  if(hs.length>1)h+=`<b>Nesta página</b>`+hs.map(x=>`<button data-alvo="${x.id}">${x.textContent}</button>`).join('');
+  if(p.rel&&p.rel.length)h+=`<div class="rel"><b>Veja também</b>${p.rel.map(id=>{const q=P.find(x=>x.id===id);return q?`<a href="#/${q.id}">${q.m||q.t}</a>`:''}).join('')}</div>`;
+  const np=$('#np');np.innerHTML=h;
+  np.querySelectorAll('button').forEach(b=>b.onclick=()=>{const el=document.getElementById(b.dataset.alvo);if(el)el.scrollIntoView({behavior:'smooth'})});
+}
+/* destaque dos pinos */
+function liga(fig,n,on){fig.querySelectorAll(`[data-n="${n}"]`).forEach(e=>e.classList.toggle('on',on))}
+document.addEventListener('mouseover',e=>{const t=e.target.closest('.pin,.leg li');if(!t)return;const fig=t.closest('.shot,.lb');if(fig)liga(fig,t.dataset.n,true)});
+document.addEventListener('mouseout',e=>{const t=e.target.closest('.pin,.leg li');if(!t)return;const fig=t.closest('.shot,.lb');if(fig)liga(fig,t.dataset.n,false)});
+document.addEventListener('focusin',e=>{const t=e.target.closest('.pin');if(t){const fig=t.closest('.shot,.lb');fig&&liga(fig,t.dataset.n,true)}});
+document.addEventListener('focusout',e=>{const t=e.target.closest('.pin');if(t){const fig=t.closest('.shot,.lb');fig&&liga(fig,t.dataset.n,false)}});
+/* lightbox */
+let lbLista=[],lbI=0;
+function abreLB(fig){lbLista=[...document.querySelectorAll('#art .shot')];lbI=lbLista.indexOf(fig);mostraLB();$('#lb').classList.add('on');$('#lbFechar').focus()}
+function mostraLB(){const fig=lbLista[lbI];if(!fig)return;const tela=fig.querySelector('.tela').cloneNode(true);const c=CAPS[fig.dataset.nome];
+  const pal=$('#lbPal');pal.innerHTML='';pal.appendChild(tela);
+  const mob=window.innerWidth<=900;const maxW=mob?window.innerWidth-20:Math.min(1500,window.innerWidth-420);const maxH=mob?window.innerHeight*0.6:window.innerHeight-44;
+  tela.style.width=Math.max(200,Math.min(maxW,maxH*c.w/c.h))+'px';
+  const leg=fig.querySelector('.leg');
+  $('#lbLado').innerHTML=`<h4>${fig.dataset.cap||'Print'}</h4><p>Passe o mouse nos números para ver cada ponto.</p>${leg?leg.outerHTML:''}<div class="ctl"><button id="lbAnt">← Anterior</button><button id="lbProx">Próximo →</button></div><p style="margin-top:8px">${lbI+1} de ${lbLista.length} prints nesta página</p>`;
+  $('#lbAnt').onclick=()=>{lbI=(lbI-1+lbLista.length)%lbLista.length;mostraLB()};
+  $('#lbProx').onclick=()=>{lbI=(lbI+1)%lbLista.length;mostraLB()};
+}
+function fechaLB(){$('#lb').classList.remove('on')}
+document.addEventListener('click',e=>{
+  const amp=e.target.closest('.shot .amp');if(amp){abreLB(amp.closest('.shot'));return}
+  const tela=e.target.closest('#art .tela');if(tela&&!e.target.closest('.pin')){abreLB(tela.closest('.shot'));return}
+  const pin=e.target.closest('#art .pin');if(pin){const fig=pin.closest('.shot');const li=fig.querySelector(`.leg li[data-n="${pin.dataset.n}"]`);if(li){li.scrollIntoView({block:'nearest',behavior:'smooth'});liga(fig,pin.dataset.n,true);setTimeout(()=>liga(fig,pin.dataset.n,false),1600)}}
+});
+$('#lbFechar').onclick=fechaLB;
+$('#lb').addEventListener('click',e=>{if(e.target.id==='lb')fechaLB()});
+/* busca */
+const IDX=P.map(p=>{let h='';try{_shotN=0;h=typeof p.h==='function'?p.h():p.h}catch(e){}
+  const secs=[...String(h).matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map(m=>texto(m[1]));
+  return {p,t:norm(p.t+' '+(p.m||'')),k:norm((p.kw||'')+' '+(p.cam||'')),x:norm(texto(p.lead||'')+' '+texto(h)),raw:texto((p.lead||'')+' '+texto(h)),secs}});
+let sel=0,resAtual=[];
+function busca(q){
+  const n=norm(q).trim();const r=$('#rBusca');
+  if(!n){resAtual=P.filter(p=>p.destaque).map(p=>({p,sn:p.lead||''}));desenha(r,'');return}
+  const termos=n.split(/\s+/).filter(Boolean);
+  resAtual=IDX.map(o=>{let s=0;for(const t of termos){if(o.t.includes(t))s+=10;else if(o.k.includes(t))s+=6;else if(o.x.includes(t))s+=2;else return null}
+    if(o.t.startsWith(termos[0]))s+=5;
+    let sn=o.p.lead||'';const i=norm(o.raw).indexOf(termos[0]);if(i>=0){const a=Math.max(0,i-60);sn=(a>0?'…':'')+o.raw.slice(a,a+170)+'…'}
+    const sec=o.secs.find(sc=>termos.every(t=>norm(sc).includes(t)));
+    return {p:o.p,s,sn,sec}}).filter(Boolean).sort((a,b)=>b.s-a.s).slice(0,14);
+  desenha(r,termos);
+}
+function marca(t,termos){if(!termos||!termos.length)return t;let out=t;termos.forEach(tt=>{const re=new RegExp('('+tt.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  const nt=norm(out);let res='',last=0,m;const reN=new RegExp(tt.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');while((m=reN.exec(nt))){res+=out.slice(last,m.index)+'<mark>'+out.slice(m.index,m.index+tt.length)+'</mark>';last=m.index+tt.length}res+=out.slice(last);out=res});return out}
+function desenha(r,termos){sel=0;if(!resAtual.length){r.innerHTML='<div class="vazio">Nada encontrado. Tente outra palavra, como “prazo”, “ata”, “boleto” ou “cargo”.</div>';return}
+  r.innerHTML=resAtual.map((o,i)=>`<a href="#/${o.p.id}${o.sec?'/'+slug(o.sec):''}" class="${i===0?'sel':''}"><b>${marca(o.p.t,termos)}</b><span class="g">${o.p.g}${o.sec?' · '+o.sec:''}</span><small>${marca(String(o.sn).replace(/</g,'&lt;'),termos)}</small></a>`).join('')}
+function abreBusca(){$('#mBusca').classList.add('on');const q=$('#qBusca');q.value='';busca('');setTimeout(()=>q.focus(),10)}
+function fechaBusca(){$('#mBusca').classList.remove('on')}
+$('#abrirBusca').onclick=abreBusca;
+$('#qBusca').addEventListener('input',e=>busca(e.target.value));
+$('#qBusca').addEventListener('keydown',e=>{const as=[...document.querySelectorAll('#rBusca a')];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!as.length)return;as[sel].classList.remove('sel');sel=(sel+(e.key==='ArrowDown'?1:-1)+as.length)%as.length;as[sel].classList.add('sel');as[sel].scrollIntoView({block:'nearest'})}
+  if(e.key==='Enter'&&as[sel]){location.hash=as[sel].getAttribute('href');fechaBusca()}});
+$('#rBusca').addEventListener('click',e=>{if(e.target.closest('a'))fechaBusca()});
+$('#mBusca').addEventListener('click',e=>{if(e.target.id==='mBusca')fechaBusca()});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();abreBusca()}
+  else if(e.key==='/'&&!/input|textarea/i.test(document.activeElement.tagName)){e.preventDefault();abreBusca()}
+  else if(e.key==='Escape'){fechaBusca();fechaLB();document.body.classList.remove('menu-on')}
+  else if($('#lb').classList.contains('on')&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){lbI=(lbI+(e.key==='ArrowRight'?1:-1)+lbLista.length)%lbLista.length;mostraLB()}
+});
+$('#menuBtn').onclick=()=>document.body.classList.toggle('menu-on');
+montaMenu();window.addEventListener('hashchange',render);render();
+</script>
+</body>
+</html>
