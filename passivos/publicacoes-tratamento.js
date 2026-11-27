@@ -86,7 +86,7 @@
     const uf = window.PP_PRAZOS?.ufDoCnj(p.numero_processo); const confereId = T.confereId || null;
     const addUteis = (iso, n) => { if (!iso) return null; let dd = new Date(iso + "T12:00:00"), c = 0, step = n < 0 ? -1 : 1; while (c < Math.abs(n)) { dd.setDate(dd.getDate() + step); if (!window.PP_PRAZOS || window.PP_PRAZOS.ehUtil(dd, uf)) c++; } return dd.toISOString().slice(0, 10); };
     /* 26/11: as etapas vêm da regra única das cadeias (PP_CADEIAS): a conferência passa a cair um dia útil depois da meta de protocolo */
-    const etapasDe = (w, fim) => window.PP_CADEIAS.etapas(w, fim, uf);
+    const etapasDe = (w, fim) => window.PP_CADEIAS.etapas(w, fim, sUf.value || uf || null, { base: dBase.value });
     const fmtBR = curta;
     // contagem numa linha, calculando sozinha (mesma regra de PP_PRAZOS.calcular); a data pode ser alterada à mão
     const nDias = inp("number", "15", { min: 1, "aria-label": "Quantidade de dias" }), sTipo = sel({ uteis: "dias úteis (CPC)", corridos: "dias corridos" }, "uteis"), dBase = inp("date", p.data_disponibilizacao ? String(p.data_disponibilizacao).slice(0, 10) : "", { "aria-label": "Contar a partir de (disponibilização)" });
@@ -96,7 +96,7 @@
     const fData = el("div", { class: "np-tp-f", hidden: "" }, el("label", { for: "tr-prazo" }, "Vencimento (alterado à mão)"), prazo); prazo.id = "tr-prazo";
     const lnkData = el("button", { type: "button", class: "lnk", onclick: () => { fData.hidden = !fData.hidden; if (!fData.hidden) prazo.focus(); } }, "alterar data");
     const renderCadeia = () => { const w = WF.find((x) => x.codigo === wfSel.value); if (!w) { cadeiaBox.hidden = true; return; } cadeiaBox.hidden = false; const fim = prazo.value; if (!fim) { cadeiaBox.replaceChildren(el("b", {}, "Tarefas que serão abertas"), el("span", { class: "np-tp-nota", style: "grid-column:1/-1" }, "Informe a contagem para ver as datas.")); return; }
-      const et = etapasDe(w, fim); cadeiaBox.replaceChildren(el("b", {}, "Tarefas que serão abertas"), ...et.flatMap((x) => [el("span", {}, fmtBR(x.prazo)), el("span", {}, x.titulo.replace(" — " + w.nome, "") + (x.codigo === "protocolar" ? " (meta interna)" : "")), el("span", {}, x.para === "confere" ? (confereId ? "controladoria" : "quem recebe") : "quem recebe")]), w.decisao_inicial ? el("span", { class: "np-tp-nota", style: "grid-column:1/-1" }, "Antes: “" + w.decisao_inicial + "”, em 2 dias úteis.") : null); };
+      const et = etapasDe(w, fim); cadeiaBox.replaceChildren(el("b", {}, "Tarefas que serão abertas"), ...et.flatMap((x) => [el("span", {}, fmtBR(x.prazo)), el("span", {}, (x.grupo === "preparo" ? "Preparo: " : "") + window.PP_CADEIAS.rotuloEtapa(x, w).replace(/^./, (c) => (x.grupo === "preparo" ? c.toLowerCase() : c))), el("span", {}, x.para === "confere" ? (confereId ? "controladoria" : "quem recebe") : x.para === "revisor" ? (T.revisorId ? "revisão" : "quem recebe") : "quem recebe")]), w.decisao_inicial ? el("span", { class: "np-tp-nota", style: "grid-column:1/-1" }, "Antes: “" + w.decisao_inicial + "”, em 2 dias úteis.") : null); };
     const mostraFim = () => { const v = prazo.value; if (!v) { resD.textContent = "Informe a contagem"; resE.replaceChildren(); atualizarBotao(); return; } resD.textContent = "Vence em " + fmtD2(v); renderCadeia(); atualizarBotao(); };
     const recalc = () => { const PZ = window.PP_PRAZOS; if (!PZ) { fData.hidden = false; return; } PZ.pronto().then(() => { const r = PZ.calcular({ base: dBase.value, dias: nDias.value, tipo: sTipo.value, uf: sUf.value || null });
       if (!r) { resE.replaceChildren("Informe a data-base e o número de dias."); return; } E.dataManual = false; prazo.value = r.fim;
@@ -104,7 +104,7 @@
       notas.replaceChildren(r.notas.length ? el("div", {}, "Considerado: " + r.notas.join("; ")) : el("div", {}, "Sem feriados ou suspensões no período."), el("div", {}, "A contagem exclui o dia da publicação e inclui o do vencimento (CPC 224). Confira o prazo específico da intimação.")); mostraFim(); }); };
     for (const x of [nDias, sTipo, dBase, sUf]) x.onchange = recalc;
     prazo.addEventListener("change", () => { E.dataManual = true; resE.replaceChildren("data informada à mão · ", lnkData); mostraFim(); });
-    wfSel.onchange = () => { const eraAto = !atoBox.hidden; montaAto(); if (atoDe()) { E.usada = null; for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", "false"); return; } if (eraAto) recalc(); const w = WF.find((x) => x.codigo === wfSel.value); if (w) { nDias.value = w.dias_legais; titulo.value = w.nome + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "1"; fatal.checked = true; recalc(); } fTipo.hidden = fTit.hidden = !!w; renderCadeia(); atualizarBotao(); };
+    wfSel.onchange = () => { const eraAto = !atoBox.hidden; montaAto(); if (atoDe()) { E.usada = null; for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", "false"); return; } if (eraAto) recalc(); const w = WF.find((x) => x.codigo === wfSel.value); if (w) { nDias.value = w.dias_legais; titulo.value = w.nome + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "1"; fatal.checked = true; if (E.usada && E.usadaGen && prazo.value) { E.dataManual = true; mostraFim(); } else recalc(); } fTipo.hidden = fTit.hidden = !!w; renderCadeia(); atualizarBotao(); };
     const campo = (id, rot, ctl, obrig) => { ctl.id = ctl.id || id; return el("div", { class: "np-tp-f" }, el("label", { for: ctl.id }, rot, obrig ? el("b", { title: "obrigatório" }, " *") : null), ctl); };
     const fTipo = campo("tr-tipo", "Tipo da tarefa", tipo), fTit = campo("tr-tit", "Título da tarefa", titulo);
     const fConta = el("div", { class: "np-tp-f" }, el("span", { class: "np-tp-lab" }, "Contagem"), el("div", { class: "np-tp-conta" }, nDias, sTipo, dBase, sUf));
@@ -125,8 +125,9 @@
         const calc = window.PP_PRAZOS?.calcular({ base: dBase.value, dias: w.dias_legais, tipo: w.tipo_contagem || "uteis", uf: sUf.value || null });
         const i = inp("date", sg?.data_sugerida || calc?.fim || "", { "aria-label": "Prazo de " + w.nome }); i.onchange = () => { atualizaAto(); }; hipIn.set(cod, i);
         linhas.push(el("li", {}, el("span", { class: "n" }, w.nome), i, el("span", { class: "np-tp-nota" }, sg ? "data sugerida" : w.dias_legais + " dias úteis"))); }
-      const pe = el("div", { class: "np-tp-nota", id: "tr-ato-pe" });
-      atoBox.replaceChildren(el("div", { class: "r" }, "Prazos deste ato"), el("ul", {}, ...linhas), pe, el("small", {}, "Confira as datas. As tarefas da peça só nascem quando a análise for concluída, com o caminho escolhido.")); atualizaAto(); };
+      const pe = el("div", { class: "np-tp-nota", id: "tr-ato-pe" }); const ja = el("input", { type: "checkbox", id: "tr-ja" }); ja.checked = !!E.ja; ja.onchange = () => { E.ja = ja.checked; atualizarBotao(); };
+      atoBox.replaceChildren(el("div", { class: "r" }, "Prazos deste ato"), el("ul", {}, ...linhas), pe, el("small", {}, "Confira as datas. As tarefas da peça só nascem quando a análise for concluída, com o caminho escolhido."),
+        el("label", { class: "ck np-tp-ja", for: "tr-ja" }, ja, "Já analisei: escolher o caminho agora")); atualizaAto(); };
     const atualizaAto = () => { const pe = atoBox.querySelector("#tr-ato-pe"); const d = prazoDaAnalise(); if (d) { prazo.value = d; E.dataManual = true; } if (pe) pe.replaceChildren("A análise vai para quem você escolher em “Para quem”, com prazo até ", el("b", {}, fmtD2(d)), "."); atualizarBotao(); };
     const blocoPrazo = el("div", { class: "np-tp-passo", "data-v": "gerou_prazo" }, el("div", { class: "np-tp-rot" }, (nP + 1) + ". Prazo e responsável"),
       el("div", { class: "np-tp-grade" }, campo("tr-wf", "Tipo de prazo", wfSel), campo("tr-resp", "Para quem", resp, true)),
@@ -134,12 +135,13 @@
     const blocoEnc = el("div", { class: "np-tp-passo", "data-v": "encaminhada" }, el("div", { class: "np-tp-grade" }, campo("tr-para", "Encaminhar para", para, true)));
     const rotTxt = el("label", { for: "tr-obs" }); const fTxt = el("div", { class: "np-tp-f", hidden: "" }, rotTxt, txt);
     const vazio = el("div", { class: "np-tp-vazio" }, "Escolha uma opção acima. Só aparecem os campos da opção escolhida.");
-    const dec = el("section", { class: "np-tp-dec", "aria-label": "Decisão" }, passoProc, el("div", { class: "np-tp-passo" }, el("div", { class: "np-tp-rot" }, nP + ". O que fazer com esta publicação"), seg, sugBox), vazio, blocoPrazo, blocoEnc, fTxt);
+    const planBox = el("div", { class: "np-tp-plano", hidden: "" });
+    const dec = el("section", { class: "np-tp-dec", "aria-label": "Decisão" }, planBox, passoProc, el("div", { class: "np-tp-passo" }, el("div", { class: "np-tp-rot" }, nP + ". O que fazer com esta publicação"), seg, sugBox), vazio, blocoPrazo, blocoEnc, fTxt);
     const body = el("div", { class: "np-tp" }, pub, dec);
     // rótulo do botão diz o que vai acontecer
     let btnSalvar = null;
     const ROT = { ciencia: "Registrar ciência", nada_a_fazer: "Registrar: nada a fazer", encaminhada: "Encaminhar", duplicidade: "Registrar: não é nosso" };
-    function atualizarBotao() { if (!btnSalvar) return; let r = "Escolha uma opção"; if (E.prov === "gerou_prazo" && atoDe()) r = "Abrir a análise e concluir"; else if (E.prov === "gerou_prazo") { const w = WF.find((x) => x.codigo === wfSel.value); const n = w ? etapasDe(w, prazo.value || "2000-01-03").length + (w.decisao_inicial ? 1 : 0) : 1; r = n > 1 ? `Criar ${n} tarefas e concluir` : "Criar tarefa e concluir"; } else if (E.prov) r = ROT[E.prov]; btnSalvar.textContent = r; btnSalvar.classList.toggle("np-tp-espera", !E.prov); }
+    function atualizarBotao() { if (!btnSalvar) return; let r = "Escolha uma opção"; if (E.prov === "gerou_prazo" && atoDe()) r = E.ja ? "Abrir a análise e escolher o caminho" : "Abrir a análise e concluir"; else if (E.prov === "gerou_prazo") { const w = WF.find((x) => x.codigo === wfSel.value); const n = w ? etapasDe(w, prazo.value || "2000-01-03").length + (w.decisao_inicial ? 1 : 0) : 1; r = n > 1 ? `Criar ${n} tarefas e concluir` : "Criar tarefa e concluir"; } else if (E.prov) r = ROT[E.prov]; btnSalvar.textContent = r; btnSalvar.classList.toggle("np-tp-espera", !E.prov); }
     function ajustar() { for (const b of seg.children) b.setAttribute("aria-pressed", String(b.dataset.o === E.prov)); vazio.hidden = !!E.prov; blocoPrazo.hidden = E.prov !== "gerou_prazo"; blocoEnc.hidden = E.prov !== "encaminhada"; fTxt.hidden = !E.prov;
       rotTxt.replaceChildren(E.prov === "gerou_prazo" ? "Instruções e observação" : "Observação", el("span", {}, E.prov === "gerou_prazo" ? ` (opcional · vai para a tarefa${meu ? ", como vinda de " + meu.nome + "," : ""} e para o histórico da publicação)` : " (opcional)"));
       txt.placeholder = E.prov === "encaminhada" ? "O que a pessoa precisa decidir…" : E.prov === "gerou_prazo" ? "O que precisa ser feito…" : "O que foi feito ou por quê…";
@@ -150,9 +152,23 @@
     const conferirSugestao = async (z, data, ehFatal, nota) => { if (!z || z.estado !== "sugerido") return null; const igual = data === z.data_sugerida;
       const { error } = await SB.rpc("publicacao_prazo_conferir", { p_prazo: z.id, p_decisao: igual ? "confirmar" : "corrigir", p_data: igual ? null : data, p_fatal: !!ehFatal, p_obs: nota, p_tarefa: false, p_responsavel: null });
       return error ? (error.message || "erro") : null; };
-    const usarSugestao = (z) => { E.usada = z; E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = String(z.rotulo || "Cumprir prazo").trim();
-      if (!wfSel.value) { titulo.value = rot + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "0"; }
-      ajustar(); resE.replaceChildren("data sugerida (" + rot + ") — confira nos autos · ", lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
+    /* 26/11 (20h13, sócia): quando o prazo não é de cabimento, a plataforma só diz “manifestação” — não sabe se é réplica, contrarrazões, provas…
+       Por isso esse prazo aparece sem nome de peça (“Prazo do ato”): “Usar” leva só a data, e quem trata escolhe o tipo em “Tipo de prazo”. */
+    const generico = (z) => /^manifestacao/.test(String(z?.rotulo || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()) || !String(z?.rotulo || "").trim();
+    const usarSugestao = (z) => { const gen = generico(z); E.usada = z; E.usadaGen = gen; E.prov = "gerou_prazo"; E.dataManual = true; prazo.value = z.data_sugerida; const rot = gen ? "prazo do ato" : String(z.rotulo || "Cumprir prazo").trim();
+      if (!wfSel.value && !gen) { titulo.value = rot + " — " + (p.numero_processo || "publicação"); titulo.dataset.auto = "0"; }
+      ajustar(); resE.replaceChildren((gen ? "data do prazo do ato — escolha o tipo em “Tipo de prazo” e confira nos autos · " : "data sugerida (" + rot + ") — confira nos autos · "), lnkData); mostraFim(); for (const b of sugBox.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z.id))); };
+    /* 0127: recurso planejado — se neste processo há “Aguardar julgamento dos embargos” aberta, a tela avisa e, com um clique, abre a cadeia do recurso contando desta publicação */
+    (async () => { if (!p.processo_id) return; try {
+      const { data } = await SB.from("tarefas").select("id,analise,responsavel_id,workflow_codigo,created_at").eq("processo_id", p.processo_id).eq("etapa_codigo", "aguardar_ed").in("status", ["aberta", "em_andamento"]).order("created_at", { ascending: false }).limit(1);
+      const esp = (data || [])[0]; if (!esp) return; const a = esp.analise || {}, cod = a.planeja || esp.workflow_codigo, w = WF.find((x) => x.codigo === cod), nome = a.planeja_rotulo || w?.nome || "recurso";
+      const quando = a.decidido_em ? fmtD2(String(a.decidido_em).slice(0, 10)) : (esp.created_at ? fmtD2(String(esp.created_at).slice(0, 10)) : null);
+      const sim = () => { if (!w) { toast("O fluxo deste recurso não está cadastrado; abra a tarefa à mão"); return; } E.espera = esp; E.prov = "gerou_prazo"; wfSel.value = w.codigo; if (esp.responsavel_id && [...resp.options].some((o) => o.value === esp.responsavel_id)) resp.value = esp.responsavel_id; wfSel.onchange(); ajustar();
+        planBox.replaceChildren(el("p", {}, el("b", {}, "Abrindo a cadeia de " + nome.toLowerCase() + "."), el("small", {}, "O prazo é contado desta publicação. Confira a contagem abaixo; ao salvar, a tarefa de espera é encerrada.")), el("button", { type: "button", class: "btn sm", onclick: () => { E.espera = null; desenhaPlano(); } }, "Desfazer")); };
+      const desenhaPlano = () => planBox.replaceChildren(el("p", {}, el("b", {}, "Recurso planejado neste processo: " + nome.toLowerCase() + "."), el("small", {}, "Decidido" + (a.decidido_por_nome ? " por " + a.decidido_por_nome : "") + (quando ? " em " + quando : "") + ", ao analisar o ato anterior. Esta intimação é o julgamento dos embargos?")),
+        el("button", { type: "button", class: "btn sm np-tp-sim", onclick: sim }, "Sim, abrir " + (/^[aeiou]/i.test(nome) ? "a " : "o ") + nome.toLowerCase()), el("button", { type: "button", class: "btn sm", onclick: () => { planBox.hidden = true; } }, "Não é"));
+      desenhaPlano(); planBox.hidden = false;
+    } catch (e) {} })();
     (async () => { try {
       const [f, z] = await Promise.all([SB.from("publicacao_fontes").select("publicacao_id,fonte,resumo:bruto->>resumo,tipo_ato:bruto->>tipo_ato").eq("publicacao_id", p.id).eq("fonte", "sync"),
         SB.from("publicacao_prazos").select("id,publicacao_id,origem,rotulo,data_sugerida,estado,data_conferida,tarefa_id").eq("publicacao_id", p.id).order("data_sugerida")]);
@@ -161,9 +177,9 @@
       const pz = (z.data || []).filter((x) => String(x.publicacao_id) === String(p.id) && x.estado !== "descartado" && x.data_sugerida);
       E.sug = pz; if (atoDe()) montaAto();
       if (pz.length) { sugBox.replaceChildren(el("div", { class: "r" }, pz.length === 1 ? "Prazo sugerido" : "Prazos sugeridos"),
-          el("ul", {}, ...pz.map((x) => { const conf = x.estado !== "sugerido"; return el("li", {}, el("span", { class: "n" }, x.rotulo || "Prazo"), el("span", { class: "d" }, fmtD2(conf && x.data_conferida ? x.data_conferida : x.data_sugerida)),
+          el("ul", {}, ...pz.map((x) => { const conf = x.estado !== "sugerido"; return el("li", {}, el("span", { class: "n" }, generico(x) ? "Prazo do ato" : x.rotulo), el("span", { class: "d" }, fmtD2(conf && x.data_conferida ? x.data_conferida : x.data_sugerida)),
             conf ? el("span", { class: "np-tp-nota" }, x.tarefa_id ? "já conferido, com tarefa" : "já conferido") : el("button", { type: "button", class: "btn sm", "data-z": String(x.id), "aria-pressed": "false", title: "Preenche a data e o título da tarefa com esta sugestão. Você confere e pode alterar.", onclick: () => usarSugestao(x) }, "Usar")); })),
-          el("small", {}, "Sugestão automática, não é prazo do escritório. “Usar” só preenche; confira o ato, a regra e o calendário do juízo.")); sugBox.hidden = false; }
+          el("small", {}, "Sugestão automática, não é prazo do escritório. “Usar” só preenche; confira o ato, a regra e o calendário do juízo." + (pz.some(generico) ? " No “Prazo do ato”, escolha você o tipo de prazo." : ""))); sugBox.hidden = false; }
     } catch (e) { /* sem o Sync (ou sem permissão de leitura) a tela segue como sempre */ } })();
     modal("Tratar publicação", body, async () => {
       if (!E.prov) throw new Error("Escolha o que fazer com esta publicação");
@@ -183,16 +199,19 @@
           const hip = hipAtual(); if (!hip.length || hip.some((h) => !h.fim)) throw new Error("Informe a data de cada prazo deste ato");
           const rowA = { titulo: `Analisar cabimento — ${ato.nome.toLowerCase()} · ${p.numero_processo || "publicação"}`, descricao, cliente_id: cliente_id || null, processo_id: processo_id || null, responsavel_id: resp.value, nucleo: "juridico", prazo: prazoDaAnalise(), prazo_fatal: false, prioridade: 1, status: "aberta", publicacao_id: p.id, etapa_codigo: "analise_ato",
             analise: { ato: atoKey(), base: dBase.value || null, uf: sUf.value || uf || null, numero: p.numero_processo || null, hip } };
-          const { error } = await SB.from("tarefas").insert(rowA); if (error) throw new Error("Não foi possível abrir a análise: " + error.message);
+          const { data: nova, error } = await SB.from("tarefas").insert(rowA).select("id,titulo").single(); if (error) throw new Error("Não foi possível abrir a análise: " + error.message);
+          if (E.ja && nova?.id) setTimeout(() => window.PP_TAREFAS?.concluirAnalise?.({ id: nova.id, titulo: nova.titulo, etapa_codigo: "analise_ato", numero_cnj: p.numero_processo, cliente_nome: p.cliente_nome }), 400);
           for (const h of hip) { const z = hipSug.get(h.wf); if (z) await conferirSugestao(z, h.fim, false, "Prazo levado para a análise de cabimento, na tela de tratamento."); }
           toast("Análise aberta para " + (colab.find((c) => c.id === resp.value)?.nome || "o responsável"));
         } else if (w) {
           const cadeia = crypto.randomUUID(); const et = etapasDe(w, prazo.value); const base = { descricao, cliente_id: cliente_id || null, processo_id: processo_id || null, nucleo: "juridico", prioridade: +pri.value, status: "aberta", publicacao_id: p.id, cadeia_id: cadeia, workflow_codigo: w.codigo };
           const rows = [];
           if (w.decisao_inicial) rows.push({ ...base, titulo: w.decisao_inicial + " — " + (p.numero_processo || "publicação"), responsavel_id: resp.value, prazo: addUteis(p.data_disponibilizacao || prazo.value, 2) || prazo.value, prazo_fatal: false, etapa_codigo: "analisar", descricao: (base.descricao || "") + "\n\nAo concluir, diga no andamento se cabe ou não. A cadeia (confeccionar → protocolar → conferir) já está aberta; se não couber, cancele as demais." });
-          for (const x of et) rows.push({ ...base, titulo: x.titulo, responsavel_id: x.para === "confere" && confereId ? confereId : resp.value, prazo: x.prazo, prazo_fatal: x.codigo === "protocolar", etapa_codigo: x.codigo, descricao: (x.codigo === "protocolar" ? `Prazo legal (fatal): ${fmtBR(x.fatalEm)}. Meta interna: protocolar até ${fmtBR(x.prazo)}.\n\n` : x.codigo === "conferir" ? "Conferir nos autos se o protocolo foi feito e juntado corretamente.\n\n" : "") + (base.descricao || "") });
+          { const { cadeia_id: _c, workflow_codigo: _w, descricao: _d, ...comum } = base; rows.push(...window.PP_CADEIAS.linhas(w, prazo.value, sUf.value || uf || null, { base: dBase.value, comum, respId: resp.value, confereId, revisorId: T.revisorId || null, desc: base.descricao || "" })); }
           const { error } = await SB.from("tarefas").insert(rows); if (error) throw new Error("Não foi possível abrir a cadeia: " + error.message);
           toast(`Cadeia aberta: ${rows.length} tarefas`);
+          /* recurso planejado: esta era a intimação do julgamento dos embargos — a tarefa de espera se encerra */
+          if (E.espera) { try { await SB.from("tarefas").update({ status: "concluida" }).eq("id", E.espera.id); if (typeof comentar === "function") await comentar(E.espera.id, `Julgamento dos embargos intimado (publicação de ${fmtD2(p.data_disponibilizacao)}). Cadeia de ${w.nome} aberta contando dessa data.`); } catch (e) {} }
         } else {
           const row = { titulo: titulo.value.trim() || TT[tipo.value], descricao, cliente_id: cliente_id || null, processo_id: processo_id || null, responsavel_id: resp.value, nucleo: "juridico", prazo: prazo.value, prazo_fatal: fatal.checked, prioridade: +pri.value, status: "aberta", publicacao_id: p.id };
           const { error } = await SB.from("tarefas").insert(row); if (error) throw new Error("Não foi possível criar a tarefa");
@@ -291,5 +310,5 @@
   window.PP_PUB_TRAT = { modalTratar, modalHistorico, pillStatus, secaoProcesso, renderRelatorio, reabrir, limparAntigas };
   window.__PP_LOGIN?.then(() => { SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome").then(({ data }) => { T.colab = data || []; });
     SB.from("workflows_prazo").select("*").eq("ativo", true).order("ordem").then(({ data }) => { T.workflows = data || []; });
-    SB.from("escritorio").select("dados").eq("id", "juridico").maybeSingle().then(({ data }) => { T.confereId = data?.dados?.conferencia_protocolo_id || null; }); });
+    SB.from("escritorio").select("dados").eq("id", "juridico").maybeSingle().then(({ data }) => { T.confereId = data?.dados?.conferencia_protocolo_id || null; T.revisorId = data?.dados?.revisao_pecas_id || null; }); });
 })();
