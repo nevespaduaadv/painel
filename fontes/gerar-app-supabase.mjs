@@ -327,16 +327,33 @@ window.__PP_RUNTIME={use:async(n)=>{
   if(n==="user")return {can:async()=>equipe(),id:async()=>PP.perfil?.id||null};
   return null;
 }};
-/* tempo real: quando algo muda no banco, recarrega a coleção afetada */
+/* tempo real: quando algo muda no banco, recarrega a coleção afetada.
+   27/11: com freio. Uma rotina que regrava centenas de clientes de uma vez disparava um recarregamento da lista inteira POR LINHA
+   (medido em produção: 77 downloads simultâneos de 751 kB, 5 a 6 s cada). Agora os avisos seguidos viram UM recarregamento:
+   espera 1,2 s de silêncio (no máximo 5 s desde o primeiro aviso), nunca roda dois ao mesmo tempo e, com a aba em segundo plano,
+   só recarrega quando a pessoa volta para ela. As gravações feitas pela própria pessoa continuam recarregando na hora (notificar). */
+const RT={t:{},desde:{},rodando:{},pendente:{}};
+function notificarRT(col){
+  if(!col)return;
+  if(document.hidden){RT.pendente[col]=true;return}
+  const agora=Date.now();RT.desde[col]??=agora;clearTimeout(RT.t[col]);
+  const espera=Math.max(0,Math.min(1200,RT.desde[col]+5000-agora));
+  RT.t[col]=setTimeout(async()=>{
+    if(RT.rodando[col]){RT.t[col]=setTimeout(()=>notificarRT(col),600);return}
+    delete RT.desde[col];RT.rodando[col]=true;
+    try{await notificar(col)}finally{RT.rodando[col]=false}
+  },espera);
+}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)return;for(const col of Object.keys(RT.pendente)){delete RT.pendente[col];notificarRT(col)}});
 function ligarTempoReal(){
   const mapa={clientes:"clientes",contratos:"contratos",historico:"historico",notas_internas:null,regras:"regras",perfis:"perfis"};
   const ch=SB.channel("painel");
   for(const t of Object.keys(mapa)){
     ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>{
       if(t==="regras")notificarRegras();
-      else if(t==="notas_internas"){notificar("clientes");notificar("contratos")}
+      else if(t==="notas_internas"){notificarRT("clientes");notificarRT("contratos")}
       else if(t==="perfis"){if(typeof renderUsuarios==="function"&&S.tab==="usuarios")renderUsuarios()}
-      else notificar(mapa[t]);
+      else notificarRT(mapa[t]);
     });
   }
   ch.subscribe();
