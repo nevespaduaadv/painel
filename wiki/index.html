@@ -72,6 +72,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 article h1{font-weight:700;font-size:34px;line-height:1.15;margin:0 0 8px;letter-spacing:-.015em;text-wrap:balance}
 article h2{font-weight:700;font-size:21px;margin:40px 0 10px;letter-spacing:-.01em;text-wrap:balance;scroll-margin-top:70px;padding-top:14px;border-top:1px solid var(--fio)}
 article h2:first-of-type{border-top:0;padding-top:0}
+article>h2:first-child{margin-top:0}
 article h3{font-size:16px;margin:24px 0 6px;font-weight:700}
 .lead{font-size:17px;color:var(--tinta2);margin:0 0 16px;max-width:64ch}
 .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 24px;font-size:13.5px}
@@ -260,7 +261,7 @@ dl.glos dt:first-of-type,dl.glos dt:first-of-type + dd{border-top:0}
 <div class="app">
   <aside class="lat" aria-label="Menu do wiki">
     <a class="marca" href="#/inicio" aria-label="Início do wiki">
-      <span class="lg">NEVES PÁDUA</span><span class="sb">wiki interno</span><span class="vs">versão 2 · 27/11/2026</span>
+      <span class="lg">NEVES PÁDUA</span><span class="sb">wiki interno</span><span class="vs">atualizado em 27/11/2026</span>
     </a>
     <button class="busca" id="abrirBusca" aria-label="Buscar no wiki">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -334,14 +335,6 @@ function dupla(a,b){return `<div class="dupla">${a}${b}</div>`}
 <script>
 /* ───────── INÍCIO ───────── */
 P.push({id:'inicio',g:'Início',t:'Início',sem_titulo:true,destaque:true,lead:'O manual do sistema interno: cada tela, cada botão e cada fluxo, com prints e passo a passo.',kw:'home começo manual wiki',h:`
-<div class="heroi">
-  <div>
-    <h1>Wiki Neves Pádua Interno</h1>
-    <p class="lead">O manual do sistema do escritório. Cada tela, cada botão e cada fluxo, com prints numerados e passo a passo, do jeito que o sistema está hoje.</p>
-    <div class="acoes">${abrir('painel','Abrir o sistema')}<a class="sec" href="#/novidades">O que mudou nesta versão</a><a class="sec" href="#/perfis">Guia do meu cargo</a></div>
-  </div>
-  <img src="img/hoje.jpg" alt="Tela Hoje do sistema" width="1229" height="584">
-</div>
 <h2>Por onde começar</h2>
 ${cards([
  {id:'entrar',ic:'1',t:'Entrar no sistema',s:'Endereço, login, liberação de acesso e troca de senha.'},
@@ -373,41 +366,6 @@ ${cards([
 <li><b>O seu menu pode ser menor.</b> Os prints foram feitos com o acesso de uma sócia. Você vê as áreas liberadas para o seu cargo.</li>
 </ul>
 ${nota('Os prints usam <b>nomes de clientes fictícios</b>. CPF, CNPJ, valores, e-mails, telefones e códigos de acesso aparecem borrados. Números de processo também foram trocados.','Sobre os prints')}
-`});
-
-P.push({id:'novidades',g:'Início',t:'O que mudou',novo:true,destaque:true,lead:'Tudo o que o sistema ganhou, perdeu ou mudou de lugar desde a primeira versão deste manual.',kw:'novidades mudanças versão 2 changelog onde foi parar',rel:['tela','perfis','regras'],h:`
-<h2>Onde foi parar</h2>
-${tabela(['Antes','Agora'],[
- ['Acompanhamento PJ (item próprio no menu)','Dentro da '+ir('carteira','Carteira PJ')+', em '+ui('⋮')+' › Acompanhamento PJ'],
- ['Monitoramento (em Ferramentas)',ir('monitoramento','Jurídico › Monitoramento')],
- ['Ferramentas (vários itens no menu)','Um item só, que abre uma '+ir('ferramentas','página de botões')],
- ['Requisições (em Equipe e gestão)','Pedido e aprovação em '+ir('perfil','Meu perfil')],
- ['Base de acordos, Regras de projeção e Calibração','Dentro de '+ir('configuracoes','Equipe e gestão › Configurações')],
- ['Espelho (beta) e Importar do ADVBox','Saíram do menu'],
- ['Ponto','Desligado — o escritório não usa mais'],
- ['Comercial (leads) e Atendimento','Saíram do sistema; do comercial fica só a '+ir('conhecimento','Base de conhecimento')]])}
-<h2>Novo</h2>
-<ul>
-<li><b>Grupo Marketing</b> no menu: ${ir('pauta','Pauta de conteúdo')}, ${ir('producao','Produção de conteúdo')} (quadro no estilo Trello, com envio para a pauta) e ${ir('automacoes','Automações')}.</li>
-<li><b>Hoje com widgets</b>: relógio, calendário, atalhos personalizáveis e blocos que você arrasta e organiza. ${ir('hoje','Ver Hoje')}.</li>
-<li><b>Tratar publicação em uma tela só</b>: teor à esquerda, tratamento à direita, com resumo e prazos sugeridos. ${ir('tratar','Ver Tratar publicação')}.</li>
-<li><b>Análise de cabimento e cadeias de prazo</b>: 25 tipos de prazo configurados, revisão da peça, preparo e conferência de protocolo. ${ir('f-cadeia','Ver a cadeia')}.</li>
-<li><b>Monitoramento pelo Sync</b>: processos novos dos CPFs e CNPJs monitorados, para cadastrar ou dispensar. ${ir('monitoramento','Ver Monitoramento')}.</li>
-<li><b>Cargos funcionais</b>: as tarefas podem ir para o cargo; se ele estiver vago, entram na fila. ${ir('equipe','Ver Cargos')}.</li>
-<li><b>Janelas novas</b>: os pop-ups (nova tarefa, compromisso, aviso, requisição) abrem no centro, com o visual do sistema.</li>
-</ul>
-<h2>Mudou o jeito de usar</h2>
-<ul>
-<li><b>Tarefas e prazos abre só com as suas tarefas.</b> Quem pode ver as dos colegas escolhe em ${ui('Ver tarefas de')}. A visão da equipe fica em ${ir('gestao-visao','Gestão › Visão geral')}.</li>
-<li><b>Só os últimos 30 dias</b> carregam nas listas de tarefas. O histórico mais antigo fica disponível sob pedido.</li>
-<li><b>Clientes e Processos são listas simples</b>, paginadas de 40 em 40, com clientes em ordem alfabética e filtro PF/PJ. Clicar abre direto a ficha.</li>
-<li><b>Reagendar exige motivo.</b> A gestão e a controladoria recebem o aviso. ${ir('nova-tarefa','Ver como reagendar')}.</li>
-<li><b>Nova tarefa enxuta</b>: os campos essenciais na frente e o resto em ${ui('Mais opções')}.</li>
-<li><b>Cores de prazo</b>: fatal em vermelho, atrasado em amarelo.</li>
-<li><b>Acordos alimenta a Base de acordos</b>; a consulta da base fica com a gestão.</li>
-<li><b>Sem letra cursiva</b> em nenhuma tela.</li>
-</ul>
-${nota('Este manual foi refeito em 27/11/2026 a partir de um tour completo pelo sistema. Se algo na tela estiver diferente do print, a tela vale: avise a gestão para atualizarmos o manual.')}
 `});
 
 /* ───────── COMECE AQUI ───────── */
@@ -566,7 +524,7 @@ P.push({id:'acompanhamento',g:'Clientes',t:'Panorama do Acompanhamento PJ',m:'Ac
 ${shot('acompanhamento',['Quadros: reuniões vencidas, desta semana, sem agendamento, pendências e sem mensal.','Situação: em acompanhamento ou encerrados.','Etapa do ciclo (inicial, mensal…).','Mais filtros.','Cliente e cidade — clique para abrir a aba Acompanhamento PJ.','Responsável pelo acompanhamento.'],'Panorama do Acompanhamento PJ')}
 <h2>Para que serve</h2>
 <p>É a visão transversal da carteira PJ. Mostra quem está em cada etapa (${ir('f-pj','Onboarding, R1, R2, R3 e Mensal')}), quem está com reunião vencida e quem ficou sem agendamento. O trabalho de cada cliente acontece na ${ir('ficha-acompanhamento','aba Acompanhamento PJ da ficha')}.</p>
-${nota('O panorama saiu do menu e agora fica dentro da Carteira PJ, no menu '+ui('⋮')+'.')}
+${nota('O panorama fica dentro da Carteira PJ, no menu '+ui('⋮')+' › Acompanhamento PJ.')}
 `});
 
 P.push({id:'ficha',g:'Clientes',t:'Ficha do cliente — Dossiê',m:'Ficha: Dossiê',lead:'A página do cliente. O Dossiê reúne as três frentes de trabalho e a linha do tempo do que o escritório fez.',cam:'Clientes > Carteira > cliente',sys:'clientes',quem:'quem atende o cliente',kw:'ficha cliente dossiê linha do tempo registrar reunião frentes estratégico consultivo jurídico contencioso negocial acordos link do cliente abas',rel:['ficha-cadastro','ficha-acompanhamento','ficha-passivos'],h:`
@@ -711,7 +669,7 @@ ${dupla(shot('negociacao-mover',['As sete etapas.','Mover etapa.'],'Mover etapa'
 ${regra('Acordos alimenta a Base de acordos com cada acordo fechado. A consulta da base fica com a gestão.')}
 `});
 
-P.push({id:'monitoramento',g:'Jurídico',t:'Monitoramento',novo:true,lead:'Os processos encontrados para os CPFs e CNPJs monitorados que ainda não estão cadastrados no sistema.',cam:'Jurídico > Monitoramento',sys:'monitoramento',quem:'controladoria e Jurídico',kw:'monitoramento sync cpf cnpj processo novo cadastrar dispensar oab escritório monitorados',rel:['processos','publicacoes','ficha-negocial'],h:`
+P.push({id:'monitoramento',g:'Jurídico',t:'Monitoramento',lead:'Os processos encontrados para os CPFs e CNPJs monitorados que ainda não estão cadastrados no sistema.',cam:'Jurídico > Monitoramento',sys:'monitoramento',quem:'controladoria e Jurídico',kw:'monitoramento sync cpf cnpj processo novo cadastrar dispensar oab escritório monitorados',rel:['processos','publicacoes','ficha-negocial'],h:`
 ${shot('monitoramento',['Processos encontrados pelo monitoramento — e como funciona.','Total a decidir.','Processos da OAB do escritório sem cliente identificado.','Cliente monitorado.','Quantidade de processos — clique para abrir o grupo.'],'Monitoramento')}
 <h2>Decidir os processos de um cliente</h2>
 ${shot('monitoramento-grupo',['Grupo do cliente, aberto.','Cadastrar todos ou dispensar todos.','Processo: número, tribunal, partes, classe e datas.','Cadastrar ou dispensar um a um.'],'Processos de um cliente')}
@@ -879,7 +837,7 @@ ${fluxo([{t:'Acordo fechado',s:'Acordos registra na base.'},{t:'Base de acordos'
 `});
 
 /* ───────── MARKETING ───────── */
-P.push({id:'pauta',g:'Marketing',t:'Pauta de conteúdo',novo:true,lead:'O calendário editorial: o que vai ao ar, quando, em qual canal e em que fase está.',cam:'Marketing > Pauta de conteúdo',sys:'marketing',quem:'Marketing e sócias',kw:'pauta conteúdo calendário editorial grade quadro lista aprovação ajustar agendado publicado instagram carrossel canal pilar legenda hashtags ideias ia',rel:['producao','f-conteudo','automacoes'],h:`
+P.push({id:'pauta',g:'Marketing',t:'Pauta de conteúdo',lead:'O calendário editorial: o que vai ao ar, quando, em qual canal e em que fase está.',cam:'Marketing > Pauta de conteúdo',sys:'marketing',quem:'Marketing e sócias',kw:'pauta conteúdo calendário editorial grade quadro lista aprovação ajustar agendado publicado instagram carrossel canal pilar legenda hashtags ideias ia',rel:['producao','f-conteudo','automacoes'],h:`
 <h2>Grade (calendário)</h2>
 ${shot('mkt-pauta',['Grade, Quadro ou Lista.','Resumo: pautas, em aprovação, atrasadas e publicadas.','Ideias IA.','Filtros e busca.','Mês — clique num dia ou numa pauta para abrir.','Mês ou Semana e navegação.','Botão principal: nova pauta.'],'Pauta em grade')}
 ${dupla(shot('mkt-pauta-quadro',['Colunas: Ideia, Aguardando aprovação, Ajustar, Aprovado para postar, Em produção, Agendado…','Role para ver as demais.','Arraste entre colunas para mudar o status.','Legenda: ajuste ou atrasada e em aprovação.'],'Pauta em quadro'),shot('mkt-pauta-lista',['Grupo por status.','Pauta: data, título, formato e canal.','Responsável.'],'Pauta em lista'))}
@@ -887,7 +845,7 @@ ${dupla(shot('mkt-pauta-quadro',['Colunas: Ideia, Aguardando aprovação, Ajusta
 ${dupla(shot('mkt-nova-pauta',['Título.','Formato, data prevista e horário.','Responsável, status e pilar.','Canais.','Ideia e roteiro.','Link do criativo e link publicado.'],'Nova pauta'),`<div>${passos(['Clique em '+ui('+ Nova pauta')+'.','Dê um título e escolha o formato (carrossel, reel…).','Defina data, responsável, status e pilar.','Marque os canais (Instagram, LinkedIn, YouTube, TikTok, Blog, WhatsApp, E-mail).','Escreva a ideia ou o roteiro; depois, legenda e hashtags.','Cole o link do criativo (Drive, Canva) e, ao publicar, o link do post.'])}</div>`)}
 `});
 
-P.push({id:'producao',g:'Marketing',t:'Produção de conteúdo',novo:true,lead:'O quadro de produção no estilo Trello: cartões com etiquetas, datas, checklist, membros e comentários, e envio para a pauta.',cam:'Marketing > Produção de conteúdo',sys:'mkt-producao',quem:'Marketing',kw:'produção conteúdo trello quadro cartão lista etiquetas datas checklist membros anexo comentários concluir enviar para a pauta arquivados',rel:['pauta','f-conteudo'],h:`
+P.push({id:'producao',g:'Marketing',t:'Produção de conteúdo',lead:'O quadro de produção no estilo Trello: cartões com etiquetas, datas, checklist, membros e comentários, e envio para a pauta.',cam:'Marketing > Produção de conteúdo',sys:'mkt-producao',quem:'Marketing',kw:'produção conteúdo trello quadro cartão lista etiquetas datas checklist membros anexo comentários concluir enviar para a pauta arquivados',rel:['pauta','f-conteudo'],h:`
 ${shot('mkt-producao',['Quadros: cartões e aguardando aprovação.','Arquivados e Ver a pauta.','Lista e o menu da lista.','Adicionar um cartão.','Cartão — a bolinha marca como concluído.','Adicionar outra lista.','Botão principal: novo cartão.'],'Quadro de produção')}
 <p>As listas são livres, como no Trello: crie, renomeie e reorganize. A última lista, <b>Aguardando aprovação</b>, é fixa.</p>
 <h2>O cartão</h2>
@@ -895,7 +853,7 @@ ${shot('mkt-cartao',['Título e a bolinha de concluir.','Adicionar: etiquetas, d
 ${passos(['Crie o cartão na lista Ideias — a data não é obrigatória.','Use etiquetas, checklist e membros conforme a peça avança.','Comente no cartão: tudo fica no histórico.','Quando estiver pronto, mova para Aguardando aprovação.','Aprovado, clique em '+ui('Enviar para a pauta')+' para levá-lo ao calendário.'])}
 `});
 
-P.push({id:'automacoes',g:'Marketing',t:'Automações',novo:true,lead:'O espaço reservado para as automações do marketing.',cam:'Marketing > Automações',sys:'mkt-automacoes',quem:'Marketing',kw:'automações marketing motor de conteúdo carrosséis radar de notícias',rel:['producao','pauta'],h:`
+P.push({id:'automacoes',g:'Marketing',t:'Automações',lead:'O espaço reservado para as automações do marketing.',cam:'Marketing > Automações',sys:'mkt-automacoes',quem:'Marketing',kw:'automações marketing motor de conteúdo carrosséis radar de notícias',rel:['producao','pauta'],h:`
 ${shot('mkt-automacoes',['Em preparação: as rotinas do marketing serão trazidas para cá.'],'Automações')}
 <p>As rotinas já desenvolvidas para o marketing (motor de conteúdo, carrosséis, radar de notícias) serão trazidas para esta tela. Por enquanto, a produção acontece no ${ir('producao','quadro de Produção de conteúdo')} e a aprovação na ${ir('pauta','Pauta')}.</p>
 `});
@@ -1136,9 +1094,9 @@ ${faq([
  {q:'Onde copio o código de 2FA de um tribunal?',r:'<p>Ferramentas › Autenticador › '+ui('Copiar')+'. Não envie o código por mensagem.</p>'}])}
 `});
 
-P.push({id:'sobre',g:'Referência',t:'Sobre este manual',lead:'Como o manual foi feito, como os prints foram protegidos e como pedir uma atualização.',kw:'sobre manual versão atualização prints anonimização',rel:['novidades','inicio'],h:`
-<h2>Versão</h2>
-<p>Versão 2, de 27/11/2026, feita a partir de um tour completo pelo sistema em 26 e 27/11/2026. Substitui a versão 1 (esqueleto de 24/11/2026). O que mudou está em ${ir('novidades','O que mudou')}.</p>
+P.push({id:'sobre',g:'Referência',t:'Sobre este manual',lead:'Como o manual foi feito, como os prints foram protegidos e como pedir uma atualização.',kw:'sobre manual atualização prints anonimização',rel:['inicio','regras'],h:`
+<h2>Atualização</h2>
+<p>Atualizado em 27/11/2026, a partir de um tour completo pelo sistema em 26 e 27/11/2026.</p>
 <h2>Prints e privacidade</h2>
 <ul>
 <li>Os nomes de clientes são fictícios e consistentes entre os prints (o mesmo cliente tem sempre o mesmo nome inventado).</li>
@@ -1188,7 +1146,7 @@ function render(){
   if(p.cam)meta.push(`<span class="cam">${p.cam.split('>').map(x=>x.trim()).map((x,i,a)=>i===a.length-1?`<b>${x}</b>`:x).join(' › ')}</span>`);
   if(p.sys)meta.push(abrir(p.sys));
   if(p.quem)meta.push(`<span class="cam">Quem usa: <b>${p.quem}</b></span>`);
-  art.innerHTML=(p.sem_titulo?'':`<h1>${p.t}</h1>${p.lead?`<p class="lead">${p.lead}</p>`:''}${meta.length?`<div class="meta">${meta.join('')}</div>`:''}`)+html+navPN(p)+`<div class="rod"><span>Wiki Neves Pádua Interno · versão 2</span><span>Prints de 26 e 27/11/2026 com nomes de clientes fictícios; documentos, valores e códigos borrados.</span></div>`;
+  art.innerHTML=(p.sem_titulo?'':`<h1>${p.t}</h1>${p.lead?`<p class="lead">${p.lead}</p>`:''}${meta.length?`<div class="meta">${meta.join('')}</div>`:''}`)+html+navPN(p)+`<div class="rod"><span>Wiki Neves Pádua Interno</span><span>Prints de 26 e 27/11/2026 com nomes de clientes fictícios; documentos, valores e códigos borrados.</span></div>`;
   art.querySelectorAll('h2').forEach(h=>{if(!h.id)h.id=slug(h.textContent)});
   $('#cami').innerHTML=p.g==='Início'?`<b>${p.t}</b>`:`${p.g} / <b>${p.m||p.t}</b>`;
   $('#topoDir').innerHTML=p.sys?abrir(p.sys):'';
