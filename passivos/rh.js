@@ -35,7 +35,7 @@ async function enviarFoto(c,file){
   const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.86));const path=`colaboradores/${c.id}.jpg`;
   const {error}=await SB.storage.from("fotos").upload(path,blob,{upsert:true,contentType:"image/jpeg"});if(error){toast("Não foi possível enviar a foto");return}
   delete R.fotos[path];const r=await SB.from("colaboradores").update({foto_path:path}).eq("id",c.id);if(r.error){toast("Foto enviada, mas não gravada");return}
-  toast("Foto atualizada");window.PP_EQUIPE?.recarregar();R.dados=null;carregar(c.id);
+  toast("Foto atualizada");window.NPUI?.fotos?.carregar?.(true);window.PP_EQUIPE?.recarregar();R.dados=null;carregar(c.id);
 }
 
 /* ---------- dados ---------- */

@@ -388,8 +388,13 @@ ${tabela(['Antes','Agora'],[
  ['Comercial (leads) e Atendimento','Saíram do sistema; do comercial fica só a '+ir('conhecimento','Base de conhecimento')]])}
 <h2>Novo</h2>
 <ul>
+<li><b>Adimplência com o escritório na Carteira</b> (28/11): cada cliente mostra a marca verde “adimplente com o escritório” ou vermelha “inadimplente com o escritório”, na lista e no cabeçalho da ficha. A marca vem do Asaas (parcela atrasada) ou do que o Financeiro informar quando o cliente pagou no cartão ou à vista. Toda a equipe vê a marca; valores e cobranças continuam só no Financeiro. Quando um cliente fica inadimplente, o líder da carteira (PF ou PJ) recebe aviso no sino.</li>
+<li><b>Marcar alguém com @</b> (28/11): em qualquer comentário ou descrição, digite ${ui('@')} e escolha a pessoa. Ela recebe um aviso no sino com o link do registro. Vale para tarefas, cartões e pauta de conteúdo, dossiê do cliente, agenda e demais caixas de texto de várias linhas.</li>
+<li><b>Conteúdo para aprovação avisa as sócias</b> (28/11): quando um conteúdo entra na pauta como “aguardando aprovação”, as sócias recebem aviso no sino e uma mensagem no canal do Discord de aprovação.</li>
+<li><b>Foto do perfil</b> (28/11): quem envia a foto em ${ir('perfil','Meu perfil')} passa a aparecer com ela no rodapé do menu, na barra superior e como responsável nas listas, no lugar das iniciais.</li>
+<li><b>Financeiro › Visão geral</b> (28/11): abre sempre no mês vigente.</li>
 <li><b>Roteiro do primeiro dia</b> (27/11, à tarde): ${ir('primeiro-dia','Seu primeiro dia no sistema')}, com o passo a passo de 15 minutos para o primeiro acesso.</li>
-<li><b>Financeiro só para quem tem a área</b> (27/11, à tarde): os dados de cobrança deixaram de aparecer para quem não tem acesso ao Financeiro, inclusive a marca de adimplência no cabeçalho da ficha do cliente.</li>
+<li><b>Financeiro só para quem tem a área</b> (27/11, à tarde): os dados de cobrança deixaram de aparecer para quem não tem acesso ao Financeiro. A marca de adimplência voltou a aparecer para todos em 28/11, só com a situação.</li>
 <li><b>Grupo Marketing</b> no menu: ${ir('pauta','Pauta de conteúdo')}, ${ir('producao','Produção de conteúdo')} (quadro no estilo Trello, com envio para a pauta) e ${ir('automacoes','Automações')}.</li>
 <li><b>Hoje com widgets</b>: relógio, calendário, atalhos personalizáveis e blocos que você arrasta e organiza. ${ir('hoje','Ver Hoje')}.</li>
 <li><b>Tratar publicação em uma tela só</b>: teor à esquerda, tratamento à direita, com resumo e prazos sugeridos. ${ir('tratar','Ver Tratar publicação')}.</li>
@@ -627,7 +632,7 @@ P.push({id:'ficha',g:'Clientes',t:'Ficha do cliente — Dossiê',m:'Ficha: Dossi
 <h2>Cabeçalho e abas</h2>
 ${shot('ficha-dossie',['Voltar para Clientes.','Nome e situação do cliente.','Copiar o documento.','Saldo em contratos ativos.','Situação com os bancos.','Link do cliente (área do cliente).','Abas: Dossiê, Cadastro, Acompanhamento PJ, Passivos, Jurídico, Negocial, Tarefas, Financeiro.','Registrar reunião.','Registrar um fato na linha do tempo.','Último registro de cada frente e o responsável.','Linha do tempo e o total de registros.'],'Dossiê do cliente PJ')}
 ${nota('Clientes PF têm uma ficha mais curta: Cadastro (dados pessoais e serviço contratado), Jurídico, Tarefas e Dossiê.')}
-${nota('A marca “adimplente” ou “inadimplente com o escritório”, no cabeçalho, e a aba Financeiro aparecem só para quem tem acesso ao Financeiro.','Dados do Financeiro')}
+${nota('A marca “adimplente” ou “inadimplente com o escritório”, no cabeçalho, aparece para toda a equipe: mostra só a situação, sem valores. A aba Financeiro e os valores das cobranças aparecem só para quem tem acesso ao Financeiro, que também informa ali quando o cliente pagou no cartão ou à vista.','Dados do Financeiro')}
 <h2>As três frentes</h2>
 ${caminhos([{t:'Estratégico / Consultivo',s:'Onboarding, reuniões, direcionamento e reserva. Trabalha na aba Acompanhamento PJ.'},{t:'Jurídico / Contencioso',s:'Processos, prazos e peças. Trabalha na aba Jurídico e em Processos e pastas.'},{t:'Negocial / Acordos',s:'Negociação com os bancos e monitoramento. Trabalha na aba Negocial e em Negociações.'}])}
 <p>As três se encontram no Dossiê, que mostra o último registro de cada frente lado a lado. O responsável por frente é fixo por pessoa, com exceção por cliente quando necessário.</p>

@@ -102,10 +102,25 @@
        A adimplência lê só a contagem de cobranças em atraso do cliente (uma consulta leve, sem trazer linhas). */
     const servPF = c.tipo_pessoa === "PF" ? (c.pf?.servico || c.dados?.pf?.servico || null) : null;
     const escr = el("span", { class: "np-fc-escr" });
-    if (window.PP?.temAcesso?.("financeiro") || window.PP?.perfil?.papel === "admin") {
-      Promise.all([SB.from("cobrancas").select("id", { count: "exact", head: true }).eq("cliente_id", c.id).eq("status", "atrasada"), SB.from("cobrancas").select("id", { count: "exact", head: true }).eq("cliente_id", c.id)])
-        .then(([at, tot]) => { if (at.error || tot.error || !escr.isConnected || !tot.count) return; escr.replaceChildren(at.count ? NPUI.marca("inadimplente com o escritório", "crit") : NPUI.marca("adimplente com o escritório", "ok")); }).catch(() => {});
-    }
+    /* 28/11 (sócia): a marca aparece para toda a equipe (só o estado, sem valores — função clientes_adimplencia, 0130).
+       Quem tem a área Financeiro informa aqui quando o cliente pagou por fora do Asaas (cartão ou à vista). */
+    const podeFin = typeof PP !== "undefined" && !!(PP.perfil?.papel === "admin" || PP.temAcesso?.("financeiro")); /* PP é constante global, não window.PP: por isso a marca antiga nunca aparecia */
+    const pintarEscr = (sit) => {
+      const m = window.NP_ADIMP?.marca?.(sit) || null; const itens = [m];
+      if (window.NP_ADIMP?.ok && (podeFin && typeof readOnly === "function" ? !readOnly() : podeFin)) {
+        const informar = async (v, rotulo) => {
+          const r = await SB.rpc("cliente_adimplencia_informar", { p_cliente: c.id, p_situacao: v, p_obs: null });
+          if (r.error) { toast(r.error.code === "42501" ? "Só quem tem acesso ao Financeiro informa a adimplência." : "Não foi possível gravar agora."); return; }
+          toast(rotulo); const mp = await window.NP_ADIMP?.carregar?.(true); pintarEscr(mp?.get(c.id) || null);
+        };
+        itens.push(el("button", { type: "button", class: "np-fc-escr-b", title: "Informar a situação com o escritório", "aria-haspopup": "menu", onclick: (e) => NPUI.pop(e.currentTarget, [
+          { label: "Em dia: pagou no cartão ou à vista", onclick: () => informar("adimplente", "Cliente marcado como adimplente com o escritório") },
+          { label: "Inadimplente com o escritório", onclick: () => informar("inadimplente", "Cliente marcado como inadimplente. O líder da carteira foi avisado.") },
+          { label: "Seguir o Asaas (automático)", onclick: () => informar("automatico", "A situação voltou a seguir o Asaas") }], { role: "menu", label: "Situação com o escritório", refoco: e.currentTarget }) }, m ? "alterar" : "informar adimplência"));
+      }
+      escr.replaceChildren(...itens.filter(Boolean));
+    };
+    if (window.NP_ADIMP?.carregar) window.NP_ADIMP.carregar().then((mp) => pintarEscr(mp?.get(c.id) || null)).catch(() => {});
     const marcasSemProc = marcas.filter((m) => !/processo/.test(m.textContent));
     const nProc = reg && reg.proc != null ? reg.proc : null;
     const quadros = reg && window.NPUI?.quadros ? NPUI.quadros([

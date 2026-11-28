@@ -315,8 +315,23 @@
     const nome = nomeRealUsuario();
     const b = eu.querySelector(".np-rot b"), av = eu.querySelector(".tab > i");
     if (b && nome) b.textContent = nome;
-    if (av && nome) av.textContent = iniciaisUsuario(nome);
+    if (av && nome && !av.classList.contains("np-foto")) av.textContent = iniciaisUsuario(nome);
+    pintarFotoUsuario();
   }
+  /* 28/11 (sócia): quem tem foto no perfil aparece com ela no rodapé do menu (no lugar das iniciais) e na barra superior, ao lado do sino */
+  function pintarFotoUsuario() {
+    let url = null; try { url = window.NPUI?.fotos?.doPerfil?.(PP?.perfil?.id) || null; } catch (_) {}
+    const av = eu.querySelector(".tab > i"); if (av && url) NPUI.fotos.pintar(av, url);
+    const ub = $("#userbox"); if (!ub) return;
+    let t = $("#np-eu-topo");
+    if (!url) { if (t) t.hidden = true; return; }
+    if (!t) {
+      t = el("button", { type: "button", id: "np-eu-topo", class: "np-eu-topo", title: "Meu perfil", "aria-label": "Meu perfil", onclick: () => { if (typeof irPara === "function") irPara("perfil"); } });
+      const sino = ub.querySelector(".ntf-wrap"); if (sino) sino.after(t); else ub.insertBefore(t, ub.firstChild);
+    }
+    t.hidden = false; t.style.backgroundImage = `url("${url}")`;
+  }
+  document.addEventListener("np-fotos", () => { try { pintarFotoUsuario(); } catch (_) {} });
 
   /* ---------- render da árvore (chamado por renderNav) ---------- */
   function montar() {
@@ -348,6 +363,7 @@
         sair ? { label: "Sair", onclick: () => sair.click() } : null], { role: "menu", label: "Conta", refoco: e.currentTarget });
     } }, ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'));
     eu.replaceChildren(el("div", { style: "flex:1;min-width:0" }, m.links.length ? el("div", { class: "np-links edit-only" }, m.links.map(l => el("a", { href: l.link }, l.label))) : "", perfilBtn || ""), conta);
+    try { window.NPUI?.fotos?.carregar?.(); pintarFotoUsuario(); } catch (_) {}
     // troca de módulo: a vista sai e o slot de ação mantém altura constante com "+ Novo ▾" até o módulo acomodar CTA próprio
     const cur = tabAtual() || "";
     if ((vistaSlot.dataset.tab || "") !== cur) { vistaSlot.replaceChildren(); preencherAcaoPadrao(); vistaSlot.dataset.tab = acaoSlot.dataset.tab = cur; }

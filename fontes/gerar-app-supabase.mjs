@@ -511,7 +511,7 @@ html = html.replace('</body>', (modo==='token' ? '' : '<script>{const _r=render;
 // fechamento de docx-contrato…). Cada módulo diz a quais áreas pertence; o carregador (PP.carregarModulos) só baixa
 // os de "core" + as áreas da pessoa (admin = todas; cliente = só carteira e ficha).
 const MODULOS = [
-  ['carteira','core','cliente'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
+  ['carteira','core','cliente'],['mencoes','core'],['tarefas','core'],['prazos','core'],['feriados','core'],['agenda','core'],['notificacoes','core'],
   ['painel','core'],['equipe','equipe'],['rh','equipe'],['dnd','core'],['ficha','core','cliente'],['acompanhamento-pj','clientes'],['fluxo','juridico'],['monitoramento-sync','juridico'],
   ['publicacoes','juridico'],['processos','juridico'],['pastas','juridico','clientes'],['publicacoes-tratamento','juridico'],['processo-ficha','juridico','clientes'],['processo-sync','juridico','clientes'],['timesheet','core'],['autenticador','juridico','clientes','ferramentas'],['marketing','marketing'],['marketing-producao','marketing'],['ferramentas','core'],
   ['growth','growth'],['financeiro','financeiro'],['central-cobrancas','financeiro'],['financeiro-controle','financeiro'],['faturamento','financeiro'],['dossie','core'],

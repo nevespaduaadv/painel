@@ -23,13 +23,24 @@
   const respDe = (c) => c.responsavel || c.dados?.responsavel || nomeColab(c.resp_estrategico_id) || nomeColab(c.resp_negocial_id) || nomeColab(c.resp_juridico_id) || null;
   const resps = (c) => [c.resp_estrategico_id, c.resp_juridico_id, c.resp_negocial_id].filter(Boolean);
 
+  /* 28/11 (sócia): adimplência com o escritório — só o estado (adimplente / inadimplente), sem valores, para toda a equipe.
+     Vem do Asaas (parcela atrasada) ou do que o Financeiro informar (pagou no cartão ou à vista). Leitura única, compartilhada com a ficha. */
+  const ADIMP = { mapa: null, pedindo: null, ok: false,
+    carregar(force) {
+      if (ADIMP.mapa && !force) return Promise.resolve(ADIMP.mapa);
+      if (!ADIMP.pedindo) ADIMP.pedindo = Promise.resolve(SB.rpc("clientes_adimplencia", {}, { get: true })).then((r) => { ADIMP.ok = !r.error; ADIMP.mapa = new Map(r.error || !Array.isArray(r.data) ? [] : r.data.map((x) => [x.cliente_id, x.situacao])); return ADIMP.mapa; }, () => (ADIMP.mapa = new Map())).finally(() => { ADIMP.pedindo = null; });
+      return ADIMP.pedindo; },
+    de: (cid) => ADIMP.mapa?.get(cid) || null,
+    marca: (sit) => sit === "inadimplente" ? NPUI.marca("inadimplente com o escritório", "crit") : sit === "adimplente" ? NPUI.marca("adimplente com o escritório", "ok") : null };
+  window.NP_ADIMP = ADIMP;
+
   /* leituras de apoio (uma vez por sessão; "Atualizar" da barra recarrega a página inteira, como nos outros módulos) */
   async function carregarApoio(force) {
     if (K.carregando || (K.prazos && !force)) return; K.carregando = true; K.erro = null;
     try {
       const [t, co] = await Promise.all([
         SB.from("v_tarefas").select("id,cliente_id,titulo,prazo,prazo_fatal,status,responsavel_nome").in("status", ["aberta", "em_andamento"]).not("cliente_id", "is", null),
-        SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome")]);
+        SB.from("colaboradores").select("id,perfil_id,nome,ativo").order("nome"), ADIMP.carregar(force)]);
       K.prazos = (t.data || []).filter((x) => x.prazo); K.colab = co.data || []; if (t.error) K.erro = t.error.message || "prazos indisponíveis";
     } catch (e) { K.prazos = []; K.colab = K.colab || []; K.erro = String(e?.message || e); }
     finally { K.carregando = false; }
@@ -47,7 +58,7 @@
       const atraso = ks.filter((x) => x.dataInicioAtraso).length; const neg = ks.filter((x) => ["negociacao", "acordo"].includes(x.situacao)).length;
       const prazos = (prazPor.get(c.id) || []).slice().sort((a, b) => a.prazo.localeCompare(b.prazo) || (b.prazo_fatal ? 1 : 0) - (a.prazo_fatal ? 1 : 0));
       const v = visPor.get(c.id) || null; const pass = passPor.get(c.id) || null;
-      return { c, ks, total, atraso, neg, prazos, prox: prazos[0] || null, proc: v ? (+v.processos_ativos || 0) : null, sitB: pass?.situacao || null,
+      return { c, ks, total, atraso, neg, prazos, prox: prazos[0] || null, proc: v ? (+v.processos_ativos || 0) : null, sitB: pass?.situacao || null, escr: ADIMP.de(c.id),
         tipo: v?.tipo_pessoa || c.tipo_pessoa || null, etapa: v?.etapa_fluxo ?? c.etapa_fluxo ?? null,
         semResp: !(c.responsavel || c.dados?.responsavel || resps(c).length),
         // Figma de 18/11: quem pede ação vem primeiro — contrato em atraso ou cliente sem responsável (o motivo aparece na linha)
@@ -103,7 +114,7 @@
   }
   function linha(r) {
     return NPUI.linha({ id: r.c.id, atual: K.aberta === r.c.id, titulo: r.c.nome || "(sem nome)", contexto: contexto(r) || null, titleAbrir: "Abrir a ficha do cliente",
-      direita: [NPUI.marca(r.tipo === "PF" ? "PF" : "PJ"), r.semResp ? null : NPUI.quem(respDe(r.c))].filter(Boolean),
+      direita: [ADIMP.marca(r.escr), NPUI.marca(r.tipo === "PF" ? "PF" : "PJ"), r.semResp ? null : NPUI.quem(respDe(r.c))].filter(Boolean),
       onOpen: () => { K.aberta = null; S.sel = r.c.id; S.sub = null; render(); } });
   }
   function lista(regs) {
@@ -169,6 +180,7 @@
       r.etapa != null && ETAPAS[r.etapa] ? ["Etapa do fluxo", `${r.etapa} · ${ETAPAS[r.etapa]}`] : null,
       pass ? ["Com os bancos", SIT_B[pass] || pass, pass === "inadimplente" ? "crit" : pass === "vai_ficar_inadimplente" ? "att" : ""] : null,
       r.proc != null ? ["Processos ativos", String(r.proc)] : null,
+      r.escr ? ["Com o escritório", r.escr === "inadimplente" ? "Inadimplente" : "Adimplente", r.escr === "inadimplente" ? "crit" : "ok"] : null,
     ]);
     const secK = NPUI.secao(`Contratos ativos${r.ks.length ? " · " + r.ks.length : ""}`,
       r.ks.length ? NPUI.tabela([{ k: "banco", label: "Banco" }, { label: "Produto", render: (x) => (typeof PRODUTOS !== "undefined" && PRODUTOS[x.produto]) || x.produto || null },

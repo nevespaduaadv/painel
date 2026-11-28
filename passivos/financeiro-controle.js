@@ -38,7 +38,9 @@ const regua=()=>K.regua.filter(r=>!r.excluida);
 
 /* ---------- cabeçalho comum ---------- */
 function head(titulo,sub){
+  K.mes=K.mes||hojeISO().slice(0,7); /* 28/11: o seletor nasce no mês vigente (antes mostrava o primeiro da lista até a carga terminar) */
   const mesSel=el("select",{class:"btn sm",onchange:e=>{K.mes=e.target.value;invalidar()}},...[-2,-1,0,1].map(n=>{const m=mesAdd(hojeISO().slice(0,7),n);return el("option",{value:m,selected:m===K.mes?"":null},mesLabel(m))}));
+  mesSel.value=K.mes;
   const sinc=K.sinc?(K.sinc.ok?"Asaas · "+fmtDT(K.sinc.inicio):"Não foi possível atualizar com o Asaas. Dados de "+fmtDT(K.sinc.inicio)):"Asaas · sem sincronização";
   return el("div",{class:"head"},el("div",{},el("div",{class:"eyebrow"},"Financeiro"),el("h1",{},titulo),el("div",{class:"sub"},sub)),
     el("div",{class:"actions",style:"align-items:center"},mesSel,el("span",{class:"note",style:K.sinc&&!K.sinc.ok?"color:var(--crit)":""},sinc),el("button",{class:"btn sm",onclick:async()=>{try{toast("Atualizando com o Asaas…");await window.PP_FIN.edge({acao:"asaas_sincronizar"});window.PP_FIN.invalidar?.();invalidar()}catch(e){toast(e.message)}}},"Atualizar agora")));
@@ -116,7 +118,9 @@ const tagTarefa=r=>{const ts=r.tarefas||[];if(!ts.length)return null;const ab=ts
 
 /* ---------- cabeçalho comum: título, mês de referência e última atualização do Asaas ---------- */
 function cab3(titulo){
+  K.mes=K.mes||hojeISO().slice(0,7); /* 28/11: o seletor nasce no mês vigente */
   const mes=el("select",{class:"fc3-mes","aria-label":"Mês de referência",onchange:e=>{K.mes=e.target.value;K.sel=null;invalidar()}},...[-2,-1,0,1].map(n=>{const m=mesAdd(hojeISO().slice(0,7),n);return el("option",{value:m,selected:m===K.mes?"":null},mesTit(m))}));
+  mes.value=K.mes; /* o atributo selected vazio não marcava a opção: o seletor ficava no primeiro mês da lista */
   const atualizar=async()=>{try{toast("Atualizando com o Asaas…");await window.PP_FIN.edge({acao:"asaas_sincronizar"});window.PP_FIN.invalidar?.();invalidar()}catch(e){toast(e.message)}};
   const falhou=!!(K.sinc&&!K.sinc.ok),q=K.sinc?dh(K.sinc.inicio):null;
   const sinc=el("span",{class:"fc3-sinc"+(falhou?" erro":"")},!K.ok?"Asaas · carregando":q?`Asaas · ${q.d}, ${q.h}`:"Asaas · sem sincronização");
