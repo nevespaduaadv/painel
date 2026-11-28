@@ -79,6 +79,8 @@ html.np-casca-v3 .np-it-dir{display:flex;gap:10px;align-items:center;justify-con
 html.np-casca-v3 .np-quem{display:inline-flex;align-items:center;gap:6px;font-size:var(--np-fs-2);color:var(--np-text-2)}
 html.np-casca-v3 .np-quem b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--np-surface-2);border:1px solid var(--np-line);font:600 var(--np-fs-1)/1 var(--np-ui);color:var(--np-text-2);letter-spacing:.02em}
 html.np-casca-v3 .np-quem-vazio{color:var(--np-text-3)}
+/* 28/11: foto do perfil no lugar das iniciais */
+.np-foto{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;color:transparent!important;font-size:0!important}
 html.np-casca-v3 .np-marca{font:500 var(--np-fs-2)/1 var(--np-display);color:var(--np-text-2)}
 html.np-casca-v3 .np-marca.crit{color:var(--np-crit)}html.np-casca-v3 .np-marca.att{color:var(--np-att)}html.np-casca-v3 .np-marca.info{color:var(--np-info)}html.np-casca-v3 .np-marca.ok{color:var(--np-ok)}
 /* feito · reabrir */
@@ -1715,6 +1717,10 @@ html.np-casca-v3 .np-painel[data-modo="centro"] h2{view-transition-name:none}
 html.np-casca-v3 .np-ficha-quadros{margin:12px 0 4px;grid-template-columns:repeat(auto-fit,minmax(170px,240px))}
 html.np-casca-v3 .np-ficha-quadros .np-qd b{font-size:22px}
 html.np-casca-v3 .np-fc-escr:empty{display:none}
+html.np-casca-v3 .np-fc-escr{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+html.np-casca-v3 .np-fc-escr-b{border:0;background:transparent;padding:4px 2px;font:inherit;font-size:var(--np-fs-1);color:var(--np-text-3);text-decoration:underline;text-underline-offset:2px;cursor:pointer;border-radius:4px}
+html.np-casca-v3 .np-fc-escr-b:hover{color:var(--np-text)}
+html.np-casca-v3 .np-fc-escr-b:focus-visible{outline:none;box-shadow:var(--np-focus)}
 html.np-casca-v3 .np-fc-resp{display:inline-flex;align-items:center}
 .np-fin-situ{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
 .np-fin-prog{display:flex;gap:10px;align-items:center}

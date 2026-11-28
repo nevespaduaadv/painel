@@ -18,7 +18,7 @@ async function enviarFoto(file){
   const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.86));const path=`colaboradores/${c.id}.jpg`;
   const {error}=await SB.storage.from("fotos").upload(path,blob,{upsert:true,contentType:"image/jpeg"});if(error){toast("Não foi possível enviar a foto");return}
   const r=await SB.from("colaboradores").update({foto_path:path}).eq("id",c.id);if(r.error){toast("Foto enviada, mas não gravada");return}
-  toast("Foto atualizada");M.dados=null;M.carregado=false;window.PP_EQUIPE?.recarregar();window.PP_RH?.invalidar();carregar();
+  toast("Foto atualizada");window.NPUI?.fotos?.carregar?.(true);M.dados=null;M.carregado=false;window.PP_EQUIPE?.recarregar();window.PP_RH?.invalidar();carregar();
 }
 const pfV3=()=>document.documentElement.classList.contains("np-casca-v3")&&!!window.NPUI;
 function nomeRealPerfil(c,p){

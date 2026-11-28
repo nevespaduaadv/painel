@@ -58,15 +58,15 @@ function cardDiscord(){
   const card=el("section",{class:"card section"},el("div",{class:"section-h"},el("div",{},el("h2",{},"Discord"),el("div",{class:"note"},"Avisos publicados aqui também vão para o canal do Discord; o canal Geral do chat pode ser espelhado nos dois sentidos."))),el("div",{class:"note"},"Carregando…"));
   (async()=>{
     const [{data:e},{data:g}]=await Promise.all([SB.from("escritorio").select("dados").eq("id","discord").maybeSingle(),SB.from("chat_canais").select("id,discord_canal").eq("chave","geral").maybeSingle()]);
-    const cfg=e?.dados||{};const avisos=inp("text",cfg.canal_avisos||"",{placeholder:"ID do canal #avisos (número)"}),geral=inp("text",g?.discord_canal||"",{placeholder:"ID do canal #geral (número)"});
+    const cfg=e?.dados||{};const avisos=inp("text",cfg.canal_avisos||"",{placeholder:"ID do canal #avisos (número)"}),geral=inp("text",g?.discord_canal||"",{placeholder:"ID do canal #geral (número)"}),aprov=inp("text",cfg.canal_aprovacao||"",{placeholder:"ID do canal de aprovação de conteúdo (número)"});
     const ponte=el("input",{type:"checkbox"});ponte.checked=cfg.ponte_ativa!==false;
     const salvar=el("button",{class:"btn sm primary",onclick:async()=>{
-      const a=avisos.value.replace(/\D/g,"")||null,gg=geral.value.replace(/\D/g,"")||null;
-      const r1=await SB.from("escritorio").update({dados:{...cfg,canal_avisos:a,ponte_ativa:ponte.checked}}).eq("id","discord");
+      const a=avisos.value.replace(/\D/g,"")||null,gg=geral.value.replace(/\D/g,"")||null,ap=aprov.value.replace(/\D/g,"")||null;
+      const r1=await SB.from("escritorio").update({dados:{...cfg,canal_avisos:a,canal_aprovacao:ap,ponte_ativa:ponte.checked}}).eq("id","discord");
       const r2=g?await SB.from("chat_canais").update({discord_canal:gg}).eq("id",g.id):{error:null};
       if(r1.error||r2.error){toast("Não foi possível salvar");return}toast("Discord configurado");invalidar();
     }},"Salvar");
-    card.replaceChildren(card.firstChild,el("div",{class:"form",style:"margin-top:8px"},field("dc-av","Canal dos avisos",avisos,"Discord → Modo desenvolvedor → botão direito no canal → Copiar ID."),field("dc-ge","Canal espelhado do chat Geral",geral,"Deixe vazio para não espelhar."),el("div",{class:"f"},el("label",{},"Ponte ativa"),el("label",{class:"switch"},ponte," importar mensagens do Discord para o chat (a cada minuto)"))),el("div",{style:"margin-top:8px"},salvar));
+    card.replaceChildren(card.firstChild,el("div",{class:"form",style:"margin-top:8px"},field("dc-av","Canal dos avisos",avisos,"Discord → Modo desenvolvedor → botão direito no canal → Copiar ID."),field("dc-ge","Canal espelhado do chat Geral",geral,"Deixe vazio para não espelhar."),field("dc-ap","Canal de aprovação de conteúdo",aprov,"Recebe uma mensagem sempre que um conteúdo entra na pauta para aprovação. Use um canal privado com as sócias e o robô. Vazio: só o sino."),el("div",{class:"f"},el("label",{},"Ponte ativa"),el("label",{class:"switch"},ponte," importar mensagens do Discord para o chat (a cada minuto)"))),el("div",{style:"margin-top:8px"},salvar));
   })();
   return card;
 }

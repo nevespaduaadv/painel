@@ -19,7 +19,46 @@ const campoAtivo = () => { const a = doc.activeElement; return !!(a && (a.closes
 /* ---------- texto: pessoas, prazos, marcas ---------- */
 const curto = (nome) => { const p = String(nome || "").trim().split(/\s+/).filter(Boolean); if (!p.length) return "—"; if (/^(maria|ana|jo[aã]o)$/i.test(p[0]) && p[1]) return p[0] + " " + p[1]; return p[0]; };
 const iniciais = (nome) => { const p = String(nome || "").trim().split(/\s+/).filter(Boolean); return ((p[0] || "")[0] || "") + ((p[p.length - 1] || "")[0] || ""); };
-const quem = (nome, { title } = {}) => nome ? el("span", { class: "np-quem", title: title || nome }, el("b", { "aria-hidden": "true" }, iniciais(nome).toUpperCase()), el("span", {}, curto(nome))) : el("span", { class: "np-quem np-quem-vazio" }, "— ninguém —");
+/* ---------- fotos de perfil (28/11, sócia): quem tem foto no cadastro aparece com ela no lugar das iniciais — na indicação de responsável,
+   no rodapé do menu e na barra superior. Uma leitura por sessão (nomes + caminho da foto) e links assinados de 24 h do bucket privado "fotos".
+   Sem foto, sem rede ou sem permissão: tudo continua com as iniciais. ---------- */
+const FOTOS = { nome: new Map(), perfil: new Map(), em: 0, pedindo: false };
+const chaveFoto = (n) => String(n || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+const fotoDe = (nome) => (nome && FOTOS.nome.get(chaveFoto(nome))) || null;
+const fotoDoPerfil = (id) => (id && FOTOS.perfil.get(id)) || null;
+const pintarFoto = (b, url) => { if (!b || !url) return; b.classList.add("np-foto"); b.style.backgroundImage = `url("${url}")`; b.textContent = ""; };
+function aplicarFotos(raiz) { if (!FOTOS.nome.size) return; (raiz || doc).querySelectorAll(".np-quem[data-quem] > b:not(.np-foto)").forEach((b) => pintarFoto(b, fotoDe(b.parentElement.getAttribute("data-quem")))); }
+async function carregarFotos(force) {
+  if (FOTOS.pedindo || (!force && FOTOS.em && Date.now() - FOTOS.em < 20 * 3600e3)) return;
+  if (typeof SB === "undefined" || typeof PP === "undefined" || !PP.perfil || PP.perfil.papel === "cliente") return;
+  FOTOS.pedindo = true;
+  try {
+    const { data, error } = await SB.from("v_colaboradores").select("nome,apelido,perfil_id,foto_path"); if (error) return;
+    const todos = data || [], com = todos.filter((c) => c.foto_path); const nome = new Map(), perfil = new Map();
+    if (com.length) {
+      const { data: urls } = await SB.storage.from("fotos").createSignedUrls(com.map((c) => c.foto_path), 86400);
+      const conta = (f) => { const m = new Map(); for (const c of todos) { const k = chaveFoto(f(c)); if (k) m.set(k, (m.get(k) || 0) + 1); } return m; };
+      const nCurto = conta((c) => curto(c.nome)), nPrim = conta((c) => String(c.nome || "").trim().split(/\s+/)[0]), nApel = conta((c) => c.apelido);
+      com.forEach((c, i) => {
+        const u = urls?.[i]?.signedUrl; if (!u) return;
+        nome.set(chaveFoto(c.nome), u); if (c.perfil_id) perfil.set(c.perfil_id, u);
+        /* nomes abreviados só valem quando apontam para uma única pessoa */
+        const kc = chaveFoto(curto(c.nome)), kp = chaveFoto(String(c.nome || "").trim().split(/\s+/)[0]), ka = chaveFoto(c.apelido);
+        if (kc && nCurto.get(kc) === 1 && !nome.has(kc)) nome.set(kc, u);
+        if (kp && nPrim.get(kp) === 1 && !nome.has(kp)) nome.set(kp, u);
+        if (ka && nApel.get(ka) === 1 && !nome.has(ka)) nome.set(ka, u);
+      });
+    }
+    FOTOS.nome = nome; FOTOS.perfil = perfil; FOTOS.em = Date.now();
+    aplicarFotos(); doc.dispatchEvent(new CustomEvent("np-fotos"));
+  } catch (_) { /* segue com as iniciais */ } finally { FOTOS.pedindo = false; }
+}
+const quem = (nome, { title } = {}) => {
+  if (!nome) return el("span", { class: "np-quem np-quem-vazio" }, "— ninguém —");
+  if (!FOTOS.em && !FOTOS.pedindo) carregarFotos();
+  const b = el("b", { "aria-hidden": "true" }, iniciais(nome).toUpperCase()); pintarFoto(b, fotoDe(nome));
+  return el("span", { class: "np-quem", title: title || nome, "data-quem": nome }, b, el("span", {}, curto(nome)));
+};
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const hojeLocal = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
 /* prazo: a data exata sempre aparece; a relativa complementa e nunca substitui */
@@ -712,5 +751,5 @@ const pedirTexto = ({ titulo = "Informar texto", mensagem = "", texto = "", rotu
 };
 
 const ativo = () => doc.documentElement.classList.contains("np-casca-v3");
-window.NPUI = { quadros, barras, fatia, paginas, ativo, form, modalV3, confirmar, pedirTexto, secaoForm, maisCampos, revelarCampo, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
+window.NPUI = { fotos: { carregar: carregarFotos, de: fotoDe, doPerfil: fotoDoPerfil, pintar: pintarFoto, aplicar: aplicarFotos }, quadros, barras, fatia, paginas, ativo, form, modalV3, confirmar, pedirTexto, secaoForm, maisCampos, revelarCampo, traduzErroBD, permite, pref, chave, reduz, ms, vt, flip, svgIco, I, quem, curto, iniciais, prazoTxt, marca, chip, seg, resumo, toolbar, sepv, grupo, linha, feito, faixaErro, vazio, carregando, rodape, painel, props, passos, secao, etapa, val, ciclo, tabela, brl, pop, fecharPop, reancorarPop, popAberto: () => !!popAtual, btn, ib, campoAtivo };
 })();

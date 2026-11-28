@@ -247,7 +247,7 @@ function mencoes(ta){
   const fechar=()=>{pop.hidden=true};
   const atual=()=>{const v=ta.value.slice(0,ta.selectionStart);const m=/@([^\s@]*)$/.exec(v);return m?{ini:v.length-m[0].length,q:m[1]}:null};
   const norm=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-  const render=()=>{const a=atual();if(!a){fechar();return}const q=norm(a.q);const lista=T.colab.filter(c=>c.ativo!==false&&c.perfil_id&&(!q||norm(c.nome).includes(q)||norm(c.apelido).includes(q))).slice(0,6);
+  const render=()=>{if(window.NP_MENCOES?.ativo){fechar();return} /* 28/11: a lista de menções agora é a geral (mencoes.js); esta fica só de reserva */const a=atual();if(!a){fechar();return}const q=norm(a.q);const lista=T.colab.filter(c=>c.ativo!==false&&c.perfil_id&&(!q||norm(c.nome).includes(q)||norm(c.apelido).includes(q))).slice(0,6);
     if(!lista.length){fechar();return}if(!pop.parentNode)ta.insertAdjacentElement("afterend",pop);pop.replaceChildren(...lista.map(c=>el("button",{type:"button",class:"item",onclick:()=>{const nome=c.apelido||c.nome.split(" ")[0];ta.value=ta.value.slice(0,a.ini)+"@"+nome+" "+ta.value.slice(ta.selectionStart);fechar();ta.focus()}},c.nome)));pop.hidden=false};
   ta.addEventListener("input",render);ta.addEventListener("keyup",e=>{if(e.key==="Escape")fechar()});ta.addEventListener("blur",()=>setTimeout(fechar,150));
 }
